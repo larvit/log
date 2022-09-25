@@ -1,6 +1,6 @@
 {
   "name": "@larvit/log",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "type": "module",
   "packageManager": "yarn@3.2.3",
   "scripts": {
