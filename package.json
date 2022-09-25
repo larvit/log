@@ -4,7 +4,7 @@
   "type": "module",
   "packageManager": "yarn@3.2.3",
   "scripts": {
-    "build": "rm -rf dist && tsc && uglifyjs dist/index.js -o dist/index.js",
+    "build": "rm -f index.js index.d.ts index.js.map && tsc && uglifyjs index.js -o index.js",
     "test": "node --loader ts-node/esm test.ts | tap-spec"
   },
   "devDependencies": {
