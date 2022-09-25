@@ -1,0 +1,10 @@
+{
+	"compilerOptions": {
+		"declaration": true,
+		"module": "NodeNext",
+		"outDir": "dist",
+		"sourceMap": true,
+		"target": "ES2022"
+	},
+	"files": ["index.ts"]
+}
