@@ -48,7 +48,7 @@ __metadata:
     tape: 5.6.1
     ts-node: 10.9.1
     typescript: 4.8.3
-    uglify-js: 3.17.1
+    uglify-js: 3.17.2
   languageName: unknown
   linkType: soft
 
@@ -1122,12 +1122,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"uglify-js@npm:3.17.1":
-  version: 3.17.1
-  resolution: "uglify-js@npm:3.17.1"
+"uglify-js@npm:3.17.2":
+  version: 3.17.2
+  resolution: "uglify-js@npm:3.17.2"
   bin:
     uglifyjs: bin/uglifyjs
-  checksum: 5e24ad48e096d309e77a462fa0508a9bfe33e2ab00e1bd21dc8bd5d035cf0b58063914bef1c6d6aca78e9e5bbe619714b142ffc646165702e3714f4cfbc7151c
+  checksum: 128233638176abe6cc0ec0f1dbae7bcb3f02edd78eb5c7752b4f379ec9d29032cd2edf06b2522dbeba0a1f05afb25f6eaffe638581da6d8554bd4c060d6622b1
   languageName: node
   linkType: hard
 
