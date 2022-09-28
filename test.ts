@@ -1,4 +1,5 @@
 import test from "tape";
+
 import { Log } from "./index.js";
 
 test("Should log to info.", t => {
@@ -81,6 +82,7 @@ test("Print nothing, even on error, when no valid level is set.", t => {
 	const oldStderr = process.stderr.write;
 	let outputMsg = "SOMETHING";
 	const log = new Log("none");
+
 	process.stderr.write = msg => outputMsg = msg;
 	log.error("kattbajs");
 	process.stderr.write = oldStderr;
@@ -92,6 +94,7 @@ test("Test silly.", t => {
 	const oldStdout = process.stdout.write;
 	let outputMsg = "";
 	const log = new Log("silly");
+
 	process.stdout.write = msg => outputMsg = msg;
 	log.silly("kattbajs");
 	process.stdout.write = oldStdout;
@@ -103,6 +106,7 @@ test("Test debug", t => {
 	const oldStdout = process.stdout.write;
 	let outputMsg = "";
 	const log = new Log("debug");
+
 	process.stdout.write = msg => outputMsg = msg;
 	log.debug("kattbajs");
 	process.stdout.write = oldStdout;
@@ -114,6 +118,7 @@ test("Test verbose", t => {
 	const oldStdout = process.stdout.write;
 	let outputMsg = "";
 	const log = new Log("verbose");
+
 	process.stdout.write = msg => outputMsg = msg;
 	log.verbose("kattbajs");
 	process.stdout.write = oldStdout;
@@ -125,6 +130,7 @@ test("Test info", t => {
 	const oldStdout = process.stdout.write;
 	let outputMsg = "";
 	const log = new Log("info");
+
 	process.stdout.write = msg => outputMsg = msg;
 	log.info("kattbajs");
 	process.stdout.write = oldStdout;
@@ -136,6 +142,7 @@ test("Test warn", t => {
 	const oldStderr = process.stderr.write;
 	let outputMsg = "";
 	const log = new Log("warn");
+
 	process.stderr.write = msg => outputMsg = msg;
 	log.warn("kattbajs");
 	process.stderr.write = oldStderr;
@@ -147,6 +154,7 @@ test("Test error", t => {
 	const oldStderr = process.stderr.write;
 	let outputMsg = "";
 	const log = new Log("silly");
+
 	process.stderr.write = msg => outputMsg = msg;
 	log.error("kattbajs");
 	process.stderr.write = oldStderr;
@@ -158,6 +166,7 @@ test("Test initializing with options object", t => {
 	const oldStderr = process.stderr.write;
 	let outputMsg = "";
 	const log = new Log({ logLevel: "error" });
+
 	process.stderr.write = msg => outputMsg = msg;
 	log.error("an error");
 	process.stderr.write = oldStderr;
@@ -169,6 +178,7 @@ test("Default level is info if nothing else is specified", t => {
 	const oldStdout = process.stdout.write;
 	let outputMsg = "";
 	const log = new Log({ logLevel: undefined });
+
 	process.stdout.write = msg => outputMsg = msg;
 	log.info("information");
 	process.stdout.write = oldStdout;
@@ -185,6 +195,7 @@ test("Test only errors are logged if log level is error", t => {
 	const oldStderr = process.stderr.write;
 	let outputMsg = "";
 	const log = new Log("error");
+
 	process.stdout.write = msg => outputMsg = msg;
 	log.silly("kattbajs");
 	process.stdout.write = oldStdout;
@@ -216,23 +227,25 @@ test("Test with metadata", t => {
 	const oldStdout = process.stdout.write;
 	let outputMsg = "";
 	const log = new Log("info");
+
 	process.stdout.write = msg => outputMsg = msg;
 	log.info("kattbajs", { foo: "bar" });
 	process.stdout.write = oldStdout;
-	t.strictEqual(outputMsg.split(" kattbajs ")[1].trim(), '{"foo":"bar"}', "Metadata should be included in output");
+	t.strictEqual(outputMsg.split(" kattbajs ")[1].trim(), "{\"foo\":\"bar\"}", "Metadata should be included in output");
 	t.end();
 });
 
 test("Test with context", t => {
 	const oldStdout = process.stdout.write;
 	let outputMsg = "";
-	const log = new Log({ context: { bosse: "bäng", hasse: "luring" }});
+	const log = new Log({ context: { bosse: "bäng", hasse: "luring" } });
+
 	process.stdout.write = msg => outputMsg = msg;
 	log.info("kattbajs", { foo: "bar" });
 	process.stdout.write = oldStdout;
 	t.strictEqual(
 		outputMsg.split(" kattbajs ")[1].trim(),
-		'{"foo":"bar","bosse":"bäng","hasse":"luring"}',
+		"{\"foo\":\"bar\",\"bosse\":\"bäng\",\"hasse\":\"luring\"}",
 		"Metadata and context should be included in output",
 	);
 	t.end();
@@ -241,13 +254,15 @@ test("Test with context", t => {
 test("Json stringifyer", t => {
 	const oldStdout = process.stdout.write;
 	let outputMsg = "";
-	const log = new Log({ format: "json", context: { hi: "ho" } });
+	const log = new Log({ context: { hello: "yo" }, format: "json" });
+
 	process.stdout.write = msg => outputMsg = msg;
 	log.info("bosse", { foo: "frasse" });
 	const parsed = JSON.parse(outputMsg);
+
 	process.stdout.write = oldStdout;
 	t.strictEqual(parsed.foo, "frasse", "Metadata foo should be \"frasse\"");
-	t.strictEqual(parsed.hi, "ho", "Context should be in the json");
+	t.strictEqual(parsed.hello, "yo", "Context should be in the json");
 	t.strictEqual(parsed.logLevel, "info", "logLevel should be set");
 	t.strictEqual(parsed.msg, "bosse", "msg should be set to \"bosse\"");
 
