@@ -1,5 +1,3 @@
-![Build and test](https://github.com/larvit/log/actions/workflows/master.yml/badge.svg)
-
 # @larvit/log
 
 Zero dependency, structured logging with a simple interface.
