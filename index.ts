@@ -1,10 +1,10 @@
-type Metadata = {
+export type Metadata = {
 	[key: string]: string;
 }
 
-type LogShorthand = (msg: string, metadata?: Metadata) => void;
+export type LogShorthand = (msg: string, metadata?: Metadata) => void;
 
-interface LogInt {
+export interface LogInt {
 	/* eslint-disable typescript-sort-keys/interface */
 	error: LogShorthand;
 	warn: LogShorthand;
@@ -15,15 +15,15 @@ interface LogInt {
 	/* eslint-enable typescript-sort-keys/interface */
 }
 
-type LogLevel = keyof LogInt;
+export type LogLevel = keyof LogInt;
 
-type EntryFormatterConf = {
+export type EntryFormatterConf = {
 	logLevel: LogLevel;
 	metadata?: Metadata;
 	msg: string;
 }
 
-type LogConf = {
+export type LogConf = {
 	context?: Metadata;
 	entryFormatter?: (conf: EntryFormatterConf) => string;
 	format?: "text" | "json";
