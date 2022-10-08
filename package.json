@@ -1,6 +1,6 @@
 {
   "name": "@larvit/log",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "type": "module",
   "license": "MIT",
   "packageManager": "yarn@3.2.3",
@@ -29,5 +29,15 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/larvit/log.git"
-  }
+  },
+  "main": "index.js",
+  "files": [
+    "index.d.ts",
+    "index.js.map",
+    "index.js",
+    "index.ts",
+    "LICENSE",
+    "package.json",
+    "README.md"
+  ]
 }
