@@ -111,7 +111,7 @@ __metadata:
   resolution: "@larvit/log@workspace:."
   dependencies:
     "@larvit/eslint-config-typescript-esm": 1.1.0
-    "@randomgoods/tap-spec": 5.0.2
+    "@randomgoods/tap-spec": 5.0.3
     "@types/node": 18.11.9
     "@types/tape": 4.13.2
     eslint: 8.28.0
@@ -149,37 +149,37 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@randomgoods/tap-out@npm:^3.0.3":
-  version: 3.0.3
-  resolution: "@randomgoods/tap-out@npm:3.0.3"
+"@randomgoods/tap-out@npm:^3.0.4":
+  version: 3.0.4
+  resolution: "@randomgoods/tap-out@npm:3.0.4"
   dependencies:
     re-emitter: 1.1.4
-    readable-stream: 4.1.0
+    readable-stream: 4.2.0
     split: 1.0.1
     trim: 1.0.1
   bin:
     tap-out: bin/cmd.js
-  checksum: f580c0128fac1ba8b939c72c54d5d650b8f1517e197ed3191495747ca793a947eba2923fb75974e8e1e6512bb3655258cd9382d041eb5a24ec766092710e20ba
+  checksum: 1b16dcd2f7e530e688bc682a3e8ca86708332325018ab0808ba8403c942f3707317d4b9bf06eaa2c3d8dc714ef07246a2f926caa835a856aa62087202cf6db2e
   languageName: node
   linkType: hard
 
-"@randomgoods/tap-spec@npm:5.0.2":
-  version: 5.0.2
-  resolution: "@randomgoods/tap-spec@npm:5.0.2"
+"@randomgoods/tap-spec@npm:5.0.3":
+  version: 5.0.3
+  resolution: "@randomgoods/tap-spec@npm:5.0.3"
   dependencies:
-    "@randomgoods/tap-out": ^3.0.3
-    chalk: ^4.1.1
+    "@randomgoods/tap-out": ^3.0.4
+    chalk: ~4.1.2
     duplexer: ^0.1.2
-    figures: ^3.2.0
+    figures: ~3.2.0
     lodash: ^4.17.21
-    pretty-ms: ^7.0.1
+    pretty-ms: ~7.0.1
     repeat-string: ^1.6.1
-    tape: ^5.6.0
+    tape: ^5.6.1
     through2: ^4.0.2
   bin:
     tap-spec: bin/cmd.js
     tspec: bin/cmd.js
-  checksum: 7c574647e3c30a58b27d22090129653e61694734a8e562eadff187836c9052e4c8ac0a3a9531f7ce8297b0862622abd0b13206fbb69c5de2d0c7dadfd595bd76
+  checksum: b7294ad2b7664757c5af682a82b92ff04ef0893cd066602720fad3ed8705beda37030986672347013bc96d1d72856191211d6f54f519adb4061308fcb6340137
   languageName: node
   linkType: hard
 
@@ -549,6 +549,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"base64-js@npm:^1.3.1":
+  version: 1.5.1
+  resolution: "base64-js@npm:1.5.1"
+  checksum: 669632eb3745404c2f822a18fc3a0122d2f9a7a13f7fb8b5823ee19d1d2ff9ee5b52c53367176ea4ad093c332fd5ab4bd0ebae5a8e27917a4105a4cfc86b1005
+  languageName: node
+  linkType: hard
+
 "brace-expansion@npm:^1.1.7":
   version: 1.1.11
   resolution: "brace-expansion@npm:1.1.11"
@@ -565,6 +572,16 @@ __metadata:
   dependencies:
     fill-range: ^7.0.1
   checksum: e2a8e769a863f3d4ee887b5fe21f63193a891c68b612ddb4b68d82d1b5f3ff9073af066c343e9867a393fe4c2555dcb33e89b937195feb9c1613d259edfcd459
+  languageName: node
+  linkType: hard
+
+"buffer@npm:^6.0.3":
+  version: 6.0.3
+  resolution: "buffer@npm:6.0.3"
+  dependencies:
+    base64-js: ^1.3.1
+    ieee754: ^1.2.1
+  checksum: 5ad23293d9a731e4318e420025800b42bf0d264004c0286c8cc010af7a270c7a0f6522e84f54b9ad65cbd6db20b8badbfd8d2ebf4f80fa03dab093b89e68c3f9
   languageName: node
   linkType: hard
 
@@ -585,7 +602,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"chalk@npm:^4.0.0, chalk@npm:^4.1.1":
+"chalk@npm:^4.0.0, chalk@npm:~4.1.2":
   version: 4.1.2
   resolution: "chalk@npm:4.1.2"
   dependencies:
@@ -985,6 +1002,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"events@npm:^3.3.0":
+  version: 3.3.0
+  resolution: "events@npm:3.3.0"
+  checksum: f6f487ad2198aa41d878fa31452f1a3c00958f46e9019286ff4787c84aac329332ab45c9cdc8c445928fc6d7ded294b9e005a7fce9426488518017831b272780
+  languageName: node
+  linkType: hard
+
 "fast-deep-equal@npm:^3.1.1, fast-deep-equal@npm:^3.1.3":
   version: 3.1.3
   resolution: "fast-deep-equal@npm:3.1.3"
@@ -1028,7 +1052,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"figures@npm:^3.2.0":
+"figures@npm:~3.2.0":
   version: 3.2.0
   resolution: "figures@npm:3.2.0"
   dependencies:
@@ -1269,6 +1293,13 @@ __metadata:
   dependencies:
     function-bind: ^1.1.1
   checksum: b9ad53d53be4af90ce5d1c38331e712522417d017d5ef1ebd0507e07c2fbad8686fffb8e12ddecd4c39ca9b9b47431afbb975b8abf7f3c3b82c98e9aad052792
+  languageName: node
+  linkType: hard
+
+"ieee754@npm:^1.2.1":
+  version: 1.2.1
+  resolution: "ieee754@npm:1.2.1"
+  checksum: 5144c0c9815e54ada181d80a0b810221a253562422e7c6c3a60b1901154184f49326ec239d618c416c1c5945a2e197107aee8d986a3dd836b53dffefd99b5e7e
   languageName: node
   linkType: hard
 
@@ -1812,12 +1843,19 @@ __metadata:
   languageName: node
   linkType: hard
 
-"pretty-ms@npm:^7.0.1":
+"pretty-ms@npm:~7.0.1":
   version: 7.0.1
   resolution: "pretty-ms@npm:7.0.1"
   dependencies:
     parse-ms: ^2.1.0
   checksum: d76c4920283b48be91f1d3797a2ce4bd51187d58d2a609ae993c028f73c92d16439449d857af57ccad91ae3a38b30c87307f5589749a056102ebb494c686957e
+  languageName: node
+  linkType: hard
+
+"process@npm:^0.11.10":
+  version: 0.11.10
+  resolution: "process@npm:0.11.10"
+  checksum: bfcce49814f7d172a6e6a14d5fa3ac92cc3d0c3b9feb1279774708a719e19acd673995226351a082a9ae99978254e320ccda4240ddc474ba31a76c79491ca7c3
   languageName: node
   linkType: hard
 
@@ -1853,12 +1891,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"readable-stream@npm:4.1.0":
-  version: 4.1.0
-  resolution: "readable-stream@npm:4.1.0"
+"readable-stream@npm:4.2.0":
+  version: 4.2.0
+  resolution: "readable-stream@npm:4.2.0"
   dependencies:
     abort-controller: ^3.0.0
-  checksum: ff2bb513af6fb43618c8360211b5b9052e25a59e6626d3669c7ba060d021dfffa43c43832e11b18acd6aac15b057c6deae1c41004c1731688c95c455ad02f982
+    buffer: ^6.0.3
+    events: ^3.3.0
+    process: ^0.11.10
+  checksum: aa8447f781e6df90af78f6b0b9b9a77da2816dcf6c8220e7021c4de36e04f8129fed7ead81eac0baad2f42098209f9e7d7cd43169e1c156efcd2613828a37439
   languageName: node
   linkType: hard
 
@@ -2091,7 +2132,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"tape@npm:5.6.1, tape@npm:^5.6.0":
+"tape@npm:5.6.1, tape@npm:^5.6.1":
   version: 5.6.1
   resolution: "tape@npm:5.6.1"
   dependencies:
