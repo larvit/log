@@ -12,7 +12,7 @@
     "test": "yarn test-unit && yarn lint"
   },
   "devDependencies": {
-    "@larvit/eslint-config-typescript-esm": "1.1.0",
+    "@larvit/eslint-config-typescript-esm": "1.2.0",
     "@randomgoods/tap-spec": "5.0.3",
     "@types/node": "18.11.18",
     "@types/tape": "4.13.2",
