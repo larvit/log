@@ -268,3 +268,14 @@ test("Json stringifyer", t => {
 
 	t.end();
 });
+
+test("Copy instance", t => {
+	const log = new Log({ context: { foo: "bar" } });
+	const newLog = log.clone({ context: { baz: "fu" }, logLevel: "error" });
+	const newLog2 = log.clone({ context: { foo: "burp" } });
+
+	t.strictEqual(JSON.stringify(newLog.context), "{\"foo\":\"bar\",\"baz\":\"fu\"}", "Context is merged in newLog.");
+	t.strictEqual(JSON.stringify(newLog2.context), "{\"foo\":\"burp\"}", "Context is merged in newLog2.");
+
+	t.end();
+});

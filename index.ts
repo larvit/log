@@ -72,6 +72,7 @@ export function msgTextFormatter(conf: EntryFormatterConf) {
 
 export class Log implements LogInt {
 	context: Metadata;
+	readonly #conf: LogConf; // Saved to be able to recreate instance
 	readonly #logLevel: LogLevel | "none";
 	readonly #entryFormatter: (conf: EntryFormatterConf) => string;
 	readonly #stderr: (msg: string) => void;
@@ -102,11 +103,47 @@ export class Log implements LogInt {
 			conf.stdout = console.log;
 		}
 
+		this.#conf = conf;
 		this.#logLevel = conf.logLevel;
 		this.#entryFormatter = conf.entryFormatter;
 		this.#stderr = conf.stderr;
 		this.#stdout = conf.stdout;
 		this.context = conf.context || {};
+	}
+
+	// Create a new instance based on the current instance
+	// All options sent in will override the current instance settings
+	clone(conf?: LogConf | LogLevel | "none") {
+		if (conf === undefined) {
+			conf = {};
+		} else if (typeof conf === "string") {
+			conf = { logLevel: conf };
+		}
+
+		if (conf.logLevel === undefined) {
+			conf.logLevel = this.#logLevel;
+		}
+
+		if (this.#conf.format !== "json" && conf.format === "json") {
+			conf.entryFormatter = msgJsonFormatter;
+		} else {
+			conf.entryFormatter = this.#entryFormatter;
+		}
+
+		if (conf.stderr === undefined) {
+			conf.stderr = this.#conf.stderr;
+		}
+
+		if (conf.stdout === undefined) {
+			conf.stdout = this.#conf.stdout;
+		}
+
+		conf.context = {
+			...this.context,
+			...conf.context,
+		};
+
+		return new Log(conf);
 	}
 
 	error(msg: string, metadata?: Metadata) {
