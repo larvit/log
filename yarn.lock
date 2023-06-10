@@ -137,7 +137,7 @@ __metadata:
   dependencies:
     "@larvit/eslint-config-typescript-esm": 1.2.0
     "@randomgoods/tap-spec": 5.0.3
-    "@types/node": 18.16.15
+    "@types/node": 18.16.17
     "@types/tape": 5.6.0
     eslint: 8.42.0
     tape: 5.6.3
@@ -250,10 +250,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/node@npm:18.16.15":
-  version: 18.16.15
-  resolution: "@types/node@npm:18.16.15"
-  checksum: 65bc0fd036b0abf307c26e99ca0add3248ac26664ace65f2ae6b85a8bf22d6d6cb2448995f3550d72280b017aafee7cafc03e8a594102a4151bf927236411724
+"@types/node@npm:18.16.17":
+  version: 18.16.17
+  resolution: "@types/node@npm:18.16.17"
+  checksum: 2f7e3a552d525ef4b7a2620ef5ef59b3fdfb1d8ab20627b537e090732b35c2bd103944933d347a319cc7d478b3866b0d1bc3d629ee5899ca663a4547ca078cee
   languageName: node
   linkType: hard
 
