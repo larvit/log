@@ -14,7 +14,7 @@
   "devDependencies": {
     "@larvit/eslint-config-typescript-esm": "1.2.0",
     "@randomgoods/tap-spec": "5.0.3",
-    "@types/node": "18.17.7",
+    "@types/node": "18.17.9",
     "@types/tape": "5.6.0",
     "eslint": "8.47.0",
     "tape": "5.6.6",
