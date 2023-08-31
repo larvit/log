@@ -1,6 +1,6 @@
 {
   "name": "@larvit/log",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "type": "module",
   "license": "MIT",
   "packageManager": "yarn@3.6.1",
@@ -35,7 +35,6 @@
     "index.d.ts",
     "index.js.map",
     "index.js",
-    "index.ts",
     "LICENSE",
     "package.json",
     "README.md"
