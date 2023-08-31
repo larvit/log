@@ -14,12 +14,12 @@
   "devDependencies": {
     "@larvit/eslint-config-typescript-esm": "1.2.0",
     "@randomgoods/tap-spec": "5.0.3",
-    "@types/node": "18.17.12",
+    "@types/node": "20.5.7",
     "@types/tape": "5.6.0",
     "eslint": "8.48.0",
     "tape": "5.6.6",
     "ts-node": "10.9.1",
-    "typescript": "5.1.6",
+    "typescript": "5.2.2",
     "uglify-js": "3.17.4"
   },
   "publishConfig": {
