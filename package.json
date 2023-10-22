@@ -15,9 +15,9 @@
     "@larvit/eslint-config-typescript-esm": "1.2.1",
     "@randomgoods/tap-spec": "5.0.4",
     "@types/node": "20.8.4",
-    "@types/tape": "5.6.1",
+    "@types/tape": "5.6.3",
     "eslint": "8.52.0",
-    "tape": "5.7.0",
+    "tape": "5.7.2",
     "ts-node": "10.9.1",
     "typescript": "5.2.2",
     "uglify-js": "3.17.4"
