@@ -147,7 +147,7 @@ __metadata:
     "@types/node": "npm:20.10.4"
     "@types/tape": "npm:5.6.4"
     eslint: "npm:8.55.0"
-    tape: "npm:5.7.2"
+    tape: "npm:5.7.3"
     ts-node: "npm:10.9.2"
     typescript: "npm:5.3.3"
     uglify-js: "npm:3.17.4"
@@ -766,7 +766,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"deep-equal@npm:^2.2.2":
+"deep-equal@npm:^2.2.2, deep-equal@npm:^2.2.3":
   version: 2.2.3
   resolution: "deep-equal@npm:2.2.3"
   dependencies:
@@ -810,7 +810,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"define-properties@npm:^1.1.3, define-properties@npm:^1.1.4, define-properties@npm:^1.2.0":
+"define-properties@npm:^1.1.3, define-properties@npm:^1.1.4, define-properties@npm:^1.2.0, define-properties@npm:^1.2.1":
   version: 1.2.1
   resolution: "define-properties@npm:1.2.1"
   dependencies:
@@ -1848,7 +1848,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"mock-property@npm:^1.0.2":
+"mock-property@npm:^1.0.2, mock-property@npm:^1.0.3":
   version: 1.0.3
   resolution: "mock-property@npm:1.0.3"
   dependencies:
@@ -1916,6 +1916,18 @@ __metadata:
     has-symbols: "npm:^1.0.3"
     object-keys: "npm:^1.1.1"
   checksum: 2f286118c023e557757620e647b02e7c88d3d417e0c568fca0820de8ec9cca68928304854d5b03e99763eddad6e78a6716e2930f7e6372e4b9b843f3fd3056f3
+  languageName: node
+  linkType: hard
+
+"object.assign@npm:^4.1.5":
+  version: 4.1.5
+  resolution: "object.assign@npm:4.1.5"
+  dependencies:
+    call-bind: "npm:^1.0.5"
+    define-properties: "npm:^1.2.1"
+    has-symbols: "npm:^1.0.3"
+    object-keys: "npm:^1.1.1"
+  checksum: 60108e1fa2706f22554a4648299b0955236c62b3685c52abf4988d14fffb0e7731e00aa8c6448397e3eb63d087dcc124a9f21e1980f36d0b2667f3c18bacd469
   languageName: node
   linkType: hard
 
@@ -2354,7 +2366,39 @@ __metadata:
   languageName: node
   linkType: hard
 
-"tape@npm:5.7.2, tape@npm:^5.7.1":
+"tape@npm:5.7.3":
+  version: 5.7.3
+  resolution: "tape@npm:5.7.3"
+  dependencies:
+    "@ljharb/resumer": "npm:^0.0.1"
+    "@ljharb/through": "npm:^2.3.11"
+    array.prototype.every: "npm:^1.1.5"
+    call-bind: "npm:^1.0.5"
+    deep-equal: "npm:^2.2.3"
+    defined: "npm:^1.0.1"
+    dotignore: "npm:^0.1.2"
+    for-each: "npm:^0.3.3"
+    get-package-type: "npm:^0.1.0"
+    glob: "npm:^7.2.3"
+    has-dynamic-import: "npm:^2.0.1"
+    hasown: "npm:^2.0.0"
+    inherits: "npm:^2.0.4"
+    is-regex: "npm:^1.1.4"
+    minimist: "npm:^1.2.8"
+    mock-property: "npm:^1.0.3"
+    object-inspect: "npm:^1.13.1"
+    object-is: "npm:^1.1.5"
+    object-keys: "npm:^1.1.1"
+    object.assign: "npm:^4.1.5"
+    resolve: "npm:^2.0.0-next.5"
+    string.prototype.trim: "npm:^1.2.8"
+  bin:
+    tape: bin/tape
+  checksum: b3de48ef9276e6002bc3fc63908ceacf55933fb60a382574b5d52d8de1b87cbffb78f7fb2d99fdb25664fa34dfc1d962fb9a9f5e4c2fe03b641b71c254480a73
+  languageName: node
+  linkType: hard
+
+"tape@npm:^5.7.1":
   version: 5.7.2
   resolution: "tape@npm:5.7.2"
   dependencies:
