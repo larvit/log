@@ -20,7 +20,7 @@
     "tape": "5.8.1",
     "ts-node": "10.9.2",
     "typescript": "5.3.3",
-    "uglify-js": "3.17.4"
+    "uglify-js": "3.18.0"
   },
   "publishConfig": {
     "access": "public",
