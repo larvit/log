@@ -150,7 +150,7 @@ __metadata:
     tape: "npm:5.9.0"
     ts-node: "npm:10.9.2"
     typescript: "npm:5.3.3"
-    uglify-js: "npm:3.18.0"
+    uglify-js: "npm:3.19.3"
   languageName: unknown
   linkType: soft
 
@@ -3099,12 +3099,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"uglify-js@npm:3.18.0":
-  version: 3.18.0
-  resolution: "uglify-js@npm:3.18.0"
+"uglify-js@npm:3.19.3":
+  version: 3.19.3
+  resolution: "uglify-js@npm:3.19.3"
   bin:
     uglifyjs: bin/uglifyjs
-  checksum: 10c0/57f5f6213a2c4e8c551be9c875c085d565dc88af6b7caaab40a197aa639183cdce7c9dc2f858675eca72a5323f850ab7e88b9cc0a52dfbe3e0768aee6ab6e102
+  checksum: 10c0/83b0a90eca35f778e07cad9622b80c448b6aad457c9ff8e568afed978212b42930a95f9e1be943a1ffa4258a3340fbb899f41461131c05bb1d0a9c303aed8479
   languageName: node
   linkType: hard
 
