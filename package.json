@@ -17,7 +17,7 @@
     "@types/node": "20.14.10",
     "@types/tape": "5.6.4",
     "eslint": "8.57.1",
-    "tape": "5.8.1",
+    "tape": "5.9.0",
     "ts-node": "10.9.2",
     "typescript": "5.3.3",
     "uglify-js": "3.18.0"
