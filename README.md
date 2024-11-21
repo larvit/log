@@ -80,6 +80,13 @@ const log = new Log({
 		return `${logLevel}: ${msg} ${JSON.stringify(metadata)}`;
 	},
 
+	// Open Telemetry additional http headers
+	// For example:
+	// { Authorization: "Bearer xxx" }
+	// Defaults to null
+	// Added in 1.4.0
+	otlpAdditionalHeaders: null,
+
 	// Open Telemetry http endpoint to send spans, traces and logs to.
 	// For example http://127.0.0.1:4318
 	// Defaults to null

@@ -62,6 +62,7 @@ export type LogConf = {
 	entryFormatter?: (conf: EntryFormatterConf) => string;
 	format?: "text" | "json";
 	logLevel?: LogLevel | "none";
+	otlpAdditionalHeaders?: Record<string, string>;
 	otlpHttpBaseURI?: string;
 	parentLog?: LogInt;
 	printTraceInfo?: boolean;
@@ -213,6 +214,7 @@ function isFetchError(error: unknown): error is FetchError {
 
 export class Log implements LogInt {
 	context: Metadata;
+	otlpAdditionalHeaders: Record<string, string> | null;
 	readonly #entryFormatter: (conf: EntryFormatterConf) => string;
 	readonly #logLevel: LogLevel | "none";
 	readonly #otlpHttpBaseURI: string;
@@ -269,6 +271,7 @@ export class Log implements LogInt {
 		this.#stdout = conf.stdout;
 		this.conf = conf;
 		this.context = conf.context || {};
+		this.otlpAdditionalHeaders = conf.otlpAdditionalHeaders;
 		this.spanId = generateSpanId();
 		this.traceId = generateTraceId();
 
@@ -412,14 +415,20 @@ export class Log implements LogInt {
 		}
 
 		const urlObj = new URL(this.#otlpHttpBaseURI);
-		const url = `${urlObj.protocol}//${urlObj.host}${path}`;
+		const url = `${urlObj.protocol}//${urlObj.username ? `${urlObj.username}:${urlObj.password}@` : "" }${urlObj.host}${path}`;
+
+		const headers = {
+			"Content-Type": "application/json",
+		};
+
+		if (this.otlpAdditionalHeaders) {
+			Object.assign(headers, this.otlpAdditionalHeaders);
+		}
 
 		try {
 			const res = await fetch(url, {
 				body: JSON.stringify(payload),
-				headers: {
-					"Content-Type": "application/json",
-				},
+				headers,
 				method: "POST",
 			});
 
