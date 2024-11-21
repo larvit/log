@@ -164,22 +164,34 @@ export function msgTextFormatter(conf: EntryFormatterConf) {
 function generateSpanId(): string {
 	const bytes = new Uint8Array(8);
 
-	crypto.getRandomValues(bytes);
-	bytes[0] |= 1; // Ensure at least one non-zero byte
+	if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+		crypto.getRandomValues(bytes);
+	} else {
+		for (let i = 0; i < 8; i++) {
+			bytes[i] = Math.floor(Math.random() * 256);
+		}
+	}
+	bytes[0] |= 1;
 
 	return Array.from(bytes)
-		.map(internalBytes => internalBytes.toString(16).padStart(2, "0"))
+		.map(byte => byte.toString(16).padStart(2, "0"))
 		.join("");
 }
 
 function generateTraceId(): string {
 	const bytes = new Uint8Array(16);
 
-	crypto.getRandomValues(bytes);
-	bytes[0] |= 1; // Ensure at least one non-zero byte
+	if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+		crypto.getRandomValues(bytes);
+	} else {
+		for (let i = 0; i < 16; i++) {
+			bytes[i] = Math.floor(Math.random() * 256);
+		}
+	}
+	bytes[0] |= 1;
 
 	return Array.from(bytes)
-		.map(internalBytes => internalBytes.toString(16).padStart(2, "0"))
+		.map(byte => byte.toString(16).padStart(2, "0"))
 		.join("");
 }
 
