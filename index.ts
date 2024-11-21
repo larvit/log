@@ -442,8 +442,9 @@ export class Log implements LogInt {
 
 			const resBody = await res.json();
 
-			if (JSON.stringify(resBody) !== "{\"partialSuccess\":{}}") {
-				throw new Error("Invalid response body from OTLP service. Expected '{\"partialSuccess\":{}}' but got: '" + JSON.stringify(resBody) + "'");
+			const resBodyStr = JSON.stringify(resBody);
+			if (resBodyStr !== "{\"partialSuccess\":{}}" && resBodyStr !== "{}") {
+				throw new Error("Invalid response body from OTLP service. Expected '{\"partialSuccess\":{}}' or '{}' but got: '" + JSON.stringify(resBody) + "'");
 			}
 
 			return true;
