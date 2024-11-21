@@ -18,7 +18,7 @@
     "@types/node": "22.9.1",
     "@types/tape": "5.6.4",
     "eslint": "8.57.1",
-    "express": "5.0.0",
+    "express": "5.0.1",
     "tape": "5.9.0",
     "ts-node": "10.9.2",
     "typescript": "5.6.3",
