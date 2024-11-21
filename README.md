@@ -83,18 +83,18 @@ const log = new Log({
 	// Open Telemetry http endpoint to send spans, traces and logs to.
 	// For example http://127.0.0.1:4318
 	// Defaults to null
-	// Added in 1.2.0
+	// Added in 1.3.0
 	otlpHttpBaseURI: null,
 
 	// Group logs together under a specific parent
 	// Used for spans and traces in Open Telemetry etc.
 	// Defaults to null, creating no span in otlp
-	// Added in 1.2.0
+	// Added in 1.3.0
 	parentLog: new Log(),
 
 	// If set to true, append spanName, spanId and traceId to the context output
 	// Defaults to false
-	// Added in 1.2.0
+	// Added in 1.3.0
 	printTraceInfo: false,
 
 	// Use a specific span name. Any log using this log as a parent will be
