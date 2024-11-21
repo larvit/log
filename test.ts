@@ -1,6 +1,32 @@
+import express from "express";
+import { Server } from "http";
+import { AddressInfo } from "net";
 import test from "tape";
 
 import { Log } from "./index.js";
+
+function isNanoTimestampWithinHour(str) {
+	if (!/^\d+$/.test(str)) {
+		return false;
+	}
+
+	// nanosecond to second
+	const unixTimestamp = Math.round(parseInt(str) / 1000000000);
+
+	// millisecond to second
+	const now = Math.floor(Date.now() / 1000);
+
+	const hourInSeconds = 3600;
+
+	// Check if number is a reasonable Unix timestamp (after 2020)
+	if (unixTimestamp > 1577836800) { // 2020-01-01
+		const difference = Math.abs(now - unixTimestamp);
+
+		return difference <= hourInSeconds;
+	}
+
+	return false;
+}
 
 test("Should log to info.", t => {
 	const oldStdout = process.stdout.write;
@@ -278,4 +304,174 @@ test("Copy instance", t => {
 	t.strictEqual(JSON.stringify(newLog2.context), "{\"foo\":\"burp\"}", "Context is merged in newLog2.");
 
 	t.end();
+});
+
+test("OLTP simple log", t => {
+	const mockExpress = express();
+	let mockServer = null as unknown as Server;
+	let traceId = "";
+
+	mockExpress.use(express.json());
+
+	mockExpress.post("/v1/traces", (req, res) => {
+		t.strictEqual(req.body.resourceSpans.length, 1, "Exactly one resourceSpan in /v1/traces body");
+		t.strictEqual(req.body.resourceSpans[0].scopeSpans.length, 1, "Exactly one scopeSpan in /v1/traces body");
+		t.strictEqual(req.body.resourceSpans[0].scopeSpans[0].spans.length, 1, "Exactly one span in /v1/traces body");
+
+		const span = req.body.resourceSpans[0].scopeSpans[0].spans[0];
+
+		t.strictEqual(typeof span.endTimeUnixNano, "string", "span.endTimeUnixNano is a string");
+		t.strictEqual(span.kind, 0, "Span kind is always 0");
+		t.strictEqual(span.name, span.spanId, "Span name is equal to spanId");
+		t.strictEqual(typeof span.startTimeUnixNano, "string", "span.startTimeUnixNano is a string");
+
+		t.strictEqual(typeof span.name, "string", "span.name is a string");
+		t.notStrictEqual(span.name.length, 0, "span.name has a non-zero length");
+
+		t.strictEqual(typeof span.spanId, "string", "span.spanId is a string");
+		t.notStrictEqual(span.spanId.length, 0, "span.spanId has a non-zero length");
+
+		t.strictEqual(typeof span.traceId, "string", "span.traceId is a string");
+		t.notStrictEqual(span.traceId.length, 0, "span.traceId has a non-zero length");
+
+		t.ok(isNanoTimestampWithinHour(span.endTimeUnixNano), "span.endTimeUnixNano is reasonable");
+		t.ok(isNanoTimestampWithinHour(span.startTimeUnixNano), "span.startTimeUnixNano is reasonable");
+
+		// Saved to be used in the logs test below
+		traceId = span.traceId;
+
+		res.json({ partialSuccess: {} });
+	});
+
+	mockExpress.post("/v1/logs", (req, res) => {
+		res.json({ partialSuccess: {} });
+
+		t.strictEqual(req.body.resourceLogs.length, 1, "Exactly one resourceLog in /v1/logs body");
+		t.strictEqual(req.body.resourceLogs[0].scopeLogs.length, 1, "Exactly one scopeLog in /v1/logs body");
+		t.strictEqual(req.body.resourceLogs[0].scopeLogs[0].logRecords.length, 1, "Exactly one logRecord in /v1/logs body");
+
+		const logRecord = req.body.resourceLogs[0].scopeLogs[0].logRecords[0];
+
+		t.strictEqual(logRecord.body.stringValue, "Gir in da house!", "logRecord.body is correct");
+		t.strictEqual(logRecord.severityNumber, 17, "logRecord.severityNumber is correct");
+		t.strictEqual(logRecord.severityText, "ERROR", "logRecord.severityText is correct");
+		t.strictEqual(logRecord.traceId, traceId, "logRecord.traceId is correct");
+
+		t.ok(isNanoTimestampWithinHour(logRecord.timeUnixNano), "timeUnixNano is reasonable");
+
+		// We expect this to be the last call, so stop the mock server here
+		mockServer.close();
+		t.end();
+	});
+
+	mockServer = mockExpress.listen(0, "127.0.0.1", () => {
+		const { port } = mockServer.address() as AddressInfo;
+		const oldStderr = process.stderr.write;
+		const log = new Log({ otlpHttpBaseURI: `http://127.0.0.1:${port}` });
+
+		process.stderr.write = () => true;
+		log.error("Gir in da house!");
+		process.stderr.write = oldStderr;
+	});
+});
+
+test("OLTP simple log with metadata", t => {
+	const mockExpress = express();
+	let mockServer = null as unknown as Server;
+
+	mockExpress.use(express.json());
+
+	mockExpress.post("/v1/traces", (_, res) => {
+		res.json({ partialSuccess: {} });
+	});
+
+	mockExpress.post("/v1/logs", (req, res) => {
+		res.json({ partialSuccess: {} });
+
+		const logRecord = req.body.resourceLogs[0].scopeLogs[0].logRecords[0];
+
+		t.strictEqual(logRecord.body.stringValue, "FOo", "logRecord.body is correct");
+		t.strictEqual(logRecord.severityNumber, 13, "logRecord.severityNumber is correct");
+		t.strictEqual(logRecord.severityText, "WARN", "logRecord.severityText is correct");
+
+		t.strictEqual(logRecord.attributes[0].key, "bar", "First attribute is bar");
+		t.strictEqual(logRecord.attributes[0].value.stringValue, "baz", "First attribute value is baz");
+		t.strictEqual(logRecord.attributes[1].key, "lökig knasnyckel | typ", "Second attribute is \"lökig knasnyckel | typ\"");
+		t.strictEqual(logRecord.attributes[1].value.stringValue, "17", "Second attribute value is \"17\"");
+
+		// We expect this to be the last call, so stop the mock server here
+		mockServer.close();
+		t.end();
+	});
+
+	mockServer = mockExpress.listen(0, "127.0.0.1", () => {
+		const { port } = mockServer.address() as AddressInfo;
+		const oldStderr = process.stderr.write;
+		const log = new Log({ otlpHttpBaseURI: `http://127.0.0.1:${port}` });
+
+		process.stderr.write = () => true;
+		log.warn("FOo", { bar: "baz", "lökig knasnyckel | typ": "17" });
+		process.stderr.write = oldStderr;
+	});
+});
+
+test("OLTP multi layer spans", t => {
+	const mockExpress = express();
+	const reqLog: { body: any, path: string }[] = [];
+	let mockServer = null as unknown as Server;
+
+	mockExpress.use(express.json());
+
+	mockExpress.post("*", (req, res) => {
+		const path = req.path;
+
+		reqLog.push({ body: req.body, path });
+
+		res.json({ partialSuccess: {} });
+
+		if (reqLog.length === 9) {
+			t.ok(true, "All requests received");
+
+			t.strictEqual(
+				reqLog[0].body.resourceSpans[0].scopeSpans[0].spans[0].traceId,
+				reqLog[1].body.resourceLogs[0].scopeLogs[0].logRecords[0].traceId,
+				"traceId should match on first log message and span",
+			);
+
+			t.strictEqual(
+				reqLog[0].body.resourceSpans[0].scopeSpans[0].spans[0].spanId,
+				reqLog[2].body.resourceSpans[0].scopeSpans[0].spans[0].parentSpanId,
+				"parentSpanId should be correct",
+			);
+
+			mockServer.close();
+			t.end();
+		} else if (reqLog.length > 9) {
+			t.fail("To many requests");
+		}
+	});
+
+	mockServer = mockExpress.listen(0, "127.0.0.1", () => {
+		const { port } = mockServer.address() as AddressInfo;
+		const oldStdout = process.stdout.write;
+		const parentLog = new Log({ logLevel: "debug", otlpHttpBaseURI: `http://127.0.0.1:${port}` });
+
+		process.stdout.write = () => true;
+
+		parentLog.verbose("I'm on the outside");
+
+		const spannedLog = new Log({ parentLog, spanName: "spannedLog" });
+
+		spannedLog.info("I'm on the inside");
+
+		const subSpannedLog = new Log({ parentLog: spannedLog, spanName: "innerSpan" });
+
+		subSpannedLog.debug("I'm SUPER inside!");
+
+		subSpannedLog.end();
+		spannedLog.end();
+		parentLog.end();
+
+		process.stdout.write = oldStdout;
+	});
 });

@@ -4,7 +4,8 @@ export type Metadata = {
 
 export type LogShorthand = (msg: string, metadata?: Metadata) => void;
 
-export interface LogInt {
+export type LogInt = {
+	conf: LogConf;
 	spanId: string;
 	traceId: string;
 	/* eslint-disable typescript-sort-keys/interface */
@@ -200,7 +201,6 @@ function isFetchError(error: unknown): error is FetchError {
 
 export class Log implements LogInt {
 	context: Metadata;
-	readonly #conf: LogConf; // Saved to be able to recreate instance
 	readonly #entryFormatter: (conf: EntryFormatterConf) => string;
 	readonly #logLevel: LogLevel | "none";
 	readonly #otlpHttpBaseURI: string;
@@ -209,6 +209,7 @@ export class Log implements LogInt {
 	readonly #spanName: string;
 	readonly #stderr: (msg: string) => void;
 	readonly #stdout: (msg: string) => void;
+	readonly conf: LogConf; // Saved to be able to recreate instance
 	readonly traceId: string;
 	readonly spanId: string;
 	#otlpSpanPayload: OtlpSpanPayload;
@@ -218,6 +219,15 @@ export class Log implements LogInt {
 			conf = {};
 		} else if (typeof conf === "string") {
 			conf = { logLevel: conf };
+		}
+
+		// Inherit conf from parent log if provided
+		if (typeof conf.parentLog === "object") {
+			for (const [key, value] of Object.entries(conf.parentLog.conf)) {
+				if (conf[key] === undefined) {
+					conf[key] = value;
+				}
+			}
 		}
 
 		if (conf.logLevel === undefined) {
@@ -238,7 +248,6 @@ export class Log implements LogInt {
 			conf.stdout = console.log;
 		}
 
-		this.#conf = conf;
 		this.#entryFormatter = conf.entryFormatter;
 		this.#logLevel = conf.logLevel;
 		this.#otlpHttpBaseURI = conf.otlpHttpBaseURI;
@@ -246,6 +255,7 @@ export class Log implements LogInt {
 		this.#printTraceInfo = conf.printTraceInfo === true ? true : false;
 		this.#stderr = conf.stderr;
 		this.#stdout = conf.stdout;
+		this.conf = conf;
 		this.context = conf.context || {};
 		this.spanId = generateSpanId();
 		this.traceId = generateTraceId();
@@ -268,18 +278,18 @@ export class Log implements LogInt {
 			conf.logLevel = this.#logLevel;
 		}
 
-		if (this.#conf.format !== "json" && conf.format === "json") {
+		if (this.conf.format !== "json" && conf.format === "json") {
 			conf.entryFormatter = msgJsonFormatter;
 		} else {
 			conf.entryFormatter = this.#entryFormatter;
 		}
 
 		if (conf.stderr === undefined) {
-			conf.stderr = this.#conf.stderr;
+			conf.stderr = this.conf.stderr;
 		}
 
 		if (conf.stdout === undefined) {
-			conf.stdout = this.#conf.stdout;
+			conf.stdout = this.conf.stdout;
 		}
 
 		conf.context = {
@@ -292,7 +302,7 @@ export class Log implements LogInt {
 
 	public error(msg: string, metadata?: Metadata) {
 		if (this.#logLevel === "none") return;
-		this.#stderr(this.#entryFormatter({ logLevel: "error", metadata: Object.assign(metadata || {}, this.context), msg }));
+		this.log("error", msg, metadata);
 	}
 
 	public warn(msg: string, metadata?: Metadata) {
@@ -353,6 +363,7 @@ export class Log implements LogInt {
 						severityNumber: LogLevels[logLevel].otlpSeverityNumber,
 						severityText: LogLevels[logLevel].otlpSeverityText,
 						timeUnixNano: String(getNsTimestamp(Date.now())),
+						traceId: this.traceId,
 					}],
 				}],
 			}],
@@ -406,6 +417,12 @@ export class Log implements LogInt {
 				err.status = res.status;
 
 				throw err;
+			}
+
+			const resBody = await res.json();
+
+			if (JSON.stringify(resBody) !== "{\"partialSuccess\":{}}") {
+				throw new Error("Invalid response body from OTLP service. Expected '{\"partialSuccess\":{}}' but got: '" + JSON.stringify(resBody) + "'");
 			}
 
 			return true;
