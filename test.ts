@@ -422,7 +422,7 @@ test("OLTP multi layer spans", t => {
 
 	mockExpress.use(express.json());
 
-	mockExpress.post("*", (req, res) => {
+	mockExpress.use((req, res) => {
 		const path = req.path;
 
 		reqLog.push({ body: req.body, path });
