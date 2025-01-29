@@ -1,13 +1,14 @@
 {
   "name": "@larvit/log",
-  "version": "1.4.0",
+  "version": "1.4.2",
   "type": "module",
   "license": "MIT",
-  "packageManager": "yarn@4.5.1",
+  "packageManager": "yarn@4.6.0",
   "scripts": {
     "build": "rm -f index.js index.d.ts index.js.map && tsc && uglifyjs index.js -o index.js",
     "lint-fix": "eslint --fix index.ts test.ts",
     "lint": "eslint index.ts test.ts",
+    "publish": "npm run build && npm publish",
     "test-unit": "node --loader ts-node/esm test.ts | tap-spec",
     "test": "yarn test-unit && yarn lint"
   },
@@ -16,12 +17,12 @@
     "@randomgoods/tap-spec": "5.0.4",
     "@types/express": "5.0.0",
     "@types/node": "22.9.1",
-    "@types/tape": "5.6.4",
+    "@types/tape": "5.8.1",
     "eslint": "8.57.1",
     "express": "5.0.1",
     "tape": "5.9.0",
     "ts-node": "10.9.2",
-    "typescript": "5.6.3",
+    "typescript": "5.7.3",
     "uglify-js": "3.19.3"
   },
   "publishConfig": {
