@@ -141,7 +141,7 @@ __metadata:
     "@types/node": "npm:22.9.1"
     "@types/tape": "npm:5.8.1"
     eslint: "npm:8.57.1"
-    express: "npm:5.0.0"
+    express: "npm:5.0.1"
     tape: "npm:5.9.0"
     ts-node: "npm:10.9.2"
     typescript: "npm:5.7.3"
@@ -914,10 +914,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"cookie@npm:0.6.0":
-  version: 0.6.0
-  resolution: "cookie@npm:0.6.0"
-  checksum: 10c0/f2318b31af7a31b4ddb4a678d024514df5e705f9be5909a192d7f116cfb6d45cbacf96a473fa733faa95050e7cff26e7832bb3ef94751592f1387b71c8956686
+"cookie@npm:0.7.1":
+  version: 0.7.1
+  resolution: "cookie@npm:0.7.1"
+  checksum: 10c0/5de60c67a410e7c8dc8a46a4b72eb0fe925871d057c9a5d2c0e8145c4270a4f81076de83410c4d397179744b478e33cd80ccbcc457abf40a9409ad27dcd21dde
   languageName: node
   linkType: hard
 
@@ -1478,15 +1478,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"express@npm:5.0.0":
-  version: 5.0.0
-  resolution: "express@npm:5.0.0"
+"express@npm:5.0.1":
+  version: 5.0.1
+  resolution: "express@npm:5.0.1"
   dependencies:
     accepts: "npm:^2.0.0"
     body-parser: "npm:^2.0.1"
     content-disposition: "npm:^1.0.0"
     content-type: "npm:~1.0.4"
-    cookie: "npm:0.6.0"
+    cookie: "npm:0.7.1"
     cookie-signature: "npm:^1.2.1"
     debug: "npm:4.3.6"
     depd: "npm:2.0.0"
@@ -1514,7 +1514,7 @@ __metadata:
     type-is: "npm:^2.0.0"
     utils-merge: "npm:1.0.1"
     vary: "npm:~1.1.2"
-  checksum: 10c0/44cb2c31b43572eff5a3e54f61fb5ccf012d61cc3684d3a74cb84e794de9ac4f78f12c672cf9076caa05952bba3080d30c88836fa417469e58d6ed8077041660
+  checksum: 10c0/6e533f28adb64178c90c3e357cbcdb5d1f233ca1290d023b3c4936c4ac67c6699aaba726edf6c148979220ec7ce6ed2e5e374cff904e3a2bf9ce91620cf8afff
   languageName: node
   linkType: hard
 
