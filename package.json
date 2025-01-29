@@ -17,12 +17,12 @@
     "@randomgoods/tap-spec": "5.0.4",
     "@types/express": "5.0.0",
     "@types/node": "22.9.1",
-    "@types/tape": "5.6.4",
+    "@types/tape": "5.8.1",
     "eslint": "8.57.1",
     "express": "5.0.0",
     "tape": "5.9.0",
     "ts-node": "10.9.2",
-    "typescript": "5.6.3",
+    "typescript": "5.7.3",
     "uglify-js": "3.19.3"
   },
   "publishConfig": {
