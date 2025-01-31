@@ -1,3 +1,13 @@
+import { Attributes, context, Span, SpanKind, trace, TraceFlags } from "@opentelemetry/api";
+import { Logger, SeverityNumber } from "@opentelemetry/api-logs";
+import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import { Resource } from "@opentelemetry/resources";
+import { BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
+import { LoggerProvider } from "@opentelemetry/sdk-logs";
+import { BatchSpanProcessor, Tracer } from "@opentelemetry/sdk-trace-base";
+import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
+
 export type Metadata = {
 	[key: string]: string;
 }
@@ -22,28 +32,28 @@ export type LogInt = {
 export const LogLevels = {
 	/* eslint-disable sort-keys */
 	error: {
-		otlpSeverityNumber: 17,
-		otlpSeverityText: "ERROR",
+		severityNumber: SeverityNumber.ERROR,
+		severityText: "ERROR",
 	},
 	warn: {
-		otlpSeverityNumber: 13,
-		otlpSeverityText: "WARN",
+		severityNumber: SeverityNumber.WARN,
+		severityText: "WARN",
 	},
 	info: {
-		otlpSeverityNumber: 9,
-		otlpSeverityText: "INFO",
+		severityNumber: SeverityNumber.INFO,
+		severityText: "INFO",
 	},
 	verbose: {
-		otlpSeverityNumber: 8,
-		otlpSeverityText: "DEBUG4",
+		severityNumber: SeverityNumber.DEBUG,
+		severityText: "DEBUG4",
 	},
 	debug: {
-		otlpSeverityNumber: 5,
-		otlpSeverityText: "DEBUG",
+		severityNumber: SeverityNumber.DEBUG2,
+		severityText: "DEBUG",
 	},
 	silly: {
-		otlpSeverityNumber: 3,
-		otlpSeverityText: "TRACE",
+		severityNumber: SeverityNumber.TRACE,
+		severityText: "TRACE",
 	},
 	/* eslint-enable sort-keys */
 };
@@ -63,65 +73,16 @@ export type LogConf = {
 	format?: "text" | "json";
 	logLevel?: LogLevel | "none";
 	otlpAdditionalHeaders?: Record<string, string>;
+	otlpExportTimeoutMillis?: number, // default: 3000, How long to wait for the export to complete
 	otlpHttpBaseURI?: string;
+	otlpMaxExportBatchSize?: number, // default: 512, Maximum number of spans to batch
+	otlpMaxQueueSize?: number, // default: 2048, Maximum queue size (default 2048)
+	otlpScheduledDelayMillis?: number, // default: 100, How often to check for spans to send (default 1000ms)
 	parentLog?: LogInt;
 	printTraceInfo?: boolean;
 	spanName?: string;
 	stderr?: (msg: string) => void;
 	stdout?: (msg: string) => void;
-}
-
-export type OtlpAttribute = {
-	key: string,
-	value: {
-		stringValue: string
-	}
-}
-
-export type OtlpSpanPayload = {
-	resourceSpans: {
-		resource: {
-			attributes: OtlpAttribute[],
-		},
-		scopeSpans: {
-			spans: {
-				attributes?: OtlpAttribute[],
-				endTimeUnixNano: string,
-				kind: 0 | 1 | 2 | 3 | 4 | 5,
-				name: string,
-				parentSpanId?: string,
-				spanId: string,
-				startTimeUnixNano: string,
-				traceId: string,
-			}[],
-		}[],
-	}[],
-}
-
-export type OtlpLogPayload = {
-	resourceLogs: {
-		resource: {
-			attributes: OtlpAttribute[],
-		},
-		scopeLogs: {
-			logRecords: {
-				attributes?: OtlpAttribute[],
-				body: {
-					stringValue: string,
-				},
-				severityNumber: number,
-				severityText: string,
-				spanId?: string,
-				timeUnixNano: string,
-				traceId?: string,
-			}[],
-		}[],
-	}[],
-}
-
-type FetchError = {
-  message: string;
-  status?: number;
 }
 
 export function msgJsonFormatter(conf: EntryFormatterConf) {
@@ -162,71 +123,16 @@ export function msgTextFormatter(conf: EntryFormatterConf) {
 	return str;
 }
 
-function generateSpanId(): string {
-	const bytes = new Uint8Array(8);
-
-	if (typeof crypto !== "undefined" && crypto.getRandomValues) {
-		crypto.getRandomValues(bytes);
-	} else {
-		for (let i = 0; i < 8; i++) {
-			bytes[i] = Math.floor(Math.random() * 256);
-		}
-	}
-	bytes[0] |= 1;
-
-	return Array.from(bytes)
-		.map(byte => byte.toString(16).padStart(2, "0"))
-		.join("");
-}
-
-function generateTraceId(): string {
-	const bytes = new Uint8Array(16);
-
-	if (typeof crypto !== "undefined" && crypto.getRandomValues) {
-		crypto.getRandomValues(bytes);
-	} else {
-		for (let i = 0; i < 16; i++) {
-			bytes[i] = Math.floor(Math.random() * 256);
-		}
-	}
-	bytes[0] |= 1;
-
-	return Array.from(bytes)
-		.map(byte => byte.toString(16).padStart(2, "0"))
-		.join("");
-}
-
-// msTimestamp should be generated from Date.now()
-function getNsTimestamp(msTimestamp: number): number {
-	// Convert to nanoseconds (multiply by 1,000,000 to convert ms to ns)
-	const nanoseconds = msTimestamp * 1000000;
-
-	// Add sub-millisecond precision using performance.now()
-	// Note: This provides microsecond precision on most systems
-	const fractionalNanoseconds = Math.floor((performance.now() % 1) * 1000000);
-
-	return nanoseconds + fractionalNanoseconds;
-}
-
-function isFetchError(error: unknown): error is FetchError {
-	return typeof error === "object" && error !== null && "message" in error;
-}
-
 export class Log implements LogInt {
+	private readonly otlpTracer: Tracer;
+	private readonly otlpLogger: Logger;
+	private currentSpan: Span | null = null;
+	private readonly otlpLoggerProvider: LoggerProvider;
+
 	context: Metadata;
-	otlpAdditionalHeaders: Record<string, string> | null;
-	readonly #entryFormatter: (conf: EntryFormatterConf) => string;
-	readonly #logLevel: LogLevel | "none";
-	readonly #otlpHttpBaseURI: string;
-	readonly #parentLog: LogInt | null;
-	readonly #printTraceInfo: boolean;
-	readonly #spanName: string;
-	readonly #stderr: (msg: string) => void;
-	readonly #stdout: (msg: string) => void;
-	readonly conf: LogConf; // Saved to be able to recreate instance
-	readonly traceId: string;
-	readonly spanId: string;
-	#otlpSpanPayload: OtlpSpanPayload;
+	readonly conf: LogConf;
+	spanId: string;
+	traceId: string;
 
 	constructor(conf?: LogConf | LogLevel | "none") {
 		if (conf === undefined) {
@@ -262,22 +168,141 @@ export class Log implements LogInt {
 			conf.stdout = console.log;
 		}
 
-		this.#entryFormatter = conf.entryFormatter;
-		this.#logLevel = conf.logLevel;
-		this.#otlpHttpBaseURI = conf.otlpHttpBaseURI;
-		this.#parentLog = typeof conf.parentLog === "object" ? conf.parentLog : null;
-		this.#printTraceInfo = conf.printTraceInfo === true ? true : false;
-		this.#stderr = conf.stderr;
-		this.#stdout = conf.stdout;
 		this.conf = conf;
-		this.context = conf.context || {};
-		this.otlpAdditionalHeaders = conf.otlpAdditionalHeaders;
-		this.spanId = generateSpanId();
-		this.traceId = generateTraceId();
+		this.context = this.conf.context || {};
 
-		this.#spanName = conf.spanName || this.spanId;
+		// Setup OpenTelemetry
+		const otlpResource = new Resource({
+			"service.name": "larvit-log",
+			...this.context,
+		});
 
-		this.otlpCreateSpan();
+		const traceExporter = new OTLPTraceExporter({
+			headers: this.conf.otlpAdditionalHeaders,
+			url: this.conf.otlpHttpBaseURI ? `${this.conf.otlpHttpBaseURI}/v1/traces` : undefined,
+		});
+
+		const logExporter = new OTLPLogExporter({
+			headers: this.conf.otlpAdditionalHeaders,
+			url: this.conf.otlpHttpBaseURI ? `${this.conf.otlpHttpBaseURI}/v1/logs` : undefined,
+		});
+
+		this.otlpLoggerProvider = new LoggerProvider({ resource: otlpResource });
+		this.otlpLoggerProvider.addLogRecordProcessor(new BatchLogRecordProcessor(logExporter, {
+			exportTimeoutMillis: this.conf.otlpExportTimeoutMillis !== undefined ? this.conf.otlpExportTimeoutMillis : 3000,
+			maxExportBatchSize: this.conf.otlpMaxExportBatchSize !== undefined ? this.conf.otlpMaxExportBatchSize : 512,
+			maxQueueSize: this.conf.otlpMaxQueueSize !== undefined ? this.conf.otlpMaxQueueSize : 2048,
+			scheduledDelayMillis: this.conf.otlpScheduledDelayMillis !== undefined ? this.conf.otlpScheduledDelayMillis : 100,
+		}));
+		this.otlpLogger = this.otlpLoggerProvider.getLogger("larvit-log");
+
+		// Initialize tracer
+		const tracerProvider = new NodeTracerProvider({
+			resource: otlpResource,
+			spanProcessors: [new BatchSpanProcessor(traceExporter, {
+				exportTimeoutMillis: this.conf.otlpExportTimeoutMillis !== undefined ? this.conf.otlpExportTimeoutMillis : 3000,
+				maxExportBatchSize: this.conf.otlpMaxExportBatchSize !== undefined ? this.conf.otlpMaxExportBatchSize : 512,
+				maxQueueSize: this.conf.otlpMaxQueueSize !== undefined ? this.conf.otlpMaxQueueSize : 2048,
+				scheduledDelayMillis: this.conf.otlpScheduledDelayMillis !== undefined ? this.conf.otlpScheduledDelayMillis : 100,
+			})],
+		});
+
+		tracerProvider.register();
+		this.otlpTracer = tracerProvider.getTracer("larvit-log");
+
+		// Create and activate the span
+		const activeContext = context.active();
+
+		this.currentSpan = this.otlpTracer.startSpan(
+			this.conf.spanName || "unnamed-span",
+			{ kind: SpanKind.INTERNAL },
+			activeContext,
+		);
+
+		// Store the IDs
+		this.spanId = this.currentSpan.spanContext().spanId;
+		this.traceId = this.currentSpan.spanContext().traceId;
+
+		if (this.conf.parentLog) {
+			const parentContext = trace.setSpanContext(context.active(), {
+				isRemote: false,
+				spanId: this.conf.parentLog.spanId,
+				traceFlags: TraceFlags.SAMPLED,
+				traceId: this.conf.parentLog.traceId,
+			});
+
+			trace.setSpan(parentContext, this.currentSpan!);
+		}
+	}
+
+	private log(logLevel: LogLevel, msg: string, metadata?: Metadata): void {
+		if (this.shouldSkipLog(logLevel)) return;
+
+		const formattedMetadata = { ...metadata, ...this.context };
+		const msTimestamp = Date.now();
+
+		// Console output
+		this.outputToConsole(logLevel, msg, formattedMetadata, msTimestamp);
+
+		// Create a context with the current span
+		if (this.currentSpan) {
+			const ctx = trace.setSpan(context.active(), this.currentSpan);
+
+			// Emit the log with the span context
+			context.with(ctx, () => {
+				this.otlpLogger.emit({
+					attributes: formattedMetadata as Attributes,
+					body: msg,
+					severityNumber: LogLevels[logLevel].severityNumber,
+					severityText: LogLevels[logLevel].severityText,
+				});
+			});
+		} else {
+			// Fallback if no span is available
+			this.otlpLogger.emit({
+				attributes: formattedMetadata as Attributes,
+				body: msg,
+				severityNumber: LogLevels[logLevel].severityNumber,
+				severityText: LogLevels[logLevel].severityText,
+			});
+		}
+	}
+
+	private shouldSkipLog(logLevel: LogLevel): boolean {
+		const levels: LogLevel[] = ["error", "warn", "info", "verbose", "debug", "silly"];
+		const currentLevelIndex = levels.indexOf(this.conf.logLevel as LogLevel);
+		const msgLevelIndex = levels.indexOf(logLevel);
+
+		return currentLevelIndex < msgLevelIndex || this.conf.logLevel === "none";
+	}
+
+	private outputToConsole(logLevel: LogLevel, msg: string, metadata: Metadata, msTimestamp: number) {
+		const output = this.conf.entryFormatter!({
+			logLevel,
+			metadata,
+			msTimestamp,
+			msg,
+		});
+
+		if (["error", "warn"].includes(logLevel)) {
+			this.conf.stderr!(output);
+		} else {
+			this.conf.stdout!(output);
+		}
+	}
+
+	public error(msg: string, metadata?: Metadata) { this.log("error", msg, metadata); }
+	public warn(msg: string, metadata?: Metadata) { this.log("warn", msg, metadata); }
+	public info(msg: string, metadata?: Metadata) { this.log("info", msg, metadata); }
+	public verbose(msg: string, metadata?: Metadata) { this.log("verbose", msg, metadata); }
+	public debug(msg: string, metadata?: Metadata) { this.log("debug", msg, metadata); }
+	public silly(msg: string, metadata?: Metadata) { this.log("silly", msg, metadata); }
+
+	public end() {
+		if (this.currentSpan) {
+			this.currentSpan.end();
+		}
+		this.otlpLoggerProvider.shutdown();
 	}
 
 	// Create a new instance based on the current instance
@@ -290,13 +315,13 @@ export class Log implements LogInt {
 		}
 
 		if (conf.logLevel === undefined) {
-			conf.logLevel = this.#logLevel;
+			conf.logLevel = this.conf.logLevel;
 		}
 
 		if (this.conf.format !== "json" && conf.format === "json") {
 			conf.entryFormatter = msgJsonFormatter;
 		} else {
-			conf.entryFormatter = this.#entryFormatter;
+			conf.entryFormatter = this.conf.entryFormatter;
 		}
 
 		if (conf.stderr === undefined) {
@@ -313,207 +338,5 @@ export class Log implements LogInt {
 		};
 
 		return new Log(conf);
-	}
-
-	public error(msg: string, metadata?: Metadata) {
-		if (this.#logLevel === "none") return;
-		this.log("error", msg, metadata);
-	}
-
-	public warn(msg: string, metadata?: Metadata) {
-		if (["none", "error"].includes(this.#logLevel)) return;
-		this.log("warn", msg, metadata);
-	}
-
-	public info(msg: string, metadata?: Metadata) {
-		if (["none", "error", "warn"].includes(this.#logLevel)) return;
-		this.log("info", msg, metadata);
-	}
-
-	public verbose(msg: string, metadata?: Metadata) {
-		if (["none", "error", "warn", "info"].includes(this.#logLevel)) return;
-		this.log("verbose", msg, metadata);
-	}
-
-	public debug(msg: string, metadata?: Metadata) {
-		if (["none", "error", "warn", "info", "verbose"].includes(this.#logLevel)) return;
-		this.log("debug", msg, metadata);
-	}
-
-	public silly(msg: string, metadata?: Metadata) {
-		if (["none", "error", "warn", "info", "verbose", "debug"].includes(this.#logLevel)) return;
-		this.log("silly", msg, metadata);
-	}
-
-	public end() {
-		this.#otlpSpanPayload.resourceSpans[0].scopeSpans[0].spans[0].endTimeUnixNano = String(getNsTimestamp(Date.now()));
-
-		this.otlpCall({ path: "/v1/traces", payload: this.#otlpSpanPayload });
-	}
-
-	private log(logLevel: LogLevel, msg: string, metadata?: Metadata): void {
-		const formattedMetadata = Object.assign(metadata || {}, this.context);
-		const msTimestamp = Date.now();
-
-		if (this.#printTraceInfo) {
-			Object.assign(metadata, { spanId: this.spanId, traceId: this.traceId });
-		}
-
-		if (["error", "warn"].includes(logLevel)) {
-			this.#stderr(this.#entryFormatter({ logLevel, metadata: formattedMetadata, msTimestamp, msg }));
-		} else {
-			this.#stdout(this.#entryFormatter({ logLevel, metadata: formattedMetadata, msTimestamp, msg }));
-		}
-
-		if (!this.#otlpHttpBaseURI) {
-			return;
-		}
-
-		const payload: OtlpLogPayload = {
-			resourceLogs: [{
-				resource: { attributes: [] },
-				scopeLogs: [{
-					logRecords: [{
-						body: { stringValue: msg },
-						severityNumber: LogLevels[logLevel].otlpSeverityNumber,
-						severityText: LogLevels[logLevel].otlpSeverityText,
-						timeUnixNano: String(getNsTimestamp(Date.now())),
-						traceId: this.traceId,
-					}],
-				}],
-			}],
-		};
-
-		if (this.#parentLog !== null && this.#parentLog.spanId) {
-			payload.resourceLogs[0].scopeLogs[0].logRecords[0].spanId = this.#parentLog.spanId;
-			payload.resourceLogs[0].scopeLogs[0].logRecords[0].traceId = this.#parentLog.traceId;
-		}
-
-		if (metadata && Object.keys(metadata).length) {
-			payload.resourceLogs[0].scopeLogs[0].logRecords[0].attributes = [];
-
-			for (const [key, value] of Object.entries(metadata)) {
-				payload.resourceLogs[0].scopeLogs[0].logRecords[0].attributes.push({
-					key,
-					value: { stringValue: value },
-				});
-			}
-		}
-
-		this.otlpCall({ path: "/v1/logs", payload });
-	}
-
-	private async otlpCall({
-		path,
-		payload,
-	}: {
-		path: string,
-		payload: OtlpSpanPayload | OtlpLogPayload,
-	}): Promise<boolean> {
-		if (!this.#otlpHttpBaseURI) {
-			return true;
-		}
-
-		const urlObj = new URL(this.#otlpHttpBaseURI);
-		const url = `${urlObj.protocol}//${urlObj.username ? `${urlObj.username}:${urlObj.password}@` : "" }${urlObj.host}${path}`;
-
-		const headers = {
-			"Content-Type": "application/json",
-		};
-
-		if (this.otlpAdditionalHeaders) {
-			Object.assign(headers, this.otlpAdditionalHeaders);
-		}
-
-		try {
-			const res = await fetch(url, {
-				body: JSON.stringify(payload),
-				headers,
-				method: "POST",
-			});
-
-			if (!res.ok) {
-				const err = (new Error("Non-ok return status")) as FetchError;
-
-				err.status = res.status;
-
-				throw err;
-			}
-
-			const resBody = await res.json();
-
-			const resBodyStr = JSON.stringify(resBody);
-			if (resBodyStr !== "{\"partialSuccess\":{}}" && resBodyStr !== "{}") {
-				throw new Error("Invalid response body from OTLP service. Expected '{\"partialSuccess\":{}}' or '{}' but got: '" + JSON.stringify(resBody) + "'");
-			}
-
-			return true;
-		} catch (err: unknown) {
-			if (isFetchError(err)) {
-				this.#stderr(this.#entryFormatter({
-					logLevel: "error",
-					metadata: {
-						fetchStatus: String(err.status),
-						url,
-					},
-					msg: err.message,
-				}));
-			} else if (err instanceof Error) {
-				this.#stderr(this.#entryFormatter({
-					logLevel: "error",
-					metadata: { url },
-					msg: err.message,
-				}));
-			} else {
-				this.#stderr(this.#entryFormatter({
-					logLevel: "error",
-					metadata: { url },
-					msg: "Unknown error sending to OTLP",
-				}));
-			}
-
-			return false;
-		}
-	}
-
-	private async otlpCreateSpan(): Promise<boolean> {
-		const msTimestamp = Date.now();
-		const nsTimestamp = getNsTimestamp(msTimestamp);
-
-		this.#otlpSpanPayload = {
-			resourceSpans: [{
-				resource: { attributes: [] },
-				scopeSpans: [{
-					spans: [{
-						endTimeUnixNano: String(nsTimestamp),
-						kind: 0,
-						name: this.#spanName,
-						spanId: this.spanId,
-						startTimeUnixNano: String(nsTimestamp),
-						traceId: this.traceId,
-					}],
-				}],
-			}],
-		};
-
-		// Add context as attributes
-		if (Object.keys(this.context).length > 0) {
-			this.#otlpSpanPayload.resourceSpans[0].scopeSpans[0].spans[0].attributes = [];
-
-			for (const [key, value] of Object.entries(this.context)) {
-				this.#otlpSpanPayload.resourceSpans[0].scopeSpans[0].spans[0].attributes.push({
-					key,
-					value: {
-						stringValue: String(value),
-					},
-				});
-			}
-		}
-
-		if (this.#parentLog !== null && this.#parentLog.spanId) {
-			this.#otlpSpanPayload.resourceSpans[0].scopeSpans[0].spans[0].parentSpanId = this.#parentLog.spanId;
-		}
-
-		return this.otlpCall({ path: "/v1/traces", payload: this.#otlpSpanPayload });
 	}
 }
