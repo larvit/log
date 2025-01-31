@@ -1,6 +1,6 @@
 # @larvit/log
 
-Zero dependency, structured logging with a simple interface.
+Structured logging with a simple interface and support for OTLP.
 
 ## Installation
 
@@ -46,7 +46,7 @@ function myRequsetHandler(req, res) {
 	// ... Here be loads of request handler logic ...
 
 	// Explicitly tell that this inner log is now ended.
-	// This is used to set timings etc.
+	// Without this spans and traces does not get sent.
 	reqLog.end();
 }
 

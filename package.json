@@ -1,14 +1,14 @@
 {
   "name": "@larvit/log",
-  "version": "1.4.2",
+  "version": "1.6.2",
   "type": "module",
   "license": "MIT",
   "packageManager": "yarn@4.6.0",
   "scripts": {
+    "build-and-publish": "npm run build && npm publish",
     "build": "rm -f index.js index.d.ts index.js.map && tsc && uglifyjs index.js -o index.js",
     "lint-fix": "eslint --fix index.ts test.ts",
     "lint": "eslint index.ts test.ts",
-    "publish": "npm run build && npm publish",
     "test-unit": "node --loader ts-node/esm test.ts | tap-spec",
     "test": "yarn test-unit && yarn lint"
   },
