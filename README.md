@@ -30,7 +30,11 @@ To get tracing, timings, spans etc you can group your logs like this example:
 import { Log } from "@larvit/log";
 
 // Creates an outer log context
-const appLog = new Log();
+const appLog = new Log({
+	context: {
+		"service.name": "foobar"
+	}
+});
 
 // Just an example on a request/response http handler that you want to log
 function myRequsetHandler(req, res) {

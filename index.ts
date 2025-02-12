@@ -173,7 +173,7 @@ export class Log implements LogInt {
 
 		// Setup OpenTelemetry
 		const otlpResource = new Resource({
-			"service.name": "larvit-log",
+			"service.name": this.context["service.name"] || "unnamed-service",
 			...this.context,
 		});
 
