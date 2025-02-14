@@ -10,7 +10,7 @@
     "lint-fix": "eslint --fix index.ts test.ts",
     "lint": "eslint index.ts test.ts",
     "test-unit": "node --loader ts-node/esm test.ts | tap-spec",
-    "test": "yarn test-unit && yarn lint"
+    "test": "corepack prepare yarn@4.6.0 --activate && yarn test-unit && yarn lint"
   },
   "devDependencies": {
     "@larvit/eslint-config-typescript-esm": "1.2.1",

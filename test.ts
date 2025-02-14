@@ -420,10 +420,6 @@ test("OLTP simple log with metadata", t => {
 		}
 	});
 
-	mockExpress.post("/v1/traces", (_, res) => {
-		res.json({ partialSuccess: {} });
-	});
-
 	mockServer = mockExpress.listen(0, "127.0.0.1", () => {
 		const { port } = mockServer.address() as AddressInfo;
 		const oldStderr = process.stderr.write;
@@ -438,6 +434,81 @@ test("OLTP simple log with metadata", t => {
 		process.stderr.write = () => true;
 		log.warn("FOo", { bar: "baz", "lökig knasnyckel | typ": "17" });
 		log.end();
+		process.stderr.write = oldStderr;
+	});
+});
+
+test("OLTP multiple instances should work independently", t => {
+	const mockExpress = express();
+	let calls = 0;
+	let mockServer = null as unknown as Server;
+
+	mockExpress.use(express.json());
+
+	mockExpress.post("*name", (req, res) => {
+		calls++;
+
+		if (req.path === "/v1/logs") {
+			const logRecord = req.body.resourceLogs[0].scopeLogs[0].logRecords[0];
+
+			const serviceName = logRecord.attributes.find((attribute: any) => attribute.key === "service.name").value.stringValue;
+
+			if (logRecord.body.stringValue === "rappakalja") {
+				t.strictEqual(serviceName, "log1", "serviceName for rappakalja should be log1.");
+			} else if (logRecord.body.stringValue === "bollhav") {
+				t.strictEqual(serviceName, "log2", "serviceaName for bollhav should be log2.");
+			} else {
+				t.fail(`Unexpected log body: "${logRecord.body.stringValue}"`);
+			}
+		} else if (req.path === "/v1/traces") {
+			t.comment("/v1/traces was called");
+		} else {
+			t.fail(`Unexpected call: ${req.path}`);
+		}
+
+		res.json({ partialSuccess: {} });
+
+		if (calls === 4) {
+			mockServer.close();
+			t.end();
+		}
+	});
+
+	mockServer = mockExpress.listen(0, "127.0.0.1", () => {
+		const { port } = mockServer.address() as AddressInfo;
+		const oldStderr = process.stderr.write;
+
+		const otlpOptions = {
+			otlpExportTimeoutMillis: 50, // default: 3000, How long to wait for the export to complete
+			otlpHttpBaseURI: `http://127.0.0.1:${port}`,
+			otlpMaxExportBatchSize: 5, // default: 512, Maximum number of spans to batch
+			otlpMaxQueueSize: 32, // default: 2048, Maximum queue size (default 2048)
+			otlpScheduledDelayMillis: 10, // default: 100, How often to check for spans to send (default 1000ms)
+		};
+
+		process.stderr.write = () => true;
+
+		// Create a first log instance
+		const log1 = new Log({
+			context: {
+				"service.name": "log1",
+			},
+			...otlpOptions,
+		});
+
+		log1.warn("rappakalja");
+		log1.end();
+
+		// Create a second, that should now be independent
+		const log2 = new Log({
+			context: {
+				"service.name": "log2",
+			},
+			...otlpOptions,
+		});
+
+		log2.warn("bollhav");
+		log2.end();
 		process.stderr.write = oldStderr;
 	});
 });
