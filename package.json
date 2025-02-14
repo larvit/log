@@ -16,7 +16,7 @@
     "@larvit/eslint-config-typescript-esm": "1.2.1",
     "@randomgoods/tap-spec": "5.0.4",
     "@types/express": "5.0.0",
-    "@types/node": "22.13.1",
+    "@types/node": "22.13.4",
     "@types/tape": "5.8.1",
     "eslint": "8.57.1",
     "express": "5.0.1",
