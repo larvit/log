@@ -1,9 +1,13 @@
 import express from "express";
 import { Server } from "http";
+import { createRequire } from "module";
 import { AddressInfo } from "net";
 import test from "tape";
 
 import { Log } from "./index.js";
+
+const require = createRequire(import.meta.url);
+const packageJson = require("./package.json");
 
 function isNanoTimestampWithinHour(str) {
 	if (!/^\d+$/.test(str)) {
@@ -136,7 +140,7 @@ test("Test debug", t => {
 	process.stdout.write = msg => outputMsg = msg;
 	log.debug("kattbajs");
 	process.stdout.write = oldStdout;
-	t.strictEqual(outputMsg.substring(19), "Z [\x1b[1;35mdeb\x1b[0m] kattbajs\n", "");
+	t.strictEqual(outputMsg.substring(19), "Z [\x1b[1;35mdeb\x1b[0m] kattbajs\n", "Debug level is outputted to stdout");
 	t.end();
 });
 
@@ -390,6 +394,9 @@ test("OLTP simple log with metadata", t => {
 	let calls = 0;
 	let mockServer = null as unknown as Server;
 
+	let spanId = "bar";
+	let traceId = "foo";
+
 	mockExpress.use(express.json());
 
 	mockExpress.post("*name", (req, res) => {
@@ -406,8 +413,46 @@ test("OLTP simple log with metadata", t => {
 			t.strictEqual(logRecord.attributes[0].value.stringValue, "baz", "First attribute value is baz");
 			t.strictEqual(logRecord.attributes[1].key, "lökig knasnyckel | typ", "Second attribute is \"lökig knasnyckel | typ\"");
 			t.strictEqual(logRecord.attributes[1].value.stringValue, "17", "Second attribute value is \"17\"");
+
+			spanId = logRecord.spanId;
+			traceId = logRecord.traceId;
 		} else if (req.path === "/v1/traces") {
-			t.comment("/v1/traces was called");
+			const traceRecord = req.body.resourceSpans[0];
+
+			t.strictEqual(traceRecord.resource.attributes.length, 4, "Resource have 4 attributes");
+			t.strictEqual(traceRecord.resource.droppedAttributesCount, 0, "No attributes dropped");
+
+			const serviceName = traceRecord.resource.attributes.find(attr => attr.key === "service.name");
+			const telemetrySdkLanguage = traceRecord.resource.attributes.find(attr => attr.key === "telemetry.sdk.language");
+			const telemetrySdkName = traceRecord.resource.attributes.find(attr => attr.key === "telemetry.sdk.name");
+			const telemetrySdkVersion = traceRecord.resource.attributes.find(attr => attr.key === "telemetry.sdk.version");
+
+			t.strictEqual(serviceName.value.stringValue, "eva-bosse", "service.name is eva-bosse");
+			t.strictEqual(telemetrySdkLanguage.value.stringValue, "ecmascript", "telemetry.sdk.language is ecmascript");
+			t.strictEqual(telemetrySdkName.value.stringValue, "@larvit/log", "telemetry.sdk.name is @larvit/log");
+			t.strictEqual(telemetrySdkVersion.value.stringValue, packageJson.version, `telemetry.sdk.version is ${packageJson.version}`);
+
+			t.strictEqual(traceRecord.scopeSpans.length, 1, "Exactly one scoped span is sent");
+			t.strictEqual(traceRecord.scopeSpans[0].spans.length, 1, "Exactly one span is sent in the scoped span");
+
+			const scopedSpan = traceRecord.scopeSpans[0];
+			const span = scopedSpan.spans[0];
+
+			t.strictEqual(scopedSpan.scope.name, "lur-bert", "Spans scope name is lur-bert");
+			t.strictEqual(span.name, "lur-bert", "Span name is lur-bert");
+			t.strictEqual(span.traceId, traceId, "traceId is the same in trace and log");
+			t.strictEqual(span.spanId, spanId, "spanId is the same in trace and log");
+			t.strictEqual(span.kind, 1, "span kind is 1");
+			t.strictEqual(isNanoTimestampWithinHour(span.startTimeUnixNano), true, "startTimeUnixNano is valid");
+			t.strictEqual(isNanoTimestampWithinHour(span.endTimeUnixNano), true, "endTimeUnixNano is valid");
+
+			t.strictEqual(span.attributes.length, 0, "Span attributes is an empty array");
+			t.strictEqual(span.droppedAttributesCount, 0, "Span have no dropped attributes");
+			t.strictEqual(span.events.length, 0, "Span events should be an empty array");
+			t.strictEqual(span.droppedEventsCount, 0, "Span have no dropped events");
+			t.strictEqual(span.status.code, 0, "span status code is 0");
+			t.strictEqual(span.links.length, 0, "span links length is an empty array");
+			t.strictEqual(span.droppedLinksCount, 0, "span have no dropped links");
 		} else {
 			t.fail(`Unexpected call: ${req.path}`);
 		}
@@ -424,11 +469,13 @@ test("OLTP simple log with metadata", t => {
 		const { port } = mockServer.address() as AddressInfo;
 		const oldStderr = process.stderr.write;
 		const log = new Log({
+			context: { "service.name": "eva-bosse" },
 			otlpExportTimeoutMillis: 50, // default: 3000, How long to wait for the export to complete
 			otlpHttpBaseURI: `http://127.0.0.1:${port}`,
 			otlpMaxExportBatchSize: 5, // default: 512, Maximum number of spans to batch
 			otlpMaxQueueSize: 32, // default: 2048, Maximum queue size (default 2048)
 			otlpScheduledDelayMillis: 10, // default: 100, How often to check for spans to send (default 1000ms)
+			spanName: "lur-bert",
 		});
 
 		process.stderr.write = () => true;
