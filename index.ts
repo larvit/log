@@ -1,8 +1,3 @@
-import { createRequire } from "module";
-
-const require = createRequire(import.meta.url);
-const packageJson = require("./package.json");
-
 export type EntryFormatterConf = {
 	logLevel: LogLevel;
 	metadata?: Metadata;
@@ -188,17 +183,18 @@ export function msgTextFormatter(conf: EntryFormatterConf) {
 	return str;
 }
 
-/**
- * Converts a Uint8Array to a hex string.
- *
- * @param {bytes} bytes - The byte array to convert
- *
- * @returns {string} The hex string representation
- */
 function bytesToHex(bytes: Uint8Array): string {
-	return Array.from(bytes)
-		.map(byte => byte.toString(16).padStart(2, "0"))
-		.join("");
+	return Array.from(bytes).map(byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function getRandomBytes(size: number): Uint8Array {
+	const bytes = new Uint8Array(size);
+
+	for (let i = 0; i < size; i++) {
+		bytes[i] = Math.floor(Math.random() * 256);
+	}
+
+	return bytes;
 }
 
 /**
@@ -206,12 +202,8 @@ function bytesToHex(bytes: Uint8Array): string {
  *
  * @returns {string} A valid OTLP span ID
  */
-function generateSpanId(): string {
-	const bytes = new Uint8Array(8);
-
-	crypto.getRandomValues(bytes);
-
-	return bytesToHex(bytes);
+export function generateSpanId(): string {
+	return bytesToHex(getRandomBytes(8));
 }
 
 /**
@@ -219,10 +211,8 @@ function generateSpanId(): string {
  *
  * @returns {string} A valid OTLP trace ID
  */
-function generateTraceId(): string {
-	const bytes = new Uint8Array(16);
-
-	crypto.getRandomValues(bytes);
+export function generateTraceId(): string {
+	const bytes = getRandomBytes(16);
 
 	// Ensure version 1 trace ID by setting first byte
 	bytes[0] = 0x01;
@@ -564,7 +554,7 @@ export class Log implements LogInt {
 						{
 							key: "telemetry.sdk.version",
 							value: {
-								stringValue: packageJson.version,
+								stringValue: "__version__",
 							},
 						},
 					],

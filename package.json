@@ -1,14 +1,15 @@
 {
   "name": "@larvit/log",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "type": "module",
   "license": "MIT",
   "packageManager": "yarn@4.6.0",
   "scripts": {
     "build-and-publish": "npm run build && npm publish",
-    "build": "rm -f index.js index.d.ts index.js.map && tsc && uglifyjs index.js -o index.js",
+    "build": "rm -f index.js index.d.ts index.js.map && tsc && uglifyjs index.js -o index.js && npm run replace-version-string",
     "lint-fix": "eslint --fix index.ts test.ts",
     "lint": "eslint index.ts test.ts",
+    "replace-version-string": "grep -o '\"version\": \"[^\"]*\"' package.json | cut -d'\"' -f4 | xargs -I {} sed -i 's/__version__/{}/g' index.js",
     "test-unit": "node --loader ts-node/esm test.ts | tap-spec",
     "test": "corepack prepare yarn@4.6.0 --activate && npm run build && yarn test-unit && yarn lint"
   },
