@@ -3,7 +3,7 @@
   "version": "1.7.1",
   "type": "module",
   "license": "MIT",
-  "packageManager": "yarn@4.6.0",
+  "packageManager": "yarn@4.7.0",
   "scripts": {
     "build-and-publish": "npm run build && npm publish",
     "build": "rm -f index.js index.d.ts index.js.map && tsc && uglifyjs index.js -o index.js && npm run replace-version-string",
