@@ -16,11 +16,11 @@
   "devDependencies": {
     "@larvit/eslint-config-typescript-esm": "1.2.1",
     "@randomgoods/tap-spec": "5.0.4",
-    "@types/express": "5.0.0",
+    "@types/express": "5.0.6",
     "@types/node": "22.13.4",
     "@types/tape": "5.8.1",
     "eslint": "8.57.1",
-    "express": "5.0.1",
+    "express": "5.2.1",
     "tape": "5.9.0",
     "ts-node": "10.9.2",
     "typescript": "5.7.3",
