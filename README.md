@@ -2,6 +2,15 @@
 
 Structured logging with a simple interface and support for OTLP.
 
+## Design priorities
+
+In priority order:
+
+1. **A simple API** — small surface, easy to drop in.
+2. **Runs anywhere JavaScript runs** — both browsers and server-side (Node.js >= 18). The only requirement is a runtime with the global `fetch` (used by the OTLP transport).
+3. **Strong OTLP support** — the OTLP payloads are hand-built JSON over `fetch` (no OpenTelemetry SDK dependency) to stay portable across runtimes.
+4. **stdout/stderr support** — works as a plain console logger when OTLP is not configured.
+
 ## Installation
 
 `npm i @larvit/log` or `yarn add @larvit/log`
@@ -37,7 +46,7 @@ const appLog = new Log({
 });
 
 // Just an example on a request/response http handler that you want to log
-function myRequsetHandler(req, res) {
+async function myRequestHandler(req, res) {
 	// Creates an inner log context for this specific request
 	const reqLog = new Log({
 		context: { requestId: crypto.randomUUID() },
@@ -51,7 +60,10 @@ function myRequsetHandler(req, res) {
 
 	// Explicitly tell that this inner log is now ended.
 	// Without this spans and traces does not get sent.
-	reqLog.end();
+	// end() returns a promise; await it when you need delivery guaranteed
+	// before the process exits (eg. short-lived scripts). Fire-and-forget
+	// (just `reqLog.end();`) is fine in long-running processes.
+	await reqLog.end();
 }
 
 ```
@@ -79,8 +91,10 @@ const log = new Log({
 	// Defaults to "info", same as Log level only section above
 	logLevel: "info",
 
-	// The function that formats the log entry, default is shown here
-	entryFormatter: ({ logLevel, metadata, msg }) => {
+	// The function that formats the log entry, default is shown here.
+	// msTimestamp is the Date.now() of the log call (use it instead of new Date()
+	// so the console, json and OTLP timestamps for one entry all match).
+	entryFormatter: ({ logLevel, metadata, msTimestamp, msg }) => {
 		return `${logLevel}: ${msg} ${JSON.stringify(metadata)}`;
 	},
 
@@ -126,3 +140,36 @@ const log = new Log({
 ### Metadata
 
 `log.info("foo", { hey: "luring" });` --> 2022-09-24T23:40:39Z [info] foo {"hey":"luring"}
+
+## Releasing
+
+Publishing is automated: creating a GitHub release runs the **Publish** workflow
+(`.github/workflows/publish.yaml`), which builds, tests, lints and then `npm publish`es.
+
+One-time setup: add an `NPM_TOKEN` repo secret (Settings → Secrets and variables → Actions)
+with an npm automation token that has publish rights to `@larvit/log`.
+
+To cut a release:
+
+1. Add a `## Changelog` entry below for the new version.
+2. Bump the version in `package.json` (`npm version <major|minor|patch>` does this and commits it).
+   Follow semver: breaking changes → major.
+3. Merge to `master`.
+4. Create a GitHub release with a tag `vX.Y.Z` that matches `package.json` (e.g. `v2.0.0`).
+   The workflow verifies the tag matches the version and fails the publish if it does not.
+
+The workflow publishes whatever is in `package.json`, so the tag and `package.json` version must agree.
+To publish manually instead: `npm run build-and-publish`.
+
+## Changelog
+
+### 2.0.0
+
+- **Breaking:** requires Node.js >= 18 (dropped 16/17). The OTLP transport uses the global `fetch`.
+- **Breaking:** removed the unused OTLP options `otlpExportTimeoutMillis`, `otlpMaxExportBatchSize`, `otlpMaxQueueSize`, `otlpScheduledDelayMillis`.
+- `end()` now returns a `Promise` — `await log.end()` to guarantee delivery before exit (fire-and-forget still works).
+- Fixed: OTLP logs now set `service.name` (and `telemetry.sdk.*`) on the resource, so Grafana/Loki shows the service for logs, not only traces.
+- Fixed: a base path in `otlpHttpBaseURI` is now kept (e.g. `http://host/otel` → `http://host/otel/v1/logs`).
+- Implemented `printTraceInfo` (appends `spanId`/`traceId`/`spanName` to console output; previously a no-op).
+- Span/trace IDs use `crypto.getRandomValues` when available; `msgJsonFormatter` no longer mutates caller metadata or throws on undefined metadata; corrected inverted `verbose`/`debug` severity ordering.
+- Tooling: switched from yarn to npm.

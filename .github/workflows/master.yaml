@@ -2,18 +2,16 @@ name: Push
 on: [push]
 jobs:
   Build-and-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
-        node-version: [16.x, 18.x, 20.x, 22.x, 23.x]
+        node-version: [18.x, 20.x, 22.x, 24.x, 26.x]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
       - run: |
-          corepack enable
-          yarn
-          yarn build
-          yarn test
+          npm ci
+          npm test

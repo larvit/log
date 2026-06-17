@@ -1,9 +1,11 @@
 {
   "name": "@larvit/log",
-  "version": "1.7.1",
+  "version": "2.0.0",
   "type": "module",
   "license": "MIT",
-  "packageManager": "yarn@4.6.0",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build-and-publish": "npm run build && npm publish",
     "build": "rm -f index.js index.d.ts index.js.map && tsc && uglifyjs index.js -o index.js && npm run replace-version-string",
@@ -11,19 +13,19 @@
     "lint": "eslint index.ts test.ts",
     "replace-version-string": "grep -o '\"version\": \"[^\"]*\"' package.json | cut -d'\"' -f4 | xargs -I {} sed -i 's/__version__/{}/g' index.js",
     "test-unit": "node --loader ts-node/esm test.ts | tap-spec",
-    "test": "corepack prepare yarn@4.6.0 --activate && npm run build && yarn test-unit && yarn lint"
+    "test": "npm run build && npm run test-unit && npm run lint"
   },
   "devDependencies": {
     "@larvit/eslint-config-typescript-esm": "1.2.1",
     "@randomgoods/tap-spec": "5.0.4",
-    "@types/express": "5.0.0",
-    "@types/node": "22.13.4",
+    "@types/express": "5.0.6",
+    "@types/node": "25.9.3",
     "@types/tape": "5.8.1",
     "eslint": "8.57.1",
-    "express": "5.0.1",
-    "tape": "5.9.0",
+    "express": "5.2.1",
+    "tape": "5.10.1",
     "ts-node": "10.9.2",
-    "typescript": "5.7.3",
+    "typescript": "5.9.3",
     "uglify-js": "3.19.3"
   },
   "publishConfig": {
