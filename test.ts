@@ -537,6 +537,15 @@ test("OLTP simple log with metadata", t => {
 			t.strictEqual(logRecord.attributes[1].key, "lökig knasnyckel | typ", "Second attribute is \"lökig knasnyckel | typ\"");
 			t.strictEqual(logRecord.attributes[1].value.stringValue, "17", "Second attribute value is \"17\"");
 
+			// service.name belongs on the log resource (this is what Grafana/Loki reads), not the log record.
+			const logResourceAttrs = req.body.resourceLogs[0].resource.attributes;
+			const logServiceName = logResourceAttrs.find((attr: any) => attr.key === "service.name");
+			const logSdkName = logResourceAttrs.find((attr: any) => attr.key === "telemetry.sdk.name");
+
+			t.strictEqual(logServiceName.value.stringValue, "eva-bosse", "log resource service.name is eva-bosse");
+			t.strictEqual(logSdkName.value.stringValue, "@larvit/log", "log resource telemetry.sdk.name is @larvit/log");
+			t.notOk(logRecord.attributes.find((attr: any) => attr.key === "service.name"), "service.name is not duplicated in log record attributes");
+
 			spanId = logRecord.spanId;
 			traceId = logRecord.traceId;
 		} else if (req.path === "/v1/traces") {

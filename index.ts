@@ -234,27 +234,38 @@ function isFetchError(error: unknown): error is FetchError {
 	return typeof error === "object" && error !== null && "message" in error;
 }
 
+// Resource-level OTLP attributes (service.name + telemetry.sdk.*). Shared by logs and spans so the
+// service is identified the same way for both — Grafana/Loki reads service.name from here, not the records.
+function buildResourceAttributes(context: Metadata): OtlpAttribute[] {
+	return [
+		{ key: "service.name", value: { stringValue: context["service.name"] || "unnamed-service" } },
+		{ key: "telemetry.sdk.language", value: { stringValue: "ecmascript" } },
+		{ key: "telemetry.sdk.name", value: { stringValue: "@larvit/log" } },
+		{ key: "telemetry.sdk.version", value: { stringValue: "__version__" } },
+	];
+}
+
 // Pure builder: state in, OTLP log payload out. Kept out of the class so it is trivially testable.
 function buildLogPayload(opts: {
+	attributes: Metadata,
 	logLevel: LogLevel,
-	metadata: Metadata,
 	msTimestamp: number,
 	msg: string,
 	span: OtlpSpan,
 }): OtlpLogPayload {
-	const { logLevel, metadata, msTimestamp, msg, span } = opts;
+	const { attributes, logLevel, msTimestamp, msg, span } = opts;
 
-	const attributes: OtlpAttribute[] = Object.entries(metadata).map(([key, value]) => ({
-		key,
-		value: { stringValue: String(value) },
-	}));
+	// service.name is carried on the resource (below), so it is excluded from the per-record attributes.
+	const recordAttributes: OtlpAttribute[] = Object.entries(attributes)
+		.filter(([key]) => key !== "service.name")
+		.map(([key, value]) => ({ key, value: { stringValue: String(value) } }));
 
 	return {
 		resourceLogs: [{
-			resource: { attributes: [] },
+			resource: { attributes: buildResourceAttributes(attributes) },
 			scopeLogs: [{
 				logRecords: [{
-					...attributes.length ? { attributes } : {},
+					...recordAttributes.length ? { attributes: recordAttributes } : {},
 					body: { stringValue: msg },
 					severityNumber: LogLevels[logLevel].severityNumber,
 					severityText: LogLevels[logLevel].severityText,
@@ -291,12 +302,7 @@ function buildSpanPayload(opts: {
 	return {
 		resourceSpans: [{
 			resource: {
-				attributes: [
-					{ key: "service.name", value: { stringValue: context["service.name"] || "unnamed-service" } },
-					{ key: "telemetry.sdk.language", value: { stringValue: "ecmascript" } },
-					{ key: "telemetry.sdk.name", value: { stringValue: "@larvit/log" } },
-					{ key: "telemetry.sdk.version", value: { stringValue: "__version__" } },
-				],
+				attributes: buildResourceAttributes(context),
 				droppedAttributesCount: 0,
 			},
 			scopeSpans: [{
@@ -468,7 +474,7 @@ export class Log implements LogInt {
 
 		// Logs attach to the parent span when there is one, otherwise to this instance's span.
 		const span = this.conf.parentLog?.span.spanId ? this.conf.parentLog.span : this.span;
-		const payload = buildLogPayload({ logLevel, metadata: attributes, msTimestamp, msg, span });
+		const payload = buildLogPayload({ attributes, logLevel, msTimestamp, msg, span });
 
 		this.track(this.otlpCall({ path: "/v1/logs", payload }));
 	}
