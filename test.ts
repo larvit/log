@@ -4,7 +4,7 @@ import { createRequire } from "module";
 import { AddressInfo } from "net";
 import test from "tape";
 
-import { Log } from "./index.js";
+import { generateSpanId, generateTraceId, Log, LogLevels, msgJsonFormatter } from "./index.js";
 
 const require = createRequire(import.meta.url);
 const packageJson = require("./package.json");
@@ -310,6 +310,98 @@ test("Copy instance", t => {
 	t.end();
 });
 
+test("msgJsonFormatter does not mutate input and is undefined-safe", t => {
+	const meta = { user: "abc" };
+	const parsed = JSON.parse(msgJsonFormatter({ logLevel: "info", metadata: meta, msg: "hi" }));
+
+	t.strictEqual(parsed.user, "abc", "user metadata preserved");
+	t.strictEqual(parsed.msg, "hi", "msg present");
+	t.strictEqual(parsed.logLevel, "info", "logLevel present");
+	t.deepEqual(meta, { user: "abc" }, "caller metadata object is NOT mutated");
+
+	const parsed2 = JSON.parse(msgJsonFormatter({ logLevel: "error", msg: "boom" }));
+
+	t.strictEqual(parsed2.msg, "boom", "undefined metadata does not throw");
+
+	t.end();
+});
+
+test("verbose is ranked more severe than debug in OTLP severity", t => {
+	t.ok(LogLevels.verbose.severityNumber > LogLevels.debug.severityNumber, "verbose severityNumber > debug severityNumber");
+	t.end();
+});
+
+test("generateSpanId/generateTraceId produce valid, unique hex ids", t => {
+	t.ok(/^[0-9a-f]{16}$/.test(generateSpanId()), "spanId is 16 hex chars");
+	t.ok(/^[0-9a-f]{32}$/.test(generateTraceId()), "traceId is 32 hex chars");
+	t.notStrictEqual(generateSpanId(), generateSpanId(), "two span ids differ");
+	t.end();
+});
+
+test("printTraceInfo appends span/trace info to output", t => {
+	const oldStdout = process.stdout.write;
+	let outputMsg = "";
+	const log = new Log({ printTraceInfo: true, spanName: "my-span" });
+
+	process.stdout.write = msg => outputMsg = msg;
+	log.info("hello");
+	process.stdout.write = oldStdout;
+
+	t.ok(outputMsg.includes("spanId"), "output contains spanId");
+	t.ok(outputMsg.includes("traceId"), "output contains traceId");
+	t.ok(outputMsg.includes("my-span"), "output contains span name");
+	t.end();
+});
+
+test("clone can downgrade json format to text", t => {
+	const oldStdout = process.stdout.write;
+	let outputMsg = "";
+	const textLog = new Log({ format: "json" }).clone({ format: "text" });
+
+	process.stdout.write = msg => outputMsg = msg;
+	textLog.info("plain");
+	process.stdout.write = oldStdout;
+
+	t.throws(() => JSON.parse(outputMsg), "text clone output is not JSON");
+	t.ok(outputMsg.includes("plain"), "message present in text output");
+	t.end();
+});
+
+test("constructor throws on malformed otlpHttpBaseURI", t => {
+	t.throws(() => new Log({ otlpHttpBaseURI: "not a valid uri" }), "malformed otlpHttpBaseURI throws at construction");
+	t.doesNotThrow(() => new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318" }), "valid uri does not throw");
+	t.end();
+});
+
+test("child log does not share its context object with the parent", t => {
+	const parent = new Log({ context: { service: "x" } });
+	const child = new Log({ parentLog: parent });
+
+	t.notStrictEqual(child.context, parent.context, "child has its own context object");
+	t.strictEqual(child.context.service, "x", "child inherits parent context values");
+
+	child.context.extra = "y";
+	t.strictEqual(parent.context.extra, undefined, "child context mutation does not leak to parent");
+	t.end();
+});
+
+test("end() returns an awaitable promise and OTLP failure is handled without hanging", async t => {
+	const oldStderr = process.stderr.write;
+	let errOutput = "";
+	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:1" }); // nothing listens -> connection refused
+
+	process.stderr.write = msg => errOutput = msg;
+	log.error("will fail to export");
+	const ret = log.end();
+
+	t.ok(ret && typeof ret.then === "function", "end() returns a thenable");
+	await ret;
+	process.stderr.write = oldStderr;
+
+	t.ok(errOutput.length > 0, "an export error was written to stderr");
+	t.end();
+});
+
 test("OLTP simple log", t => {
 	const mockExpress = express();
 	let calls = 0;
@@ -375,11 +467,7 @@ test("OLTP simple log", t => {
 		const { port } = mockServer.address() as AddressInfo;
 		const oldStderr = process.stderr.write;
 		const log = new Log({
-			otlpExportTimeoutMillis: 50, // default: 3000, How long to wait for the export to complete
 			otlpHttpBaseURI: `http://127.0.0.1:${port}`,
-			otlpMaxExportBatchSize: 5, // default: 512, Maximum number of spans to batch
-			otlpMaxQueueSize: 32, // default: 2048, Maximum queue size (default 2048)
-			otlpScheduledDelayMillis: 10, // default: 100, How often to check for spans to send (default 1000ms)
 		});
 
 		process.stderr.write = () => true;
@@ -470,11 +558,7 @@ test("OLTP simple log with metadata", t => {
 		const oldStderr = process.stderr.write;
 		const log = new Log({
 			context: { "service.name": "eva-bosse" },
-			otlpExportTimeoutMillis: 50, // default: 3000, How long to wait for the export to complete
 			otlpHttpBaseURI: `http://127.0.0.1:${port}`,
-			otlpMaxExportBatchSize: 5, // default: 512, Maximum number of spans to batch
-			otlpMaxQueueSize: 32, // default: 2048, Maximum queue size (default 2048)
-			otlpScheduledDelayMillis: 10, // default: 100, How often to check for spans to send (default 1000ms)
 			spanName: "lur-bert",
 		});
 
@@ -526,11 +610,7 @@ test("OLTP multiple instances should work independently", t => {
 		const oldStderr = process.stderr.write;
 
 		const otlpOptions = {
-			otlpExportTimeoutMillis: 50, // default: 3000, How long to wait for the export to complete
 			otlpHttpBaseURI: `http://127.0.0.1:${port}`,
-			otlpMaxExportBatchSize: 5, // default: 512, Maximum number of spans to batch
-			otlpMaxQueueSize: 32, // default: 2048, Maximum queue size (default 2048)
-			otlpScheduledDelayMillis: 10, // default: 100, How often to check for spans to send (default 1000ms)
 		};
 
 		process.stderr.write = () => true;

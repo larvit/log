@@ -2,6 +2,8 @@
 
 Structured logging with a simple interface and support for OTLP.
 
+Runs anywhere modern JavaScript runs: Node.js (>= 18) and reasonably modern browsers. The OTLP transport uses the global `fetch`, so any runtime providing it is supported.
+
 ## Installation
 
 `npm i @larvit/log` or `yarn add @larvit/log`
@@ -37,7 +39,7 @@ const appLog = new Log({
 });
 
 // Just an example on a request/response http handler that you want to log
-function myRequsetHandler(req, res) {
+async function myRequsetHandler(req, res) {
 	// Creates an inner log context for this specific request
 	const reqLog = new Log({
 		context: { requestId: crypto.randomUUID() },
@@ -51,7 +53,10 @@ function myRequsetHandler(req, res) {
 
 	// Explicitly tell that this inner log is now ended.
 	// Without this spans and traces does not get sent.
-	reqLog.end();
+	// end() returns a promise; await it when you need delivery guaranteed
+	// before the process exits (eg. short-lived scripts). Fire-and-forget
+	// (just `reqLog.end();`) is fine in long-running processes.
+	await reqLog.end();
 }
 
 ```
@@ -79,8 +84,10 @@ const log = new Log({
 	// Defaults to "info", same as Log level only section above
 	logLevel: "info",
 
-	// The function that formats the log entry, default is shown here
-	entryFormatter: ({ logLevel, metadata, msg }) => {
+	// The function that formats the log entry, default is shown here.
+	// msTimestamp is the Date.now() of the log call (use it instead of new Date()
+	// so the console, json and OTLP timestamps for one entry all match).
+	entryFormatter: ({ logLevel, metadata, msTimestamp, msg }) => {
 		return `${logLevel}: ${msg} ${JSON.stringify(metadata)}`;
 	},
 
