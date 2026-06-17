@@ -70,10 +70,10 @@ async function myRequestHandler(req, res) {
 
 ### Configuration
 
-**Log level only**  
+**Log level only**
 `const log = new Log("info");` Will only output error, warn and info logs. This is the default. All possible options: "error", "warn", "info", "verbose", "debug", "silly" and "none".
 
-**All options**  
+**All options**
 ```javascript
 const log = new Log({
 	// All options is optional
@@ -123,7 +123,7 @@ const log = new Log({
 	printTraceInfo: false,
 
 	// Use a specific span name. Any log using this log as a parent will be
-	// grouped under this span name. 
+	// grouped under this span name.
 	// Defaults to be the same as the span id, that is internally generated for each span
 	spanName: "my-span",
 
@@ -163,7 +163,7 @@ To publish manually instead: `npm run build-and-publish`.
 
 ## Changelog
 
-### 2.0.0
+### v2.0.0
 
 - **Breaking:** requires Node.js >= 18 (dropped 16/17). The OTLP transport uses the global `fetch`.
 - **Breaking:** removed the unused OTLP options `otlpExportTimeoutMillis`, `otlpMaxExportBatchSize`, `otlpMaxQueueSize`, `otlpScheduledDelayMillis`.
