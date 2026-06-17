@@ -2,7 +2,14 @@
 
 Structured logging with a simple interface and support for OTLP.
 
-Runs anywhere modern JavaScript runs: Node.js (>= 18) and reasonably modern browsers. The OTLP transport uses the global `fetch`, so any runtime providing it is supported.
+## Design priorities
+
+In priority order:
+
+1. **A simple API** — small surface, easy to drop in.
+2. **Runs anywhere JavaScript runs** — both browsers and server-side (Node.js >= 18). The only requirement is a runtime with the global `fetch` (used by the OTLP transport).
+3. **Strong OTLP support** — the OTLP payloads are hand-built JSON over `fetch` (no OpenTelemetry SDK dependency) to stay portable across runtimes.
+4. **stdout/stderr support** — works as a plain console logger when OTLP is not configured.
 
 ## Installation
 
