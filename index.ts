@@ -515,7 +515,8 @@ export class Log implements LogInt {
 		}
 
 		const base = this.otlpBaseUrl;
-		const url = `${base.protocol}//${base.username ? `${base.username}:${base.password}@` : "" }${base.host}${path}`;
+		const basePath = base.pathname.replace(/\/$/, ""); // keep any base path prefix, drop a trailing slash
+		const url = `${base.protocol}//${base.username ? `${base.username}:${base.password}@` : "" }${base.host}${basePath}${path}`;
 
 		const headers = {
 			"Content-Type": "application/json",

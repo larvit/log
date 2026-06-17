@@ -390,7 +390,11 @@ test("end() returns an awaitable promise and OTLP failure is handled without han
 	let errOutput = "";
 	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:1" }); // nothing listens -> connection refused
 
-	process.stderr.write = msg => errOutput = msg;
+	process.stderr.write = msg => {
+		errOutput += String(msg);
+
+		return true;
+	};
 	log.error("will fail to export");
 	const ret = log.end();
 
@@ -398,8 +402,39 @@ test("end() returns an awaitable promise and OTLP failure is handled without han
 	await ret;
 	process.stderr.write = oldStderr;
 
-	t.ok(errOutput.length > 0, "an export error was written to stderr");
+	// Assert on the OTLP endpoint url, which only the export-error path emits — not the log.error() above.
+	t.ok(errOutput.includes("127.0.0.1:1"), "the OTLP export error (incl. endpoint url) was written to stderr");
 	t.end();
+});
+
+test("OTLP preserves a base path from otlpHttpBaseURI", t => {
+	const mockExpress = express();
+	let mockServer = null as unknown as Server;
+	const seenPaths: string[] = [];
+
+	mockExpress.use(express.json());
+
+	mockExpress.post("*name", (req, res) => {
+		seenPaths.push(req.path);
+		res.json({ partialSuccess: {} });
+
+		if (seenPaths.length === 2) {
+			mockServer.close();
+			t.deepEqual(seenPaths.sort(), ["/otel/v1/logs", "/otel/v1/traces"], "base path /otel is kept on both endpoints");
+			t.end();
+		}
+	});
+
+	mockServer = mockExpress.listen(0, "127.0.0.1", () => {
+		const { port } = mockServer.address() as AddressInfo;
+		const oldStderr = process.stderr.write;
+		const log = new Log({ otlpHttpBaseURI: `http://127.0.0.1:${port}/otel` });
+
+		process.stderr.write = () => true;
+		log.error("with base path");
+		log.end();
+		process.stderr.write = oldStderr;
+	});
 });
 
 test("OLTP simple log", t => {

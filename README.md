@@ -46,7 +46,7 @@ const appLog = new Log({
 });
 
 // Just an example on a request/response http handler that you want to log
-async function myRequsetHandler(req, res) {
+async function myRequestHandler(req, res) {
 	// Creates an inner log context for this specific request
 	const reqLog = new Log({
 		context: { requestId: crypto.randomUUID() },
