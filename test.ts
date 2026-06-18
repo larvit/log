@@ -1,4 +1,4 @@
-import { type LogConf, generateSpanId, generateTraceId, Log, LogLevels, msgJsonFormatter } from "./index.js";
+import { generateSpanId, generateTraceId, Log, type LogConf, LogLevels, msgJsonFormatter } from "./index.js";
 import test from "./tap.js";
 
 // --- helpers ---------------------------------------------------------------

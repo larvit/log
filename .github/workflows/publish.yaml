@@ -25,6 +25,8 @@ jobs:
             exit 1
           fi
       - run: npm ci
+      # Lint runs on the host (it's no longer bundled into the dockerized `ci` script).
+      - run: npm run lint
       # Dockerized node + browser tests (same as CI / local).
       - run: npm test
       # Build the publishable artifacts on the runner (the dockerized tests don't write to the host).

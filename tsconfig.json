@@ -3,7 +3,9 @@
 		"declaration": true,
 		"module": "NodeNext",
 		"sourceMap": true,
-		"target": "ES2022"
+		"strict": true,
+		"target": "ES2022",
+		"types": ["node"]
 	},
 	"files": ["index.ts"]
 }
