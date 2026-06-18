@@ -1,9 +1,9 @@
 export type EntryFormatterConf = {
 	logLevel: LogLevel;
 	metadata?: Metadata;
-	msTimestamp?: number;
 	msg: string;
-}
+	msTimestamp?: number;
+};
 
 export type LogConf = {
 	context?: Metadata;
@@ -17,12 +17,15 @@ export type LogConf = {
 	spanName?: string;
 	stderr?: (msg: string) => void;
 	stdout?: (msg: string) => void;
-}
+};
+
+// conf after the constructor fills its defaults: the always-set fields are no longer optional.
+export type ResolvedLogConf = LogConf & Required<Pick<LogConf, "entryFormatter" | "logLevel" | "stderr" | "stdout">>;
 
 export type LogInt = {
 	conf: LogConf;
 	span: OtlpSpan;
-	/* eslint-disable typescript-sort-keys/interface */
+	/* eslint-disable perfectionist/sort-object-types */
 	error: LogShorthand;
 	warn: LogShorthand;
 	info: LogShorthand;
@@ -30,8 +33,8 @@ export type LogInt = {
 	debug: LogShorthand;
 	silly: LogShorthand;
 	end: () => Promise<void>;
-	/* eslint-enable typescript-sort-keys/interface */
-}
+	/* eslint-enable perfectionist/sort-object-types */
+};
 
 export type LogLevel = keyof typeof LogLevels;
 
@@ -39,7 +42,7 @@ export type LogShorthand = (msg: string, metadata?: Metadata) => void;
 
 export type Metadata = {
 	[key: string]: MetadataValue;
-}
+};
 
 // Primitive values only. String() coerces them for OTLP; the JSON formatter keeps them native.
 // bigint/objects are excluded: JSON.stringify throws on bigint and renders objects as "[object Object]".
@@ -50,7 +53,7 @@ export type OtlpAttribute = {
 	value: {
 		stringValue: string
 	}
-}
+};
 
 export type OtlpLogPayload = {
 	resourceLogs: {
@@ -71,7 +74,7 @@ export type OtlpLogPayload = {
 			}[],
 		}[],
 	}[],
-}
+};
 
 export type OtlpSpan = {
 	attributes: OtlpAttribute[],
@@ -88,7 +91,7 @@ export type OtlpSpan = {
 	startTimeUnixNano: string,
 	status: { code: number },
 	traceId: string,
-}
+};
 
 export type OtlpSpanPayload = {
 	resourceSpans: {
@@ -103,12 +106,12 @@ export type OtlpSpanPayload = {
 			spans: OtlpSpan[],
 		}[],
 	}[],
-}
+};
 
 type FetchError = {
-  message: string;
-  status?: number;
-}
+	message: string;
+	status?: number;
+};
 
 // Fixed OTLP export timeout (ms). Bounds each fetch so end() can never hang on an unresponsive collector.
 const OTLP_EXPORT_TIMEOUT_MS = 3000;
@@ -153,7 +156,7 @@ export function msgJsonFormatter(conf: EntryFormatterConf) {
 }
 
 export function msgTextFormatter(conf: EntryFormatterConf) {
-	let levelOut = "";
+	let levelOut: string;
 
 	if (conf.logLevel === "silly") {
 		levelOut = "\x1b[1;37msil\x1b[0m";
@@ -253,8 +256,8 @@ function buildResourceAttributes(context: Metadata): OtlpAttribute[] {
 function buildLogPayload(opts: {
 	attributes: Metadata,
 	logLevel: LogLevel,
-	msTimestamp: number,
 	msg: string,
+	msTimestamp: number,
 	span: OtlpSpan,
 }): OtlpLogPayload {
 	const { attributes, logLevel, msTimestamp, msg, span } = opts;
@@ -321,7 +324,7 @@ export class Log implements LogInt {
 	context: Metadata;
 	ended: boolean = false;
 
-	readonly conf: LogConf;
+	readonly conf: ResolvedLogConf;
 
 	// In-flight OTLP log exports, awaited by end() so all logs are sent before the trace/span.
 	private inFlight = new Set<Promise<unknown>>();
@@ -340,9 +343,12 @@ export class Log implements LogInt {
 
 		// Inherit conf from parent log if provided
 		if (typeof conf.parentLog === "object") {
-			for (const [key, value] of Object.entries(conf.parentLog.conf)) {
+			const parentConf = conf.parentLog.conf;
+
+			for (const key of Object.keys(parentConf) as (keyof LogConf)[]) {
 				if (conf[key] === undefined) {
-					conf[key] = value;
+					// Same key on both sides, so the value type matches; `as never` satisfies the writer.
+					conf[key] = parentConf[key] as never;
 				}
 			}
 		}
@@ -365,7 +371,8 @@ export class Log implements LogInt {
 			conf.stdout = console.log;
 		}
 
-		this.conf = conf;
+		// Every optional field the resolved type requires has been defaulted above.
+		this.conf = conf as ResolvedLogConf;
 		// Own copy, so a clone/child never mutates a context object shared with another instance.
 		this.context = { ...this.conf.context ?? {} };
 

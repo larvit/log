@@ -159,6 +159,9 @@ exact same tests exercise the console output and the OTLP transport in Node and 
 The container runs `npm run ci` / `ci-browser` internally — run those directly only if you already
 have deps installed locally.
 
+- `npm run lint` — eslint over the sources. Linting needs Node 20+ (eslint 10), so CI runs it once
+  in its own job rather than inside the Node 18–26 test matrix. Needs deps installed locally.
+
 ## Releasing
 
 Publishing is automated: creating a GitHub release runs the **Publish** workflow

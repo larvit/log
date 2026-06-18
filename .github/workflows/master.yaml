@@ -24,3 +24,17 @@ jobs:
           persist-credentials: false
       # Same suite in real Chromium via the official Playwright Docker image.
       - run: npm run test-browser
+
+  Lint:
+    runs-on: ubuntu-24.04
+    # eslint 10 / eslint-plugin-perfectionist need Node 20+; lint is static, so run it once
+    # here instead of inside every test-matrix node (Node 18 can't run the linter).
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.x
+      - run: npm ci
+      - run: npm run lint
