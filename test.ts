@@ -1,301 +1,215 @@
-import express from "express";
-import { Server } from "http";
-import { createRequire } from "module";
-import { AddressInfo } from "net";
-import test from "tape";
+import { type LogConf, generateSpanId, generateTraceId, Log, LogLevels, msgJsonFormatter } from "./index.js";
+import test from "./tap.js";
 
-import { generateSpanId, generateTraceId, Log, LogLevels, msgJsonFormatter } from "./index.js";
+// --- helpers ---------------------------------------------------------------
 
-const require = createRequire(import.meta.url);
-const packageJson = require("./package.json");
-
-function isNanoTimestampWithinHour(str) {
+function isNanoTimestampWithinHour(str: string): boolean {
 	if (!/^\d+$/.test(str)) {
 		return false;
 	}
 
-	// nanosecond to second
-	const unixTimestamp = Math.round(parseInt(str) / 1000000000);
-
-	// millisecond to second
-	const now = Math.floor(Date.now() / 1000);
-
+	const unixTimestamp = Math.round(parseInt(str) / 1000000000); // nanosecond to second
+	const now = Math.floor(Date.now() / 1000); // millisecond to second
 	const hourInSeconds = 3600;
 
-	// Check if number is a reasonable Unix timestamp (after 2020)
-	if (unixTimestamp > 1577836800) { // 2020-01-01
-		const difference = Math.abs(now - unixTimestamp);
-
-		return difference <= hourInSeconds;
+	// Check if number is a reasonable Unix timestamp (after 2020-01-01)
+	if (unixTimestamp > 1577836800) {
+		return Math.abs(now - unixTimestamp) <= hourInSeconds;
 	}
 
 	return false;
 }
 
+// Build a Log whose console output is captured into arrays instead of touching the real console.
+// Works in any runtime (no process.stdout patching).
+function capture(conf?: ConstructorParameters<typeof Log>[0]) {
+	const stderr: string[] = [];
+	const stdout: string[] = [];
+	const opts: LogConf = typeof conf === "object" ? { ...conf } : { logLevel: conf };
+
+	opts.stderr = line => { stderr.push(line); };
+	opts.stdout = line => { stdout.push(line); };
+
+	return { log: new Log(opts), stderr, stdout };
+}
+
+function okResponse(json: unknown = { partialSuccess: {} }) {
+	// eslint-disable-next-line id-length -- "ok" mirrors the fetch Response shape the transport reads
+	return { json: () => Promise.resolve(json), ok: true, status: 200 };
+}
+
+// Replace the global fetch with a recording stub. Works in Node and the browser, so the OTLP
+// transport can be asserted without a real HTTP server (deterministic, no express dependency).
+// The harness restores globalThis.fetch after each test, so callers never restore it themselves.
+function stubFetch(responder?: (path: string, body: unknown) => ReturnType<typeof okResponse> | undefined) {
+	const calls: { body: any, path: string, url: string }[] = [];
+
+	globalThis.fetch = (async (url: string, init: { body: string }) => {
+		const body = JSON.parse(init.body);
+		const path = new URL(String(url)).pathname;
+
+		calls.push({ body, path, url: String(url) });
+
+		return responder?.(path, body) ?? okResponse();
+	}) as unknown as typeof fetch;
+
+	return { calls };
+}
+
+// --- console output --------------------------------------------------------
+
 test("Should log to info.", t => {
-	const oldStdout = process.stdout.write;
-	const log = new Log();
-
-	let outputMsg = "";
-
-	process.stdout.write = msg => outputMsg = msg;
+	const { log, stdout } = capture();
 
 	log.info("flurp");
-
-	process.stdout.write = oldStdout;
-
-	t.strictEqual(
-		outputMsg.substring(19),
-		"Z [\u001b[1;32minf\u001b[0m] flurp\n",
-		"Should detect \"flurp\" in the output of the inf log",
-	);
-
+	t.strictEqual(stdout[0].substring(19), "Z [\x1b[1;32minf\x1b[0m] flurp", "\"flurp\" is in the inf log output");
 	t.end();
 });
 
 test("Should log to error.", t => {
-	const oldStderr = process.stderr.write;
-	const log = new Log();
-
-	let outputMsg = "";
-
-	process.stderr.write = msg => outputMsg = msg;
+	const { log, stderr } = capture();
 
 	log.error("burp");
-
-	process.stderr.write = oldStderr;
-
-	t.strictEqual(
-		outputMsg.substring(19),
-		"Z [\u001b[1;31merr\u001b[0m] burp\n",
-		"Should detect \"burp\" in the output of the err log",
-	);
-
+	t.strictEqual(stderr[0].substring(19), "Z [\x1b[1;31merr\x1b[0m] burp", "\"burp\" is in the err log output");
 	t.end();
 });
 
 test("Should not print debug by default.", t => {
-	const oldStdout = process.stdout.write;
-	const log = new Log();
-
-	let outputMsg = "yay";
-
-	process.stdout.write = msg => outputMsg = msg;
+	const { log, stdout } = capture();
 
 	log.debug("nai");
-
-	process.stdout.write = oldStdout;
-
-	t.strictEqual(outputMsg, "yay", "Should get \"yay\" since the outputMsg should not be replaced");
-
+	t.strictEqual(stdout.length, 0, "debug is not logged at the default level");
 	t.end();
 });
 
 test("Should print debug when given \"silly\" as level.", t => {
-	const oldStdout = process.stdout.write;
-	const log = new Log("silly");
-
-	let outputMsg = "woof";
-
-	process.stdout.write = msg => outputMsg = msg;
+	const { log, stdout } = capture("silly");
 
 	log.debug("wapp");
-
-	process.stdout.write = oldStdout;
-
-	t.strictEqual(outputMsg.substring(19), "Z [\u001b[1;35mdeb\u001b[0m] wapp\n", "Should obtain \"wapp\" from the deb log");
-
+	t.strictEqual(stdout[0].substring(19), "Z [\x1b[1;35mdeb\x1b[0m] wapp", "\"wapp\" is in the deb log output");
 	t.end();
 });
 
 test("Print nothing, even on error, when no valid level is set.", t => {
-	const oldStderr = process.stderr.write;
-	let outputMsg = "SOMETHING";
-	const log = new Log("none");
+	const { log, stderr } = capture("none");
 
-	process.stderr.write = msg => outputMsg = msg;
 	log.error("kattbajs");
-	process.stderr.write = oldStderr;
-	t.strictEqual(outputMsg.substring(19), "", "Nothing should be written without an error log level");
+	t.strictEqual(stderr.length, 0, "Nothing is written at level \"none\"");
 	t.end();
 });
 
 test("Test silly.", t => {
-	const oldStdout = process.stdout.write;
-	let outputMsg = "";
-	const log = new Log("silly");
+	const { log, stdout } = capture("silly");
 
-	process.stdout.write = msg => outputMsg = msg;
 	log.silly("kattbajs");
-	process.stdout.write = oldStdout;
-	t.strictEqual(outputMsg.substring(19), "Z [\x1b[1;37msil\x1b[0m] kattbajs\n", "Should obtain \"kattbajs\" from the outputMsg");
+	t.strictEqual(stdout[0].substring(19), "Z [\x1b[1;37msil\x1b[0m] kattbajs");
 	t.end();
 });
 
 test("Test debug", t => {
-	const oldStdout = process.stdout.write;
-	let outputMsg = "";
-	const log = new Log("debug");
+	const { log, stdout } = capture("debug");
 
-	process.stdout.write = msg => outputMsg = msg;
 	log.debug("kattbajs");
-	process.stdout.write = oldStdout;
-	t.strictEqual(outputMsg.substring(19), "Z [\x1b[1;35mdeb\x1b[0m] kattbajs\n", "Debug level is outputted to stdout");
+	t.strictEqual(stdout[0].substring(19), "Z [\x1b[1;35mdeb\x1b[0m] kattbajs", "Debug level is output to stdout");
 	t.end();
 });
 
 test("Test verbose", t => {
-	const oldStdout = process.stdout.write;
-	let outputMsg = "";
-	const log = new Log("verbose");
+	const { log, stdout } = capture("verbose");
 
-	process.stdout.write = msg => outputMsg = msg;
 	log.verbose("kattbajs");
-	process.stdout.write = oldStdout;
-	t.strictEqual(outputMsg.substring(19), "Z [\x1b[1;34mver\x1b[0m] kattbajs\n");
+	t.strictEqual(stdout[0].substring(19), "Z [\x1b[1;34mver\x1b[0m] kattbajs");
 	t.end();
 });
 
 test("Test info", t => {
-	const oldStdout = process.stdout.write;
-	let outputMsg = "";
-	const log = new Log("info");
+	const { log, stdout } = capture("info");
 
-	process.stdout.write = msg => outputMsg = msg;
 	log.info("kattbajs");
-	process.stdout.write = oldStdout;
-	t.strictEqual(outputMsg.substring(19), "Z [\x1b[1;32minf\x1b[0m] kattbajs\n");
+	t.strictEqual(stdout[0].substring(19), "Z [\x1b[1;32minf\x1b[0m] kattbajs");
 	t.end();
 });
 
 test("Test warn", t => {
-	const oldStderr = process.stderr.write;
-	let outputMsg = "";
-	const log = new Log("warn");
+	const { log, stderr } = capture("warn");
 
-	process.stderr.write = msg => outputMsg = msg;
 	log.warn("kattbajs");
-	process.stderr.write = oldStderr;
-	t.strictEqual(outputMsg.substring(19), "Z [\x1b[1;33mwar\x1b[0m] kattbajs\n");
+	t.strictEqual(stderr[0].substring(19), "Z [\x1b[1;33mwar\x1b[0m] kattbajs");
 	t.end();
 });
 
 test("Test error", t => {
-	const oldStderr = process.stderr.write;
-	let outputMsg = "";
-	const log = new Log("silly");
+	const { log, stderr } = capture("silly");
 
-	process.stderr.write = msg => outputMsg = msg;
 	log.error("kattbajs");
-	process.stderr.write = oldStderr;
-	t.strictEqual(outputMsg.substring(19), "Z [\x1b[1;31merr\x1b[0m] kattbajs\n");
+	t.strictEqual(stderr[0].substring(19), "Z [\x1b[1;31merr\x1b[0m] kattbajs");
 	t.end();
 });
 
 test("Test initializing with options object", t => {
-	const oldStderr = process.stderr.write;
-	let outputMsg = "";
-	const log = new Log({ logLevel: "error" });
+	const { log, stderr } = capture({ logLevel: "error" });
 
-	process.stderr.write = msg => outputMsg = msg;
 	log.error("an error");
-	process.stderr.write = oldStderr;
-	t.strictEqual(outputMsg.substring(19), "Z [\x1b[1;31merr\x1b[0m] an error\n");
+	t.strictEqual(stderr[0].substring(19), "Z [\x1b[1;31merr\x1b[0m] an error");
 	t.end();
 });
 
 test("Default level is info if nothing else is specified", t => {
-	const oldStdout = process.stdout.write;
-	let outputMsg = "";
-	const log = new Log({ logLevel: undefined });
+	const { log, stdout } = capture({ logLevel: undefined });
 
-	process.stdout.write = msg => outputMsg = msg;
 	log.info("information");
-	process.stdout.write = oldStdout;
-	t.ok(outputMsg.includes(" information"));
-	process.stdout.write = msg => outputMsg = msg;
+	t.ok(stdout[0].includes(" information"), "info is logged at the default level");
 	log.verbose("not logged");
-	process.stdout.write = oldStdout;
-	t.notOk(outputMsg.includes(" not logged"));
+	t.strictEqual(stdout.length, 1, "verbose is not logged at the default level");
 	t.end();
 });
 
 test("Test only errors are logged if log level is error", t => {
-	const oldStdout = process.stdout.write;
-	const oldStderr = process.stderr.write;
-	let outputMsg = "";
-	const log = new Log("error");
+	const { log, stderr, stdout } = capture("error");
 
-	process.stdout.write = msg => outputMsg = msg;
 	log.silly("kattbajs");
-	process.stdout.write = oldStdout;
-	t.strictEqual(outputMsg.length, 0, "Log level \"silly\" should not be logged");
-
-	process.stdout.write = msg => outputMsg = msg;
 	log.debug("kattbajs");
-	process.stdout.write = oldStdout;
-	t.strictEqual(outputMsg.length, 0, "Log level \"debug\" should not be logged");
-
-	process.stdout.write = msg => outputMsg = msg;
 	log.verbose("kattbajs");
-	process.stdout.write = oldStdout;
-	t.strictEqual(outputMsg.length, 0, "Log level \"verbose\" should not be logged");
+	t.strictEqual(stdout.length, 0, "silly/debug/verbose are not logged at level error");
 
-	process.stderr.write = msg => outputMsg = msg;
 	log.warn("kattbajs");
-	process.stderr.write = oldStderr;
-	t.strictEqual(outputMsg.length, 0, "Log level \"warn\" should not be logged");
+	t.strictEqual(stderr.length, 0, "warn is not logged at level error");
 
-	process.stderr.write = msg => outputMsg = msg;
 	log.error("kattbajs");
-	process.stderr.write = oldStderr;
-	t.ok(outputMsg.includes(" kattbajs"), "Log level \"error\" should be logged");
+	t.ok(stderr[0].includes(" kattbajs"), "error is logged at level error");
 	t.end();
 });
 
 test("Test with metadata", t => {
-	const oldStdout = process.stdout.write;
-	let outputMsg = "";
-	const log = new Log("info");
+	const { log, stdout } = capture("info");
 
-	process.stdout.write = msg => outputMsg = msg;
 	log.info("kattbajs", { foo: "bar" });
-	process.stdout.write = oldStdout;
-	t.strictEqual(outputMsg.split(" kattbajs ")[1].trim(), "{\"foo\":\"bar\"}", "Metadata should be included in output");
+	t.strictEqual(stdout[0].split(" kattbajs ")[1].trim(), "{\"foo\":\"bar\"}", "Metadata is included in output");
 	t.end();
 });
 
 test("Test with context", t => {
-	const oldStdout = process.stdout.write;
-	let outputMsg = "";
-	const log = new Log({ context: { bosse: "bäng", hasse: "luring" } });
+	const { log, stdout } = capture({ context: { bosse: "bäng", hasse: "luring" } });
 
-	process.stdout.write = msg => outputMsg = msg;
 	log.info("kattbajs", { foo: "bar" });
-	process.stdout.write = oldStdout;
 	t.strictEqual(
-		outputMsg.split(" kattbajs ")[1].trim(),
+		stdout[0].split(" kattbajs ")[1].trim(),
 		"{\"foo\":\"bar\",\"bosse\":\"bäng\",\"hasse\":\"luring\"}",
-		"Metadata and context should be included in output",
+		"Metadata and context are included in output",
 	);
 	t.end();
 });
 
 test("Json stringifyer", t => {
-	const oldStdout = process.stdout.write;
-	let outputMsg = "";
-	const log = new Log({ context: { hello: "yo" }, format: "json" });
+	const { log, stdout } = capture({ context: { hello: "yo" }, format: "json" });
 
-	process.stdout.write = msg => outputMsg = msg;
 	log.info("bosse", { foo: "frasse" });
-	const parsed = JSON.parse(outputMsg);
+	const parsed = JSON.parse(stdout[0]);
 
-	process.stdout.write = oldStdout;
-	t.strictEqual(parsed.foo, "frasse", "Metadata foo should be \"frasse\"");
-	t.strictEqual(parsed.hello, "yo", "Context should be in the json");
-	t.strictEqual(parsed.logLevel, "info", "logLevel should be set");
-	t.strictEqual(parsed.msg, "bosse", "msg should be set to \"bosse\"");
-
+	t.strictEqual(parsed.foo, "frasse", "Metadata foo is \"frasse\"");
+	t.strictEqual(parsed.hello, "yo", "Context is in the json");
+	t.strictEqual(parsed.logLevel, "info", "logLevel is set");
+	t.strictEqual(parsed.msg, "bosse", "msg is set to \"bosse\"");
 	t.end();
 });
 
@@ -306,7 +220,6 @@ test("Copy instance", t => {
 
 	t.strictEqual(JSON.stringify(newLog.context), "{\"foo\":\"bar\",\"baz\":\"fu\"}", "Context is merged in newLog.");
 	t.strictEqual(JSON.stringify(newLog2.context), "{\"foo\":\"burp\"}", "Context is merged in newLog2.");
-
 	t.end();
 });
 
@@ -322,7 +235,6 @@ test("msgJsonFormatter does not mutate input and is undefined-safe", t => {
 	const parsed2 = JSON.parse(msgJsonFormatter({ logLevel: "error", msg: "boom" }));
 
 	t.strictEqual(parsed2.msg, "boom", "undefined metadata does not throw");
-
 	t.end();
 });
 
@@ -339,31 +251,22 @@ test("generateSpanId/generateTraceId produce valid, unique hex ids", t => {
 });
 
 test("printTraceInfo appends span/trace info to output", t => {
-	const oldStdout = process.stdout.write;
-	let outputMsg = "";
-	const log = new Log({ printTraceInfo: true, spanName: "my-span" });
+	const { log, stdout } = capture({ printTraceInfo: true, spanName: "my-span" });
 
-	process.stdout.write = msg => outputMsg = msg;
 	log.info("hello");
-	process.stdout.write = oldStdout;
-
-	t.ok(outputMsg.includes("spanId"), "output contains spanId");
-	t.ok(outputMsg.includes("traceId"), "output contains traceId");
-	t.ok(outputMsg.includes("my-span"), "output contains span name");
+	t.ok(stdout[0].includes("spanId"), "output contains spanId");
+	t.ok(stdout[0].includes("traceId"), "output contains traceId");
+	t.ok(stdout[0].includes("my-span"), "output contains span name");
 	t.end();
 });
 
 test("clone can downgrade json format to text", t => {
-	const oldStdout = process.stdout.write;
-	let outputMsg = "";
-	const textLog = new Log({ format: "json" }).clone({ format: "text" });
+	const stdout: string[] = [];
+	const textLog = new Log({ format: "json" }).clone({ format: "text", stdout: line => stdout.push(line) });
 
-	process.stdout.write = msg => outputMsg = msg;
 	textLog.info("plain");
-	process.stdout.write = oldStdout;
-
-	t.throws(() => JSON.parse(outputMsg), "text clone output is not JSON");
-	t.ok(outputMsg.includes("plain"), "message present in text output");
+	t.throws(() => JSON.parse(stdout[0]), "text clone output is not JSON");
+	t.ok(stdout[0].includes("plain"), "message present in text output");
 	t.end();
 });
 
@@ -385,301 +288,160 @@ test("child log does not share its context object with the parent", t => {
 	t.end();
 });
 
+// --- OTLP transport (fetch-stubbed) ----------------------------------------
+
 test("end() returns an awaitable promise and OTLP failure is handled without hanging", async t => {
-	const oldStderr = process.stderr.write;
-	let errOutput = "";
-	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:1" }); // nothing listens -> connection refused
+	stubFetch(() => { throw new Error("connection refused"); });
+	const stderr: string[] = [];
+	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:1", stderr: line => stderr.push(line) });
 
-	process.stderr.write = msg => {
-		errOutput += String(msg);
-
-		return true;
-	};
 	log.error("will fail to export");
 	const ret = log.end();
 
 	t.ok(ret && typeof ret.then === "function", "end() returns a thenable");
 	await ret;
-	process.stderr.write = oldStderr;
 
-	// Assert on the OTLP endpoint url, which only the export-error path emits — not the log.error() above.
-	t.ok(errOutput.includes("127.0.0.1:1"), "the OTLP export error (incl. endpoint url) was written to stderr");
+	t.ok(stderr.join("\n").includes("127.0.0.1:1"), "the OTLP export error (incl. endpoint url) is written to stderr");
 	t.end();
 });
 
-test("OTLP preserves a base path from otlpHttpBaseURI", t => {
-	const mockExpress = express();
-	let mockServer = null as unknown as Server;
-	const seenPaths: string[] = [];
+test("OTLP preserves a base path from otlpHttpBaseURI", async t => {
+	const { calls } = stubFetch();
+	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318/otel", stderr: () => {} });
 
-	mockExpress.use(express.json());
+	log.error("with base path");
+	await log.end();
 
-	mockExpress.post("*name", (req, res) => {
-		seenPaths.push(req.path);
-		res.json({ partialSuccess: {} });
-
-		if (seenPaths.length === 2) {
-			mockServer.close();
-			t.deepEqual(seenPaths.sort(), ["/otel/v1/logs", "/otel/v1/traces"], "base path /otel is kept on both endpoints");
-			t.end();
-		}
-	});
-
-	mockServer = mockExpress.listen(0, "127.0.0.1", () => {
-		const { port } = mockServer.address() as AddressInfo;
-		const oldStderr = process.stderr.write;
-		const log = new Log({ otlpHttpBaseURI: `http://127.0.0.1:${port}/otel` });
-
-		process.stderr.write = () => true;
-		log.error("with base path");
-		log.end();
-		process.stderr.write = oldStderr;
-	});
+	t.deepEqual(calls.map(call => call.path).sort(), ["/otel/v1/logs", "/otel/v1/traces"], "base path /otel is kept on both endpoints");
+	t.end();
 });
 
-test("OLTP simple log", t => {
-	const mockExpress = express();
-	let calls = 0;
-	let mockServer = null as unknown as Server;
-	let traceId = "";
+test("OLTP simple log", async t => {
+	const { calls } = stubFetch();
+	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 
-	mockExpress.use(express.json());
+	log.error("Gir in da house!");
+	await log.end();
 
-	mockExpress.post("*name", (req, res) => {
-		calls++;
+	const logsBody: any = calls.find(call => call.path === "/v1/logs")?.body;
+	const tracesBody: any = calls.find(call => call.path === "/v1/traces")?.body;
 
-		if (req.path === "/v1/logs") {
-			t.strictEqual(req.body.resourceLogs.length, 1, "Exactly one resourceLog in /v1/logs body");
-			t.strictEqual(req.body.resourceLogs[0].scopeLogs.length, 1, "Exactly one scopeLog in /v1/logs body");
-			t.strictEqual(req.body.resourceLogs[0].scopeLogs[0].logRecords.length, 1, "Exactly one logRecord in /v1/logs body");
+	t.ok(logsBody, "a /v1/logs call was made");
+	t.ok(tracesBody, "a /v1/traces call was made");
 
-			const logRecord = req.body.resourceLogs[0].scopeLogs[0].logRecords[0];
+	t.strictEqual(logsBody.resourceLogs.length, 1, "Exactly one resourceLog in /v1/logs body");
+	t.strictEqual(logsBody.resourceLogs[0].scopeLogs.length, 1, "Exactly one scopeLog in /v1/logs body");
+	t.strictEqual(logsBody.resourceLogs[0].scopeLogs[0].logRecords.length, 1, "Exactly one logRecord in /v1/logs body");
 
-			t.strictEqual(logRecord.body.stringValue, "Gir in da house!", "logRecord.body is correct");
-			t.strictEqual(logRecord.severityNumber, 17, "logRecord.severityNumber is correct");
-			t.strictEqual(logRecord.severityText, "ERROR", "logRecord.severityText is correct");
-			t.notStrictEqual(logRecord.traceId.length, 0, "logRecord.traceId has a non-zero length");
+	const logRecord = logsBody.resourceLogs[0].scopeLogs[0].logRecords[0];
 
-			t.ok(isNanoTimestampWithinHour(logRecord.timeUnixNano), "timeUnixNano is reasonable");
+	t.strictEqual(logRecord.body.stringValue, "Gir in da house!", "logRecord.body is correct");
+	t.strictEqual(logRecord.severityNumber, 17, "logRecord.severityNumber is correct");
+	t.strictEqual(logRecord.severityText, "ERROR", "logRecord.severityText is correct");
+	t.notStrictEqual(logRecord.traceId.length, 0, "logRecord.traceId has a non-zero length");
+	t.ok(isNanoTimestampWithinHour(logRecord.timeUnixNano), "timeUnixNano is reasonable");
 
-			traceId = logRecord.traceId;
-		} else if (req.path === "/v1/traces") {
-			t.strictEqual(req.body.resourceSpans.length, 1, "Exactly one resourceSpan in /v1/traces body");
-			t.strictEqual(req.body.resourceSpans[0].scopeSpans.length, 1, "Exactly one scopeSpan in /v1/traces body");
-			t.strictEqual(req.body.resourceSpans[0].scopeSpans[0].spans.length, 1, "Exactly one span in /v1/traces body");
+	t.strictEqual(tracesBody.resourceSpans.length, 1, "Exactly one resourceSpan in /v1/traces body");
+	t.strictEqual(tracesBody.resourceSpans[0].scopeSpans.length, 1, "Exactly one scopeSpan in /v1/traces body");
+	t.strictEqual(tracesBody.resourceSpans[0].scopeSpans[0].spans.length, 1, "Exactly one span in /v1/traces body");
 
-			const span = req.body.resourceSpans[0].scopeSpans[0].spans[0];
+	const span = tracesBody.resourceSpans[0].scopeSpans[0].spans[0];
 
-			t.strictEqual(typeof span.endTimeUnixNano, "string", "span.endTimeUnixNano is a string");
-			t.strictEqual(span.kind, 1, "Span kind is always 1");
-			t.strictEqual(typeof span.startTimeUnixNano, "string", "span.startTimeUnixNano is a string");
-
-			t.strictEqual(typeof span.name, "string", "span.name is a string");
-			t.notStrictEqual(span.name.length, 0, "span.name has a non-zero length");
-
-			t.strictEqual(typeof span.spanId, "string", "span.spanId is a string");
-			t.notStrictEqual(span.spanId.length, 0, "span.spanId has a non-zero length");
-
-			t.strictEqual(typeof span.traceId, "string", "span.traceId is a string");
-			t.notStrictEqual(span.traceId.length, 0, "span.traceId has a non-zero length");
-			t.strictEqual(span.traceId, traceId, "span.traceId is correct");
-
-			t.ok(isNanoTimestampWithinHour(span.endTimeUnixNano), "span.endTimeUnixNano is reasonable");
-			t.ok(isNanoTimestampWithinHour(span.startTimeUnixNano), "span.startTimeUnixNano is reasonable");
-		} else {
-			t.fail(`Unexpected call: ${req.path}`);
-		}
-
-		res.json({ partialSuccess: {} });
-
-		if (calls === 2) {
-			mockServer.close();
-			t.end();
-		}
-	});
-
-	mockServer = mockExpress.listen(0, "127.0.0.1", () => {
-		const { port } = mockServer.address() as AddressInfo;
-		const oldStderr = process.stderr.write;
-		const log = new Log({
-			otlpHttpBaseURI: `http://127.0.0.1:${port}`,
-		});
-
-		process.stderr.write = () => true;
-		log.error("Gir in da house!");
-		process.stderr.write = oldStderr;
-		log.end();
-	});
+	t.strictEqual(span.kind, 1, "Span kind is always 1");
+	t.strictEqual(typeof span.name, "string", "span.name is a string");
+	t.notStrictEqual(span.name.length, 0, "span.name has a non-zero length");
+	t.notStrictEqual(span.spanId.length, 0, "span.spanId has a non-zero length");
+	t.strictEqual(span.traceId, logRecord.traceId, "span.traceId matches the log traceId");
+	t.ok(isNanoTimestampWithinHour(span.endTimeUnixNano), "span.endTimeUnixNano is reasonable");
+	t.ok(isNanoTimestampWithinHour(span.startTimeUnixNano), "span.startTimeUnixNano is reasonable");
+	t.end();
 });
 
-test("OLTP simple log with metadata", t => {
-	const mockExpress = express();
-	let calls = 0;
-	let mockServer = null as unknown as Server;
-
-	let spanId = "bar";
-	let traceId = "foo";
-
-	mockExpress.use(express.json());
-
-	mockExpress.post("*name", (req, res) => {
-		calls++;
-
-		if (req.path === "/v1/logs") {
-			const logRecord = req.body.resourceLogs[0].scopeLogs[0].logRecords[0];
-
-			t.strictEqual(logRecord.body.stringValue, "FOo", "logRecord.body is correct");
-			t.strictEqual(logRecord.severityNumber, 13, "logRecord.severityNumber is correct");
-			t.strictEqual(logRecord.severityText, "WARN", "logRecord.severityText is correct");
-
-			t.strictEqual(logRecord.attributes[0].key, "bar", "First attribute is bar");
-			t.strictEqual(logRecord.attributes[0].value.stringValue, "baz", "First attribute value is baz");
-			t.strictEqual(logRecord.attributes[1].key, "lökig knasnyckel | typ", "Second attribute is \"lökig knasnyckel | typ\"");
-			t.strictEqual(logRecord.attributes[1].value.stringValue, "17", "Second attribute value is \"17\"");
-
-			// service.name belongs on the log resource (this is what Grafana/Loki reads), not the log record.
-			const logResourceAttrs = req.body.resourceLogs[0].resource.attributes;
-			const logServiceName = logResourceAttrs.find((attr: any) => attr.key === "service.name");
-			const logSdkName = logResourceAttrs.find((attr: any) => attr.key === "telemetry.sdk.name");
-
-			t.strictEqual(logServiceName.value.stringValue, "eva-bosse", "log resource service.name is eva-bosse");
-			t.strictEqual(logSdkName.value.stringValue, "@larvit/log", "log resource telemetry.sdk.name is @larvit/log");
-			t.notOk(logRecord.attributes.find((attr: any) => attr.key === "service.name"), "service.name is not duplicated in log record attributes");
-
-			spanId = logRecord.spanId;
-			traceId = logRecord.traceId;
-		} else if (req.path === "/v1/traces") {
-			const traceRecord = req.body.resourceSpans[0];
-
-			t.strictEqual(traceRecord.resource.attributes.length, 4, "Resource have 4 attributes");
-			t.strictEqual(traceRecord.resource.droppedAttributesCount, 0, "No attributes dropped");
-
-			const serviceName = traceRecord.resource.attributes.find(attr => attr.key === "service.name");
-			const telemetrySdkLanguage = traceRecord.resource.attributes.find(attr => attr.key === "telemetry.sdk.language");
-			const telemetrySdkName = traceRecord.resource.attributes.find(attr => attr.key === "telemetry.sdk.name");
-			const telemetrySdkVersion = traceRecord.resource.attributes.find(attr => attr.key === "telemetry.sdk.version");
-
-			t.strictEqual(serviceName.value.stringValue, "eva-bosse", "service.name is eva-bosse");
-			t.strictEqual(telemetrySdkLanguage.value.stringValue, "ecmascript", "telemetry.sdk.language is ecmascript");
-			t.strictEqual(telemetrySdkName.value.stringValue, "@larvit/log", "telemetry.sdk.name is @larvit/log");
-			t.strictEqual(telemetrySdkVersion.value.stringValue, packageJson.version, `telemetry.sdk.version is ${packageJson.version}`);
-
-			t.strictEqual(traceRecord.scopeSpans.length, 1, "Exactly one scoped span is sent");
-			t.strictEqual(traceRecord.scopeSpans[0].spans.length, 1, "Exactly one span is sent in the scoped span");
-
-			const scopedSpan = traceRecord.scopeSpans[0];
-			const span = scopedSpan.spans[0];
-
-			t.strictEqual(scopedSpan.scope.name, "lur-bert", "Spans scope name is lur-bert");
-			t.strictEqual(span.name, "lur-bert", "Span name is lur-bert");
-			t.strictEqual(span.traceId, traceId, "traceId is the same in trace and log");
-			t.strictEqual(span.spanId, spanId, "spanId is the same in trace and log");
-			t.strictEqual(span.kind, 1, "span kind is 1");
-			t.strictEqual(isNanoTimestampWithinHour(span.startTimeUnixNano), true, "startTimeUnixNano is valid");
-			t.strictEqual(isNanoTimestampWithinHour(span.endTimeUnixNano), true, "endTimeUnixNano is valid");
-
-			t.strictEqual(span.attributes.length, 0, "Span attributes is an empty array");
-			t.strictEqual(span.droppedAttributesCount, 0, "Span have no dropped attributes");
-			t.strictEqual(span.events.length, 0, "Span events should be an empty array");
-			t.strictEqual(span.droppedEventsCount, 0, "Span have no dropped events");
-			t.strictEqual(span.status.code, 0, "span status code is 0");
-			t.strictEqual(span.links.length, 0, "span links length is an empty array");
-			t.strictEqual(span.droppedLinksCount, 0, "span have no dropped links");
-		} else {
-			t.fail(`Unexpected call: ${req.path}`);
-		}
-
-		res.json({ partialSuccess: {} });
-
-		if (calls === 2) {
-			mockServer.close();
-			t.end();
-		}
+test("OLTP simple log with metadata", async t => {
+	const { calls } = stubFetch();
+	const log = new Log({
+		context: { "service.name": "eva-bosse" },
+		otlpHttpBaseURI: "http://127.0.0.1:4318",
+		spanName: "lur-bert",
 	});
 
-	mockServer = mockExpress.listen(0, "127.0.0.1", () => {
-		const { port } = mockServer.address() as AddressInfo;
-		const oldStderr = process.stderr.write;
-		const log = new Log({
-			context: { "service.name": "eva-bosse" },
-			otlpHttpBaseURI: `http://127.0.0.1:${port}`,
-			spanName: "lur-bert",
-		});
+	log.warn("FOo", { bar: "baz", "lökig knasnyckel | typ": "17" });
+	await log.end();
 
-		process.stderr.write = () => true;
-		log.warn("FOo", { bar: "baz", "lökig knasnyckel | typ": "17" });
-		log.end();
-		process.stderr.write = oldStderr;
-	});
+	const logsBody: any = calls.find(call => call.path === "/v1/logs")?.body;
+	const tracesBody: any = calls.find(call => call.path === "/v1/traces")?.body;
+	const logRecord = logsBody.resourceLogs[0].scopeLogs[0].logRecords[0];
+
+	t.strictEqual(logRecord.body.stringValue, "FOo", "logRecord.body is correct");
+	t.strictEqual(logRecord.severityNumber, 13, "logRecord.severityNumber is correct");
+	t.strictEqual(logRecord.severityText, "WARN", "logRecord.severityText is correct");
+	t.strictEqual(logRecord.attributes[0].key, "bar", "First attribute is bar");
+	t.strictEqual(logRecord.attributes[0].value.stringValue, "baz", "First attribute value is baz");
+	t.strictEqual(logRecord.attributes[1].key, "lökig knasnyckel | typ", "Second attribute key is correct");
+	t.strictEqual(logRecord.attributes[1].value.stringValue, "17", "Second attribute value is \"17\"");
+
+	// service.name belongs on the log resource (this is what Grafana/Loki reads), not the log record.
+	const logResourceAttrs = logsBody.resourceLogs[0].resource.attributes;
+
+	t.strictEqual(logResourceAttrs.find((attr: any) => attr.key === "service.name").value.stringValue, "eva-bosse", "log resource service.name is eva-bosse");
+	t.strictEqual(logResourceAttrs.find((attr: any) => attr.key === "telemetry.sdk.name").value.stringValue, "@larvit/log", "log resource telemetry.sdk.name is @larvit/log");
+	t.notOk(logRecord.attributes.find((attr: any) => attr.key === "service.name"), "service.name is not duplicated in log record attributes");
+
+	const traceResource = tracesBody.resourceSpans[0];
+
+	t.strictEqual(traceResource.resource.attributes.length, 4, "Resource has 4 attributes");
+	t.strictEqual(traceResource.resource.droppedAttributesCount, 0, "No attributes dropped");
+
+	const findAttr = (key: string) => traceResource.resource.attributes.find((attr: any) => attr.key === key).value.stringValue;
+
+	t.strictEqual(findAttr("service.name"), "eva-bosse", "service.name is eva-bosse");
+	t.strictEqual(findAttr("telemetry.sdk.language"), "ecmascript", "telemetry.sdk.language is ecmascript");
+	t.strictEqual(findAttr("telemetry.sdk.name"), "@larvit/log", "telemetry.sdk.name is @larvit/log");
+	t.ok(/^\d+\.\d+\.\d+/.test(findAttr("telemetry.sdk.version")), "telemetry.sdk.version is a semver (build replaced __version__)");
+
+	const scopedSpan = traceResource.scopeSpans[0];
+	const span = scopedSpan.spans[0];
+
+	t.strictEqual(scopedSpan.scope.name, "lur-bert", "Span scope name is lur-bert");
+	t.strictEqual(span.name, "lur-bert", "Span name is lur-bert");
+	t.strictEqual(span.traceId, logRecord.traceId, "traceId is the same in trace and log");
+	t.strictEqual(span.spanId, logRecord.spanId, "spanId is the same in trace and log");
+	t.strictEqual(span.kind, 1, "span kind is 1");
+	t.strictEqual(span.attributes.length, 0, "Span attributes is an empty array");
+	t.strictEqual(span.status.code, 0, "span status code is 0");
+	t.strictEqual(span.links.length, 0, "span links is an empty array");
+	t.strictEqual(span.droppedLinksCount, 0, "span has no dropped links");
+	t.end();
 });
 
-test("OLTP multiple instances should work independently", t => {
-	const mockExpress = express();
-	let calls = 0;
-	let mockServer = null as unknown as Server;
+test("OLTP multiple instances should work independently", async t => {
+	const { calls } = stubFetch();
+	const otlp = { otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} };
 
-	mockExpress.use(express.json());
+	const log1 = new Log({ context: { "service.name": "log1" }, ...otlp });
 
-	mockExpress.post("*name", (req, res) => {
-		calls++;
+	log1.warn("rappakalja");
+	await log1.end();
 
-		if (req.path === "/v1/logs") {
-			const logRecord = req.body.resourceLogs[0].scopeLogs[0].logRecords[0];
+	const log2 = new Log({ context: { "service.name": "log2" }, ...otlp });
 
-			const serviceName = logRecord.attributes.find((attribute: any) => attribute.key === "service.name").value.stringValue;
+	log2.warn("bollhav");
+	await log2.end();
 
-			if (logRecord.body.stringValue === "rappakalja") {
-				t.strictEqual(serviceName, "log1", "serviceName for rappakalja should be log1.");
-			} else if (logRecord.body.stringValue === "bollhav") {
-				t.strictEqual(serviceName, "log2", "serviceaName for bollhav should be log2.");
-			} else {
-				t.fail(`Unexpected log body: "${logRecord.body.stringValue}"`);
-			}
-		} else if (req.path === "/v1/traces") {
-			t.comment("/v1/traces was called");
+	t.strictEqual(calls.length, 4, "two log exports + two trace exports");
+
+	for (const call of calls.filter(call => call.path === "/v1/logs")) {
+		const logRecord = call.body.resourceLogs[0].scopeLogs[0].logRecords[0];
+		const serviceName = call.body.resourceLogs[0].resource.attributes.find((attr: any) => attr.key === "service.name").value.stringValue;
+
+		if (logRecord.body.stringValue === "rappakalja") {
+			t.strictEqual(serviceName, "log1", "service.name for rappakalja is log1");
+		} else if (logRecord.body.stringValue === "bollhav") {
+			t.strictEqual(serviceName, "log2", "service.name for bollhav is log2");
 		} else {
-			t.fail(`Unexpected call: ${req.path}`);
+			t.fail(`Unexpected log body: "${logRecord.body.stringValue}"`);
 		}
+	}
 
-		res.json({ partialSuccess: {} });
-
-		if (calls === 4) {
-			mockServer.close();
-			t.end();
-		}
-	});
-
-	mockServer = mockExpress.listen(0, "127.0.0.1", () => {
-		const { port } = mockServer.address() as AddressInfo;
-		const oldStderr = process.stderr.write;
-
-		const otlpOptions = {
-			otlpHttpBaseURI: `http://127.0.0.1:${port}`,
-		};
-
-		process.stderr.write = () => true;
-
-		// Create a first log instance
-		const log1 = new Log({
-			context: {
-				"service.name": "log1",
-			},
-			...otlpOptions,
-		});
-
-		log1.warn("rappakalja");
-		log1.end();
-
-		// Create a second, that should now be independent
-		const log2 = new Log({
-			context: {
-				"service.name": "log2",
-			},
-			...otlpOptions,
-		});
-
-		log2.warn("bollhav");
-		log2.end();
-		process.stderr.write = oldStderr;
-	});
+	t.end();
 });

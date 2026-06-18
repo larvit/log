@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
       - name: Use Node.js
         uses: actions/setup-node@v6
         with:
@@ -23,7 +25,10 @@ jobs:
             exit 1
           fi
       - run: npm ci
+      # Dockerized node + browser tests (same as CI / local).
       - run: npm test
+      # Build the publishable artifacts on the runner (the dockerized tests don't write to the host).
+      - run: npm run build
       - run: npm publish --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
