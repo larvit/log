@@ -17,7 +17,7 @@
     "replace-version-string": "grep -o '\"version\": \"[^\"]*\"' package.json | cut -d'\"' -f4 | xargs -I {} sed -i.bak 's/__version__/{}/g' index.js && rm -f index.js.bak",
     "test-node": "node .tmp/test/test.js",
     "test-docker": "docker build -t larvit-log-test-node --build-arg BASE_IMAGE=\"${NODE_IMAGE:-node:22-bookworm-slim}\" . && docker run --rm larvit-log-test-node npm run ci",
-    "test-browser": "docker build -t larvit-log-test-browser --build-arg BASE_IMAGE=mcr.microsoft.com/playwright:v1.61.0-noble . && docker run --rm --init --ipc=host larvit-log-test-browser npm run ci-browser",
+    "test-browser": "docker build -t larvit-log-test-browser --build-arg BASE_IMAGE=mcr.microsoft.com/playwright:v$(node -p \"require('./package.json').devDependencies.playwright\")-noble . && docker run --rm --init --ipc=host larvit-log-test-browser npm run ci-browser",
     "test": "npm run test-docker && npm run test-browser"
   },
   "devDependencies": {
