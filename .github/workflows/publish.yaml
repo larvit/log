@@ -23,8 +23,10 @@ jobs:
             exit 1
           fi
       - run: npm ci
+      # Dockerized node + browser tests (same as CI / local).
       - run: npm test
-      - run: npm run test-browser
+      # Build the publishable artifacts on the runner (the dockerized tests don't write to the host).
+      - run: npm run build
       - run: npm publish --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

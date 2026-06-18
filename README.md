@@ -143,13 +143,18 @@ const log = new Log({
 
 ## Testing
 
-- `npm test` — builds the library, runs the suite in Node (all supported versions in CI) and lints.
-- `npm run test-browser` — runs the **same** suite in real Chromium via the official Playwright
-  Docker image, so browser support is verified on every change without depending on a locally
-  installed browser. Requires Docker. CI runs both jobs.
+All tests run inside Docker — dependencies are installed in the container too — so a local run is
+identical to CI. Requires Docker; no local `npm install` is needed to run them.
+
+- `npm test` — runs everything: the Node suite and the browser suite.
+- `npm run test-docker` — Node suite only. Override the Node version with
+  `NODE_IMAGE=node:18-bookworm-slim npm run test-docker` (CI runs the full 18–26 matrix this way).
+- `npm run test-browser` — the same suite in real Chromium via the official Playwright image.
 
 The suite is runtime-agnostic: it injects `stdout`/`stderr` and stubs the global `fetch`, so the
 exact same tests exercise the console output and the OTLP transport in Node and in the browser.
+The container runs `npm run ci` / `ci-browser` internally — run those directly only if you already
+have deps installed locally.
 
 ## Releasing
 
@@ -182,6 +187,8 @@ To publish manually instead: `npm run build-and-publish`.
 - Test tooling: replaced `tape`/`tap-spec`/`express`/`ts-node` with a tiny built-in TAP harness and
   a `fetch` stub, compiled by the existing `tsc` pipeline (no bundler added). `npm install` now pins
   exact versions (`save-exact`).
+- All tests (Node + browser) now run inside Docker with deps installed in the container, so local
+  runs match CI exactly. See [Testing](#testing).
 
 ### v2.0.0
 

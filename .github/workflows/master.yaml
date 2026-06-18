@@ -5,25 +5,18 @@ jobs:
     runs-on: ubuntu-24.04
     strategy:
       matrix:
-        node-version: [18.x, 20.x, 22.x, 24.x, 26.x]
+        node-version: ["18", "20", "22", "24", "26"]
     steps:
       - uses: actions/checkout@v6
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v6
-        with:
-          node-version: ${{ matrix.node-version }}
-      - run: |
-          npm ci
-          npm test
+      # Deps + build + test all run inside the container, so this matches `npm run test-docker` locally.
+      - name: Test (Node ${{ matrix.node-version }}, in Docker)
+        run: npm run test-docker
+        env:
+          NODE_IMAGE: node:${{ matrix.node-version }}-bookworm-slim
 
   Browser-test:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
-      - name: Use Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 22.x
-      - run: npm ci
-      # Runs the same suite in real Chromium via the official Playwright Docker image.
+      # Same suite in real Chromium via the official Playwright Docker image.
       - run: npm run test-browser
