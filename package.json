@@ -21,7 +21,7 @@
     "test": "npm run test-docker && npm run test-browser"
   },
   "devDependencies": {
-    "@larvit/eslint-config-typescript-esm": "1.2.1",
+    "@larvit/eslint-config-typescript-esm": "2.0.0",
     "@types/node": "25.9.3",
     "eslint": "8.57.1",
     "playwright": "1.56.1",
