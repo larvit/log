@@ -38,8 +38,12 @@ export type LogLevel = keyof typeof LogLevels;
 export type LogShorthand = (msg: string, metadata?: Metadata) => void;
 
 export type Metadata = {
-	[key: string]: string;
+	[key: string]: MetadataValue;
 }
+
+// Primitive values only. String() coerces them for OTLP; the JSON formatter keeps them native.
+// bigint/objects are excluded: JSON.stringify throws on bigint and renders objects as "[object Object]".
+export type MetadataValue = boolean | number | string;
 
 export type OtlpAttribute = {
 	key: string,
@@ -238,7 +242,7 @@ function isFetchError(error: unknown): error is FetchError {
 // service is identified the same way for both — Grafana/Loki reads service.name from here, not the records.
 function buildResourceAttributes(context: Metadata): OtlpAttribute[] {
 	return [
-		{ key: "service.name", value: { stringValue: context["service.name"] || "unnamed-service" } },
+		{ key: "service.name", value: { stringValue: String(context["service.name"] || "unnamed-service") } },
 		{ key: "telemetry.sdk.language", value: { stringValue: "ecmascript" } },
 		{ key: "telemetry.sdk.name", value: { stringValue: "@larvit/log" } },
 		{ key: "telemetry.sdk.version", value: { stringValue: "__version__" } },

@@ -141,6 +141,9 @@ const log = new Log({
 
 `log.info("foo", { hey: "luring" });` --> 2022-09-24T23:40:39Z [info] foo {"hey":"luring"}
 
+Values may be `string`, `number`, or `boolean`. OTLP attributes are string-only, so `{ count: 5 }`
+is sent as `"5"`; the JSON formatter keeps it native (`5`).
+
 ## Testing
 
 All tests run inside Docker — dependencies are installed in the container too — so a local run is
