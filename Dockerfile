@@ -6,13 +6,19 @@ FROM ${BASE_IMAGE}
 
 # Browsers ship inside the Playwright base image; never let the npm install download them.
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+ENV HOME=/app
 
 WORKDIR /app
 
+# Install and test as an unprivileged user, not root. A fresh "app" user works on both base images
+# (Playwright's browsers under /ms-playwright are world-accessible).
+RUN groupadd -r app && useradd -r -g app -d /app app && chown app:app /app
+USER app
+
 # Install deps first so this layer is cached unless the manifests change.
-COPY .npmrc package.json package-lock.json ./
+COPY --chown=app:app .npmrc package.json package-lock.json ./
 RUN npm ci
 
-COPY . .
+COPY --chown=app:app . .
 
 # The actual command (npm run ci / ci-browser) is passed by `docker run`.
