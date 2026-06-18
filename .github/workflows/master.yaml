@@ -7,7 +7,7 @@ jobs:
       matrix:
         node-version: ["18", "20", "22", "24", "26"]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       # Deps + build + test all run inside the container, so this matches `npm run test-docker` locally.
@@ -19,7 +19,7 @@ jobs:
   Browser-test:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       # Same suite in real Chromium via the official Playwright Docker image.
@@ -30,7 +30,7 @@ jobs:
     # eslint 10 / eslint-plugin-perfectionist need Node 20+; lint is static, so run it once
     # here instead of inside every test-matrix node (Node 18 can't run the linter).
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - uses: actions/setup-node@v6
