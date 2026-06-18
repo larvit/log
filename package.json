@@ -9,9 +9,9 @@
   "scripts": {
     "build-and-publish": "npm run build && npm publish",
     "build": "rm -f index.js index.d.ts index.js.map && tsc && uglifyjs index.js -o index.js && npm run replace-version-string",
-    "build-tests": "rm -rf .tmp/test && tsc -p tsconfig.test.json && cp index.js .tmp/test/index.js",
-    "ci": "npm run build && npm run build-tests && npm run test-node && npm run lint",
-    "ci-browser": "npm run build && npm run build-tests && node scripts/run-browser-tests.mjs",
+    "build-tests": "npm run build && rm -rf .tmp/test && tsc -p tsconfig.test.json && cp index.js .tmp/test/index.js",
+    "ci": "npm run build-tests && npm run test-node && npm run lint",
+    "ci-browser": "npm run build-tests && node scripts/run-browser-tests.mjs",
     "lint-fix": "eslint --fix index.ts tap.ts test.ts",
     "lint": "eslint index.ts tap.ts test.ts",
     "replace-version-string": "grep -o '\"version\": \"[^\"]*\"' package.json | cut -d'\"' -f4 | xargs -I {} sed -i 's/__version__/{}/g' index.js",

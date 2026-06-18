@@ -40,9 +40,9 @@ function okResponse(json: unknown = { partialSuccess: {} }) {
 
 // Replace the global fetch with a recording stub. Works in Node and the browser, so the OTLP
 // transport can be asserted without a real HTTP server (deterministic, no express dependency).
+// The harness restores globalThis.fetch after each test, so callers never restore it themselves.
 function stubFetch(responder?: (path: string, body: unknown) => ReturnType<typeof okResponse> | undefined) {
 	const calls: { body: any, path: string, url: string }[] = [];
-	const realFetch = globalThis.fetch;
 
 	globalThis.fetch = (async (url: string, init: { body: string }) => {
 		const body = JSON.parse(init.body);
@@ -53,7 +53,7 @@ function stubFetch(responder?: (path: string, body: unknown) => ReturnType<typeo
 		return responder?.(path, body) ?? okResponse();
 	}) as unknown as typeof fetch;
 
-	return { calls, restore: () => { globalThis.fetch = realFetch; } };
+	return { calls };
 }
 
 // --- console output --------------------------------------------------------
@@ -291,7 +291,7 @@ test("child log does not share its context object with the parent", t => {
 // --- OTLP transport (fetch-stubbed) ----------------------------------------
 
 test("end() returns an awaitable promise and OTLP failure is handled without hanging", async t => {
-	const { restore } = stubFetch(() => { throw new Error("connection refused"); });
+	stubFetch(() => { throw new Error("connection refused"); });
 	const stderr: string[] = [];
 	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:1", stderr: line => stderr.push(line) });
 
@@ -300,31 +300,28 @@ test("end() returns an awaitable promise and OTLP failure is handled without han
 
 	t.ok(ret && typeof ret.then === "function", "end() returns a thenable");
 	await ret;
-	restore();
 
 	t.ok(stderr.join("\n").includes("127.0.0.1:1"), "the OTLP export error (incl. endpoint url) is written to stderr");
 	t.end();
 });
 
 test("OTLP preserves a base path from otlpHttpBaseURI", async t => {
-	const { calls, restore } = stubFetch();
+	const { calls } = stubFetch();
 	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318/otel", stderr: () => {} });
 
 	log.error("with base path");
 	await log.end();
-	restore();
 
 	t.deepEqual(calls.map(call => call.path).sort(), ["/otel/v1/logs", "/otel/v1/traces"], "base path /otel is kept on both endpoints");
 	t.end();
 });
 
 test("OLTP simple log", async t => {
-	const { calls, restore } = stubFetch();
+	const { calls } = stubFetch();
 	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 
 	log.error("Gir in da house!");
 	await log.end();
-	restore();
 
 	const logsBody: any = calls.find(call => call.path === "/v1/logs")?.body;
 	const tracesBody: any = calls.find(call => call.path === "/v1/traces")?.body;
@@ -361,7 +358,7 @@ test("OLTP simple log", async t => {
 });
 
 test("OLTP simple log with metadata", async t => {
-	const { calls, restore } = stubFetch();
+	const { calls } = stubFetch();
 	const log = new Log({
 		context: { "service.name": "eva-bosse" },
 		otlpHttpBaseURI: "http://127.0.0.1:4318",
@@ -370,7 +367,6 @@ test("OLTP simple log with metadata", async t => {
 
 	log.warn("FOo", { bar: "baz", "lökig knasnyckel | typ": "17" });
 	await log.end();
-	restore();
 
 	const logsBody: any = calls.find(call => call.path === "/v1/logs")?.body;
 	const tracesBody: any = calls.find(call => call.path === "/v1/traces")?.body;
@@ -419,7 +415,7 @@ test("OLTP simple log with metadata", async t => {
 });
 
 test("OLTP multiple instances should work independently", async t => {
-	const { calls, restore } = stubFetch();
+	const { calls } = stubFetch();
 	const otlp = { otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} };
 
 	const log1 = new Log({ context: { "service.name": "log1" }, ...otlp });
@@ -431,7 +427,6 @@ test("OLTP multiple instances should work independently", async t => {
 
 	log2.warn("bollhav");
 	await log2.end();
-	restore();
 
 	t.strictEqual(calls.length, 4, "two log exports + two trace exports");
 

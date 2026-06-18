@@ -19,6 +19,10 @@ export interface Assertions {
 	throws(cb: () => void, msg?: string): void;
 }
 
+// A hung async test must fail fast rather than hang the Node run (the browser run also has its own
+// Playwright timeout). Keep this comfortably above any real test and below that Playwright timeout.
+const TEST_TIMEOUT_MS = 10000;
+
 const tests: { cb: TestFn, name: string }[] = [];
 let scheduled = false;
 let count = 0;
@@ -48,6 +52,9 @@ function deepEq(left: unknown, right: unknown): boolean {
 	if (typeof left !== "object" || typeof right !== "object" || left === null || right === null) {
 		return false;
 	}
+	if (Array.isArray(left) !== Array.isArray(right)) {
+		return false;
+	}
 
 	const leftKeys = Object.keys(left);
 	const rightKeys = Object.keys(right);
@@ -56,7 +63,15 @@ function deepEq(left: unknown, right: unknown): boolean {
 		return false;
 	}
 
-	return leftKeys.every(key => deepEq((left as Record<string, unknown>)[key], (right as Record<string, unknown>)[key]));
+	return leftKeys.every(key => {
+		// Same length is not enough: both sides must hold the same keys, else a missing key reads as
+		// undefined and a {a:undefined} vs {b:undefined} pair would wrongly compare equal.
+		if (!Object.prototype.hasOwnProperty.call(right, key)) {
+			return false;
+		}
+
+		return deepEq((left as Record<string, unknown>)[key], (right as Record<string, unknown>)[key]);
+	});
 }
 
 const t: Assertions = {
@@ -89,15 +104,30 @@ const t: Assertions = {
 	},
 };
 
+function rejectAfterTimeout(): Promise<never> {
+	return new Promise((_resolve, reject) => {
+		const timer = setTimeout(() => reject(new Error(`timed out after ${TEST_TIMEOUT_MS}ms`)), TEST_TIMEOUT_MS);
+
+		// Don't let a pending timeout keep the Node process alive once the tests are done.
+		(timer as { unref?: () => void }).unref?.();
+	});
+}
+
 async function run(): Promise<void> {
 	print("TAP version 13");
 
+	// Tests run serially; suites that stub globals (e.g. fetch) rely on this. We snapshot and
+	// restore globalThis.fetch around each test so a throwing test can never leak its stub.
 	for (const { cb, name } of tests) {
+		const savedFetch = globalThis.fetch;
+
 		print(`# ${name}`);
 		try {
-			await cb(t);
+			await Promise.race([cb(t), rejectAfterTimeout()]);
 		} catch (err) {
 			assert(false, `${name} threw`, String(err));
+		} finally {
+			globalThis.fetch = savedFetch;
 		}
 	}
 
@@ -119,6 +149,15 @@ export default function test(name: string, cb: TestFn): void {
 	if (!scheduled) {
 		scheduled = true;
 		// Defer so every synchronous test() registration is collected before the run starts.
-		queueMicrotask(run);
+		// Guard the run itself so an unexpected throw still surfaces as a failure, never a false pass.
+		queueMicrotask(() => {
+			void run().catch(err => {
+				console.error(err);
+				(globalThis as { __tap?: unknown }).__tap = { fail: 1, pass: 0, total: 1 };
+				if (typeof process !== "undefined") {
+					process.exitCode = 1;
+				}
+			});
+		});
 	}
 }
