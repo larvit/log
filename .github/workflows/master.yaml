@@ -15,3 +15,15 @@ jobs:
       - run: |
           npm ci
           npm test
+
+  Browser-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22.x
+      - run: npm ci
+      # Runs the same suite in real Chromium via the official Playwright Docker image.
+      - run: npm run test-browser

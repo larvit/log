@@ -9,22 +9,20 @@
   "scripts": {
     "build-and-publish": "npm run build && npm publish",
     "build": "rm -f index.js index.d.ts index.js.map && tsc && uglifyjs index.js -o index.js && npm run replace-version-string",
-    "lint-fix": "eslint --fix index.ts test.ts",
-    "lint": "eslint index.ts test.ts",
+    "build-tests": "rm -rf .tmp/test && tsc -p tsconfig.test.json && cp index.js .tmp/test/index.js",
+    "lint-fix": "eslint --fix index.ts tap.ts test.ts",
+    "lint": "eslint index.ts tap.ts test.ts",
     "replace-version-string": "grep -o '\"version\": \"[^\"]*\"' package.json | cut -d'\"' -f4 | xargs -I {} sed -i 's/__version__/{}/g' index.js",
-    "test-unit": "node --loader ts-node/esm test.ts | tap-spec",
-    "test": "npm run build && npm run test-unit && npm run lint"
+    "test-node": "node .tmp/test/test.js",
+    "test-browser-run": "docker run --rm --init --ipc=host -v \"$PWD\":/app -w /app mcr.microsoft.com/playwright:v1.56.1-noble node scripts/run-browser-tests.mjs",
+    "test-browser": "npm run build && npm run build-tests && npm run test-browser-run",
+    "test": "npm run build && npm run build-tests && npm run test-node && npm run lint"
   },
   "devDependencies": {
     "@larvit/eslint-config-typescript-esm": "1.2.1",
-    "@randomgoods/tap-spec": "5.0.4",
-    "@types/express": "5.0.6",
     "@types/node": "25.9.3",
-    "@types/tape": "5.8.1",
     "eslint": "8.57.1",
-    "express": "5.2.1",
-    "tape": "5.10.1",
-    "ts-node": "10.9.2",
+    "playwright": "1.56.1",
     "typescript": "5.9.3",
     "uglify-js": "3.19.3"
   },
@@ -37,6 +35,14 @@
     "url": "git+https://github.com/larvit/log.git"
   },
   "main": "index.js",
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    }
+  },
+  "sideEffects": false,
   "files": [
     "index.d.ts",
     "index.js.map",

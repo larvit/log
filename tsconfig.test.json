@@ -1,0 +1,10 @@
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"declaration": false,
+		"outDir": ".tmp/test",
+		"rootDir": ".",
+		"sourceMap": false
+	},
+	"files": ["tap.ts", "test.ts"]
+}

@@ -141,6 +141,16 @@ const log = new Log({
 
 `log.info("foo", { hey: "luring" });` --> 2022-09-24T23:40:39Z [info] foo {"hey":"luring"}
 
+## Testing
+
+- `npm test` — builds the library, runs the suite in Node (all supported versions in CI) and lints.
+- `npm run test-browser` — runs the **same** suite in real Chromium via the official Playwright
+  Docker image, so browser support is verified on every change without depending on a locally
+  installed browser. Requires Docker. CI runs both jobs.
+
+The suite is runtime-agnostic: it injects `stdout`/`stderr` and stubs the global `fetch`, so the
+exact same tests exercise the console output and the OTLP transport in Node and in the browser.
+
 ## Releasing
 
 Publishing is automated: creating a GitHub release runs the **Publish** workflow
@@ -162,6 +172,16 @@ The workflow publishes whatever is in `package.json`, so the tag and `package.js
 To publish manually instead: `npm run build-and-publish`.
 
 ## Changelog
+
+### Unreleased
+
+- Browsers are now a **tested** target: the suite runs in real Chromium (Playwright in Docker) in
+  CI, alongside the Node matrix. No library/runtime behaviour change — the code was already
+  browser-safe (global `fetch`, `crypto.getRandomValues` with a fallback, `AbortController`).
+- Added package `exports` map, `types` and `sideEffects: false` for cleaner bundler/CDN resolution.
+- Test tooling: replaced `tape`/`tap-spec`/`express`/`ts-node` with a tiny built-in TAP harness and
+  a `fetch` stub, compiled by the existing `tsc` pipeline (no bundler added). `npm install` now pins
+  exact versions (`save-exact`).
 
 ### v2.0.0
 
