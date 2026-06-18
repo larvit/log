@@ -141,6 +141,9 @@ const log = new Log({
 
 `log.info("foo", { hey: "luring" });` --> 2022-09-24T23:40:39Z [info] foo {"hey":"luring"}
 
+Values may be `string`, `number`, or `boolean`. OTLP attributes are string-only, so `{ count: 5 }`
+is sent as `"5"`; the JSON formatter keeps it native (`5`).
+
 ## Testing
 
 All tests run inside Docker — dependencies are installed in the container too — so a local run is
@@ -178,8 +181,11 @@ To publish manually instead: `npm run build-and-publish`.
 
 ## Changelog
 
-### Unreleased
+### v2.1.0
 
+- `Metadata` values may now be `number` or `boolean`, not only `string` (new exported `MetadataValue`
+  type). OTLP attributes receive the stringified form (`{ count: 5 }` → `"5"`); the JSON formatter
+  keeps them native (`5`).
 - Browsers are now a **tested** target: the suite runs in real Chromium (Playwright in Docker) in
   CI, alongside the Node matrix. No library/runtime behaviour change — the code was already
   browser-safe (global `fetch`, `crypto.getRandomValues` with a fallback, `AbortController`).

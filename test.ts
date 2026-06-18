@@ -224,13 +224,14 @@ test("Copy instance", t => {
 });
 
 test("msgJsonFormatter does not mutate input and is undefined-safe", t => {
-	const meta = { user: "abc" };
+	const meta = { count: 5, user: "abc" };
 	const parsed = JSON.parse(msgJsonFormatter({ logLevel: "info", metadata: meta, msg: "hi" }));
 
 	t.strictEqual(parsed.user, "abc", "user metadata preserved");
+	t.strictEqual(parsed.count, 5, "number metadata stays a number in JSON output");
 	t.strictEqual(parsed.msg, "hi", "msg present");
 	t.strictEqual(parsed.logLevel, "info", "logLevel present");
-	t.deepEqual(meta, { user: "abc" }, "caller metadata object is NOT mutated");
+	t.deepEqual(meta, { count: 5, user: "abc" }, "caller metadata object is NOT mutated");
 
 	const parsed2 = JSON.parse(msgJsonFormatter({ logLevel: "error", msg: "boom" }));
 
@@ -365,7 +366,7 @@ test("OLTP simple log with metadata", async t => {
 		spanName: "lur-bert",
 	});
 
-	log.warn("FOo", { bar: "baz", "lökig knasnyckel | typ": "17" });
+	log.warn("FOo", { active: true, bar: "baz", "lökig knasnyckel | typ": 17 });
 	await log.end();
 
 	const logsBody: any = calls.find(call => call.path === "/v1/logs")?.body;
@@ -375,10 +376,12 @@ test("OLTP simple log with metadata", async t => {
 	t.strictEqual(logRecord.body.stringValue, "FOo", "logRecord.body is correct");
 	t.strictEqual(logRecord.severityNumber, 13, "logRecord.severityNumber is correct");
 	t.strictEqual(logRecord.severityText, "WARN", "logRecord.severityText is correct");
-	t.strictEqual(logRecord.attributes[0].key, "bar", "First attribute is bar");
-	t.strictEqual(logRecord.attributes[0].value.stringValue, "baz", "First attribute value is baz");
-	t.strictEqual(logRecord.attributes[1].key, "lökig knasnyckel | typ", "Second attribute key is correct");
-	t.strictEqual(logRecord.attributes[1].value.stringValue, "17", "Second attribute value is \"17\"");
+	t.strictEqual(logRecord.attributes[0].key, "active", "First attribute is active");
+	t.strictEqual(logRecord.attributes[0].value.stringValue, "true", "boolean metadata coerced to \"true\"");
+	t.strictEqual(logRecord.attributes[1].key, "bar", "Second attribute is bar");
+	t.strictEqual(logRecord.attributes[1].value.stringValue, "baz", "Second attribute value is baz");
+	t.strictEqual(logRecord.attributes[2].key, "lökig knasnyckel | typ", "Third attribute key is correct");
+	t.strictEqual(logRecord.attributes[2].value.stringValue, "17", "number metadata coerced to \"17\"");
 
 	// service.name belongs on the log resource (this is what Grafana/Loki reads), not the log record.
 	const logResourceAttrs = logsBody.resourceLogs[0].resource.attributes;
