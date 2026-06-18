@@ -181,8 +181,11 @@ To publish manually instead: `npm run build-and-publish`.
 
 ## Changelog
 
-### Unreleased
+### v2.1.0
 
+- `Metadata` values may now be `number` or `boolean`, not only `string` (new exported `MetadataValue`
+  type). OTLP attributes receive the stringified form (`{ count: 5 }` → `"5"`); the JSON formatter
+  keeps them native (`5`).
 - Browsers are now a **tested** target: the suite runs in real Chromium (Playwright in Docker) in
   CI, alongside the Node matrix. No library/runtime behaviour change — the code was already
   browser-safe (global `fetch`, `crypto.getRandomValues` with a fallback, `AbortController`).
