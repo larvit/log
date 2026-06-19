@@ -23,7 +23,7 @@
   },
   "devDependencies": {
     "@larvit/eslint-config-typescript-esm": "2.0.0",
-    "@types/node": "25.9.3",
+    "@types/node": "25.9.4",
     "eslint": "10.5.0",
     "globals": "17.6.0",
     "playwright": "1.61.0",
