@@ -16,6 +16,7 @@
     "lint": "eslint index.ts tap.ts test.ts",
     "replace-version-string": "grep -o '\"version\": \"[^\"]*\"' package.json | cut -d'\"' -f4 | xargs -I {} sed -i.bak 's/__version__/{}/g' index.js && rm -f index.js.bak",
     "test-node": "node .tmp/test/test.js",
+    "test-otlp": "docker build -t larvit-log-test-node . && docker run --rm larvit-log-test-node sh -c \"npm run build >/dev/null && cat index.js\" > index.js && node scripts/run-otlp-tests.mjs",
     "test-docker": "docker build -t larvit-log-test-node --build-arg BASE_IMAGE=\"${NODE_IMAGE:-node:22-bookworm-slim}\" . && docker run --rm larvit-log-test-node npm run ci",
     "test-browser": "docker build -t larvit-log-test-browser --build-arg BASE_IMAGE=mcr.microsoft.com/playwright:v$(node -p \"require('./package.json').devDependencies.playwright\")-noble . && docker run --rm --init --ipc=host larvit-log-test-browser npm run ci-browser",
     "test": "npm run test-docker && npm run test-browser"

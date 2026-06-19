@@ -1,0 +1,22 @@
+# OTLP receiver -> file exporter. Used by scripts/run-otlp-tests.mjs to verify the library's real
+# OTLP output (both JSON and protobuf) against the reference OpenTelemetry Collector: whatever the
+# collector parses is written to a file the test reads back and asserts on.
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+exporters:
+  file:
+    # /data is a host directory mounted by scripts/run-otlp-tests.mjs (the image is distroless, no /tmp).
+    path: /data/otlp-received.json
+
+service:
+  pipelines:
+    logs:
+      receivers: [otlp]
+      exporters: [file]
+    traces:
+      receivers: [otlp]
+      exporters: [file]

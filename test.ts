@@ -42,18 +42,138 @@ function okResponse(json: unknown = { partialSuccess: {} }) {
 // transport can be asserted without a real HTTP server (deterministic, no express dependency).
 // The harness restores globalThis.fetch after each test, so callers never restore it themselves.
 function stubFetch(responder?: (path: string, body: unknown) => ReturnType<typeof okResponse> | undefined) {
-	const calls: { body: any, path: string, url: string }[] = [];
+	const calls: { body: any, contentType: string, path: string, rawBody: any, url: string }[] = [];
 
-	globalThis.fetch = (async (url: string, init: { body: string }) => {
-		const body = JSON.parse(init.body);
+	globalThis.fetch = (async (url: string, init: { body: any, headers: Record<string, string> }) => {
+		const contentType = init.headers?.["Content-Type"];
 		const path = new URL(String(url)).pathname;
+		// Only JSON bodies are parsed; protobuf bodies are raw bytes, inspected via rawBody.
+		const body = contentType === "application/json" ? JSON.parse(init.body) : undefined;
 
-		calls.push({ body, path, url: String(url) });
+		calls.push({ body, contentType, path, rawBody: init.body, url: String(url) });
 
 		return responder?.(path, body) ?? okResponse();
 	}) as unknown as typeof fetch;
 
 	return { calls };
+}
+
+// --- protobuf decode (test-only, zero-dep) ---------------------------------
+// Minimal reader that verifies the hand-rolled OTLP protobuf encoder: it decodes the wire bytes
+// back into the shape the JSON transport builds, so the same facts can be asserted. Field numbers
+// mirror the OTLP proto definitions. Independent of the encoder (own varint/fixed64 reader), so an
+// encoder bug can't be masked by symmetric reuse.
+
+function pbReadVarint(buf: Uint8Array, pos: number): [bigint, number] {
+	let result = 0n;
+	let shift = 0n;
+	let cursor = pos;
+
+	for (;;) {
+		const byte = buf[cursor++];
+
+		result |= BigInt(byte & 0x7f) << shift;
+		if ((byte & 0x80) === 0) break;
+		shift += 7n;
+	}
+
+	return [result, cursor];
+}
+
+// Group one message's fields by field number. Values: bigint (varint/fixed64) or Uint8Array (len-delimited).
+function pbDecode(buf: Uint8Array): Map<number, (bigint | Uint8Array)[]> {
+	const fields = new Map<number, (bigint | Uint8Array)[]>();
+	let pos = 0;
+
+	while (pos < buf.length) {
+		const [tag, afterTag] = pbReadVarint(buf, pos);
+
+		pos = afterTag;
+		const fieldNo = Number(tag >> 3n);
+		const wireType = Number(tag & 0x7n);
+		let value: bigint | Uint8Array;
+
+		if (wireType === 0) {
+			[value, pos] = pbReadVarint(buf, pos);
+		} else if (wireType === 1) {
+			let acc = 0n;
+
+			for (let i = 7; i >= 0; i--) acc = (acc << 8n) | BigInt(buf[pos + i]);
+			value = acc;
+			pos += 8;
+		} else if (wireType === 2) {
+			let len: bigint;
+
+			[len, pos] = pbReadVarint(buf, pos);
+			value = buf.slice(pos, pos + Number(len));
+			pos += Number(len);
+		} else {
+			throw new Error(`unsupported wire type ${wireType}`);
+		}
+
+		const arr = fields.get(fieldNo) ?? [];
+
+		arr.push(value);
+		fields.set(fieldNo, arr);
+	}
+
+	return fields;
+}
+
+const pbStr = (bytes: bigint | Uint8Array) => new TextDecoder().decode(bytes as Uint8Array);
+const pbHex = (bytes: bigint | Uint8Array) => Array.from(bytes as Uint8Array).map(byte => byte.toString(16).padStart(2, "0")).join("");
+const pbMsg = (field: bigint | Uint8Array) => pbDecode(field as Uint8Array);
+
+// KeyValue { key=1: string, value=2: AnyValue { string_value=1 } }
+function pbKeyValue(bytes: bigint | Uint8Array) {
+	const fields = pbDecode(bytes as Uint8Array);
+
+	return { key: pbStr(fields.get(1)![0]), value: { stringValue: pbStr(pbMsg(fields.get(2)![0]).get(1)![0]) } };
+}
+
+// Resource { attributes=1: repeated KeyValue }
+const pbResourceAttrs = (bytes: bigint | Uint8Array) => (pbDecode(bytes as Uint8Array).get(1) ?? []).map(pbKeyValue);
+
+// ExportLogsServiceRequest -> ResourceLogs[0] -> ScopeLogs[0] -> LogRecord[0]
+function pbDecodeLogs(buf: Uint8Array) {
+	const resLog = pbMsg(pbDecode(buf).get(1)![0]);
+	const rec = pbMsg(pbMsg(resLog.get(2)![0]).get(2)![0]);
+
+	return {
+		logRecord: {
+			attributes: (rec.get(6) ?? []).map(pbKeyValue),
+			body: pbStr(pbMsg(rec.get(5)![0]).get(1)![0]),
+			severityNumber: Number(rec.get(2)![0]),
+			severityText: pbStr(rec.get(3)![0]),
+			spanId: pbHex(rec.get(10)![0]),
+			timeUnixNano: String(rec.get(1)![0]),
+			traceId: pbHex(rec.get(9)![0]),
+		},
+		resourceAttrs: pbResourceAttrs(resLog.get(1)![0]),
+	};
+}
+
+// ExportTraceServiceRequest -> ResourceSpans[0] -> ScopeSpans[0] -> Span[0]
+function pbDecodeSpans(buf: Uint8Array) {
+	const resSpan = pbMsg(pbDecode(buf).get(1)![0]);
+	const scopeSpan = pbMsg(resSpan.get(2)![0]);
+	const span = pbMsg(scopeSpan.get(2)![0]);
+
+	return {
+		resourceAttrs: pbResourceAttrs(resSpan.get(1)![0]),
+		scopeName: pbStr(pbMsg(scopeSpan.get(1)![0]).get(1)![0]), // ScopeSpans.scope (msg) -> InstrumentationScope.name
+
+		span: {
+			attributes: (span.get(9) ?? []).map(pbKeyValue),
+			endTimeUnixNano: String(span.get(8)![0]),
+			kind: Number(span.get(6)![0]),
+			name: pbStr(span.get(5)![0]),
+			spanId: pbHex(span.get(2)![0]),
+			startTimeUnixNano: String(span.get(7)![0]),
+			statusCode: span.get(15) ? Number(pbMsg(span.get(15)![0]).get(3)?.[0] ?? 0n) : 0,
+			traceId: pbHex(span.get(1)![0]),
+		},
+	};
 }
 
 // --- console output --------------------------------------------------------
@@ -271,6 +391,34 @@ test("clone can downgrade json format to text", t => {
 	t.end();
 });
 
+test("clone() inherits OTLP config and printTraceInfo, but keeps its own span", async t => {
+	const { calls } = stubFetch();
+	const stdout: string[] = [];
+	const base = new Log({
+		otlpHttpBaseURI: "http://127.0.0.1:4318",
+		otlpProtocol: "http/protobuf",
+		printTraceInfo: true,
+		stderr: () => {},
+		stdout: line => stdout.push(line),
+	});
+
+	const child = base.clone({ context: { cloned: "yes" } });
+
+	child.info("from clone");
+	await child.end();
+
+	// OTLP endpoint + protocol are inherited: the clone actually exports, and as protobuf.
+	t.ok(calls.some(call => call.path === "/v1/logs"), "clone exported a log to the inherited OTLP endpoint");
+	t.ok(calls.length > 0 && calls.every(call => call.contentType === "application/x-protobuf"), "clone inherited otlpProtocol http/protobuf");
+
+	// printTraceInfo is inherited: console output carries span/trace info.
+	t.ok(stdout[0].includes("spanId"), "clone inherited printTraceInfo");
+
+	// ...but the clone is its own span, not a child of base.
+	t.notStrictEqual(child.span.traceId, base.span.traceId, "clone has its own traceId, not base's");
+	t.end();
+});
+
 test("constructor throws on malformed otlpHttpBaseURI", t => {
 	t.throws(() => new Log({ otlpHttpBaseURI: "not a valid uri" }), "malformed otlpHttpBaseURI throws at construction");
 	t.doesNotThrow(() => new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318" }), "valid uri does not throw");
@@ -329,6 +477,7 @@ test("OLTP simple log", async t => {
 
 	t.ok(logsBody, "a /v1/logs call was made");
 	t.ok(tracesBody, "a /v1/traces call was made");
+	t.ok(calls.every(call => call.contentType === "application/json"), "default protocol sends JSON content-type");
 
 	t.strictEqual(logsBody.resourceLogs.length, 1, "Exactly one resourceLog in /v1/logs body");
 	t.strictEqual(logsBody.resourceLogs[0].scopeLogs.length, 1, "Exactly one scopeLog in /v1/logs body");
@@ -414,6 +563,56 @@ test("OLTP simple log with metadata", async t => {
 	t.strictEqual(span.status.code, 0, "span status code is 0");
 	t.strictEqual(span.links.length, 0, "span links is an empty array");
 	t.strictEqual(span.droppedLinksCount, 0, "span has no dropped links");
+	t.end();
+});
+
+test("OTLP protobuf encodes logs and spans on the wire", async t => {
+	const { calls } = stubFetch();
+	const log = new Log({
+		context: { "service.name": "proto-svc" },
+		otlpHttpBaseURI: "http://127.0.0.1:4318",
+		otlpProtocol: "http/protobuf",
+		spanName: "proto-span",
+		stderr: () => {},
+	});
+
+	log.warn("protobuf works", { active: true, count: 17, foo: "bar" });
+	await log.end();
+
+	const logsCall = calls.find(call => call.path === "/v1/logs")!;
+	const tracesCall = calls.find(call => call.path === "/v1/traces")!;
+
+	t.strictEqual(logsCall.contentType, "application/x-protobuf", "logs are sent as protobuf");
+	t.strictEqual(tracesCall.contentType, "application/x-protobuf", "traces are sent as protobuf");
+
+	const { logRecord, resourceAttrs: logResourceAttrs } = pbDecodeLogs(logsCall.rawBody);
+	const { resourceAttrs: spanResourceAttrs, scopeName, span } = pbDecodeSpans(tracesCall.rawBody);
+
+	t.strictEqual(logRecord.body, "protobuf works", "decoded log body matches");
+	t.strictEqual(logRecord.severityNumber, 13, "decoded severityNumber is WARN (13)");
+	t.strictEqual(logRecord.severityText, "WARN", "decoded severityText is WARN");
+	t.deepEqual(
+		logRecord.attributes,
+		[
+			{ key: "active", value: { stringValue: "true" } },
+			{ key: "count", value: { stringValue: "17" } },
+			{ key: "foo", value: { stringValue: "bar" } },
+		],
+		"decoded log attributes match, values stringified",
+	);
+	t.strictEqual(logResourceAttrs.find(attr => attr.key === "service.name")!.value.stringValue, "proto-svc", "service.name is on the log resource");
+	t.notOk(logRecord.attributes.find(attr => attr.key === "service.name"), "service.name is not duplicated in record attributes");
+	t.ok(isNanoTimestampWithinHour(logRecord.timeUnixNano), "log timeUnixNano is reasonable");
+
+	t.strictEqual(scopeName, "proto-span", "scope name is the span name");
+	t.strictEqual(span.name, "proto-span", "decoded span name matches");
+	t.strictEqual(span.kind, 1, "decoded span kind is 1");
+	t.strictEqual(span.statusCode, 0, "decoded span status code is 0");
+	t.strictEqual(span.traceId, logRecord.traceId, "span and log share the traceId");
+	t.strictEqual(span.spanId, logRecord.spanId, "span and log share the spanId");
+	t.strictEqual(spanResourceAttrs.find(attr => attr.key === "service.name")!.value.stringValue, "proto-svc", "service.name is on the span resource");
+	t.ok(isNanoTimestampWithinHour(span.startTimeUnixNano), "span startTimeUnixNano is reasonable");
+	t.ok(isNanoTimestampWithinHour(span.endTimeUnixNano), "span endTimeUnixNano is reasonable");
 	t.end();
 });
 
