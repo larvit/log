@@ -6,10 +6,10 @@ Structured logging with a simple interface and support for OTLP.
 
 In priority order:
 
-1. **A simple API** — small surface, easy to drop in.
-2. **Runs anywhere JavaScript runs** — both browsers and server-side (Node.js >= 18). The only requirement is a runtime with the global `fetch` (used by the OTLP transport).
-3. **Strong OTLP support** — the OTLP payloads are hand-built JSON over `fetch` (no OpenTelemetry SDK dependency) to stay portable across runtimes.
-4. **stdout/stderr support** — works as a plain console logger when OTLP is not configured.
+1. **Works everywhere** — Node.js, Bun, Deno and other server runtimes, plus browsers and React Native. Leans on the common JavaScript surface (global `fetch`), with graceful fallbacks where a runtime lacks an API.
+2. **A very easy API** — "just log" must stay trivial. Developers pick it up fast without needing to understand OTLP internals.
+3. **Composable** — attach to upstream headers/spans/traces and inherit logs, spans and traces between instances. A chameleon that slots into most setups.
+4. **Low footprint for the consumer** — small runtime cost and install weight in the consumer's app. Build/codegen steps in *this* library's own development are fine, as long as they don't carry over to consumers.
 
 ## Installation
 
@@ -111,6 +111,12 @@ const log = new Log({
 	// Added in 1.3.0
 	otlpHttpBaseURI: null,
 
+	// OTLP wire format: "http/json" (default) or "http/protobuf".
+	// Both POST to the same endpoint; protobuf sends Content-Type: application/x-protobuf.
+	// Use protobuf for collectors that don't accept JSON.
+	// Added in 2.2.0
+	otlpProtocol: "http/json",
+
 	// Group logs together under a specific parent
 	// Used for spans and traces in Open Telemetry etc.
 	// Defaults to null, creating no span in otlp
@@ -183,6 +189,16 @@ The workflow publishes whatever is in `package.json`, so the tag and `package.js
 To publish manually instead: `npm run build-and-publish`.
 
 ## Changelog
+
+### v2.2.0
+
+- OTLP can now export over **HTTP/protobuf**, not only HTTP/JSON. Opt in with
+  `otlpProtocol: "http/protobuf"` (default stays `"http/json"`); both POST to the same endpoint.
+  The protobuf encoder is hand-built and dependency-free, so the library stays a single
+  self-contained file that runs anywhere. Useful for collectors that only accept protobuf.
+- Fixed: `clone()` now inherits OTLP settings (`otlpHttpBaseURI`, `otlpProtocol`,
+  `otlpAdditionalHeaders`) and `printTraceInfo`, which it previously dropped silently. A clone still
+  gets its own span — it is not made a child of the original.
 
 ### v2.1.0
 
