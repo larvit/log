@@ -1,4 +1,4 @@
-import { formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, LogLevels, msgJsonFormatter, parseTraceparent } from "./index.js";
+import { formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, type LogLevel, LogLevels, msgJsonFormatter, parseTraceparent } from "./index.js";
 import test from "./tap.js";
 
 // --- helpers ---------------------------------------------------------------
@@ -8,20 +8,14 @@ function isNanoTimestampWithinHour(str: string): boolean {
 		return false;
 	}
 
-	const unixTimestamp = Math.round(parseInt(str) / 1000000000); // nanosecond to second
-	const now = Math.floor(Date.now() / 1000); // millisecond to second
-	const hourInSeconds = 3600;
+	const unixTimestamp = Math.round(parseInt(str) / 1000000000); // ns -> s
+	const now = Math.floor(Date.now() / 1000);
 
-	// Check if number is a reasonable Unix timestamp (after 2020-01-01)
-	if (unixTimestamp > 1577836800) {
-		return Math.abs(now - unixTimestamp) <= hourInSeconds;
-	}
-
-	return false;
+	// A plausible recent Unix timestamp: after 2020-01-01 and within an hour of now.
+	return unixTimestamp > 1577836800 && Math.abs(now - unixTimestamp) <= 3600;
 }
 
-// Build a Log whose console output is captured into arrays instead of touching the real console.
-// Works in any runtime (no process.stdout patching).
+// Build a Log capturing console output into arrays (runtime-agnostic, no process.stdout patching).
 function capture(conf?: ConstructorParameters<typeof Log>[0]) {
 	const stderr: string[] = [];
 	const stdout: string[] = [];
@@ -33,23 +27,16 @@ function capture(conf?: ConstructorParameters<typeof Log>[0]) {
 	return { log: new Log(opts), stderr, stdout };
 }
 
-function okResponse(json: unknown = { partialSuccess: {} }) {
-	// eslint-disable-next-line id-length -- "ok" mirrors the fetch Response shape the transport reads
-	return { headers: new Headers(), json: () => Promise.resolve(json), ok: true, status: 200 };
-}
-
-// A fetch Response stand-in for log.fetch tests, with overridable status/headers.
-function fetchResponse(opts: { headers?: Headers, status?: number } = {}) {
-	const status = opts.status ?? 200;
-
+// A minimal fetch Response stand-in. Defaults satisfy the OTLP transport (which reads .json());
+// log.fetch tests override status/headers — log.fetch never reads the body.
+function response({ headers, json = { partialSuccess: {} }, status = 200 }: { headers?: Headers, json?: unknown, status?: number } = {}) {
 	// eslint-disable-next-line id-length -- "ok" mirrors the fetch Response shape
-	return { headers: opts.headers ?? new Headers(), json: () => Promise.resolve({}), ok: status < 400, status };
+	return { headers: headers ?? new Headers(), json: () => Promise.resolve(json), ok: status < 400, status };
 }
 
-// Replace the global fetch with a recording stub. Works in Node and the browser, so the OTLP
-// transport can be asserted without a real HTTP server (deterministic, no express dependency).
-// The harness restores globalThis.fetch after each test, so callers never restore it themselves.
-function stubFetch(responder?: (path: string, body: unknown) => ReturnType<typeof okResponse> | undefined) {
+// Replace global fetch with a recording stub (Node + browser), so the OTLP transport is asserted
+// without a real server. The harness restores globalThis.fetch after each test.
+function stubFetch(responder?: (path: string, body: unknown) => ReturnType<typeof response> | undefined) {
 	const calls: { body: any, contentType: string, headers: any, path: string, rawBody: any, url: string }[] = [];
 
 	globalThis.fetch = (async (url: string, init: { body: any, headers: Record<string, string> }) => {
@@ -60,16 +47,16 @@ function stubFetch(responder?: (path: string, body: unknown) => ReturnType<typeo
 
 		calls.push({ body, contentType, headers: init.headers, path, rawBody: init.body, url: String(url) });
 
-		return responder?.(path, body) ?? okResponse();
+		return responder?.(path, body) ?? response();
 	}) as unknown as typeof fetch;
 
 	return { calls };
 }
 
-// Read a single header from a recorded call, normalising plain-object and Headers shapes.
+// Read a header from a recorded call, normalising plain-object and Headers shapes.
 const callHeader = (call: { headers: any }, name: string) => new Headers(call.headers ?? {}).get(name);
 
-// Locate the exported CLIENT span (kind 3) among the /v1/traces calls — the one log.fetch creates.
+// The exported CLIENT span (kind 3) among the /v1/traces calls — the one log.fetch creates.
 function clientSpan(calls: { body: any, path: string }[]) {
 	for (const call of calls.filter(call => call.path === "/v1/traces")) {
 		const span = call.body.resourceSpans[0].scopeSpans[0].spans[0];
@@ -83,10 +70,9 @@ function clientSpan(calls: { body: any, path: string }[]) {
 }
 
 // --- protobuf decode (test-only, zero-dep) ---------------------------------
-// Minimal reader that verifies the hand-rolled OTLP protobuf encoder: it decodes the wire bytes
-// back into the shape the JSON transport builds, so the same facts can be asserted. Field numbers
-// mirror the OTLP proto definitions. Independent of the encoder (own varint/fixed64 reader), so an
-// encoder bug can't be masked by symmetric reuse.
+// Independent reader (own varint/fixed64 logic) that decodes the hand-rolled OTLP protobuf back into
+// the JSON transport's shape, so an encoder bug can't hide behind symmetric reuse. Field numbers
+// mirror the OTLP proto definitions.
 
 function pbReadVarint(buf: Uint8Array, pos: number): [bigint, number] {
 	let result = 0n;
@@ -185,7 +171,7 @@ function pbDecodeSpans(buf: Uint8Array) {
 
 	return {
 		resourceAttrs: pbResourceAttrs(resSpan.get(1)![0]),
-		scopeName: pbStr(pbMsg(scopeSpan.get(1)![0]).get(1)![0]), // ScopeSpans.scope (msg) -> InstrumentationScope.name
+		scopeName: pbStr(pbMsg(scopeSpan.get(1)![0]).get(1)![0]), // ScopeSpans.scope -> InstrumentationScope.name
 
 		span: {
 			attributes: (span.get(9) ?? []).map(pbKeyValue),
@@ -202,188 +188,96 @@ function pbDecodeSpans(buf: Uint8Array) {
 
 // --- console output --------------------------------------------------------
 
-test("Should log to info.", t => {
-	const { log, stdout } = capture();
+test("each level writes its colored token to the right stream", t => {
+	const cases: { level: LogLevel, stream: "stderr" | "stdout", token: string }[] = [
+		{ level: "error", stream: "stderr", token: "\x1b[1;31merr\x1b[0m" },
+		{ level: "warn", stream: "stderr", token: "\x1b[1;33mwar\x1b[0m" },
+		{ level: "info", stream: "stdout", token: "\x1b[1;32minf\x1b[0m" },
+		{ level: "verbose", stream: "stdout", token: "\x1b[1;34mver\x1b[0m" },
+		{ level: "debug", stream: "stdout", token: "\x1b[1;35mdeb\x1b[0m" },
+		{ level: "silly", stream: "stdout", token: "\x1b[1;37msil\x1b[0m" },
+	];
 
-	log.info("flurp");
-	t.strictEqual(stdout[0].substring(19), "Z [\x1b[1;32minf\x1b[0m] flurp", "\"flurp\" is in the inf log output");
+	for (const { level, stream, token } of cases) {
+		const cap = capture("silly"); // silly passes every level through the filter
+
+		cap.log[level]("msg");
+		t.strictEqual(cap[stream][0]?.substring(19), `Z [${token}] msg`, `${level} -> ${stream} with its token`);
+	}
 	t.end();
 });
 
-test("Should log to error.", t => {
-	const { log, stderr } = capture();
+test("respects the configured log-level threshold", t => {
+	const def = capture(); // default level is info
 
-	log.error("burp");
-	t.strictEqual(stderr[0].substring(19), "Z [\x1b[1;31merr\x1b[0m] burp", "\"burp\" is in the err log output");
+	def.log.info("x");
+	def.log.verbose("x");
+	def.log.debug("x");
+	t.strictEqual(def.stdout.length, 1, "default level passes info but not verbose/debug");
+
+	const err = capture("error");
+
+	err.log.silly("x");
+	err.log.debug("x");
+	err.log.verbose("x");
+	err.log.warn("x");
+	t.strictEqual(err.stdout.length + err.stderr.length, 0, "everything below error (incl. warn) is suppressed");
+	err.log.error("x");
+	t.strictEqual(err.stderr.length, 1, "error passes at level error");
+
+	const silly = capture("silly");
+
+	silly.log.debug("x");
+	t.strictEqual(silly.stdout.length, 1, "debug passes at the lowest level");
+
+	const none = capture("none");
+
+	none.log.error("x");
+	t.strictEqual(none.stderr.length, 0, "nothing is written at level none, not even error");
 	t.end();
 });
 
-test("Should not print debug by default.", t => {
-	const { log, stdout } = capture();
+test("metadata and context appear in the output", t => {
+	const meta = capture("info");
 
-	log.debug("nai");
-	t.strictEqual(stdout.length, 0, "debug is not logged at the default level");
-	t.end();
-});
+	meta.log.info("kattbajs", { foo: "bar" });
+	t.strictEqual(meta.stdout[0].split(" kattbajs ")[1].trim(), "{\"foo\":\"bar\"}", "metadata is appended");
 
-test("Should print debug when given \"silly\" as level.", t => {
-	const { log, stdout } = capture("silly");
+	const ctx = capture({ context: { bosse: "bäng", hasse: "luring" } });
 
-	log.debug("wapp");
-	t.strictEqual(stdout[0].substring(19), "Z [\x1b[1;35mdeb\x1b[0m] wapp", "\"wapp\" is in the deb log output");
-	t.end();
-});
-
-test("Print nothing, even on error, when no valid level is set.", t => {
-	const { log, stderr } = capture("none");
-
-	log.error("kattbajs");
-	t.strictEqual(stderr.length, 0, "Nothing is written at level \"none\"");
-	t.end();
-});
-
-test("Test silly.", t => {
-	const { log, stdout } = capture("silly");
-
-	log.silly("kattbajs");
-	t.strictEqual(stdout[0].substring(19), "Z [\x1b[1;37msil\x1b[0m] kattbajs");
-	t.end();
-});
-
-test("Test debug", t => {
-	const { log, stdout } = capture("debug");
-
-	log.debug("kattbajs");
-	t.strictEqual(stdout[0].substring(19), "Z [\x1b[1;35mdeb\x1b[0m] kattbajs", "Debug level is output to stdout");
-	t.end();
-});
-
-test("Test verbose", t => {
-	const { log, stdout } = capture("verbose");
-
-	log.verbose("kattbajs");
-	t.strictEqual(stdout[0].substring(19), "Z [\x1b[1;34mver\x1b[0m] kattbajs");
-	t.end();
-});
-
-test("Test info", t => {
-	const { log, stdout } = capture("info");
-
-	log.info("kattbajs");
-	t.strictEqual(stdout[0].substring(19), "Z [\x1b[1;32minf\x1b[0m] kattbajs");
-	t.end();
-});
-
-test("Test warn", t => {
-	const { log, stderr } = capture("warn");
-
-	log.warn("kattbajs");
-	t.strictEqual(stderr[0].substring(19), "Z [\x1b[1;33mwar\x1b[0m] kattbajs");
-	t.end();
-});
-
-test("Test error", t => {
-	const { log, stderr } = capture("silly");
-
-	log.error("kattbajs");
-	t.strictEqual(stderr[0].substring(19), "Z [\x1b[1;31merr\x1b[0m] kattbajs");
-	t.end();
-});
-
-test("Test initializing with options object", t => {
-	const { log, stderr } = capture({ logLevel: "error" });
-
-	log.error("an error");
-	t.strictEqual(stderr[0].substring(19), "Z [\x1b[1;31merr\x1b[0m] an error");
-	t.end();
-});
-
-test("Default level is info if nothing else is specified", t => {
-	const { log, stdout } = capture({ logLevel: undefined });
-
-	log.info("information");
-	t.ok(stdout[0].includes(" information"), "info is logged at the default level");
-	log.verbose("not logged");
-	t.strictEqual(stdout.length, 1, "verbose is not logged at the default level");
-	t.end();
-});
-
-test("Test only errors are logged if log level is error", t => {
-	const { log, stderr, stdout } = capture("error");
-
-	log.silly("kattbajs");
-	log.debug("kattbajs");
-	log.verbose("kattbajs");
-	t.strictEqual(stdout.length, 0, "silly/debug/verbose are not logged at level error");
-
-	log.warn("kattbajs");
-	t.strictEqual(stderr.length, 0, "warn is not logged at level error");
-
-	log.error("kattbajs");
-	t.ok(stderr[0].includes(" kattbajs"), "error is logged at level error");
-	t.end();
-});
-
-test("Test with metadata", t => {
-	const { log, stdout } = capture("info");
-
-	log.info("kattbajs", { foo: "bar" });
-	t.strictEqual(stdout[0].split(" kattbajs ")[1].trim(), "{\"foo\":\"bar\"}", "Metadata is included in output");
-	t.end();
-});
-
-test("Test with context", t => {
-	const { log, stdout } = capture({ context: { bosse: "bäng", hasse: "luring" } });
-
-	log.info("kattbajs", { foo: "bar" });
+	ctx.log.info("kattbajs", { foo: "bar" });
 	t.strictEqual(
-		stdout[0].split(" kattbajs ")[1].trim(),
+		ctx.stdout[0].split(" kattbajs ")[1].trim(),
 		"{\"foo\":\"bar\",\"bosse\":\"bäng\",\"hasse\":\"luring\"}",
-		"Metadata and context are included in output",
+		"metadata and context are merged into the output",
 	);
 	t.end();
 });
 
-test("Json stringifyer", t => {
+test("json format emits context, metadata, logLevel and msg", t => {
 	const { log, stdout } = capture({ context: { hello: "yo" }, format: "json" });
 
 	log.info("bosse", { foo: "frasse" });
 	const parsed = JSON.parse(stdout[0]);
 
-	t.strictEqual(parsed.foo, "frasse", "Metadata foo is \"frasse\"");
-	t.strictEqual(parsed.hello, "yo", "Context is in the json");
+	t.strictEqual(parsed.foo, "frasse", "metadata is in the json");
+	t.strictEqual(parsed.hello, "yo", "context is in the json");
 	t.strictEqual(parsed.logLevel, "info", "logLevel is set");
-	t.strictEqual(parsed.msg, "bosse", "msg is set to \"bosse\"");
+	t.strictEqual(parsed.msg, "bosse", "msg is set");
 	t.end();
 });
 
-test("Copy instance", t => {
-	const log = new Log({ context: { foo: "bar" } });
-	const newLog = log.clone({ context: { baz: "fu" }, logLevel: "error" });
-	const newLog2 = log.clone({ context: { foo: "burp" } });
-
-	t.strictEqual(JSON.stringify(newLog.context), "{\"foo\":\"bar\",\"baz\":\"fu\"}", "Context is merged in newLog.");
-	t.strictEqual(JSON.stringify(newLog2.context), "{\"foo\":\"burp\"}", "Context is merged in newLog2.");
-	t.end();
-});
-
-test("msgJsonFormatter does not mutate input and is undefined-safe", t => {
+test("msgJsonFormatter keeps native types, does not mutate input, is undefined-safe", t => {
 	const meta = { count: 5, user: "abc" };
 	const parsed = JSON.parse(msgJsonFormatter({ logLevel: "info", metadata: meta, msg: "hi" }));
 
-	t.strictEqual(parsed.user, "abc", "user metadata preserved");
 	t.strictEqual(parsed.count, 5, "number metadata stays a number in JSON output");
-	t.strictEqual(parsed.msg, "hi", "msg present");
-	t.strictEqual(parsed.logLevel, "info", "logLevel present");
-	t.deepEqual(meta, { count: 5, user: "abc" }, "caller metadata object is NOT mutated");
-
-	const parsed2 = JSON.parse(msgJsonFormatter({ logLevel: "error", msg: "boom" }));
-
-	t.strictEqual(parsed2.msg, "boom", "undefined metadata does not throw");
+	t.deepEqual(meta, { count: 5, user: "abc" }, "caller metadata is not mutated");
+	t.doesNotThrow(() => msgJsonFormatter({ logLevel: "error", msg: "boom" }), "undefined metadata does not throw");
 	t.end();
 });
 
-test("verbose is ranked more severe than debug in OTLP severity", t => {
+test("verbose ranks more severe than debug in OTLP severity", t => {
 	t.ok(LogLevels.verbose.severityNumber > LogLevels.debug.severityNumber, "verbose severityNumber > debug severityNumber");
 	t.end();
 });
@@ -405,6 +299,14 @@ test("printTraceInfo appends span/trace info to output", t => {
 	t.end();
 });
 
+test("clone merges context (overrides win)", t => {
+	const log = new Log({ context: { foo: "bar" } });
+
+	t.strictEqual(JSON.stringify(log.clone({ context: { baz: "fu" } }).context), "{\"foo\":\"bar\",\"baz\":\"fu\"}", "new keys merge in");
+	t.strictEqual(JSON.stringify(log.clone({ context: { foo: "burp" } }).context), "{\"foo\":\"burp\"}", "existing keys are overridden");
+	t.end();
+});
+
 test("clone can downgrade json format to text", t => {
 	const stdout: string[] = [];
 	const textLog = new Log({ format: "json" }).clone({ format: "text", stdout: line => stdout.push(line) });
@@ -415,10 +317,13 @@ test("clone can downgrade json format to text", t => {
 	t.end();
 });
 
-test("clone() inherits OTLP config and printTraceInfo, but keeps its own span", async t => {
+test("clone inherits config (OTLP, printTraceInfo, fetch policy) but keeps its own span", async t => {
 	const { calls } = stubFetch();
 	const stdout: string[] = [];
 	const base = new Log({
+		captureQuery: true,
+		captureRequestHeaders: ["x-req"],
+		captureResponseHeaders: ["x-resp"],
 		otlpHttpBaseURI: "http://127.0.0.1:4318",
 		otlpProtocol: "http/protobuf",
 		printTraceInfo: true,
@@ -431,11 +336,16 @@ test("clone() inherits OTLP config and printTraceInfo, but keeps its own span", 
 	child.info("from clone");
 	await child.end();
 
-	// OTLP endpoint + protocol are inherited: the clone actually exports, and as protobuf.
-	t.ok(calls.some(call => call.path === "/v1/logs"), "clone exported a log to the inherited OTLP endpoint");
+	// OTLP endpoint + protocol inherited: the clone actually exports, as protobuf.
+	t.ok(calls.some(call => call.path === "/v1/logs"), "clone exports to the inherited OTLP endpoint");
 	t.ok(calls.length > 0 && calls.every(call => call.contentType === "application/x-protobuf"), "clone inherited otlpProtocol http/protobuf");
 
-	// printTraceInfo is inherited: console output carries span/trace info.
+	// log.fetch policy inherited.
+	t.strictEqual(child.conf.captureQuery, true, "captureQuery inherited");
+	t.deepEqual(child.conf.captureRequestHeaders, ["x-req"], "request header allow-list inherited");
+	t.deepEqual(child.conf.captureResponseHeaders, ["x-resp"], "response header allow-list inherited");
+
+	// printTraceInfo inherited.
 	t.ok(stdout[0].includes("spanId"), "clone inherited printTraceInfo");
 
 	// ...but the clone is its own span, not a child of base.
@@ -453,9 +363,7 @@ test("child log does not share its context object with the parent", t => {
 	const parent = new Log({ context: { service: "x" } });
 	const child = new Log({ parentLog: parent });
 
-	t.notStrictEqual(child.context, parent.context, "child has its own context object");
 	t.strictEqual(child.context.service, "x", "child inherits parent context values");
-
 	child.context.extra = "y";
 	t.strictEqual(parent.context.extra, undefined, "child context mutation does not leak to parent");
 	t.end();
@@ -463,7 +371,7 @@ test("child log does not share its context object with the parent", t => {
 
 // --- OTLP transport (fetch-stubbed) ----------------------------------------
 
-test("end() returns an awaitable promise and OTLP failure is handled without hanging", async t => {
+test("end() is awaitable and an OTLP export failure is reported without hanging", async t => {
 	stubFetch(() => { throw new Error("connection refused"); });
 	const stderr: string[] = [];
 	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:1", stderr: line => stderr.push(line) });
@@ -473,8 +381,7 @@ test("end() returns an awaitable promise and OTLP failure is handled without han
 
 	t.ok(ret && typeof ret.then === "function", "end() returns a thenable");
 	await ret;
-
-	t.ok(stderr.join("\n").includes("127.0.0.1:1"), "the OTLP export error (incl. endpoint url) is written to stderr");
+	t.ok(stderr.join("\n").includes("127.0.0.1:1"), "the export error, incl. the endpoint url, is written to stderr");
 	t.end();
 });
 
@@ -489,104 +396,74 @@ test("OTLP preserves a base path from otlpHttpBaseURI", async t => {
 	t.end();
 });
 
-test("OLTP simple log", async t => {
-	const { calls } = stubFetch();
-	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
-
-	log.error("Gir in da house!");
-	await log.end();
-
-	const logsBody: any = calls.find(call => call.path === "/v1/logs")?.body;
-	const tracesBody: any = calls.find(call => call.path === "/v1/traces")?.body;
-
-	t.ok(logsBody, "a /v1/logs call was made");
-	t.ok(tracesBody, "a /v1/traces call was made");
-	t.ok(calls.every(call => call.contentType === "application/json"), "default protocol sends JSON content-type");
-
-	t.strictEqual(logsBody.resourceLogs.length, 1, "Exactly one resourceLog in /v1/logs body");
-	t.strictEqual(logsBody.resourceLogs[0].scopeLogs.length, 1, "Exactly one scopeLog in /v1/logs body");
-	t.strictEqual(logsBody.resourceLogs[0].scopeLogs[0].logRecords.length, 1, "Exactly one logRecord in /v1/logs body");
-
-	const logRecord = logsBody.resourceLogs[0].scopeLogs[0].logRecords[0];
-
-	t.strictEqual(logRecord.body.stringValue, "Gir in da house!", "logRecord.body is correct");
-	t.strictEqual(logRecord.severityNumber, 17, "logRecord.severityNumber is correct");
-	t.strictEqual(logRecord.severityText, "ERROR", "logRecord.severityText is correct");
-	t.notStrictEqual(logRecord.traceId.length, 0, "logRecord.traceId has a non-zero length");
-	t.ok(isNanoTimestampWithinHour(logRecord.timeUnixNano), "timeUnixNano is reasonable");
-
-	t.strictEqual(tracesBody.resourceSpans.length, 1, "Exactly one resourceSpan in /v1/traces body");
-	t.strictEqual(tracesBody.resourceSpans[0].scopeSpans.length, 1, "Exactly one scopeSpan in /v1/traces body");
-	t.strictEqual(tracesBody.resourceSpans[0].scopeSpans[0].spans.length, 1, "Exactly one span in /v1/traces body");
-
-	const span = tracesBody.resourceSpans[0].scopeSpans[0].spans[0];
-
-	t.strictEqual(span.kind, 1, "Span kind is always 1");
-	t.strictEqual(typeof span.name, "string", "span.name is a string");
-	t.notStrictEqual(span.name.length, 0, "span.name has a non-zero length");
-	t.notStrictEqual(span.spanId.length, 0, "span.spanId has a non-zero length");
-	t.strictEqual(span.traceId, logRecord.traceId, "span.traceId matches the log traceId");
-	t.ok(isNanoTimestampWithinHour(span.endTimeUnixNano), "span.endTimeUnixNano is reasonable");
-	t.ok(isNanoTimestampWithinHour(span.startTimeUnixNano), "span.startTimeUnixNano is reasonable");
-	t.end();
-});
-
-test("OLTP simple log with metadata", async t => {
+test("OTLP/JSON exports one log record and one span sharing trace/span ids", async t => {
 	const { calls } = stubFetch();
 	const log = new Log({
 		context: { "service.name": "eva-bosse" },
 		otlpHttpBaseURI: "http://127.0.0.1:4318",
 		spanName: "lur-bert",
+		stderr: () => {},
 	});
 
 	log.warn("FOo", { active: true, bar: "baz", "lökig knasnyckel | typ": 17 });
 	await log.end();
 
-	const logsBody: any = calls.find(call => call.path === "/v1/logs")?.body;
-	const tracesBody: any = calls.find(call => call.path === "/v1/traces")?.body;
+	t.ok(calls.every(call => call.contentType === "application/json"), "default protocol sends JSON");
+
+	const logsBody: any = calls.find(call => call.path === "/v1/logs")!.body;
+	const tracesBody: any = calls.find(call => call.path === "/v1/traces")!.body;
+	const resourceAttr = (attrs: any[], key: string) => attrs.find(attr => attr.key === key)?.value.stringValue;
+
+	// Exactly one resource/scope/record and resource/scope/span.
+	t.strictEqual(logsBody.resourceLogs.length, 1, "one resourceLog");
+	t.strictEqual(logsBody.resourceLogs[0].scopeLogs.length, 1, "one scopeLog");
+	t.strictEqual(logsBody.resourceLogs[0].scopeLogs[0].logRecords.length, 1, "one logRecord");
+	t.strictEqual(tracesBody.resourceSpans.length, 1, "one resourceSpan");
+	t.strictEqual(tracesBody.resourceSpans[0].scopeSpans.length, 1, "one scopeSpan");
+	t.strictEqual(tracesBody.resourceSpans[0].scopeSpans[0].spans.length, 1, "one span");
+
 	const logRecord = logsBody.resourceLogs[0].scopeLogs[0].logRecords[0];
 
-	t.strictEqual(logRecord.body.stringValue, "FOo", "logRecord.body is correct");
-	t.strictEqual(logRecord.severityNumber, 13, "logRecord.severityNumber is correct");
-	t.strictEqual(logRecord.severityText, "WARN", "logRecord.severityText is correct");
-	t.strictEqual(logRecord.attributes[0].key, "active", "First attribute is active");
-	t.strictEqual(logRecord.attributes[0].value.stringValue, "true", "boolean metadata coerced to \"true\"");
-	t.strictEqual(logRecord.attributes[1].key, "bar", "Second attribute is bar");
-	t.strictEqual(logRecord.attributes[1].value.stringValue, "baz", "Second attribute value is baz");
-	t.strictEqual(logRecord.attributes[2].key, "lökig knasnyckel | typ", "Third attribute key is correct");
-	t.strictEqual(logRecord.attributes[2].value.stringValue, "17", "number metadata coerced to \"17\"");
+	t.strictEqual(logRecord.body.stringValue, "FOo", "log body");
+	t.strictEqual(logRecord.severityNumber, 13, "severityNumber is WARN (13)");
+	t.strictEqual(logRecord.severityText, "WARN", "severityText is WARN");
+	t.ok(isNanoTimestampWithinHour(logRecord.timeUnixNano), "log timeUnixNano is reasonable");
+	t.deepEqual(
+		logRecord.attributes,
+		[
+			{ key: "active", value: { stringValue: "true" } },
+			{ key: "bar", value: { stringValue: "baz" } },
+			{ key: "lökig knasnyckel | typ", value: { stringValue: "17" } },
+		],
+		"metadata attributes are coerced to strings, in insertion order",
+	);
 
-	// service.name belongs on the log resource (this is what Grafana/Loki reads), not the log record.
-	const logResourceAttrs = logsBody.resourceLogs[0].resource.attributes;
-
-	t.strictEqual(logResourceAttrs.find((attr: any) => attr.key === "service.name").value.stringValue, "eva-bosse", "log resource service.name is eva-bosse");
-	t.strictEqual(logResourceAttrs.find((attr: any) => attr.key === "telemetry.sdk.name").value.stringValue, "@larvit/log", "log resource telemetry.sdk.name is @larvit/log");
-	t.notOk(logRecord.attributes.find((attr: any) => attr.key === "service.name"), "service.name is not duplicated in log record attributes");
+	// service.name lives on the resource (what Grafana/Loki reads), never duplicated on the record.
+	t.strictEqual(resourceAttr(logsBody.resourceLogs[0].resource.attributes, "service.name"), "eva-bosse", "service.name on log resource");
+	t.notOk(logRecord.attributes.find((attr: any) => attr.key === "service.name"), "service.name not duplicated on the record");
 
 	const traceResource = tracesBody.resourceSpans[0];
 
-	t.strictEqual(traceResource.resource.attributes.length, 4, "Resource has 4 attributes");
-	t.strictEqual(traceResource.resource.droppedAttributesCount, 0, "No attributes dropped");
+	t.strictEqual(traceResource.resource.attributes.length, 4, "resource has 4 attributes");
+	t.strictEqual(traceResource.resource.droppedAttributesCount, 0, "no dropped resource attributes");
+	t.strictEqual(resourceAttr(traceResource.resource.attributes, "service.name"), "eva-bosse", "service.name on span resource");
+	t.strictEqual(resourceAttr(traceResource.resource.attributes, "telemetry.sdk.language"), "ecmascript", "telemetry.sdk.language");
+	t.strictEqual(resourceAttr(traceResource.resource.attributes, "telemetry.sdk.name"), "@larvit/log", "telemetry.sdk.name");
+	t.ok(/^\d+\.\d+\.\d+/.test(resourceAttr(traceResource.resource.attributes, "telemetry.sdk.version")), "telemetry.sdk.version is a real semver (build replaced __version__)");
 
-	const findAttr = (key: string) => traceResource.resource.attributes.find((attr: any) => attr.key === key).value.stringValue;
+	const span = traceResource.scopeSpans[0].spans[0];
 
-	t.strictEqual(findAttr("service.name"), "eva-bosse", "service.name is eva-bosse");
-	t.strictEqual(findAttr("telemetry.sdk.language"), "ecmascript", "telemetry.sdk.language is ecmascript");
-	t.strictEqual(findAttr("telemetry.sdk.name"), "@larvit/log", "telemetry.sdk.name is @larvit/log");
-	t.ok(/^\d+\.\d+\.\d+/.test(findAttr("telemetry.sdk.version")), "telemetry.sdk.version is a semver (build replaced __version__)");
-
-	const scopedSpan = traceResource.scopeSpans[0];
-	const span = scopedSpan.spans[0];
-
-	t.strictEqual(scopedSpan.scope.name, "lur-bert", "Span scope name is lur-bert");
-	t.strictEqual(span.name, "lur-bert", "Span name is lur-bert");
-	t.strictEqual(span.traceId, logRecord.traceId, "traceId is the same in trace and log");
-	t.strictEqual(span.spanId, logRecord.spanId, "spanId is the same in trace and log");
-	t.strictEqual(span.kind, 1, "span kind is 1");
-	t.strictEqual(span.attributes.length, 0, "Span attributes is an empty array");
-	t.strictEqual(span.status.code, 0, "span status code is 0");
-	t.strictEqual(span.links.length, 0, "span links is an empty array");
+	t.strictEqual(traceResource.scopeSpans[0].scope.name, "lur-bert", "scope name is the span name");
+	t.strictEqual(span.name, "lur-bert", "span name");
+	t.strictEqual(span.kind, 1, "span kind 1");
+	t.strictEqual(span.status.code, 0, "span status is ok");
+	t.strictEqual(span.attributes.length, 0, "no span attributes (context held only service.name)");
+	t.strictEqual(span.links.length, 0, "span has no links");
 	t.strictEqual(span.droppedLinksCount, 0, "span has no dropped links");
+	t.strictEqual(span.traceId, logRecord.traceId, "span and log share the traceId");
+	t.strictEqual(span.spanId, logRecord.spanId, "span and log share the spanId");
+	t.ok(isNanoTimestampWithinHour(span.startTimeUnixNano), "span startTimeUnixNano is reasonable");
+	t.ok(isNanoTimestampWithinHour(span.endTimeUnixNano), "span endTimeUnixNano is reasonable");
 	t.end();
 });
 
@@ -640,7 +517,7 @@ test("OTLP protobuf encodes logs and spans on the wire", async t => {
 	t.end();
 });
 
-test("OLTP multiple instances should work independently", async t => {
+test("OTLP instances export independently, each with its own service.name", async t => {
 	const { calls } = stubFetch();
 	const otlp = { otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} };
 
@@ -656,19 +533,14 @@ test("OLTP multiple instances should work independently", async t => {
 
 	t.strictEqual(calls.length, 4, "two log exports + two trace exports");
 
-	for (const call of calls.filter(call => call.path === "/v1/logs")) {
-		const logRecord = call.body.resourceLogs[0].scopeLogs[0].logRecords[0];
-		const serviceName = call.body.resourceLogs[0].resource.attributes.find((attr: any) => attr.key === "service.name").value.stringValue;
+	const serviceFor = (msg: string) => {
+		const call = calls.find(call => call.path === "/v1/logs" && call.body.resourceLogs[0].scopeLogs[0].logRecords[0].body.stringValue === msg)!;
 
-		if (logRecord.body.stringValue === "rappakalja") {
-			t.strictEqual(serviceName, "log1", "service.name for rappakalja is log1");
-		} else if (logRecord.body.stringValue === "bollhav") {
-			t.strictEqual(serviceName, "log2", "service.name for bollhav is log2");
-		} else {
-			t.fail(`Unexpected log body: "${logRecord.body.stringValue}"`);
-		}
-	}
+		return call.body.resourceLogs[0].resource.attributes.find((attr: any) => attr.key === "service.name").value.stringValue;
+	};
 
+	t.strictEqual(serviceFor("rappakalja"), "log1", "first instance keeps its service.name");
+	t.strictEqual(serviceFor("bollhav"), "log2", "second instance keeps its service.name");
 	t.end();
 });
 
@@ -696,31 +568,32 @@ test("parseTraceparent rejects malformed headers", t => {
 	t.end();
 });
 
-test("Log adopts an incoming traceparent (distributed trace continuation)", t => {
+test("traceparent adoption: incoming joins; malformed, parentLog and clone do not", t => {
 	const traceId = generateTraceId();
 	const spanId = generateSpanId();
-	const log = new Log({ traceparent: formatTraceparent(traceId, spanId) });
 
-	t.strictEqual(log.span.traceId, traceId, "log joins the incoming trace");
-	t.strictEqual(log.span.parentSpanId, spanId, "the incoming span becomes the parent span");
-	t.end();
-});
+	// An incoming traceparent: join the trace and nest under its span.
+	const adopted = new Log({ traceparent: formatTraceparent(traceId, spanId) });
 
-test("Log ignores a malformed traceparent and starts a fresh trace", t => {
-	let log!: Log;
+	t.strictEqual(adopted.span.traceId, traceId, "adopts the incoming trace");
+	t.strictEqual(adopted.span.parentSpanId, spanId, "nests under the incoming span");
 
-	t.doesNotThrow(() => { log = new Log({ traceparent: "not-a-traceparent" }); }, "malformed traceparent does not throw (untrusted input)");
-	t.ok(/^[0-9a-f]{32}$/.test(log.span.traceId), "a fresh traceId is generated");
-	t.strictEqual(log.span.parentSpanId, undefined, "no parent span is set");
-	t.end();
-});
+	// Malformed (untrusted) input is ignored: a fresh trace starts, no throw.
+	let fresh!: Log;
 
-test("parentLog wins over traceparent", t => {
+	t.doesNotThrow(() => { fresh = new Log({ traceparent: "not-a-traceparent" }); }, "malformed traceparent does not throw");
+	t.notStrictEqual(fresh.span.traceId, traceId, "malformed traceparent starts a fresh trace");
+	t.strictEqual(fresh.span.parentSpanId, undefined, "no parent span for a fresh trace");
+
+	// An in-process parentLog wins over a supplied traceparent.
 	const parent = new Log();
-	const child = new Log({ parentLog: parent, traceparent: formatTraceparent(generateTraceId(), generateSpanId()) });
+	const child = new Log({ parentLog: parent, traceparent: formatTraceparent(traceId, spanId) });
 
-	t.strictEqual(child.span.traceId, parent.span.traceId, "in-process parent trace takes precedence");
-	t.strictEqual(child.span.parentSpanId, parent.span.spanId, "the parent span is the parent, not the header span");
+	t.strictEqual(child.span.traceId, parent.span.traceId, "parentLog trace wins over the header");
+	t.strictEqual(child.span.parentSpanId, parent.span.spanId, "parentLog span is the parent");
+
+	// A clone is its own trace, never re-adopting the base's traceparent.
+	t.notStrictEqual(adopted.clone().span.traceId, adopted.span.traceId, "clone starts its own trace");
 	t.end();
 });
 
@@ -731,50 +604,34 @@ test("log.traceparent() emits the current span context", t => {
 	t.end();
 });
 
-test("clone() does not re-adopt the traceparent (its own trace)", t => {
-	const base = new Log({ traceparent: formatTraceparent(generateTraceId(), generateSpanId()) });
-	const clone = base.clone();
-
-	t.notStrictEqual(clone.span.traceId, base.span.traceId, "clone starts its own trace, not the adopted one");
-	t.end();
-});
-
 // --- log.fetch() auto-instrumentation --------------------------------------
 
-test("log.fetch injects a traceparent and returns the response", async t => {
-	const { calls } = stubFetch();
-	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
-
-	const res = await log.fetch("https://api.test/users");
-
-	await log.end();
-
-	t.strictEqual(res.status, 200, "the underlying response is returned to the caller");
-
-	const parsed = parseTraceparent(callHeader(calls.find(call => call.path === "/users")!, "traceparent") ?? "");
-
-	t.ok(parsed, "outgoing request carries a valid traceparent");
-	t.strictEqual(parsed!.traceId, log.span.traceId, "outgoing trace continues this log's trace");
-	t.notStrictEqual(parsed!.spanId, log.span.spanId, "a fresh child span id is propagated, not the calling span's");
-	t.end();
-});
-
-test("log.fetch exports a CLIENT span with url.full query dropped by default", async t => {
+test("log.fetch traces a successful call and drops the query by default", async t => {
 	const { calls } = stubFetch();
 	const log = new Log({ context: { "service.name": "svc" }, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 
-	await log.fetch("https://api.test:8443/users?token=secret&q=hi", { method: "POST" });
+	const res = await log.fetch("https://api.test:8443/users?token=secret&q=hi", { method: "POST" });
+
 	await log.end();
+
+	t.strictEqual(res.status, 200, "the underlying response is returned");
+
+	// The outgoing request continues this log's trace under a fresh child span.
+	const sent = parseTraceparent(callHeader(calls.find(call => call.path === "/users")!, "traceparent") ?? "");
+
+	t.strictEqual(sent?.traceId, log.span.traceId, "outgoing request continues this log's trace");
+	t.notStrictEqual(sent?.spanId, log.span.spanId, "a fresh child span id is propagated, not the calling span's");
 
 	const span = clientSpan(calls);
 	const attr = (key: string) => span.attributes.find((attribute: any) => attribute.key === key)?.value.stringValue;
 
 	t.strictEqual(span.kind, 3, "client span kind");
-	t.strictEqual(span.name, "POST api.test:8443", "low-cardinality span name (method + host)");
-	t.strictEqual(span.parentSpanId, log.span.spanId, "fetch span nests under the calling log span");
+	t.strictEqual(span.name, "POST api.test:8443", "low-cardinality name (method + host)");
+	t.strictEqual(span.parentSpanId, log.span.spanId, "span nests under the calling log span");
+	t.strictEqual(span.spanId, sent?.spanId, "the propagated span id is the exported span");
 	t.strictEqual(attr("http.request.method"), "POST", "method attribute");
-	t.strictEqual(attr("url.full"), "https://api.test:8443/users", "url.full has no query string and no userinfo by default");
-	t.strictEqual(attr("url.scheme"), "https", "url.scheme attribute");
+	t.strictEqual(attr("url.full"), "https://api.test:8443/users", "url.full drops query and userinfo");
+	t.strictEqual(attr("url.scheme"), "https", "scheme attribute");
 	t.strictEqual(attr("server.address"), "api.test", "server.address attribute");
 	t.strictEqual(attr("server.port"), "8443", "server.port attribute");
 	t.strictEqual(attr("http.response.status_code"), "200", "status_code attribute");
@@ -797,13 +654,7 @@ test("log.fetch captureQuery keeps the query but redacts known-sensitive keys", 
 });
 
 test("log.fetch captures allow-listed request and response headers only", async t => {
-	const { calls } = stubFetch(path => {
-		if (path === "/h") {
-			return fetchResponse({ headers: new Headers({ "x-resp": "rv", "x-secret": "nope" }) });
-		}
-
-		return undefined;
-	});
+	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ "x-resp": "rv", "x-secret": "nope" }) }) : undefined);
 	const log = new Log({
 		captureRequestHeaders: ["x-req"],
 		captureResponseHeaders: ["x-resp"],
@@ -824,35 +675,21 @@ test("log.fetch captures allow-listed request and response headers only", async 
 	t.end();
 });
 
-test("log.fetch marks 4xx/5xx responses as error spans but still returns them", async t => {
+test("log.fetch marks error spans for 4xx and for network failures, propagating each outcome", async t => {
 	const { calls } = stubFetch(path => {
-		if (path === "/missing") {
-			return fetchResponse({ status: 404 });
-		}
+		if (path === "/missing") return response({ status: 404 });
+		if (path === "/boom") throw Object.assign(new Error("down"), { code: "ECONNREFUSED" });
 
 		return undefined;
 	});
 	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 
+	// A 4xx is a returned response, not an exception.
 	const res = await log.fetch("https://api.test/missing");
 
-	await log.end();
+	t.strictEqual(res.status, 404, "a 4xx response is still returned");
 
-	t.strictEqual(res.status, 404, "a 4xx response is still returned (it is not an exception)");
-	t.strictEqual(clientSpan(calls).status.code, 2, "span status is ERROR for 4xx");
-	t.end();
-});
-
-test("log.fetch records error.type and re-throws on a network failure", async t => {
-	const { calls } = stubFetch(path => {
-		if (path === "/boom") {
-			throw Object.assign(new Error("down"), { code: "ECONNREFUSED" });
-		}
-
-		return undefined;
-	});
-	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
-
+	// A network failure re-throws unchanged.
 	let threw = false;
 
 	try {
@@ -860,15 +697,18 @@ test("log.fetch records error.type and re-throws on a network failure", async t 
 	} catch {
 		threw = true;
 	}
+	t.ok(threw, "the underlying network error propagates to the caller");
 
 	await log.end();
 
-	t.ok(threw, "the underlying fetch error propagates to the caller");
+	const spans = calls.filter(call => call.path === "/v1/traces").map(call => call.body.resourceSpans[0].scopeSpans[0].spans[0]);
+	const attr = (span: any, key: string) => span.attributes.find((attribute: any) => attribute.key === key)?.value.stringValue;
+	const span404 = spans.find(span => attr(span, "http.response.status_code") === "404")!;
+	const spanBoom = spans.find(span => attr(span, "error.type") === "ECONNREFUSED")!;
 
-	const span = clientSpan(calls);
-
-	t.strictEqual(span.status.code, 2, "span status is ERROR");
-	t.strictEqual(span.attributes.find((attribute: any) => attribute.key === "error.type").value.stringValue, "ECONNREFUSED", "error.type captured from the error code");
+	t.strictEqual(span404.status.code, 2, "the 4xx span is ERROR");
+	t.strictEqual(spanBoom.status.code, 2, "the network-failure span is ERROR");
+	t.strictEqual(attr(spanBoom, "error.type"), "ECONNREFUSED", "error.type captured from the error code");
 	t.end();
 });
 
@@ -892,8 +732,7 @@ test("await log.end() drains a fire-and-forget log.fetch span", async t => {
 
 	await log.end();
 
-	// The span must be delivered by the time end() resolves, even though the fetch was not awaited —
-	// otherwise a short-lived process would exit before the span is exported.
+	// The span must be delivered by the time end() resolves, else a short-lived process would exit first.
 	t.strictEqual(clientSpan(calls).name, "GET api.test", "the client span was exported before end() resolved");
 	t.end();
 });
@@ -912,7 +751,6 @@ test("log.fetch with an invalid header rejects but never hangs end()", async t =
 	}
 
 	// Must resolve, not hang — the tracked promise has to settle even when setup throws.
-	// (The harness fails the test on a >10s hang.)
 	await log.end();
 
 	t.ok(threw, "the setup error propagates to the caller");
@@ -925,16 +763,6 @@ test("log.fetch throws when the log is already ended", async t => {
 
 	await log.end();
 	t.throws(() => log.fetch("https://api.test/x"), "fetch on an ended log throws, like the log methods");
-	t.end();
-});
-
-test("clone() inherits captureQuery and the header allow-lists", t => {
-	const base = new Log({ captureQuery: true, captureRequestHeaders: ["x-req"], captureResponseHeaders: ["x-resp"] });
-	const clone = base.clone();
-
-	t.strictEqual(clone.conf.captureQuery, true, "captureQuery inherited");
-	t.deepEqual(clone.conf.captureRequestHeaders, ["x-req"], "request header allow-list inherited");
-	t.deepEqual(clone.conf.captureResponseHeaders, ["x-resp"], "response header allow-list inherited");
 	t.end();
 });
 

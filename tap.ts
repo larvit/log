@@ -1,8 +1,6 @@
-// Minimal TAP harness that runs identically in Node and browsers (no Node-only deps),
-// so the exact same suite can run server-side and in a real browser. Replaces tape/tap-spec.
-//
-// Node: sets process.exitCode (1 on any failure). Browser: exposes globalThis.__tap so the
-// Playwright runner can read the result. TAP lines go to console (captured in both runtimes).
+// Minimal TAP harness with no Node-only deps, so the same suite runs in Node and a real browser.
+// Node: sets process.exitCode (1 on any failure). Browser: exposes globalThis.__tap for the
+// Playwright runner. TAP lines go to console (captured in both runtimes).
 
 export type TestFn = (t: Assertions) => void | Promise<void>;
 
@@ -19,8 +17,8 @@ export interface Assertions {
 	throws(cb: () => void, msg?: string): void;
 }
 
-// A hung async test must fail fast rather than hang the Node run (the browser run also has its own
-// Playwright timeout). Keep this comfortably above any real test and below that Playwright timeout.
+// A hung async test must fail fast, not hang the run. Keep comfortably above any real test and
+// below the Playwright timeout.
 const TEST_TIMEOUT_MS = 10000;
 
 const tests: { cb: TestFn, name: string }[] = [];
