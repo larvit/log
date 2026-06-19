@@ -6,6 +6,12 @@ export type EntryFormatterConf = {
 };
 
 export type LogConf = {
+	// log.fetch only: include the URL query string on the span (sensitive keys still redacted). Default false.
+	captureQuery?: boolean;
+	// log.fetch only: request header names to record as http.request.header.* (allow-list, none by default).
+	captureRequestHeaders?: string[];
+	// log.fetch only: response header names to record as http.response.header.* (allow-list, none by default).
+	captureResponseHeaders?: string[];
 	context?: Metadata;
 	entryFormatter?: (conf: EntryFormatterConf) => string;
 	format?: "text" | "json";
@@ -18,6 +24,9 @@ export type LogConf = {
 	spanName?: string;
 	stderr?: (msg: string) => void;
 	stdout?: (msg: string) => void;
+	// Incoming W3C traceparent to adopt: this log joins that trace and nests under that span.
+	// Ignored if malformed or if parentLog is set. Edge-only: not inherited by clones/children.
+	traceparent?: string;
 };
 
 // conf after the constructor fills its defaults: the always-set fields are no longer optional.
@@ -25,7 +34,9 @@ export type ResolvedLogConf = LogConf & Required<Pick<LogConf, "entryFormatter" 
 
 export type LogInt = {
 	conf: LogConf;
+	fetch: (input: string | URL, init?: RequestInit) => Promise<Response>;
 	span: OtlpSpan;
+	traceparent: () => string;
 	/* eslint-disable perfectionist/sort-object-types */
 	error: LogShorthand;
 	warn: LogShorthand;
@@ -226,6 +237,38 @@ export function generateTraceId(): string {
 	bytes[0] = 0x01;
 
 	return bytesToHex(bytes);
+}
+
+/**
+ * Builds a W3C `traceparent` header value (`version-traceId-spanId-flags`) for the given context.
+ *
+ * @returns {string} A traceparent header value, sampled by default
+ */
+export function formatTraceparent(traceId: string, spanId: string, sampled: boolean = true): string {
+	return `00-${traceId}-${spanId}-${sampled ? "01" : "00"}`;
+}
+
+/**
+ * Parses a W3C `traceparent` header. Untrusted input: returns null (rather than throwing) for any
+ * malformed or all-zero value, so the caller cleanly starts a fresh trace instead of continuing.
+ *
+ * @returns {{ flags: string, spanId: string, traceId: string } | null} The parsed parts, or null
+ */
+export function parseTraceparent(header: string): { flags: string, spanId: string, traceId: string } | null {
+	const match = /^[0-9a-f]{2}-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$/.exec(header.trim().toLowerCase());
+
+	if (!match) {
+		return null;
+	}
+
+	const [, traceId, spanId, flags] = match;
+
+	// All-zero ids are invalid per the spec; treat them as absent.
+	if (/^0+$/.test(traceId) || /^0+$/.test(spanId)) {
+		return null;
+	}
+
+	return { flags, spanId, traceId };
 }
 
 // msTimestamp should be generated from Date.now()
@@ -490,6 +533,32 @@ function encodeOtlpProtobuf(payload: OtlpLogPayload | OtlpSpanPayload): Uint8Arr
 	return "resourceLogs" in payload ? encodeOtlpLogPayload(payload) : encodeOtlpSpanPayload(payload);
 }
 
+// --- log.fetch helpers -----------------------------------------------------
+
+// Query-param keys whose values are replaced with REDACTED when captureQuery is on. Mirrors the
+// default deny-list of the official OTel HTTP instrumentations. Matched case-insensitively.
+const SENSITIVE_QUERY_KEYS = new Set(["awsaccesskeyid", "signature", "sig", "x-goog-signature"]);
+
+// Builds the `url.full` span attribute. Userinfo is always dropped (origin omits it); the query is
+// dropped unless captureQuery is set, in which case sensitive values are redacted.
+function buildUrlFull(url: URL, captureQuery: boolean): string {
+	const base = url.origin + url.pathname;
+
+	if (!captureQuery || !url.search) {
+		return base;
+	}
+
+	const params = new URLSearchParams(url.search);
+
+	for (const key of [...params.keys()]) {
+		if (SENSITIVE_QUERY_KEYS.has(key.toLowerCase())) {
+			params.set(key, "REDACTED");
+		}
+	}
+
+	return `${base}?${params.toString()}`;
+}
+
 export class Log implements LogInt {
 	context: Metadata;
 	ended: boolean = false;
@@ -551,6 +620,14 @@ export class Log implements LogInt {
 			this.otlpBaseUrl = new URL(this.conf.otlpHttpBaseURI);
 		}
 
+		// An in-process parentLog wins; otherwise adopt an incoming traceparent (cross-process parent);
+		// otherwise start a fresh trace.
+		let incoming: ReturnType<typeof parseTraceparent> = null;
+
+		if (!this.conf.parentLog && this.conf.traceparent) {
+			incoming = parseTraceparent(this.conf.traceparent);
+		}
+
 		this.span = {
 			attributes: [],
 			droppedAttributesCount: 0,
@@ -561,11 +638,11 @@ export class Log implements LogInt {
 			kind: 1,
 			links: [],
 			name: this.conf.spanName || "unnamed-span",
-			parentSpanId: this.conf.parentLog?.span.spanId,
+			parentSpanId: this.conf.parentLog?.span.spanId ?? incoming?.spanId,
 			spanId: generateSpanId(),
 			startTimeUnixNano: getNsTimestamp(Date.now()),
 			status: { code: 0 },
-			traceId: this.conf.parentLog?.span.traceId || generateTraceId(),
+			traceId: this.conf.parentLog?.span.traceId || incoming?.traceId || generateTraceId(),
 		};
 	}
 
@@ -598,7 +675,7 @@ export class Log implements LogInt {
 		// parentLog. parentLog and spanName are excluded: a clone is its own span, not a child of the
 		// original. (A manual allow-list here previously dropped OTLP options added after clone existed.)
 		for (const key of Object.keys(this.conf) as (keyof LogConf)[]) {
-			if (key !== "parentLog" && key !== "spanName" && conf[key] === undefined) {
+			if (key !== "parentLog" && key !== "spanName" && key !== "traceparent" && conf[key] === undefined) {
 				conf[key] = this.conf[key] as never;
 			}
 		}
@@ -618,6 +695,78 @@ export class Log implements LogInt {
 		// All logs must be sent before the trace/span.
 		await Promise.all([...this.inFlight]);
 		await this.otlpCreateSpan(this.span);
+	}
+
+	// The current span's context as a W3C `traceparent` header, for propagating to non-fetch clients.
+	public traceparent(): string {
+		return formatTraceparent(this.span.traceId, this.span.spanId);
+	}
+
+	// Drop-in `fetch` that auto-creates a CLIENT span for the call (nested under this log's span),
+	// injects a `traceparent` header, and records OTel http.* attributes. The span is exported in the
+	// background and flushed by this log's end(); the fetch never waits on the OTLP round-trip.
+	// Instrumentation never changes the call's outcome — an unparseable URL passes straight through.
+	public async fetch(input: string | URL, init?: RequestInit): Promise<Response> {
+		let url: URL | undefined;
+
+		try {
+			url = new URL(String(input), (globalThis as { location?: { href?: string } }).location?.href);
+		} catch {
+			return globalThis.fetch(input, init);
+		}
+
+		const method = (init?.method ?? "GET").toUpperCase();
+		const child = new Log({ parentLog: this, spanName: `${method} ${url.host}` });
+
+		child.span.kind = 3; // CLIENT
+		Object.assign(child.context, {
+			"http.request.method": method,
+			"server.address": url.hostname,
+			"url.full": buildUrlFull(url, this.conf.captureQuery === true),
+			"url.scheme": url.protocol.replace(/:$/, ""),
+			...url.port ? { "server.port": Number(url.port) } : {},
+		});
+
+		const headers = new Headers(init?.headers);
+
+		if (!headers.has("traceparent")) {
+			headers.set("traceparent", formatTraceparent(child.span.traceId, child.span.spanId));
+		}
+
+		for (const name of this.conf.captureRequestHeaders ?? []) {
+			const value = headers.get(name);
+
+			if (value !== null) {
+				child.context[`http.request.header.${name.toLowerCase()}`] = value;
+			}
+		}
+
+		try {
+			const res = await globalThis.fetch(url, { ...init, headers });
+
+			child.context["http.response.status_code"] = res.status;
+			child.span.status.code = res.status >= 400 ? 2 : 0; // 4xx/5xx are errors for client spans
+
+			for (const name of this.conf.captureResponseHeaders ?? []) {
+				const value = res.headers.get(name);
+
+				if (value !== null) {
+					child.context[`http.response.header.${name.toLowerCase()}`] = value;
+				}
+			}
+
+			return res;
+		} catch (err) {
+			const cause = err as { code?: string, name?: string };
+
+			child.span.status.code = 2; // ERROR
+			child.context["error.type"] = cause.code ?? cause.name ?? "fetch_error";
+
+			throw err;
+		} finally {
+			// Export in the background; this log's end() awaits it, the fetch itself does not.
+			this.track(child.end());
+		}
 	}
 
 	public error(msg: string, metadata?: Metadata) { this.log("error", msg, metadata); }

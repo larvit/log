@@ -1,6 +1,6 @@
 # @larvit/log
 
-Structured logging with a simple interface and support for OTLP.
+Structured logging with a simple interface, OTLP export, and auto-instrumented HTTP tracing.
 
 ## Design priorities
 
@@ -68,6 +68,44 @@ async function myRequestHandler(req, res) {
 
 ```
 
+### Trace outgoing HTTP calls
+
+`log.fetch()` is a drop-in for `fetch()` that automatically creates an OpenTelemetry **client span**
+for the call (nested under the log's span) and injects a W3C `traceparent` header, so the downstream
+service continues the same trace:
+
+```javascript
+const reqLog = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", parentLog: appLog });
+
+const res = await reqLog.fetch("https://api.example.com/users", { method: "POST" });
+
+await reqLog.end(); // flushes the spans (the fetch itself never waits on the OTLP export)
+```
+
+The span records the OTel HTTP semantic-convention attributes (`http.request.method`, `url.full`,
+`url.scheme`, `server.address`/`server.port`, `http.response.status_code`, and `error.type` on
+failure). 4xx/5xx responses, and thrown network errors (which are re-thrown unchanged), mark the span
+as errored. Instrumentation never changes the call's result.
+
+**Privacy:** the query string is **dropped** from `url.full` by default (it may carry tokens) and
+userinfo is always stripped. Opt in with `captureQuery: true` (known-sensitive keys like `Signature`
+are still redacted). Headers are captured only when allow-listed via `captureRequestHeaders` /
+`captureResponseHeaders`; request/response bodies are never captured.
+
+### Continue a trace from an incoming request
+
+To join a trace started upstream, pass the incoming `traceparent` header — this log adopts that trace
+and nests under the caller's span. Read the current context back with `log.traceparent()` to propagate
+it to a non-fetch client:
+
+```javascript
+const reqLog = new Log({ traceparent: req.headers.traceparent });
+// ...later, calling some other client:
+myClient.send({ headers: { traceparent: reqLog.traceparent() } });
+```
+
+A malformed `traceparent` is ignored (a fresh trace starts), so passing an untrusted header is safe.
+
 ### Configuration
 
 **Log level only**
@@ -77,6 +115,17 @@ async function myRequestHandler(req, res) {
 ```javascript
 const log = new Log({
 	// All options is optional
+
+	// log.fetch only: include the URL query string on the span (sensitive keys still redacted).
+	// Default false — the query is dropped, as it may contain tokens.
+	// Added in 2.3.0
+	captureQuery: false,
+
+	// log.fetch only: header names to record as http.request.header.* / http.response.header.*
+	// Allow-lists; nothing is captured by default.
+	// Added in 2.3.0
+	captureRequestHeaders: null,
+	captureResponseHeaders: null,
 
 	// Context will be appended as metadata to all log entries
 	// Default is an empty context
@@ -127,6 +176,11 @@ const log = new Log({
 	// Defaults to false
 	// Added in 1.3.0
 	printTraceInfo: false,
+
+	// Incoming W3C traceparent to adopt: this log joins that trace and nests under that span.
+	// Ignored if malformed or if parentLog is set.
+	// Added in 2.3.0
+	traceparent: null,
 
 	// Use a specific span name. Any log using this log as a parent will be
 	// grouped under this span name.
@@ -195,6 +249,20 @@ The workflow publishes whatever is in `package.json`, so the tag and `package.js
 To publish manually instead: `npm run build-and-publish`.
 
 ## Changelog
+
+### v2.3.0
+
+- **Auto-instrumented HTTP client.** New `log.fetch(input, init?)` — a drop-in for `fetch` that
+  creates an OTel **client span** for the call (nested under the log's span), injects a W3C
+  `traceparent` header, and records the HTTP semantic-convention attributes. The query string is
+  dropped from `url.full` by default (opt in with `captureQuery`); headers are captured only via the
+  `captureRequestHeaders`/`captureResponseHeaders` allow-lists; bodies are never captured. 4xx/5xx and
+  thrown errors (re-thrown unchanged) mark the span errored. Spans export in the background and flush
+  on `end()`, so the fetch never waits on the OTLP round-trip.
+- **W3C trace-context propagation.** New `traceparent` option to adopt an incoming trace (join it and
+  nest under its span; malformed values are ignored) and `log.traceparent()` to emit the current
+  context for non-fetch clients. New exported helpers `parseTraceparent`/`formatTraceparent`.
+- Still dependency-free and runtime-agnostic — built on global `fetch`/`Headers`/`URL`.
 
 ### v2.2.0
 
