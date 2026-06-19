@@ -1,4 +1,4 @@
-import { generateSpanId, generateTraceId, Log, type LogConf, LogLevels, msgJsonFormatter } from "./index.js";
+import { formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, LogLevels, msgJsonFormatter, parseTraceparent } from "./index.js";
 import test from "./tap.js";
 
 // --- helpers ---------------------------------------------------------------
@@ -35,14 +35,22 @@ function capture(conf?: ConstructorParameters<typeof Log>[0]) {
 
 function okResponse(json: unknown = { partialSuccess: {} }) {
 	// eslint-disable-next-line id-length -- "ok" mirrors the fetch Response shape the transport reads
-	return { json: () => Promise.resolve(json), ok: true, status: 200 };
+	return { headers: new Headers(), json: () => Promise.resolve(json), ok: true, status: 200 };
+}
+
+// A fetch Response stand-in for log.fetch tests, with overridable status/headers.
+function fetchResponse(opts: { headers?: Headers, status?: number } = {}) {
+	const status = opts.status ?? 200;
+
+	// eslint-disable-next-line id-length -- "ok" mirrors the fetch Response shape
+	return { headers: opts.headers ?? new Headers(), json: () => Promise.resolve({}), ok: status < 400, status };
 }
 
 // Replace the global fetch with a recording stub. Works in Node and the browser, so the OTLP
 // transport can be asserted without a real HTTP server (deterministic, no express dependency).
 // The harness restores globalThis.fetch after each test, so callers never restore it themselves.
 function stubFetch(responder?: (path: string, body: unknown) => ReturnType<typeof okResponse> | undefined) {
-	const calls: { body: any, contentType: string, path: string, rawBody: any, url: string }[] = [];
+	const calls: { body: any, contentType: string, headers: any, path: string, rawBody: any, url: string }[] = [];
 
 	globalThis.fetch = (async (url: string, init: { body: any, headers: Record<string, string> }) => {
 		const contentType = init.headers?.["Content-Type"];
@@ -50,12 +58,28 @@ function stubFetch(responder?: (path: string, body: unknown) => ReturnType<typeo
 		// Only JSON bodies are parsed; protobuf bodies are raw bytes, inspected via rawBody.
 		const body = contentType === "application/json" ? JSON.parse(init.body) : undefined;
 
-		calls.push({ body, contentType, path, rawBody: init.body, url: String(url) });
+		calls.push({ body, contentType, headers: init.headers, path, rawBody: init.body, url: String(url) });
 
 		return responder?.(path, body) ?? okResponse();
 	}) as unknown as typeof fetch;
 
 	return { calls };
+}
+
+// Read a single header from a recorded call, normalising plain-object and Headers shapes.
+const callHeader = (call: { headers: any }, name: string) => new Headers(call.headers ?? {}).get(name);
+
+// Locate the exported CLIENT span (kind 3) among the /v1/traces calls — the one log.fetch creates.
+function clientSpan(calls: { body: any, path: string }[]) {
+	for (const call of calls.filter(call => call.path === "/v1/traces")) {
+		const span = call.body.resourceSpans[0].scopeSpans[0].spans[0];
+
+		if (span.kind === 3) {
+			return span;
+		}
+	}
+
+	throw new Error("no client span was exported");
 }
 
 // --- protobuf decode (test-only, zero-dep) ---------------------------------
@@ -645,5 +669,285 @@ test("OLTP multiple instances should work independently", async t => {
 		}
 	}
 
+	t.end();
+});
+
+// --- trace context propagation (W3C traceparent) ---------------------------
+
+test("formatTraceparent/parseTraceparent round-trip", t => {
+	const traceId = generateTraceId();
+	const spanId = generateSpanId();
+	const header = formatTraceparent(traceId, spanId);
+
+	t.ok(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/.test(header), "formatted header has the W3C shape and is sampled");
+
+	const parsed = parseTraceparent(header);
+
+	t.strictEqual(parsed?.traceId, traceId, "round-tripped traceId");
+	t.strictEqual(parsed?.spanId, spanId, "round-tripped spanId");
+	t.end();
+});
+
+test("parseTraceparent rejects malformed headers", t => {
+	t.strictEqual(parseTraceparent("garbage"), null, "non-hex garbage is rejected");
+	t.strictEqual(parseTraceparent(`00-${"0".repeat(32)}-${"a".repeat(16)}-01`), null, "all-zero traceId is rejected");
+	t.strictEqual(parseTraceparent(`00-${"a".repeat(32)}-${"0".repeat(16)}-01`), null, "all-zero spanId is rejected");
+	t.strictEqual(parseTraceparent(`00-${"a".repeat(31)}-${"b".repeat(16)}-01`), null, "wrong-length traceId is rejected");
+	t.end();
+});
+
+test("Log adopts an incoming traceparent (distributed trace continuation)", t => {
+	const traceId = generateTraceId();
+	const spanId = generateSpanId();
+	const log = new Log({ traceparent: formatTraceparent(traceId, spanId) });
+
+	t.strictEqual(log.span.traceId, traceId, "log joins the incoming trace");
+	t.strictEqual(log.span.parentSpanId, spanId, "the incoming span becomes the parent span");
+	t.end();
+});
+
+test("Log ignores a malformed traceparent and starts a fresh trace", t => {
+	let log!: Log;
+
+	t.doesNotThrow(() => { log = new Log({ traceparent: "not-a-traceparent" }); }, "malformed traceparent does not throw (untrusted input)");
+	t.ok(/^[0-9a-f]{32}$/.test(log.span.traceId), "a fresh traceId is generated");
+	t.strictEqual(log.span.parentSpanId, undefined, "no parent span is set");
+	t.end();
+});
+
+test("parentLog wins over traceparent", t => {
+	const parent = new Log();
+	const child = new Log({ parentLog: parent, traceparent: formatTraceparent(generateTraceId(), generateSpanId()) });
+
+	t.strictEqual(child.span.traceId, parent.span.traceId, "in-process parent trace takes precedence");
+	t.strictEqual(child.span.parentSpanId, parent.span.spanId, "the parent span is the parent, not the header span");
+	t.end();
+});
+
+test("log.traceparent() emits the current span context", t => {
+	const log = new Log();
+
+	t.strictEqual(log.traceparent(), formatTraceparent(log.span.traceId, log.span.spanId), "emitted header carries this span's context");
+	t.end();
+});
+
+test("clone() does not re-adopt the traceparent (its own trace)", t => {
+	const base = new Log({ traceparent: formatTraceparent(generateTraceId(), generateSpanId()) });
+	const clone = base.clone();
+
+	t.notStrictEqual(clone.span.traceId, base.span.traceId, "clone starts its own trace, not the adopted one");
+	t.end();
+});
+
+// --- log.fetch() auto-instrumentation --------------------------------------
+
+test("log.fetch injects a traceparent and returns the response", async t => {
+	const { calls } = stubFetch();
+	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+
+	const res = await log.fetch("https://api.test/users");
+
+	await log.end();
+
+	t.strictEqual(res.status, 200, "the underlying response is returned to the caller");
+
+	const parsed = parseTraceparent(callHeader(calls.find(call => call.path === "/users")!, "traceparent") ?? "");
+
+	t.ok(parsed, "outgoing request carries a valid traceparent");
+	t.strictEqual(parsed!.traceId, log.span.traceId, "outgoing trace continues this log's trace");
+	t.notStrictEqual(parsed!.spanId, log.span.spanId, "a fresh child span id is propagated, not the calling span's");
+	t.end();
+});
+
+test("log.fetch exports a CLIENT span with url.full query dropped by default", async t => {
+	const { calls } = stubFetch();
+	const log = new Log({ context: { "service.name": "svc" }, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+
+	await log.fetch("https://api.test:8443/users?token=secret&q=hi", { method: "POST" });
+	await log.end();
+
+	const span = clientSpan(calls);
+	const attr = (key: string) => span.attributes.find((attribute: any) => attribute.key === key)?.value.stringValue;
+
+	t.strictEqual(span.kind, 3, "client span kind");
+	t.strictEqual(span.name, "POST api.test:8443", "low-cardinality span name (method + host)");
+	t.strictEqual(span.parentSpanId, log.span.spanId, "fetch span nests under the calling log span");
+	t.strictEqual(attr("http.request.method"), "POST", "method attribute");
+	t.strictEqual(attr("url.full"), "https://api.test:8443/users", "url.full has no query string and no userinfo by default");
+	t.strictEqual(attr("url.scheme"), "https", "url.scheme attribute");
+	t.strictEqual(attr("server.address"), "api.test", "server.address attribute");
+	t.strictEqual(attr("server.port"), "8443", "server.port attribute");
+	t.strictEqual(attr("http.response.status_code"), "200", "status_code attribute");
+	t.end();
+});
+
+test("log.fetch captureQuery keeps the query but redacts known-sensitive keys", async t => {
+	const { calls } = stubFetch();
+	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+
+	await log.fetch("https://api.test/x?q=hi&Signature=abc");
+	await log.end();
+
+	const urlFull = clientSpan(calls).attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue;
+
+	t.ok(urlFull.includes("q=hi"), "non-sensitive query param is kept");
+	t.ok(urlFull.includes("Signature=REDACTED"), "sensitive query value is redacted");
+	t.ok(!urlFull.includes("abc"), "the sensitive value is not leaked");
+	t.end();
+});
+
+test("log.fetch captures allow-listed request and response headers only", async t => {
+	const { calls } = stubFetch(path => {
+		if (path === "/h") {
+			return fetchResponse({ headers: new Headers({ "x-resp": "rv", "x-secret": "nope" }) });
+		}
+
+		return undefined;
+	});
+	const log = new Log({
+		captureRequestHeaders: ["x-req"],
+		captureResponseHeaders: ["x-resp"],
+		otlpHttpBaseURI: "http://127.0.0.1:4318",
+		stderr: () => {},
+	});
+
+	await log.fetch("https://api.test/h", { headers: { "x-other": "ignored", "x-req": "qv" } });
+	await log.end();
+
+	const span = clientSpan(calls);
+	const attr = (key: string) => span.attributes.find((attribute: any) => attribute.key === key)?.value.stringValue;
+
+	t.strictEqual(attr("http.request.header.x-req"), "qv", "allow-listed request header captured");
+	t.strictEqual(attr("http.request.header.x-other"), undefined, "non-listed request header not captured");
+	t.strictEqual(attr("http.response.header.x-resp"), "rv", "allow-listed response header captured");
+	t.strictEqual(attr("http.response.header.x-secret"), undefined, "non-listed response header not captured");
+	t.end();
+});
+
+test("log.fetch marks 4xx/5xx responses as error spans but still returns them", async t => {
+	const { calls } = stubFetch(path => {
+		if (path === "/missing") {
+			return fetchResponse({ status: 404 });
+		}
+
+		return undefined;
+	});
+	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+
+	const res = await log.fetch("https://api.test/missing");
+
+	await log.end();
+
+	t.strictEqual(res.status, 404, "a 4xx response is still returned (it is not an exception)");
+	t.strictEqual(clientSpan(calls).status.code, 2, "span status is ERROR for 4xx");
+	t.end();
+});
+
+test("log.fetch records error.type and re-throws on a network failure", async t => {
+	const { calls } = stubFetch(path => {
+		if (path === "/boom") {
+			throw Object.assign(new Error("down"), { code: "ECONNREFUSED" });
+		}
+
+		return undefined;
+	});
+	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+
+	let threw = false;
+
+	try {
+		await log.fetch("https://api.test/boom");
+	} catch {
+		threw = true;
+	}
+
+	await log.end();
+
+	t.ok(threw, "the underlying fetch error propagates to the caller");
+
+	const span = clientSpan(calls);
+
+	t.strictEqual(span.status.code, 2, "span status is ERROR");
+	t.strictEqual(span.attributes.find((attribute: any) => attribute.key === "error.type").value.stringValue, "ECONNREFUSED", "error.type captured from the error code");
+	t.end();
+});
+
+test("log.fetch keeps a caller-supplied traceparent", async t => {
+	const { calls } = stubFetch();
+	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+	const supplied = formatTraceparent(generateTraceId(), generateSpanId());
+
+	await log.fetch("https://api.test/x", { headers: { traceparent: supplied } });
+	await log.end();
+
+	t.strictEqual(callHeader(calls.find(call => call.path === "/x")!, "traceparent"), supplied, "the caller's traceparent is not overwritten");
+	t.end();
+});
+
+test("await log.end() drains a fire-and-forget log.fetch span", async t => {
+	const { calls } = stubFetch();
+	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+
+	log.fetch("https://api.test/bg"); // deliberately NOT awaited
+
+	await log.end();
+
+	// The span must be delivered by the time end() resolves, even though the fetch was not awaited —
+	// otherwise a short-lived process would exit before the span is exported.
+	t.strictEqual(clientSpan(calls).name, "GET api.test", "the client span was exported before end() resolved");
+	t.end();
+});
+
+test("log.fetch with an invalid header rejects but never hangs end()", async t => {
+	const { calls } = stubFetch();
+	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+
+	let threw = false;
+
+	try {
+		// An invalid header name makes `new Headers()` throw during setup, before the request goes out.
+		await log.fetch("https://api.test/x", { headers: { "bad header name": "v" } });
+	} catch {
+		threw = true;
+	}
+
+	// Must resolve, not hang — the tracked promise has to settle even when setup throws.
+	// (The harness fails the test on a >10s hang.)
+	await log.end();
+
+	t.ok(threw, "the setup error propagates to the caller");
+	t.strictEqual(clientSpan(calls).status.code, 2, "an error span is still exported for the failed call");
+	t.end();
+});
+
+test("log.fetch throws when the log is already ended", async t => {
+	const log = new Log({ stderr: () => {} });
+
+	await log.end();
+	t.throws(() => log.fetch("https://api.test/x"), "fetch on an ended log throws, like the log methods");
+	t.end();
+});
+
+test("clone() inherits captureQuery and the header allow-lists", t => {
+	const base = new Log({ captureQuery: true, captureRequestHeaders: ["x-req"], captureResponseHeaders: ["x-resp"] });
+	const clone = base.clone();
+
+	t.strictEqual(clone.conf.captureQuery, true, "captureQuery inherited");
+	t.deepEqual(clone.conf.captureRequestHeaders, ["x-req"], "request header allow-list inherited");
+	t.deepEqual(clone.conf.captureResponseHeaders, ["x-resp"], "response header allow-list inherited");
+	t.end();
+});
+
+test("log.fetch works without OTLP, still injecting a traceparent", async t => {
+	const { calls } = stubFetch();
+	const log = new Log({ stderr: () => {} });
+
+	const res = await log.fetch("https://api.test/x");
+
+	await log.end();
+
+	t.strictEqual(res.status, 200, "fetch still returns the response");
+	t.ok(calls.every(call => call.path !== "/v1/traces"), "no span is exported when OTLP is not configured");
+	t.ok(callHeader(calls.find(call => call.path === "/x")!, "traceparent"), "traceparent is still injected for downstream continuation");
 	t.end();
 });
