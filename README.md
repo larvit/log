@@ -6,48 +6,42 @@ Structured logging with a simple interface, OTLP export, and auto-instrumented H
 
 In priority order:
 
-1. **Works everywhere** — Node.js, Bun, Deno and other server runtimes, plus browsers and React Native. Leans on the common JavaScript surface (global `fetch`), with graceful fallbacks where a runtime lacks an API.
-2. **A very easy API** — "just log" must stay trivial. Developers pick it up fast without needing to understand OTLP internals.
-3. **Composable** — attach to upstream headers/spans/traces and inherit logs, spans and traces between instances. A chameleon that slots into most setups.
-4. **Low footprint for the consumer** — small runtime cost and install weight in the consumer's app. Build/codegen steps in *this* library's own development are fine, as long as they don't carry over to consumers.
+1. **Works everywhere** — Node.js, Bun, Deno and other server runtimes, plus browsers and React Native. Built on the common JS surface (global `fetch`), with fallbacks where a runtime lacks an API.
+2. **A very easy API** — "just log" stays trivial; no need to learn OTLP internals.
+3. **Composable** — inherit context/spans/traces between instances and attach to upstream headers/spans/traces. A chameleon that slots into most setups.
+4. **Low footprint for the consumer** — small runtime cost and install weight. This library's own build/codegen steps are fine as long as they don't reach consumers.
 
 ## Installation
 
-`npm i @larvit/log` or `yarn add @larvit/log`
+`npm i @larvit/log`
 
 ## Usage
 
 ```javascript
 import { Log } from "@larvit/log";
 
-const log = new Log("silly"); // Replace "silly" with the minimum log level you want. Defaults to "info"
+const log = new Log("silly"); // minimum level to output; defaults to "info"
 log.error("Apocalypse! :O"); // stderr
 log.warn("The chaos is near"); // stderr
-log.info("All is well, but this message is important"); // stdout
-log.verbose("Extra info, likely good in a production environment"); // stdout
-log.debug("A lot of detailed logs to debug your application"); // stdout
+log.info("All is well, but important"); // stdout
+log.verbose("Good in a production environment"); // stdout
+log.debug("Detailed debugging logs"); // stdout
 log.silly("Open the flood gates!"); // stdout
 ```
 
-To clone your log instance: `const log2 = log.clone();`.
+Clone an instance: `const log2 = log.clone();`.
 
 ### Group your logs
 
-To get tracing, timings, spans etc you can group your logs like this example:
+For tracing, timings and spans, group logs under a parent:
 
 ```javascript
 import { Log } from "@larvit/log";
 
-// Creates an outer log context
-const appLog = new Log({
-	context: {
-		"service.name": "foobar"
-	}
-});
+const appLog = new Log({ context: { "service.name": "foobar" } });
 
-// Just an example on a request/response http handler that you want to log
 async function myRequestHandler(req, res) {
-	// Creates an inner log context for this specific request
+	// Inner context for this specific request
 	const reqLog = new Log({
 		context: { requestId: crypto.randomUUID() },
 		parentLog: appLog,
@@ -56,23 +50,19 @@ async function myRequestHandler(req, res) {
 
 	reqLog.info("Incoming request", { url: req.url });
 
-	// ... Here be loads of request handler logic ...
+	// ... request handler logic ...
 
-	// Explicitly tell that this inner log is now ended.
-	// Without this spans and traces does not get sent.
-	// end() returns a promise; await it when you need delivery guaranteed
-	// before the process exits (eg. short-lived scripts). Fire-and-forget
-	// (just `reqLog.end();`) is fine in long-running processes.
+	// Ends the span/trace and flushes them (without end() they are never sent). Await when you
+	// need delivery before the process exits (short-lived scripts); fire-and-forget is fine in
+	// long-running processes.
 	await reqLog.end();
 }
-
 ```
 
 ### Trace outgoing HTTP calls
 
-`log.fetch()` is a drop-in for `fetch()` that automatically creates an OpenTelemetry **client span**
-for the call (nested under the log's span) and injects a W3C `traceparent` header, so the downstream
-service continues the same trace:
+`log.fetch()` is a drop-in for `fetch()` that creates an OpenTelemetry **client span** (nested under
+the log's span) and injects a W3C `traceparent` header, so the downstream service continues the trace:
 
 ```javascript
 const reqLog = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", parentLog: appLog });
@@ -82,40 +72,36 @@ const res = await reqLog.fetch("https://api.example.com/users", { method: "POST"
 await reqLog.end(); // flushes the spans (the fetch itself never waits on the OTLP export)
 ```
 
-The span records the OTel HTTP semantic-convention attributes (`http.request.method`, `url.full`,
+It records the OTel HTTP semantic-convention attributes (`http.request.method`, `url.full`,
 `url.scheme`, `server.address`/`server.port`, `http.response.status_code`, and `error.type` on
-failure — its value is the error's `code`, else its `name`, else `"fetch_error"`). 4xx/5xx responses,
-and thrown network errors (which are re-thrown unchanged), mark the span as errored. Instrumentation
-never changes the call's result.
+failure — its `code`, else `name`, else `"fetch_error"`). 4xx/5xx and thrown network errors
+(re-thrown unchanged) mark the span errored; the call's result is never altered.
 
 Notes:
 
-- **The span is the only output** — `log.fetch` writes no log line. Without `otlpHttpBaseURI` it just
-  injects the `traceparent` header (still useful: downstream services continue the trace).
-- **Delivery:** the span exports in the background, so the call returns as soon as the response is
-  ready. `await log.end()` delivers every span started by this log — including a fire-and-forget
-  `log.fetch()` you never awaited — so a short-lived process can safely exit after `end()`.
-- **Errors:** fire-and-forget delivers the *span*, not error handling — exactly like plain `fetch`, a
-  `log.fetch()` you don't await surfaces a failed request as an unhandled promise rejection. Await it
-  (or attach a `.catch`) whenever the call can fail.
-- **Inputs:** only `string` and `URL` are traced. A `Request` object, or a relative URL with no base
-  (e.g. in Node), passes straight through to a plain, untraced `fetch` (the call still works).
+- **The span is the only output** — no log line. Without `otlpHttpBaseURI` it only injects the
+  `traceparent` header (downstream still continues the trace).
+- **Delivery:** spans export in the background, so the call returns as soon as the response is ready.
+  `await log.end()` delivers every span, including a fire-and-forget `log.fetch()` you never awaited.
+- **Errors:** an un-awaited `log.fetch()` surfaces a failed request as an unhandled rejection, exactly
+  like plain `fetch`. Await it (or attach `.catch`) whenever the call can fail.
+- **Inputs:** only `string` and `URL` are traced. A `Request`, or a relative URL with no base (e.g. in
+  Node), passes straight through to a plain, untraced `fetch`.
 
 **Privacy:** the query string is **dropped** from `url.full` by default (it may carry tokens) and
 userinfo is always stripped. Opt in with `captureQuery: true` (known-sensitive keys like `Signature`
 are still redacted). Headers are captured only when allow-listed via `captureRequestHeaders` /
-`captureResponseHeaders`; request/response bodies are never captured. These three are an
-instance-wide policy (read at call time from the log); `clone()` to vary them.
+`captureResponseHeaders`; bodies are never captured. These three are instance-wide (read at call time);
+`clone()` to vary them.
 
 ### Continue a trace from an incoming request
 
-To join a trace started upstream, pass the incoming `traceparent` header — this log adopts that trace
-and nests under the caller's span. Read the current context back with `log.traceparent()` to propagate
-it to a non-fetch client:
+Pass the incoming `traceparent` header to join an upstream trace (nesting under the caller's span).
+Read it back with `log.traceparent()` to propagate to a non-fetch client:
 
 ```javascript
 const reqLog = new Log({ traceparent: req.headers.traceparent });
-// ...later, calling some other client:
+// ...later, calling another client:
 myClient.send({ headers: { traceparent: reqLog.traceparent() } });
 ```
 
@@ -123,144 +109,112 @@ A malformed `traceparent` is ignored (a fresh trace starts), so passing an untru
 
 ### Configuration
 
-**Log level only**
-`const log = new Log("info");` Will only output error, warn and info logs. This is the default. All possible options: "error", "warn", "info", "verbose", "debug", "silly" and "none".
+**Log level only:** `new Log("info")` outputs error/warn/info. Levels: `"error"`, `"warn"`, `"info"`,
+`"verbose"`, `"debug"`, `"silly"`, `"none"`. Default `"info"`.
 
-**All options**
+**All options** (all optional):
+
 ```javascript
 const log = new Log({
-	// All options is optional
-
 	// log.fetch only: include the URL query string on the span (sensitive keys still redacted).
-	// Default false — the query is dropped, as it may contain tokens.
-	// Added in 2.3.0
+	// Default false. Added in 2.3.0
 	captureQuery: false,
 
 	// log.fetch only: header-name allow-lists, recorded as http.request.header.* /
-	// http.response.header.*. Default: none captured. Instance-wide; clone() to vary per call.
-	// Added in 2.3.0
+	// http.response.header.*. Default none. Instance-wide; clone() to vary. Added in 2.3.0
 	captureRequestHeaders: ["x-request-id"],
 	captureResponseHeaders: ["x-request-id"],
 
-	// Context will be appended as metadata to all log entries
-	// Default is an empty context
-	context: {
-		key: "string",
-		anotherKey: "string",
-	},
+	// Appended as metadata to every log entry. Default {}
+	context: { key: "string", anotherKey: "string" },
 
-	// Options are "text" and "json", "text" is the default
+	// "text" (default) or "json"
 	format: "text",
 
-	// Defaults to "info", same as Log level only section above
+	// Default "info", same as the log-level-only form above
 	logLevel: "info",
 
-	// The function that formats the log entry, default is shown here.
-	// msTimestamp is the Date.now() of the log call (use it instead of new Date()
-	// so the console, json and OTLP timestamps for one entry all match).
+	// Formats the log entry; default shown. msTimestamp is the Date.now() of the log call (use it
+	// instead of new Date() so the console, json and OTLP timestamps for one entry all match).
 	entryFormatter: ({ logLevel, metadata, msTimestamp, msg }) => {
 		return `${logLevel}: ${msg} ${JSON.stringify(metadata)}`;
 	},
 
-	// Open Telemetry additional http headers
-	// For example:
-	// { Authorization: "Bearer xxx" }
-	// Defaults to null
-	// Added in 1.4.0
+	// Extra OTLP HTTP headers, eg. { Authorization: "Bearer xxx" }. Default null. Added in 1.4.0
 	otlpAdditionalHeaders: null,
 
-	// Open Telemetry http endpoint to send spans, traces and logs to.
-	// For example http://127.0.0.1:4318
-	// Defaults to null
-	// Added in 1.3.0
+	// OTLP HTTP endpoint for spans/traces/logs, eg. http://127.0.0.1:4318. Default null. Added in 1.3.0
 	otlpHttpBaseURI: null,
 
-	// OTLP wire format: "http/json" (default) or "http/protobuf".
-	// Both POST to the same endpoint; protobuf sends Content-Type: application/x-protobuf.
-	// Use protobuf for collectors that don't accept JSON.
-	// Added in 2.2.0
+	// OTLP wire format: "http/json" (default) or "http/protobuf" (same endpoint, Content-Type
+	// application/x-protobuf). Use protobuf for collectors that reject JSON. Added in 2.2.0
 	otlpProtocol: "http/json",
 
-	// Group logs together under a specific parent
-	// Used for spans and traces in Open Telemetry etc.
-	// Defaults to null, creating no span in otlp
-	// Added in 1.3.0
+	// Group logs under a parent (spans/traces). Default null (no span). Added in 1.3.0
 	parentLog: new Log(),
 
-	// If set to true, append spanName, spanId and traceId to the context output
-	// Defaults to false
-	// Added in 1.3.0
+	// Append spanName/spanId/traceId to console output. Default false. Added in 1.3.0
 	printTraceInfo: false,
 
-	// Incoming W3C traceparent to adopt: this log joins that trace and nests under that span.
-	// Ignored if malformed or if parentLog is set.
-	// Added in 2.3.0
+	// Incoming W3C traceparent to adopt (join that trace, nest under its span). Ignored if malformed
+	// or if parentLog is set. Added in 2.3.0
 	traceparent: null,
 
-	// Use a specific span name. Any log using this log as a parent will be
-	// grouped under this span name.
-	// Defaults to be the same as the span id, that is internally generated for each span
+	// Span name; logs using this log as parent group under it. Defaults to the generated span id.
 	spanName: "my-span",
 
-	// Function that will be called to write log levels silly, debug, verbose and info.
-	// Defaults to console.log
+	// Writes silly/debug/verbose/info. Default console.log
 	stdout: console.log,
 
-	// Function that will be called to write log levels error and warn.
-	// Defaults to console.error
+	// Writes error/warn. Default console.error
 	stderr: console.error,
 });
 ```
 
 ### Metadata
 
-`log.info("foo", { hey: "luring" });` --> 2022-09-24T23:40:39Z [info] foo {"hey":"luring"}
+`log.info("foo", { hey: "luring" })` → `2022-09-24T23:40:39Z [info] foo {"hey":"luring"}`
 
 Values may be `string`, `number`, or `boolean`. OTLP attributes are string-only, so `{ count: 5 }`
 is sent as `"5"`; the JSON formatter keeps it native (`5`).
 
 ## Testing
 
-All tests run inside Docker — dependencies are installed in the container too — so a local run is
-identical to CI. Requires Docker; no local `npm install` is needed to run them.
+All tests run in Docker (dependencies installed in the container too), so a local run matches CI.
+Requires Docker; no local `npm install` needed.
 
-- `npm test` — runs everything: the Node suite and the browser suite.
-- `npm run test-docker` — Node suite only. Override the Node version with
+- `npm test` — everything: the Node and browser suites.
+- `npm run test-docker` — Node suite only. Override the version with
   `NODE_IMAGE=node:18-bookworm-slim npm run test-docker` (CI runs the full 18–26 matrix this way).
-- `npm run test-browser` — the same suite in real Chromium via the official Playwright image.
+- `npm run test-browser` — the same suite in real Chromium (official Playwright image).
+- `npm run test-otlp` — end-to-end export to a pinned OpenTelemetry Collector, asserting it parsed
+  both the JSON **and** protobuf output (validates the hand-built protobuf encoder against the
+  reference, not just our own decoder). `OTLP_DEBUG=1` dumps what the collector received. See
+  `scripts/run-otlp-tests.mjs`. Needs only Docker.
+- `npm run lint` — eslint over the sources. Needs Node 20+ (eslint 10) and deps installed locally, so
+  CI runs it in its own job rather than inside the Node test matrix.
 
-The suite is runtime-agnostic: it injects `stdout`/`stderr` and stubs the global `fetch`, so the
-exact same tests exercise the console output and the OTLP transport in Node and in the browser.
-The container runs `npm run ci` / `ci-browser` internally — run those directly only if you already
-have deps installed locally.
-
-- `npm run test-otlp` — end-to-end OTLP check: exports to a real (pinned) OpenTelemetry Collector and
-  asserts it parsed both the JSON **and** protobuf output. This validates the hand-built protobuf
-  encoder against the reference implementation, not just our own decoder. `index.js` is built inside
-  Docker and the driver runs on the host with plain Node, so — like the suites above — it needs only
-  Docker, no local `npm install`. See `scripts/run-otlp-tests.mjs` (`OTLP_DEBUG=1` dumps exactly what
-  the collector received).
-- `npm run lint` — eslint over the sources. Linting needs Node 20+ (eslint 10), so CI runs it once
-  in its own job rather than inside the Node 18–26 test matrix. Needs deps installed locally.
+The suite is runtime-agnostic: it injects `stdout`/`stderr` and stubs the global `fetch`, so the same
+tests cover console output and OTLP in Node and the browser. The container runs `npm run ci` /
+`ci-browser` internally.
 
 ## Releasing
 
 Publishing is automated: creating a GitHub release runs the **Publish** workflow
-(`.github/workflows/publish.yaml`), which builds, tests, lints and then `npm publish`es.
+(`.github/workflows/publish.yaml`) — build, test, lint, then `npm publish`.
 
-One-time setup: add an `NPM_TOKEN` repo secret (Settings → Secrets and variables → Actions)
-with an npm automation token that has publish rights to `@larvit/log`.
+One-time setup: add an `NPM_TOKEN` repo secret (Settings → Secrets and variables → Actions) — an npm
+automation token with publish rights to `@larvit/log`.
 
 To cut a release:
 
 1. Add a `## Changelog` entry below for the new version.
-2. Bump the version in `package.json` (`npm version <major|minor|patch>` does this and commits it).
+2. Bump the version in `package.json` (`npm version <major|minor|patch>` does this and commits).
    Follow semver: breaking changes → major.
 3. Merge to `master`.
-4. Create a GitHub release with a tag `vX.Y.Z` that matches `package.json` (e.g. `v2.0.0`).
-   The workflow verifies the tag matches the version and fails the publish if it does not.
+4. Create a GitHub release with a tag `vX.Y.Z` that matches `package.json` (the workflow verifies the
+   tag matches the version and fails the publish otherwise).
 
-The workflow publishes whatever is in `package.json`, so the tag and `package.json` version must agree.
 To publish manually instead: `npm run build-and-publish`.
 
 ## Changelog

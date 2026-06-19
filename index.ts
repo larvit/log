@@ -216,44 +216,27 @@ function getRandomBytes(size: number): Uint8Array {
 	return bytes;
 }
 
-/**
- * Generates a random 8-byte span ID as a 16-character hex string.
- *
- * @returns {string} A valid OTLP span ID
- */
+// Random 8-byte span id as 16 hex chars.
 export function generateSpanId(): string {
 	return bytesToHex(getRandomBytes(8));
 }
 
-/**
- * Generates a random 16-byte trace ID as a 32-character hex string.
- *
- * @returns {string} A valid OTLP trace ID
- */
+// Random 16-byte trace id as 32 hex chars.
 export function generateTraceId(): string {
 	const bytes = getRandomBytes(16);
 
-	// Ensure version 1 trace ID by setting first byte
-	bytes[0] = 0x01;
+	bytes[0] = 0x01; // version 1 trace id
 
 	return bytesToHex(bytes);
 }
 
-/**
- * Builds a W3C `traceparent` header value (`version-traceId-spanId-flags`) for the given context.
- *
- * @returns {string} A traceparent header value, sampled by default
- */
+// W3C `traceparent` header value (`version-traceId-spanId-flags`); sampled by default.
 export function formatTraceparent(traceId: string, spanId: string, sampled: boolean = true): string {
 	return `00-${traceId}-${spanId}-${sampled ? "01" : "00"}`;
 }
 
-/**
- * Parses a W3C `traceparent` header. Untrusted input: returns null (rather than throwing) for any
- * malformed or all-zero value, so the caller cleanly starts a fresh trace instead of continuing.
- *
- * @returns {{ flags: string, spanId: string, traceId: string } | null} The parsed parts, or null
- */
+// Parses a W3C `traceparent`. Untrusted input: returns null (never throws) for any malformed or
+// all-zero value, so the caller cleanly starts a fresh trace instead of continuing.
 export function parseTraceparent(header: string): { flags: string, spanId: string, traceId: string } | null {
 	const match = /^[0-9a-f]{2}-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$/.exec(header.trim().toLowerCase());
 
@@ -285,8 +268,8 @@ function isFetchError(error: unknown): error is FetchError {
 	return typeof error === "object" && error !== null && "message" in error;
 }
 
-// Resource-level OTLP attributes (service.name + telemetry.sdk.*). Shared by logs and spans so the
-// service is identified the same way for both — Grafana/Loki reads service.name from here, not the records.
+// Resource-level OTLP attributes (service.name + telemetry.sdk.*), shared by logs and spans.
+// Grafana/Loki reads service.name from here, not from the records.
 function buildResourceAttributes(context: Metadata): OtlpAttribute[] {
 	return [
 		{ key: "service.name", value: { stringValue: String(context["service.name"] || "unnamed-service") } },
@@ -366,9 +349,8 @@ function buildSpanPayload(opts: {
 }
 
 // --- OTLP/HTTP protobuf encoding -------------------------------------------
-// Hand-rolled protobuf wire encoder for the small, frozen OTLP message subset this library emits.
-// Zero dependencies keeps the library a single self-contained file that runs in any JS runtime
-// (priority: works everywhere). Field numbers below are from the OTLP proto definitions (v1).
+// Hand-rolled wire encoder for the small, frozen OTLP subset this library emits — zero deps keeps it
+// a single self-contained file that runs anywhere. Field numbers are from the OTLP proto defs (v1).
 
 const WIRE_VARINT = 0;
 const WIRE_FIXED64 = 1;
@@ -671,10 +653,9 @@ export class Log implements LogInt {
 			...conf.context,
 		};
 
-		// Inherit every other setting not explicitly overridden — log level, sinks, OTLP endpoint/
-		// protocol/headers, printTraceInfo, etc. — mirroring how the constructor inherits from a
-		// parentLog. parentLog and spanName are excluded: a clone is its own span, not a child of the
-		// original. (A manual allow-list here previously dropped OTLP options added after clone existed.)
+		// Inherit every other setting not overridden (log level, sinks, OTLP config, printTraceInfo…),
+		// like the constructor does from a parentLog. parentLog/spanName/traceparent are excluded: a
+		// clone is its own span, not a child. (A manual allow-list here once dropped newer OTLP options.)
 		for (const key of Object.keys(this.conf) as (keyof LogConf)[]) {
 			if (key !== "parentLog" && key !== "spanName" && key !== "traceparent" && conf[key] === undefined) {
 				conf[key] = this.conf[key] as never;
@@ -703,14 +684,11 @@ export class Log implements LogInt {
 		return formatTraceparent(this.span.traceId, this.span.spanId);
 	}
 
-	// Drop-in `fetch` that auto-creates an OTel CLIENT span for the call (nested under this log's
-	// span), injects a `traceparent` header, and records the OTel http.* attributes. The span exports
-	// in the background — the call returns as soon as the response is ready and never waits on the
-	// OTLP round-trip — but it is registered with end() at call time, so `await log.end()` delivers it
-	// even when the fetch was not awaited. The span is the only output: no log line is written.
-	// Instrumentation never changes the call's outcome: only `string`/`URL` inputs are traced;
-	// anything else (a `Request`, or an unparseable/relative URL with no base) passes straight through
-	// to a plain, untraced fetch.
+	// Drop-in `fetch`: auto-creates a CLIENT span (nested under this log's span), injects a
+	// `traceparent`, records the OTel http.* attributes, and is the only output (no log line). The
+	// span exports in the background and is registered with end() at call time, so `await log.end()`
+	// delivers it even when the fetch wasn't awaited. Only `string`/`URL` inputs are traced; anything
+	// else (a `Request`, or a relative URL with no base) passes through to a plain, untraced fetch.
 	public fetch(input: string | URL, init?: RequestInit): Promise<Response> {
 		if (this.ended) {
 			throw new Error("Logging instance is already ended");
@@ -724,8 +702,8 @@ export class Log implements LogInt {
 			return globalThis.fetch(input, init);
 		}
 
-		// Register the whole operation (request + span export) synchronously, so a fire-and-forget
-		// log.fetch() is still delivered by a later await log.end().
+		// Register the whole operation synchronously, so a fire-and-forget log.fetch() is still
+		// delivered by a later await log.end().
 		let settle!: () => void;
 
 		this.track(new Promise<void>(resolve => { settle = resolve; }));
@@ -734,9 +712,8 @@ export class Log implements LogInt {
 	}
 
 	private async tracedFetch(url: URL, init: RequestInit | undefined, settle: () => void): Promise<Response> {
-		// Created with safe operations only; everything that can throw (e.g. `new Headers` on a bad
-		// header name) lives inside the try, so the finally always runs and settles the tracked
-		// promise — end() can never hang on this fetch.
+		// childSpan can't throw; everything that can (e.g. `new Headers` on a bad name) is inside the
+		// try, so finally always settles the tracked promise and end() can never hang on this fetch.
 		const span = this.childSpan(url.host, 3); // CLIENT; name refined below
 		const context: Metadata = { ...this.context };
 
@@ -788,9 +765,8 @@ export class Log implements LogInt {
 
 			throw err;
 		} finally {
-			// Always settle the tracked promise so end() can never hang on this fetch — even if the
-			// export call itself were to throw synchronously (defense-in-depth; it normally returns a
-			// promise we resolve via .then once the span is delivered).
+			// Always settle the tracked promise so end() can never hang on this fetch, even if the
+			// export call itself throws synchronously (it normally resolves once the span is delivered).
 			try {
 				void this.exportChildSpan(span, context).then(settle, settle);
 			} catch {
