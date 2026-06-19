@@ -84,13 +84,25 @@ await reqLog.end(); // flushes the spans (the fetch itself never waits on the OT
 
 The span records the OTel HTTP semantic-convention attributes (`http.request.method`, `url.full`,
 `url.scheme`, `server.address`/`server.port`, `http.response.status_code`, and `error.type` on
-failure). 4xx/5xx responses, and thrown network errors (which are re-thrown unchanged), mark the span
-as errored. Instrumentation never changes the call's result.
+failure — its value is the error's `code`, else its `name`, else `"fetch_error"`). 4xx/5xx responses,
+and thrown network errors (which are re-thrown unchanged), mark the span as errored. Instrumentation
+never changes the call's result.
+
+Notes:
+
+- **The span is the only output** — `log.fetch` writes no log line. Without `otlpHttpBaseURI` it just
+  injects the `traceparent` header (still useful: downstream services continue the trace).
+- **Delivery:** the span exports in the background, so the call returns as soon as the response is
+  ready. `await log.end()` delivers every span started by this log — including a fire-and-forget
+  `log.fetch()` you never awaited — so a short-lived process can safely exit after `end()`.
+- **Inputs:** only `string` and `URL` are traced. A `Request` object, or a relative URL with no base
+  (e.g. in Node), passes straight through to a plain, untraced `fetch` (the call still works).
 
 **Privacy:** the query string is **dropped** from `url.full` by default (it may carry tokens) and
 userinfo is always stripped. Opt in with `captureQuery: true` (known-sensitive keys like `Signature`
 are still redacted). Headers are captured only when allow-listed via `captureRequestHeaders` /
-`captureResponseHeaders`; request/response bodies are never captured.
+`captureResponseHeaders`; request/response bodies are never captured. These three are an
+instance-wide policy (read at call time from the log); `clone()` to vary them.
 
 ### Continue a trace from an incoming request
 
@@ -121,11 +133,11 @@ const log = new Log({
 	// Added in 2.3.0
 	captureQuery: false,
 
-	// log.fetch only: header names to record as http.request.header.* / http.response.header.*
-	// Allow-lists; nothing is captured by default.
+	// log.fetch only: header-name allow-lists, recorded as http.request.header.* /
+	// http.response.header.*. Default: none captured. Instance-wide; clone() to vary per call.
 	// Added in 2.3.0
-	captureRequestHeaders: null,
-	captureResponseHeaders: null,
+	captureRequestHeaders: ["x-request-id"],
+	captureResponseHeaders: ["x-request-id"],
 
 	// Context will be appended as metadata to all log entries
 	// Default is an empty context

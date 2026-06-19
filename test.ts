@@ -884,6 +884,38 @@ test("log.fetch keeps a caller-supplied traceparent", async t => {
 	t.end();
 });
 
+test("await log.end() drains a fire-and-forget log.fetch span", async t => {
+	const { calls } = stubFetch();
+	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+
+	log.fetch("https://api.test/bg"); // deliberately NOT awaited
+
+	await log.end();
+
+	// The span must be delivered by the time end() resolves, even though the fetch was not awaited —
+	// otherwise a short-lived process would exit before the span is exported.
+	t.strictEqual(clientSpan(calls).name, "GET api.test", "the client span was exported before end() resolved");
+	t.end();
+});
+
+test("log.fetch throws when the log is already ended", async t => {
+	const log = new Log({ stderr: () => {} });
+
+	await log.end();
+	t.throws(() => log.fetch("https://api.test/x"), "fetch on an ended log throws, like the log methods");
+	t.end();
+});
+
+test("clone() inherits captureQuery and the header allow-lists", t => {
+	const base = new Log({ captureQuery: true, captureRequestHeaders: ["x-req"], captureResponseHeaders: ["x-resp"] });
+	const clone = base.clone();
+
+	t.strictEqual(clone.conf.captureQuery, true, "captureQuery inherited");
+	t.deepEqual(clone.conf.captureRequestHeaders, ["x-req"], "request header allow-list inherited");
+	t.deepEqual(clone.conf.captureResponseHeaders, ["x-resp"], "response header allow-list inherited");
+	t.end();
+});
+
 test("log.fetch works without OTLP, still injecting a traceparent", async t => {
 	const { calls } = stubFetch();
 	const log = new Log({ stderr: () => {} });

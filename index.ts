@@ -329,7 +329,8 @@ function buildLogPayload(opts: {
 	};
 }
 
-// Pure builder: state in, OTLP span payload out. Mutates the passed span with its resolved attributes/parent.
+// Span finalizer: writes the resolved attributes/parent onto the span, then returns the OTLP payload.
+// Not pure — it mutates `span` — but kept out of the class so it stays trivially testable.
 function buildSpanPayload(opts: {
 	context: Metadata,
 	parentSpan?: OtlpSpan,
@@ -702,12 +703,20 @@ export class Log implements LogInt {
 		return formatTraceparent(this.span.traceId, this.span.spanId);
 	}
 
-	// Drop-in `fetch` that auto-creates a CLIENT span for the call (nested under this log's span),
-	// injects a `traceparent` header, and records OTel http.* attributes. The span is exported in the
-	// background and flushed by this log's end(); the fetch never waits on the OTLP round-trip.
-	// Instrumentation never changes the call's outcome — an unparseable URL passes straight through.
-	public async fetch(input: string | URL, init?: RequestInit): Promise<Response> {
-		let url: URL | undefined;
+	// Drop-in `fetch` that auto-creates an OTel CLIENT span for the call (nested under this log's
+	// span), injects a `traceparent` header, and records the OTel http.* attributes. The span exports
+	// in the background — the call returns as soon as the response is ready and never waits on the
+	// OTLP round-trip — but it is registered with end() at call time, so `await log.end()` delivers it
+	// even when the fetch was not awaited. The span is the only output: no log line is written.
+	// Instrumentation never changes the call's outcome: only `string`/`URL` inputs are traced;
+	// anything else (a `Request`, or an unparseable/relative URL with no base) passes straight through
+	// to a plain, untraced fetch.
+	public fetch(input: string | URL, init?: RequestInit): Promise<Response> {
+		if (this.ended) {
+			throw new Error("Logging instance is already ended");
+		}
+
+		let url: URL;
 
 		try {
 			url = new URL(String(input), (globalThis as { location?: { href?: string } }).location?.href);
@@ -715,43 +724,52 @@ export class Log implements LogInt {
 			return globalThis.fetch(input, init);
 		}
 
-		const method = (init?.method ?? "GET").toUpperCase();
-		const child = new Log({ parentLog: this, spanName: `${method} ${url.host}` });
+		// Register the whole operation (request + span export) synchronously, so a fire-and-forget
+		// log.fetch() is still delivered by a later await log.end().
+		let settle!: () => void;
 
-		child.span.kind = 3; // CLIENT
-		Object.assign(child.context, {
+		this.track(new Promise<void>(resolve => { settle = resolve; }));
+
+		return this.tracedFetch(url, init, settle);
+	}
+
+	private async tracedFetch(url: URL, init: RequestInit | undefined, settle: () => void): Promise<Response> {
+		const method = (init?.method ?? "GET").toUpperCase();
+		const span = this.childSpan(`${method} ${url.host}`, 3); // CLIENT
+		const context: Metadata = {
+			...this.context,
 			"http.request.method": method,
 			"server.address": url.hostname,
 			"url.full": buildUrlFull(url, this.conf.captureQuery === true),
 			"url.scheme": url.protocol.replace(/:$/, ""),
 			...url.port ? { "server.port": Number(url.port) } : {},
-		});
+		};
 
 		const headers = new Headers(init?.headers);
 
 		if (!headers.has("traceparent")) {
-			headers.set("traceparent", formatTraceparent(child.span.traceId, child.span.spanId));
+			headers.set("traceparent", formatTraceparent(span.traceId, span.spanId));
 		}
 
 		for (const name of this.conf.captureRequestHeaders ?? []) {
 			const value = headers.get(name);
 
 			if (value !== null) {
-				child.context[`http.request.header.${name.toLowerCase()}`] = value;
+				context[`http.request.header.${name.toLowerCase()}`] = value;
 			}
 		}
 
 		try {
 			const res = await globalThis.fetch(url, { ...init, headers });
 
-			child.context["http.response.status_code"] = res.status;
-			child.span.status.code = res.status >= 400 ? 2 : 0; // 4xx/5xx are errors for client spans
+			context["http.response.status_code"] = res.status;
+			span.status.code = res.status >= 400 ? 2 : 0; // 4xx/5xx are errors for client spans
 
 			for (const name of this.conf.captureResponseHeaders ?? []) {
 				const value = res.headers.get(name);
 
 				if (value !== null) {
-					child.context[`http.response.header.${name.toLowerCase()}`] = value;
+					context[`http.response.header.${name.toLowerCase()}`] = value;
 				}
 			}
 
@@ -759,13 +777,13 @@ export class Log implements LogInt {
 		} catch (err) {
 			const cause = err as { code?: string, name?: string };
 
-			child.span.status.code = 2; // ERROR
-			child.context["error.type"] = cause.code ?? cause.name ?? "fetch_error";
+			span.status.code = 2; // ERROR
+			context["error.type"] = cause.code ?? cause.name ?? "fetch_error";
 
 			throw err;
 		} finally {
-			// Export in the background; this log's end() awaits it, the fetch itself does not.
-			this.track(child.end());
+			// Export in the background; resolve the call-time tracked promise once the span is delivered.
+			void this.exportChildSpan(span, context).then(settle, settle);
 		}
 	}
 
@@ -921,6 +939,35 @@ export class Log implements LogInt {
 		} finally {
 			clearTimeout(timer);
 		}
+	}
+
+	// A fresh child span under this log's span/trace, with its kind set at birth (no later mutation).
+	private childSpan(name: string, kind: OtlpSpan["kind"]): OtlpSpan {
+		const now = getNsTimestamp(Date.now());
+
+		return {
+			attributes: [],
+			droppedAttributesCount: 0,
+			droppedEventsCount: 0,
+			droppedLinksCount: 0,
+			endTimeUnixNano: now,
+			events: [],
+			kind,
+			links: [],
+			name,
+			parentSpanId: this.span.spanId,
+			spanId: generateSpanId(),
+			startTimeUnixNano: now,
+			status: { code: 0 },
+			traceId: this.span.traceId,
+		};
+	}
+
+	// Stamps the end time and exports a child span, deriving its attributes/resource from `context`.
+	private exportChildSpan(span: OtlpSpan, context: Metadata): Promise<unknown> {
+		span.endTimeUnixNano = getNsTimestamp(Date.now());
+
+		return this.otlpCall({ path: "/v1/traces", payload: buildSpanPayload({ context, span }) });
 	}
 
 	private async otlpCreateSpan(span: OtlpSpan): Promise<boolean> {
