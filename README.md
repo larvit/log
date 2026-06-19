@@ -165,6 +165,12 @@ exact same tests exercise the console output and the OTLP transport in Node and 
 The container runs `npm run ci` / `ci-browser` internally — run those directly only if you already
 have deps installed locally.
 
+- `npm run test-otlp` — end-to-end OTLP check: exports to a real (pinned) OpenTelemetry Collector and
+  asserts it parsed both the JSON **and** protobuf output. This validates the hand-built protobuf
+  encoder against the reference implementation, not just our own decoder. `index.js` is built inside
+  Docker and the driver runs on the host with plain Node, so — like the suites above — it needs only
+  Docker, no local `npm install`. See `scripts/run-otlp-tests.mjs` (`OTLP_DEBUG=1` dumps exactly what
+  the collector received).
 - `npm run lint` — eslint over the sources. Linting needs Node 20+ (eslint 10), so CI runs it once
   in its own job rather than inside the Node 18–26 test matrix. Needs deps installed locally.
 
