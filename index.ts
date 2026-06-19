@@ -734,32 +734,38 @@ export class Log implements LogInt {
 	}
 
 	private async tracedFetch(url: URL, init: RequestInit | undefined, settle: () => void): Promise<Response> {
-		const method = (init?.method ?? "GET").toUpperCase();
-		const span = this.childSpan(`${method} ${url.host}`, 3); // CLIENT
-		const context: Metadata = {
-			...this.context,
-			"http.request.method": method,
-			"server.address": url.hostname,
-			"url.full": buildUrlFull(url, this.conf.captureQuery === true),
-			"url.scheme": url.protocol.replace(/:$/, ""),
-			...url.port ? { "server.port": Number(url.port) } : {},
-		};
-
-		const headers = new Headers(init?.headers);
-
-		if (!headers.has("traceparent")) {
-			headers.set("traceparent", formatTraceparent(span.traceId, span.spanId));
-		}
-
-		for (const name of this.conf.captureRequestHeaders ?? []) {
-			const value = headers.get(name);
-
-			if (value !== null) {
-				context[`http.request.header.${name.toLowerCase()}`] = value;
-			}
-		}
+		// Created with safe operations only; everything that can throw (e.g. `new Headers` on a bad
+		// header name) lives inside the try, so the finally always runs and settles the tracked
+		// promise — end() can never hang on this fetch.
+		const span = this.childSpan(url.host, 3); // CLIENT; name refined below
+		const context: Metadata = { ...this.context };
 
 		try {
+			const method = (init?.method ?? "GET").toUpperCase();
+
+			span.name = `${method} ${url.host}`;
+			Object.assign(context, {
+				"http.request.method": method,
+				"server.address": url.hostname,
+				"url.full": buildUrlFull(url, this.conf.captureQuery === true),
+				"url.scheme": url.protocol.replace(/:$/, ""),
+				...url.port ? { "server.port": Number(url.port) } : {},
+			});
+
+			const headers = new Headers(init?.headers);
+
+			if (!headers.has("traceparent")) {
+				headers.set("traceparent", formatTraceparent(span.traceId, span.spanId));
+			}
+
+			for (const name of this.conf.captureRequestHeaders ?? []) {
+				const value = headers.get(name);
+
+				if (value !== null) {
+					context[`http.request.header.${name.toLowerCase()}`] = value;
+				}
+			}
+
 			const res = await globalThis.fetch(url, { ...init, headers });
 
 			context["http.response.status_code"] = res.status;
@@ -782,7 +788,8 @@ export class Log implements LogInt {
 
 			throw err;
 		} finally {
-			// Export in the background; resolve the call-time tracked promise once the span is delivered.
+			// Always runs (even if setup above threw), so the tracked promise always settles once the
+			// span is delivered — end() can never hang on this fetch.
 			void this.exportChildSpan(span, context).then(settle, settle);
 		}
 	}

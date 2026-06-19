@@ -898,6 +898,28 @@ test("await log.end() drains a fire-and-forget log.fetch span", async t => {
 	t.end();
 });
 
+test("log.fetch with an invalid header rejects but never hangs end()", async t => {
+	const { calls } = stubFetch();
+	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+
+	let threw = false;
+
+	try {
+		// An invalid header name makes `new Headers()` throw during setup, before the request goes out.
+		await log.fetch("https://api.test/x", { headers: { "bad header name": "v" } });
+	} catch {
+		threw = true;
+	}
+
+	// Must resolve, not hang — the tracked promise has to settle even when setup throws.
+	// (The harness fails the test on a >10s hang.)
+	await log.end();
+
+	t.ok(threw, "the setup error propagates to the caller");
+	t.strictEqual(clientSpan(calls).status.code, 2, "an error span is still exported for the failed call");
+	t.end();
+});
+
 test("log.fetch throws when the log is already ended", async t => {
 	const log = new Log({ stderr: () => {} });
 

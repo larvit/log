@@ -95,6 +95,9 @@ Notes:
 - **Delivery:** the span exports in the background, so the call returns as soon as the response is
   ready. `await log.end()` delivers every span started by this log — including a fire-and-forget
   `log.fetch()` you never awaited — so a short-lived process can safely exit after `end()`.
+- **Errors:** fire-and-forget delivers the *span*, not error handling — exactly like plain `fetch`, a
+  `log.fetch()` you don't await surfaces a failed request as an unhandled promise rejection. Await it
+  (or attach a `.catch`) whenever the call can fail.
 - **Inputs:** only `string` and `URL` are traced. A `Request` object, or a relative URL with no base
   (e.g. in Node), passes straight through to a plain, untraced `fetch` (the call still works).
 
