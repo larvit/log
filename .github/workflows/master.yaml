@@ -25,6 +25,20 @@ jobs:
       # Same suite in real Chromium via the official Playwright Docker image.
       - run: npm run test-browser
 
+  OTLP-test:
+    runs-on: ubuntu-24.04
+    # End-to-end check: export to a real (pinned) OpenTelemetry Collector and assert it parsed both
+    # our JSON and protobuf output. index.js is built in Docker (deps in the container), so the host
+    # needs only Docker plus Node to run the driver — no `npm ci`.
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.x
+      - run: npm run test-otlp
+
   Lint:
     runs-on: ubuntu-24.04
     # eslint 10 / eslint-plugin-perfectionist need Node 20+; lint is static, so run it once
