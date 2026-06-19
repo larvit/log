@@ -788,9 +788,14 @@ export class Log implements LogInt {
 
 			throw err;
 		} finally {
-			// Always runs (even if setup above threw), so the tracked promise always settles once the
-			// span is delivered — end() can never hang on this fetch.
-			void this.exportChildSpan(span, context).then(settle, settle);
+			// Always settle the tracked promise so end() can never hang on this fetch — even if the
+			// export call itself were to throw synchronously (defense-in-depth; it normally returns a
+			// promise we resolve via .then once the span is delivered).
+			try {
+				void this.exportChildSpan(span, context).then(settle, settle);
+			} catch {
+				settle();
+			}
 		}
 	}
 
