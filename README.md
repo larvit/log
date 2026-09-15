@@ -8,8 +8,8 @@ tracing. No dependencies.
 
 - **Runs anywhere.** Node 18+, Bun, Deno, browsers and React Native. Built on global `fetch`.
 - **Just log.** `log.info("msg", { key: "value" })` to stdout/stderr, text or JSON.
-- **Traces without an SDK.** Set `otlpHttpBaseURI` and every instance is a span; logs attach to it.
-  OTLP (OpenTelemetry's export protocol) over HTTP, JSON or protobuf.
+- **Traces without an SDK.** Set `otlpHttpBaseURI` and every instance is a span, its logs exported
+  with it. OTLP (OpenTelemetry's export protocol) over HTTP, JSON or protobuf.
 - **Composable.** Nest instances under a parent, join an upstream trace from a `traceparent` header,
   hand the current context on to any client.
 - **HTTP client tracing.** `log.fetch()` is a drop-in `fetch` that records a client span and
@@ -55,7 +55,8 @@ log.info("Order placed", { orderId, total: 199, express: true });
 // 2022-09-24T23:40:39Z [info] Order placed {"orderId":"…","total":199,"express":true}
 ```
 
-Metadata values are `string`, `number` or `boolean`. Keys set in the instance's `context` option are
+Metadata values are `string`, `number` or `boolean`, not `undefined`; drop optional fields before
+passing. Keys set in the instance's `context` option are
 added to every entry and win over a per-call key of the same name.
 
 ## Group logs into a trace
@@ -75,7 +76,7 @@ const appLog = new Log({
 
 async function myRequestHandler(req, res) {
 	const reqLog = new Log({
-		context: { requestId: crypto.randomUUID() },
+		context: { ...appLog.context, requestId: crypto.randomUUID() },
 		parentLog: appLog,
 		spanName: "request",
 	});
@@ -88,17 +89,21 @@ async function myRequestHandler(req, res) {
 }
 ```
 
-A child inherits every option it does not set itself, `context` and OTLP settings included. The
-`service.name` context key becomes the OTLP resource's service name (default `"unnamed-service"`)
-rather than a per-entry attribute.
+A child inherits every option it does not set itself, `spanName` included. Setting `context` on a
+child replaces the parent's rather than merging, hence the spread above. The `service.name` context
+key becomes the OTLP resource's service name (default `"unnamed-service"`) rather than a per-entry
+attribute. A child's log entries attach to the parent's span; the child's own span holds its
+timing and is exported by `end()`.
 
 `end()` closes the span and flushes it and any pending log exports; a span that is never ended is
 never sent. `await` it when delivery must complete before the process exits (a short-lived script);
-fire-and-forget is fine in a long-running process. An instance is single-use: logging, `fetch()` or
-`end()` on an ended instance throws.
+fire-and-forget is fine in a long-running process. Each export request is bounded by a 3 s timeout,
+so `await end()` returns within about 6 s against a dead collector. An instance is single-use:
+logging and `fetch()` on an ended instance throw, `end()` rejects.
 
-`log.clone(options?)` makes an independent instance with the same settings; `context` merges per
-key, everything else is overridden as given. A clone is its own span in a new trace, not a child.
+`log.clone(options?)` (on `Log`, not `LogInt`) makes an independent instance with the same
+settings; `context` merges per key, everything else is overridden as given. A clone is its own span
+in a new trace, not a child.
 
 ## Trace outgoing HTTP
 
@@ -122,13 +127,15 @@ Pass the incoming `traceparent` header to nest under the caller's span. `log.tra
 the current context for a client that is not `fetch`:
 
 ```javascript
-const reqLog = new Log({ parentLog: appLog, traceparent: req.headers.traceparent });
+const reqLog = appLog.clone({ spanName: "request", traceparent: req.headers.traceparent });
 
 myClient.send({ headers: { traceparent: reqLog.traceparent() } });
 ```
 
-A malformed header is ignored and a fresh trace starts, so an untrusted header is safe to pass.
-`traceparent` applies only to the instance it is given to; children and clones do not inherit it.
+`clone()` rather than `parentLog`: when `parentLog` is set, `traceparent` is ignored and the
+instance nests under the parent instead. A malformed header is ignored and a fresh trace starts, so
+an untrusted header is safe to pass. `traceparent` applies only to the instance it is given to;
+children and clones do not inherit it.
 
 ## Accept a logger in your library
 
@@ -147,6 +154,11 @@ export function createClient(options: { log?: LogInt }) {
 A consumer passes `new Log("debug")`, or a child of their request log so your library's entries land
 in their trace.
 
+For a span per operation, make a child, `new Log({ parentLog: log, spanName: "submit_sm" })`, and
+`end()` that child. It inherits the consumer's level, sinks and OTLP settings, so a `"none"`
+consumer stays silent. Never `end()` the instance you were handed; it is single-use and the
+consumer owns it.
+
 ## Options
 
 `new Log(options)`, `new Log(level)` or `new Log()`. A level string is shorthand for
@@ -164,9 +176,9 @@ in their trace.
 | `otlpAdditionalHeaders` | `Record<string, string>` | none | Extra headers on every OTLP request, e.g. `{ Authorization: "Bearer …" }`. |
 | `otlpHttpBaseURI` | `string` | none | OTLP/HTTP endpoint, e.g. `http://127.0.0.1:4318`. Logs go to `/v1/logs`, spans to `/v1/traces` under it; a base path is kept. A malformed URI throws in the constructor. |
 | `otlpProtocol` | `"http/json" \| "http/protobuf"` | `"http/json"` | Wire format. Both use the same endpoint; use protobuf for collectors that reject JSON. |
-| `parentLog` | `LogInt` | none | Nest under this instance's span and inherit its options. |
+| `parentLog` | `LogInt` | none | Nest under this instance's span and inherit its options. Log entries attach to the parent's span. |
 | `printTraceInfo` | `boolean` | `false` | Append `spanId`, `traceId` and `spanName` to console output. |
-| `spanName` | `string` | `"unnamed-span"` | The instance's span name. |
+| `spanName` | `string` | `"unnamed-span"` | The instance's span name. Inherited from `parentLog` when set there. |
 | `stderr` | `(msg: string) => void` | `console.error` | Sink for `error` and `warn`. |
 | `stdout` | `(msg: string) => void` | `console.log` | Sink for the other levels. |
 | `traceparent` | `string` | none | Incoming W3C `traceparent` to nest under. Ignored when malformed or when `parentLog` is set. |
@@ -191,8 +203,8 @@ keeps it native. Levels map to OTLP severity through the exported `LogLevels` ta
 
 ## `log.fetch` in depth
 
-Only `string` and `URL` inputs are traced. A `Request`, or a relative URL with no base (Node), passes
-straight through to an untraced `fetch`. The span is the only output; no log line is written.
+Input is a `string` or `URL`. A relative URL with no base (Node) passes straight through to an
+untraced `fetch`. The span is the only output; no log line is written.
 
 Span attributes follow the OpenTelemetry HTTP semantic conventions:
 
