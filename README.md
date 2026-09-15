@@ -211,7 +211,7 @@ To cut a release:
 1. Add a `## Changelog` entry below for the new version.
 2. Bump the version in `package.json` (`npm version <major|minor|patch>` does this and commits).
    Follow semver: breaking changes → major.
-3. Merge to `master`.
+3. Merge to `main`.
 4. Create a GitHub release with a tag `vX.Y.Z` that matches `package.json` (the workflow verifies the
    tag matches the version and fails the publish otherwise).
 
