@@ -109,9 +109,10 @@ error's message, and an `error.type` attribute from its `code`, else `name`; a `
 error is a plain `end()`. A logged `log.error()` never fails the span; a recovered error is not a
 failed operation. `await` it when delivery must complete before the process exits (a short-lived
 script); fire-and-forget is fine in a long-running process. Against a dead collector `await end()`
-returns within about 6 s, plus however long any un-awaited `log.fetch()` takes to complete, and the
-queue keeps retrying in the background. An instance is single-use: logging and `fetch()` on an
-ended instance throw, `end()` rejects. `log.flush()` delivers what is queued without ending.
+returns after one failed attempt, within about 3 s plus however long any un-awaited `log.fetch()`
+takes to complete; the retry then runs only for as long as the process lives. An instance is
+single-use: logging and `fetch()` on an ended instance throw, `end()` rejects. `log.flush()`
+delivers what is queued without ending.
 
 `log.clone(options?)` (on `Log`, not `LogInt`) makes an independent instance with the same
 settings; `context` merges per key, `spanName` is not copied, everything else is overridden as
@@ -184,13 +185,14 @@ queue is in memory only.
 | `otlpAdditionalHeaders` | `Record<string, string>` | none | Extra headers on every request, e.g. `{ Authorization: "Bearer …" }`. |
 | `otlpHttpBaseURI` | `string` | required | OTLP/HTTP endpoint, e.g. `http://127.0.0.1:4318`. Logs go to `/v1/logs`, spans to `/v1/traces` under it; a base path is kept. A malformed URI throws in the constructor. |
 | `otlpProtocol` | `"http/json" \| "http/protobuf"` | `"http/json"` | Wire format. Both use the same endpoint; use protobuf for collectors that reject JSON. |
-| `report` | `(msg, metadata) => void` | `console.error` | Sink for one line per failed batch. The `Log`-built queue writes through the instance's `stderr` and `entryFormatter`. |
+| `report` | `(msg, metadata) => void` | `console.error` | Sink for one line per failed attempt, dropped batch or drop round. The `Log`-built queue writes through the instance's `stderr` and `entryFormatter`. |
 | `retryDelayMs` | `number` | `1000` | Delay before the first retry; doubles per consecutive failure, capped at 30 s. |
 | `storage` | `QueueStorage` | none | Persists the queue, see above. |
 
 A send has a 3 s timeout. A network error, timeout, 408, 429 or 5xx keeps the batch for retry; any
-other non-2xx drops it. A retry timer never keeps a Node process alive, so a script that exits
-without `await end()` loses what the collector did not take.
+other non-2xx drops it. A retry timer never keeps a Node or Deno process alive, so a script whose
+first attempt fails loses the batch at exit, `await end()` or not; give the queue a `storage` to
+carry it into the next run.
 
 `flush()` on `Log` or `Queue` sends everything queued, one attempt per batch, and resolves when that
 round is done. A failed batch stays queued for the retry, and until that fires `flush()` attempts

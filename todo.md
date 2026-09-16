@@ -19,7 +19,7 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
 - [x] Add an export queue, pluggable through an `otlpQueue` option: `OtlpQueue` is
   `enqueue(payload)` + `flush()`; `Queue` is the one implementation, in memory or, with
   `storage`, persisted across app restarts. Batching by size and time, retry with backoff,
-  `keepalive` and the 64 KB cap, the 1000-item bound and one stderr line per failed batch all live
+  `keepalive` and the 64 KB cap, the 1000-item bound and one stderr line per failed attempt all live
   in the queue. `log.flush()` flushes without ending; `end()` flushes after closing the span.
 - [ ] Add `colors?: boolean` to the text format, defaulting to on when `process.stdout.isTTY` is
   true and `NO_COLOR` is unset, else off. Today ANSI codes are always emitted.
