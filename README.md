@@ -230,10 +230,10 @@ Span attributes follow the OpenTelemetry HTTP semantic conventions:
 | `http.request.header.<name>` | Headers listed in `captureRequestHeaders` |
 | `http.response.status_code` | Response status |
 | `http.response.header.<name>` | Headers listed in `captureResponseHeaders` |
-| `error.type` | On a thrown error: its `code`, else `name`, else `"fetch_error"` |
+| `error.type` | On a thrown error: its `code`, else `name`, else `"_OTHER"` |
 
-A 4xx/5xx response or a thrown error marks the span errored; the response or error reaches the
-caller unchanged. Bodies are never captured. `captureQuery` and the header allow-lists are read at
+A 4xx/5xx response marks the span errored; a thrown error does too, with its message as the status
+message. The response or error reaches the caller unchanged. Bodies are never captured. `captureQuery` and the header allow-lists are read at
 call time from the instance; `clone()` to vary them per call site.
 
 Spans export in the background and are registered with `end()` at call time, so `await log.end()`
