@@ -13,6 +13,16 @@ Structured logging with a tiny API and first-class OTLP (logs + traces) over `fe
 3. **Composable** — instances inherit context/spans/traces and can attach to upstream headers/spans/traces. Favour designs that slot into existing setups.
 4. **Low footprint for the consumer** — minimise runtime cost and install weight shipped to consumers. Dev-time build/codegen steps in this repo are fine, as long as they don't reach consumers.
 
+## Audience (decided 2026-09-16)
+
+- Consumers are the public npm audience, not only larvit's own apps. A breaking change is
+  deprecated in a minor first and lands in the next major with a `MIGRATION.md` entry.
+- A mobile app on cellular with offline periods is a primary target, equal to servers. An export
+  queue must survive app restarts (storage adapter: AsyncStorage on React Native, IndexedDB in
+  browsers, none on servers). Valid while a larvit mobile app ships this library.
+- Personas the README serves, in order: the app developer wiring logs and traces into a service
+  or app; the library author accepting a logger from their consumer.
+
 ## Working here
 
 - Source is a single `index.ts`, compiled + uglified to `index.js` for publish.
