@@ -52,7 +52,7 @@ same message aggregate in your log backend:
 
 ```javascript
 log.info("Order placed", { orderId, total: 199, express: true });
-// 2022-09-24T23:40:39Z [info] Order placed {"orderId":"…","total":199,"express":true}
+// 2022-09-24T23:40:39Z [inf] Order placed {"orderId":"…","total":199,"express":true}
 ```
 
 Metadata values are `string`, `number` or `boolean`, not `undefined`; drop optional fields before
@@ -98,17 +98,19 @@ timing and is exported by `end()`.
 `end()` closes the span and flushes it and any pending log exports; a span that is never ended is
 never sent. `await` it when delivery must complete before the process exits (a short-lived script);
 fire-and-forget is fine in a long-running process. Each export request is bounded by a 3 s timeout,
-so `await end()` returns within about 6 s against a dead collector. An instance is single-use:
+so `await end()` returns within about 6 s against a dead collector, plus however long any
+un-awaited `log.fetch()` takes to complete. An instance is single-use:
 logging and `fetch()` on an ended instance throw, `end()` rejects.
 
 `log.clone(options?)` (on `Log`, not `LogInt`) makes an independent instance with the same
-settings; `context` merges per key, everything else is overridden as given. A clone is its own span
-in a new trace, not a child.
+settings; `context` merges per key, `spanName` is not copied, everything else is overridden as
+given. A clone is its own span in a new trace, not a child.
 
 ## Trace outgoing HTTP
 
 `log.fetch()` is a drop-in for `fetch()` that records a client span under the log's span and sends
-a W3C `traceparent` header, so the downstream service continues the trace:
+a W3C `traceparent` header unless the request already has one, so the downstream service continues
+the trace:
 
 ```javascript
 const res = await reqLog.fetch("https://api.example.com/users", { method: "POST" });
@@ -185,10 +187,11 @@ consumer owns it.
 
 ## Output formats
 
-Text (default):
+Text (default). The level is a three-letter tag, `err`/`war`/`inf`/`ver`/`deb`/`sil`, wrapped in
+ANSI colour codes; parse `format: "json"` instead of this:
 
 ```
-2022-09-24T23:40:39Z [info] Order placed {"orderId":"…","total":199}
+2022-09-24T23:40:39Z [inf] Order placed {"orderId":"…","total":199}
 ```
 
 JSON (`format: "json"`), one object per line. `logLevel`, `msg` and `time` win over metadata keys of

@@ -1,7 +1,5 @@
 # Todo
 
-Findings from the 2026-09-15 README review that need code or CI changes, not documentation.
-
 ## Deriving instances
 
 - [ ] A child (`parentLog`) that sets its own `context` replaces the parent's wholesale
