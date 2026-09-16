@@ -184,8 +184,8 @@ queue is in memory only.
 | `otlpAdditionalHeaders` | `Record<string, string>` | none | Extra headers on every request, e.g. `{ Authorization: "Bearer …" }`. |
 | `otlpHttpBaseURI` | `string` | required | OTLP/HTTP endpoint, e.g. `http://127.0.0.1:4318`. Logs go to `/v1/logs`, spans to `/v1/traces` under it; a base path is kept. A malformed URI throws in the constructor. |
 | `otlpProtocol` | `"http/json" \| "http/protobuf"` | `"http/json"` | Wire format. Both use the same endpoint; use protobuf for collectors that reject JSON. |
+| `report` | `(msg, metadata) => void` | `console.error` | Sink for one line per failed batch. The `Log`-built queue writes through the instance's `stderr` and `entryFormatter`. |
 | `retryDelayMs` | `number` | `1000` | Delay before the first retry; doubles per consecutive failure, capped at 30 s. |
-| `stderr` | `(msg, metadata) => void` | `console.error` | Sink for one line per failed batch. The `Log`-built queue writes through the instance's `stderr` and `entryFormatter`. |
 | `storage` | `QueueStorage` | none | Persists the queue, see above. |
 
 A send has a 3 s timeout. A network error, timeout, 408, 429 or 5xx keeps the batch for retry; any
@@ -193,9 +193,11 @@ other non-2xx drops it. A retry timer never keeps a Node process alive, so a scr
 without `await end()` loses what the collector did not take.
 
 `flush()` on `Log` or `Queue` sends everything queued, one attempt per batch, and resolves when that
-round is done; a failed batch stays queued for the retry. Any object with `enqueue({ path, payload })`
-and `flush()` can stand in for `Queue`: the `OtlpQueue` type, with `OtlpLogPayload` and
-`OtlpSpanPayload` for what arrives.
+round is done. A failed batch stays queued for the retry, and until that fires `flush()` attempts
+nothing new, so `end()` on a busy server cannot hammer a failing collector. Records under one
+resource share one `resourceLogs` entry per POST. Any object with `enqueue(payload)` and `flush()`
+can stand in for `Queue`: the `OtlpQueue` type, with `OtlpLogPayload` and `OtlpSpanPayload` for
+what arrives.
 
 ## Accept a logger in your library
 
@@ -311,8 +313,8 @@ Spans are queued when the response arrives and are registered with `flush()` at 
 | `DefinedMetadata` | `Metadata` without `undefined` values: what a formatter and `log.context` see. |
 | `EntryFormatterConf` | The argument to `entryFormatter`. |
 | `OtlpSpan`, `OtlpAttribute`, `OtlpLogPayload`, `OtlpSpanPayload` | The OTLP wire shapes; `log.span` is an `OtlpSpan`. |
-| `OtlpQueue`, `OtlpQueueItem` | What `otlpQueue` takes, `{ enqueue, flush }`, and what `enqueue` receives, `{ path, payload }`. |
-| `QueueConf`, `QueueStorage` | `Queue`'s options and the `storage` shape, `{ getItem, setItem, removeItem }`. |
+| `OtlpQueue`, `OtlpPayload` | What `otlpQueue` takes, `{ enqueue, flush }`, and what `enqueue` receives, a log or span payload. |
+| `QueueConf`, `ResolvedQueueConf`, `QueueStorage` | `Queue`'s options, `queue.conf` with defaults applied, and the `storage` shape, `{ getItem, setItem, removeItem }`. |
 
 Instance fields: `log.conf`, `log.context`, `log.span`, `log.ended`.
 
