@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `MetadataValue` accepts `undefined`; such keys are dropped from console, custom-formatter and OTLP
+  output, so `{ port: options.port }` with an optional field type-checks.
 - `log.enabled(level)`: `true` when a call at that level would output, so a caller can skip building
   expensive metadata.
 - Exported `Logger` type: the six level methods plus `enabled`. `LogInt` is `Logger` plus `conf`,

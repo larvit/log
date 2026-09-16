@@ -247,17 +247,29 @@ test("respects the configured log-level threshold", t => {
 test("metadata and context appear in the output", t => {
 	const meta = capture("info");
 
-	meta.log.info("kattbajs", { foo: "bar" });
-	t.strictEqual(meta.stdout[0].split(" kattbajs ")[1].trim(), "{\"foo\":\"bar\"}", "metadata is appended");
+	meta.log.info("kattbajs", { foo: "bar", gone: undefined });
+	t.strictEqual(meta.stdout[0].split(" kattbajs ")[1].trim(), "{\"foo\":\"bar\"}", "metadata is appended; undefined keys are dropped");
 
-	const ctx = capture({ context: { bosse: "bäng", hasse: "luring" } });
+	const ctx = capture({ context: { bosse: "bäng", hasse: "luring", port: undefined } });
 
-	ctx.log.info("kattbajs", { foo: "bar" });
+	ctx.log.info("kattbajs", { foo: "bar", port: 80 });
 	t.strictEqual(
 		ctx.stdout[0].split(" kattbajs ")[1].trim(),
-		"{\"foo\":\"bar\",\"bosse\":\"bäng\",\"hasse\":\"luring\"}",
-		"metadata and context are merged into the output",
+		"{\"foo\":\"bar\",\"port\":80,\"bosse\":\"bäng\",\"hasse\":\"luring\"}",
+		"metadata and context are merged into the output; an undefined context key does not shadow",
 	);
+
+	const seen: string[][] = [];
+	const custom = capture({
+		entryFormatter: entry => {
+			seen.push(Object.keys(entry.metadata ?? {}));
+
+			return "";
+		},
+	});
+
+	custom.log.info("x", { keep: 1, skip: undefined });
+	t.deepEqual(seen, [["keep"]], "a custom formatter never sees undefined keys");
 	t.end();
 });
 
@@ -311,6 +323,7 @@ test("clone merges context (overrides win)", t => {
 
 	t.strictEqual(JSON.stringify(log.clone({ context: { baz: "fu" } }).context), "{\"foo\":\"bar\",\"baz\":\"fu\"}", "new keys merge in");
 	t.strictEqual(JSON.stringify(log.clone({ context: { foo: "burp" } }).context), "{\"foo\":\"burp\"}", "existing keys are overridden");
+	t.strictEqual(JSON.stringify(log.clone({ context: { foo: undefined } }).context), "{\"foo\":\"bar\"}", "an undefined override is dropped, not applied");
 	t.end();
 });
 
@@ -406,13 +419,13 @@ test("OTLP preserves a base path from otlpHttpBaseURI", async t => {
 test("OTLP/JSON exports one log record and one span sharing trace/span ids", async t => {
 	const { calls } = stubFetch();
 	const log = new Log({
-		context: { "service.name": "eva-bosse" },
+		context: { region: undefined, "service.name": "eva-bosse" },
 		otlpHttpBaseURI: "http://127.0.0.1:4318",
 		spanName: "lur-bert",
 		stderr: () => {},
 	});
 
-	log.warn("FOo", { active: true, bar: "baz", "lökig knasnyckel | typ": 17 });
+	log.warn("FOo", { active: true, bar: "baz", "lökig knasnyckel | typ": 17, missing: undefined });
 	await log.end();
 
 	t.ok(calls.every(call => call.contentType === "application/json"), "default protocol sends JSON");
@@ -442,7 +455,7 @@ test("OTLP/JSON exports one log record and one span sharing trace/span ids", asy
 			{ key: "bar", value: { stringValue: "baz" } },
 			{ key: "lökig knasnyckel | typ", value: { stringValue: "17" } },
 		],
-		"metadata attributes are coerced to strings, in insertion order",
+		"metadata attributes are coerced to strings, in insertion order; undefined keys are dropped",
 	);
 
 	// service.name lives on the resource (what Grafana/Loki reads), never duplicated on the record.
@@ -464,7 +477,7 @@ test("OTLP/JSON exports one log record and one span sharing trace/span ids", asy
 	t.strictEqual(span.name, "lur-bert", "span name");
 	t.strictEqual(span.kind, 1, "span kind 1");
 	t.strictEqual(span.status.code, 0, "span status is ok");
-	t.strictEqual(span.attributes.length, 0, "no span attributes (context held only service.name)");
+	t.strictEqual(span.attributes.length, 0, "no span attributes (context held only service.name and an undefined key)");
 	t.strictEqual(span.links.length, 0, "span has no links");
 	t.strictEqual(span.droppedLinksCount, 0, "span has no dropped links");
 	t.strictEqual(span.traceId, logRecord.traceId, "span and log share the traceId");

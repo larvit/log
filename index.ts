@@ -62,7 +62,8 @@ export type Metadata = {
 
 // Primitive values only. String() coerces them for OTLP; the JSON formatter keeps them native.
 // bigint/objects are excluded: JSON.stringify throws on bigint and renders objects as "[object Object]".
-export type MetadataValue = boolean | number | string;
+// undefined is accepted so optional fields pass straight through; such keys are dropped on output.
+export type MetadataValue = boolean | number | string | undefined;
 
 export type OtlpAttribute = {
 	key: string,
@@ -160,6 +161,10 @@ export const LogLevels = {
 	},
 	/* eslint-enable sort-keys */
 };
+
+function withoutUndefined(metadata?: Metadata): Metadata {
+	return Object.fromEntries(Object.entries(metadata ?? {}).filter(([, value]) => value !== undefined));
+}
 
 export function msgJsonFormatter(conf: EntryFormatterConf) {
 	// New object: never mutate the caller's metadata. Framework keys win over metadata.
@@ -600,7 +605,7 @@ export class Log implements LogInt {
 		// Every optional field the resolved type requires has been defaulted above.
 		this.conf = conf as ResolvedLogConf;
 		// Own copy, so a clone/child never mutates a context object shared with another instance.
-		this.context = { ...this.conf.context ?? {} };
+		this.context = withoutUndefined(this.conf.context);
 
 		// Validate the endpoint eagerly: a malformed URI fails here, not as an unhandled rejection mid-log.
 		if (this.conf.otlpHttpBaseURI) {
@@ -654,7 +659,7 @@ export class Log implements LogInt {
 		// Merge context per-key (overrides win) instead of replacing it wholesale.
 		conf.context = {
 			...this.context,
-			...conf.context,
+			...withoutUndefined(conf.context),
 		};
 
 		// Inherit every other setting not overridden (log level, sinks, OTLP config, printTraceInfo…),
@@ -803,7 +808,7 @@ export class Log implements LogInt {
 		if (!this.enabled(logLevel)) return;
 
 		const msTimestamp = Date.now();
-		const attributes: Metadata = { ...metadata, ...this.context };
+		const attributes: Metadata = { ...withoutUndefined(metadata), ...this.context };
 
 		// Console output, optionally enriched with span/trace info.
 		const consoleMetadata: Metadata = { ...attributes };
