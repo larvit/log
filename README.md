@@ -55,9 +55,9 @@ log.info("Order placed", { orderId, total: 199, express: true });
 // 2022-09-24T23:40:39Z [inf] Order placed {"orderId":"…","total":199,"express":true}
 ```
 
-Metadata values are `string`, `number` or `boolean`, not `undefined`; drop optional fields before
-passing. Keys set in the instance's `context` option are
-added to every entry and win over a per-call key of the same name.
+Metadata values are `string`, `number` or `boolean`. A key whose value is `undefined` is dropped, so
+optional fields pass straight through. Keys set in the instance's `context` option are added to every
+entry and win over a per-call key of the same name.
 
 ## Group logs into a trace
 
@@ -246,7 +246,7 @@ delivers a `log.fetch()` you never awaited.
 | `LogInt` | `Logger` plus `fetch`, `traceparent`, `end`, `conf`, `span`. What `parentLog` takes. |
 | `LogConf`, `ResolvedLogConf` | The options object; `ResolvedLogConf` is `log.conf` with defaults applied. |
 | `LogLevel`, `LogShorthand` | Level name union; the signature of one level method. |
-| `Metadata`, `MetadataValue` | `Record<string, string \| number \| boolean>` and its value type. |
+| `Metadata`, `MetadataValue` | `Record<string, string \| number \| boolean \| undefined>` and its value type. |
 | `EntryFormatterConf` | The argument to `entryFormatter`. |
 | `OtlpSpan`, `OtlpAttribute`, `OtlpLogPayload`, `OtlpSpanPayload` | The OTLP wire shapes; `log.span` is an `OtlpSpan`. |
 

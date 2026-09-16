@@ -11,7 +11,7 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
   building expensive metadata. Redefine `LogInt = Logger & { conf, end, fetch, span,
   traceparent }`; `flush` joins it with the export queue. Libraries accept `Logger`; `parentLog`
   stays `LogInt`.
-- [ ] Accept `undefined` in `MetadataValue` and drop such keys on output, so `{ port: options.port }`
+- [x] Accept `undefined` in `MetadataValue` and drop such keys on output, so `{ port: options.port }`
   with an optional field type-checks.
 - [ ] Add `end({ error })`, which marks the instance's span failed: status `ERROR`, `error.type`
   from the error's `code`, else `name`, and the message as the status message. Keep `log.error()`
