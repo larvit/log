@@ -7,9 +7,9 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
 
 ### Additive
 
-- [ ] `Logger` type: the six level methods. `LogInt = Logger & { conf, end, fetch, span,
-  traceparent }`. Libraries accept `Logger`; `parentLog` stays `LogInt`.
-- [ ] `log.enabled(level)`, so a library can skip building expensive metadata.
+- [ ] `Logger` type: the six level methods plus `enabled(level)`, so a library can skip building
+  expensive metadata. `LogInt = Logger & { conf, end, fetch, flush, span, traceparent }`.
+  Libraries accept `Logger`; `parentLog` stays `LogInt`.
 - [ ] `MetadataValue` accepts `undefined`; such keys are dropped on output.
 - [ ] `end({ error })` marks the instance's span failed: status `ERROR`, `error.type` from the
   error's `code`, else `name`, and the message as the status message. `log.error()` does not
@@ -54,9 +54,12 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
 - [ ] `parentLog` with `traceparent`: settings inherit from `parentLog`, the span nests under the
   upstream `traceparent`. This is the request-handler case and today it silently loses the trace.
 - [ ] Nothing throws after `end()`. Level methods still write to the console and their OTLP
-  records attach to the ended span; `end()` a second time resolves `{ err }`. `ended` joins
-  `LogInt`.
-- [ ] Require `spanName` when `otlpHttpBaseURI` is set, so no backend shows `unnamed-span`.
+  records attach to the ended span, entering the queue like any other record, so the queue's
+  size/time flush exports them with no further call. `end()` a second time resolves `{ err }`.
+  `ended` joins `LogInt`.
+- [ ] Require `spanName` whenever `otlpHttpBaseURI` is set or inherited: a child or clone of an
+  OTLP-configured instance must name its span, and the constructor rejects one that does not.
+  No backend shows `unnamed-span`.
 - [ ] `MIGRATION.md`: one entry per item above, with the 2.x spelling and the 3.0.0 spelling.
 
 ## Kept as is, decided 2026-09-16
