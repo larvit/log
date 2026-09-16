@@ -31,6 +31,11 @@ Structured logging with a tiny API and first-class OTLP (logs + traces) over `fe
   and `ResolvedLogConf` stay exported. `log.span` and `log.conf` are public, so declaration emit
   requires the first two and the last; queue implementers need the payloads.
 - 2026-09-16: no level-string shorthand; `{ logLevel }` is the one spelling from 3.0.0.
+- 2026-09-16: the OTLP endpoint belongs to the queue. `otlpHttpBaseURI`, `otlpProtocol` and
+  `otlpAdditionalHeaders` on `Log` are shorthand for a default `Queue` and are rejected beside an
+  `otlpQueue` they did not build. One `Queue` class, in memory or persisted through `storage`; a
+  second implementation needs a reason a `storage` cannot give. Valid while a queue owns the
+  transport.
 
 ## Working here
 

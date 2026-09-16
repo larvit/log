@@ -14,11 +14,14 @@ tracing. No dependencies.
   hand the current context on to any client.
 - **HTTP client tracing.** `log.fetch()` is a drop-in `fetch` that records a client span and
   propagates the trace downstream.
+- **Queued exports.** Records and spans are batched and retried with backoff; give the queue a
+  storage and they survive an app restart.
 - **Zero install weight.** One file, no runtime dependencies.
 
 [Install](#install) · [Log something](#log-something) · [Group logs into a trace](#group-logs-into-a-trace) ·
 [Trace outgoing HTTP](#trace-outgoing-http) · [Join an incoming trace](#join-an-incoming-trace) ·
-[Accept a logger in your library](#accept-a-logger-in-your-library) · [Options](#options) ·
+[Queue exports](#queue-exports) · [Accept a logger in your library](#accept-a-logger-in-your-library) ·
+[Options](#options) ·
 [Output formats](#output-formats) · [`log.fetch` in depth](#logfetch-in-depth) · [Exports](#exports) ·
 [Development](#development) · [Changelog](CHANGELOG.md)
 
@@ -100,15 +103,15 @@ key becomes the OTLP resource's service name (default `"unnamed-service"`) rathe
 attribute. A child's log entries attach to the parent's span; the child's own span holds its
 timing and is exported by `end()`.
 
-`end()` closes the span and flushes it and any pending log exports; a span that is never ended is
-never sent. `end({ error })` also marks the span failed: status `ERROR` with the error's message, and
-an `error.type` attribute from its `code`, else `name`; a `null` or `undefined` error is a plain
-`end()`. A logged `log.error()` never fails the span; a recovered error is not a failed operation.
-`await` it when delivery must complete before the process exits (a short-lived script);
-fire-and-forget is fine in a long-running process. Each export request is bounded by a 3 s timeout,
-so `await end()` returns within about 6 s against a dead collector, plus however long any un-awaited
-`log.fetch()` takes to complete. An instance is single-use:
-logging and `fetch()` on an ended instance throw, `end()` rejects.
+`end()` closes the span, queues it and flushes the [export queue](#queue-exports); a span that is
+never ended is never sent. `end({ error })` also marks the span failed: status `ERROR` with the
+error's message, and an `error.type` attribute from its `code`, else `name`; a `null` or `undefined`
+error is a plain `end()`. A logged `log.error()` never fails the span; a recovered error is not a
+failed operation. `await` it when delivery must complete before the process exits (a short-lived
+script); fire-and-forget is fine in a long-running process. Against a dead collector `await end()`
+returns within about 6 s, plus however long any un-awaited `log.fetch()` takes to complete, and the
+queue keeps retrying in the background. An instance is single-use: logging and `fetch()` on an
+ended instance throw, `end()` rejects. `log.flush()` delivers what is queued without ending.
 
 `log.clone(options?)` (on `Log`, not `LogInt`) makes an independent instance with the same
 settings; `context` merges per key, `spanName` is not copied, everything else is overridden as
@@ -146,6 +149,53 @@ myClient.send({ headers: { traceparent: reqLog.traceparent() } });
 instance nests under the parent instead. A malformed header is ignored and a fresh trace starts, so
 an untrusted header is safe to pass. `traceparent` applies only to the instance it is given to;
 children and clones do not inherit it.
+
+## Queue exports
+
+Every record and span goes through an export queue. `otlpHttpBaseURI` builds one, shared by every
+child and clone, so one process sends few POSTs and retries a batch the collector
+did not accept with backoff. Configure it yourself to persist the queue or to tune it:
+
+```javascript
+import { Log, Queue } from "@larvit/log";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const appLog = new Log({
+	context: { "service.name": "mobile-app" },
+	otlpQueue: new Queue({ otlpHttpBaseURI: "https://collector.example.com", storage: AsyncStorage }),
+});
+```
+
+With `storage`, undelivered items are written after every change and loaded, ahead of new ones, by
+the next `Queue` created with the same `storage` and `key`. `AsyncStorage` and `localStorage` fit
+`storage` as they are; anything with `getItem`, `setItem` and `removeItem`, sync or async, does.
+Create one `Queue` per `key` per process, two would overwrite each other. Without `storage` the
+queue is in memory only.
+
+`new Queue(options)`. The endpoint belongs to the queue: a `Log` given `otlpQueue` rejects
+`otlpHttpBaseURI`, `otlpProtocol` and `otlpAdditionalHeaders` beside it.
+
+| Option | Type | Default | |
+|---|---|---|---|
+| `batchDelayMs` | `number` | `1000` | How long a queued item waits for company before a send. |
+| `key` | `string` | `"@larvit/log:otlp-queue"` | The `storage` key. |
+| `maxBatchBytes` | `number` | `65536` | Items per POST are cut here, measured as their JSON size. The default is the browser `keepalive` limit; a batch over 64 KiB is sent without `keepalive`. |
+| `maxItems` | `number` | `1000` | Queue bound. The oldest items are dropped when exceeded, reported in one stderr line with the count. |
+| `otlpAdditionalHeaders` | `Record<string, string>` | none | Extra headers on every request, e.g. `{ Authorization: "Bearer …" }`. |
+| `otlpHttpBaseURI` | `string` | required | OTLP/HTTP endpoint, e.g. `http://127.0.0.1:4318`. Logs go to `/v1/logs`, spans to `/v1/traces` under it; a base path is kept. A malformed URI throws in the constructor. |
+| `otlpProtocol` | `"http/json" \| "http/protobuf"` | `"http/json"` | Wire format. Both use the same endpoint; use protobuf for collectors that reject JSON. |
+| `retryDelayMs` | `number` | `1000` | Delay before the first retry; doubles per consecutive failure, capped at 30 s. |
+| `stderr` | `(msg, metadata) => void` | `console.error` | Sink for one line per failed batch. The `Log`-built queue writes through the instance's `stderr` and `entryFormatter`. |
+| `storage` | `QueueStorage` | none | Persists the queue, see above. |
+
+A send has a 3 s timeout. A network error, timeout, 408, 429 or 5xx keeps the batch for retry; any
+other non-2xx drops it. A retry timer never keeps a Node process alive, so a script that exits
+without `await end()` loses what the collector did not take.
+
+`flush()` on `Log` or `Queue` sends everything queued, one attempt per batch, and resolves when that
+round is done; a failed batch stays queued for the retry. Any object with `enqueue({ path, payload })`
+and `flush()` can stand in for `Queue`: the `OtlpQueue` type, with `OtlpLogPayload` and
+`OtlpSpanPayload` for what arrives.
 
 ## Accept a logger in your library
 
@@ -187,9 +237,10 @@ instance you were handed; it is single-use and the consumer owns it.
 | `entryFormatter` | `(EntryFormatterConf) => string` | text formatter | Formats console output. Use `msTimestamp` rather than `new Date()` so console and OTLP timestamps of one entry match. |
 | `format` | `"text" \| "json"` | `"text"` | Console output format. Ignored when `entryFormatter` is set. |
 | `logLevel` | `LogLevel \| "none"` | `"info"` | Minimum level to output. |
-| `otlpAdditionalHeaders` | `Record<string, string>` | none | Extra headers on every OTLP request, e.g. `{ Authorization: "Bearer …" }`. |
-| `otlpHttpBaseURI` | `string` | none | OTLP/HTTP endpoint, e.g. `http://127.0.0.1:4318`. Logs go to `/v1/logs`, spans to `/v1/traces` under it; a base path is kept. A malformed URI throws in the constructor. |
-| `otlpProtocol` | `"http/json" \| "http/protobuf"` | `"http/json"` | Wire format. Both use the same endpoint; use protobuf for collectors that reject JSON. |
+| `otlpAdditionalHeaders` | `Record<string, string>` | none | Shorthand: the same option on the default `Queue`. |
+| `otlpHttpBaseURI` | `string` | none | Shorthand for `otlpQueue: new Queue({ otlpHttpBaseURI, otlpProtocol, otlpAdditionalHeaders })`. |
+| `otlpProtocol` | `"http/json" \| "http/protobuf"` | `"http/json"` | Shorthand: the same option on the default `Queue`. |
+| `otlpQueue` | `OtlpQueue` | none | The [export queue](#queue-exports). Cannot be combined with the three shorthands above. Inherited by children and clones; one that sets a shorthand instead gets a queue of its own. |
 | `parentLog` | `LogInt` | none | Nest under this instance's span and inherit its options. Log entries attach to the parent's span. |
 | `printTraceInfo` | `boolean` | `false` | Append `spanId`, `traceId` and `spanName` to console output. |
 | `spanName` | `string` | `"unnamed-span"` | The instance's span name. Inherited from `parentLog` when set there. |
@@ -238,27 +289,30 @@ message. The response or error reaches the caller unchanged. Bodies are never ca
 `captureQuery` and the header allow-lists are read at call time from the instance; `clone()` to vary
 them per call site.
 
-Spans export in the background and are registered with `end()` at call time, so `await log.end()`
-delivers a `log.fetch()` you never awaited.
+Spans are queued when the response arrives and are registered with `flush()` at call time, so
+`await log.end()` delivers a `log.fetch()` you never awaited.
 
 ## Exports
 
 | Export | |
 |---|---|
 | `Log` | The logger class. |
+| `Queue` | The export queue; `new Queue(options)`, see [Queue exports](#queue-exports). |
 | `LogLevels` | Level → OTLP `severityNumber`/`severityText`, most to least severe. |
 | `msgTextFormatter`, `msgJsonFormatter` | The built-in `entryFormatter`s; wrap one to extend it. |
 | `parseTraceparent(header)` | `{ traceId, spanId, flags }` or `null` when malformed. |
 | `formatTraceparent(traceId, spanId, sampled?)` | Builds a W3C `traceparent` header value. |
 | `generateTraceId()`, `generateSpanId()` | Random 32- and 16-hex-char ids. |
 | `Logger` | The six level methods and `enabled(level)`. Accept this in library code. |
-| `LogInt` | `Logger` plus `fetch`, `traceparent`, `end({ error }?)`, `conf`, `span`. What `parentLog` takes. |
+| `LogInt` | `Logger` plus `fetch`, `traceparent`, `end({ error }?)`, `flush`, `conf`, `span`. What `parentLog` takes. |
 | `LogConf`, `ResolvedLogConf` | The options object; `ResolvedLogConf` is `log.conf` with defaults applied. |
 | `LogLevel`, `LogShorthand` | Level name union; the signature of one level method. |
 | `Metadata`, `MetadataValue` | `Record<string, string \| number \| boolean \| undefined>` and its value type. |
 | `DefinedMetadata` | `Metadata` without `undefined` values: what a formatter and `log.context` see. |
 | `EntryFormatterConf` | The argument to `entryFormatter`. |
 | `OtlpSpan`, `OtlpAttribute`, `OtlpLogPayload`, `OtlpSpanPayload` | The OTLP wire shapes; `log.span` is an `OtlpSpan`. |
+| `OtlpQueue`, `OtlpQueueItem` | What `otlpQueue` takes, `{ enqueue, flush }`, and what `enqueue` receives, `{ path, payload }`. |
+| `QueueConf`, `QueueStorage` | `Queue`'s options and the `storage` shape, `{ getItem, setItem, removeItem }`. |
 
 Instance fields: `log.conf`, `log.context`, `log.span`, `log.ended`.
 
