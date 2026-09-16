@@ -141,25 +141,29 @@ children and clones do not inherit it.
 
 ## Accept a logger in your library
 
-Take a `LogInt` and default to a silent instance, so the consumer decides whether and where your
-library logs:
+Take a `Logger` and default to a silent instance, so the consumer decides whether and where your
+library logs. `enabled(level)` tells you whether a call at that level would output, so expensive
+metadata is built only when it will be seen:
 
 ```typescript
-import { Log, type LogInt } from "@larvit/log";
+import { Log, type Logger } from "@larvit/log";
 
-export function createClient(options: { log?: LogInt }) {
+export function createClient(options: { log?: Logger }) {
 	const log = options.log ?? new Log("none");
 	log.debug("createClient() - connecting", { host: "example.com" });
+	if (log.enabled("silly")) {
+		log.silly("createClient() - full config", { config: JSON.stringify(options) });
+	}
 }
 ```
 
 A consumer passes `new Log("debug")`, or a child of their request log so your library's entries land
 in their trace.
 
-For a span per operation, make a child, `new Log({ parentLog: log, spanName: "submit_sm" })`, and
-`end()` that child. It inherits the consumer's level, sinks and OTLP settings, so a `"none"`
-consumer stays silent. Never `end()` the instance you were handed; it is single-use and the
-consumer owns it.
+For a span per operation, take a `LogInt` instead, make a child,
+`new Log({ parentLog: log, spanName: "submit_sm" })`, and `end()` that child. It inherits the
+consumer's level, sinks and OTLP settings, so a `"none"` consumer stays silent. Never `end()` the
+instance you were handed; it is single-use and the consumer owns it.
 
 ## Options
 
@@ -238,7 +242,8 @@ delivers a `log.fetch()` you never awaited.
 | `parseTraceparent(header)` | `{ traceId, spanId, flags }` or `null` when malformed. |
 | `formatTraceparent(traceId, spanId, sampled?)` | Builds a W3C `traceparent` header value. |
 | `generateTraceId()`, `generateSpanId()` | Random 32- and 16-hex-char ids. |
-| `LogInt` | The logger interface: level methods, `fetch`, `traceparent`, `end`, `conf`, `span`. Accept this in library code. |
+| `Logger` | The six level methods and `enabled(level)`. Accept this in library code. |
+| `LogInt` | `Logger` plus `fetch`, `traceparent`, `end`, `conf`, `span`. What `parentLog` takes. |
 | `LogConf`, `ResolvedLogConf` | The options object; `ResolvedLogConf` is `log.conf` with defaults applied. |
 | `LogLevel`, `LogShorthand` | Level name union; the signature of one level method. |
 | `Metadata`, `MetadataValue` | `Record<string, string \| number \| boolean>` and its value type. |

@@ -1,4 +1,4 @@
-import { formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, type LogLevel, LogLevels, msgJsonFormatter, parseTraceparent } from "./index.js";
+import { formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, type Logger, type LogLevel, LogLevels, msgJsonFormatter, parseTraceparent } from "./index.js";
 import test from "./tap.js";
 
 // --- helpers ---------------------------------------------------------------
@@ -215,6 +215,12 @@ test("respects the configured log-level threshold", t => {
 	def.log.debug("x");
 	t.strictEqual(def.stdout.length, 1, "default level passes info but not verbose/debug");
 
+	const logger: Logger = def.log;
+
+	t.strictEqual(logger.enabled("info"), true, "enabled() is true at the threshold");
+	t.strictEqual(logger.enabled("error"), true, "enabled() is true above the threshold");
+	t.strictEqual(logger.enabled("verbose"), false, "enabled() is false below the threshold");
+
 	const err = capture("error");
 
 	err.log.silly("x");
@@ -234,6 +240,7 @@ test("respects the configured log-level threshold", t => {
 
 	none.log.error("x");
 	t.strictEqual(none.stderr.length, 0, "nothing is written at level none, not even error");
+	t.strictEqual(none.log.enabled("error"), false, "enabled() is false for every level at none");
 	t.end();
 });
 

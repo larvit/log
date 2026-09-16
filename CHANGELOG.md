@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- `log.enabled(level)`: `true` when a call at that level would output, so a caller can skip building
+  expensive metadata.
+- Exported `Logger` type: the six level methods plus `enabled`. `LogInt` is `Logger` plus `conf`,
+  `end`, `fetch`, `span` and `traceparent`. Libraries accept `Logger`; `parentLog` takes `LogInt`.
+
 ## v2.3.0
 
 - `log.fetch(input, init?)`: a drop-in `fetch` that records an OTel client span under the log's span,
