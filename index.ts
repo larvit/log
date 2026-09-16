@@ -289,23 +289,30 @@ function isFetchError(error: unknown): error is FetchError {
 	return typeof error === "object" && error !== null && "message" in error;
 }
 
-// A string field off a caught value of unknown shape; undefined when absent or not a string.
+// Total: a throwing getter yields undefined, so the flush path never rejects on its input.
 function stringField(value: unknown, key: string): string | undefined {
-	if (typeof value !== "object" || value === null) {
+	try {
+		const field: unknown = typeof value === "object" && value !== null ? Reflect.get(value, key) : undefined;
+
+		return typeof field === "string" ? field : undefined;
+	} catch {
 		return undefined;
 	}
-
-	const field: unknown = Reflect.get(value, key);
-
-	return typeof field === "string" ? field : undefined;
 }
 
-// OTel semconv: error.type is the error's code, else its class name, else "_OTHER".
+// error.type per OTel semconv; "_OTHER" is its fallback.
 function spanFailure(error: unknown): { message: string, type: string } {
-	return {
-		message: stringField(error, "message") ?? String(error),
-		type: stringField(error, "code") ?? stringField(error, "name") ?? "_OTHER",
-	};
+	let message = stringField(error, "message");
+
+	if (message === undefined) {
+		try {
+			message = String(error);
+		} catch {
+			message = "_OTHER";
+		}
+	}
+
+	return { message, type: stringField(error, "code") ?? stringField(error, "name") ?? "_OTHER" };
 }
 
 // Resource-level OTLP attributes (service.name + telemetry.sdk.*), shared by logs and spans.
@@ -707,7 +714,6 @@ export class Log implements LogInt {
 
 	// Ends the span and flushes OTLP. Awaitable: `await log.end()` guarantees delivery before exit.
 	// Fire-and-forget (`log.end()`) still works for callers that do not care.
-	// `error` marks the span failed; a logged error does not, since a recovered error is not a failed operation.
 	public async end(options?: { error?: unknown }): Promise<void> {
 		if (this.ended) {
 			throw new Error("Logging instance is already ended");
@@ -717,7 +723,7 @@ export class Log implements LogInt {
 
 		const context: DefinedMetadata = { ...this.context };
 
-		if (options?.error !== undefined) {
+		if (options?.error !== undefined && options.error !== null) {
 			const failure = spanFailure(options.error);
 
 			this.span.status = { code: 2, message: failure.message };

@@ -417,7 +417,7 @@ test("OTLP preserves a base path from otlpHttpBaseURI", async t => {
 	t.end();
 });
 
-test("OTLP/JSON exports one log record and one span sharing trace/span ids", async t => {
+test("OTLP/JSON exports one log record per call and one span sharing trace/span ids", async t => {
 	const { calls } = stubFetch();
 	const log = new Log({
 		context: { region: undefined, "service.name": "eva-bosse" },
@@ -500,6 +500,8 @@ test("end({ error }) marks the span failed", async t => {
 	await new Log(conf).end({ error: new RangeError("too big") });
 	await new Log(conf).end({ error: "plain string" });
 	await new Log(conf).end({ error: undefined });
+	await new Log(conf).end({ error: null });
+	await new Log(conf).end({ error: Object.create(null) });
 
 	t.deepEqual(exportedSpan(0).status, { code: 2, message: "refused" }, "status is ERROR with the error message");
 	t.strictEqual(attr(exportedSpan(0), "error.type"), "ECONNREFUSED", "error.type is the error's code when it has one");
@@ -510,6 +512,8 @@ test("end({ error }) marks the span failed", async t => {
 	t.strictEqual(attr(exportedSpan(2), "error.type"), "_OTHER", "error.type is the semconv fallback when there is neither code nor name");
 	t.deepEqual(exportedSpan(3).status, { code: 0 }, "end({ error: undefined }) leaves the span ok");
 	t.notOk(attr(exportedSpan(3), "error.type"), "no error.type without an error");
+	t.deepEqual(exportedSpan(4).status, { code: 0 }, "end({ error: null }) leaves the span ok, for callback-style errors");
+	t.deepEqual(exportedSpan(5).status, { code: 2, message: "_OTHER" }, "a value that cannot be stringified still ends and exports the span");
 	t.end();
 });
 
@@ -727,6 +731,7 @@ test("log.fetch marks error spans for 4xx and for network failures, propagating 
 	const { calls } = stubFetch(path => {
 		if (path === "/missing") return response({ status: 404 });
 		if (path === "/boom") throw Object.assign(new Error("down"), { code: "ECONNREFUSED" });
+		if (path === "/abort") throw new DOMException("aborted", "AbortError");
 
 		return undefined;
 	});
@@ -747,6 +752,7 @@ test("log.fetch marks error spans for 4xx and for network failures, propagating 
 	}
 	t.ok(threw, "the underlying network error propagates to the caller");
 
+	await log.fetch("https://api.test/abort").catch(() => {});
 	await log.end();
 
 	const spans = calls.filter(call => call.path === "/v1/traces").map(call => call.body.resourceSpans[0].scopeSpans[0].spans[0]);
@@ -757,6 +763,7 @@ test("log.fetch marks error spans for 4xx and for network failures, propagating 
 	t.deepEqual(span404.status, { code: 2 }, "the 4xx span is ERROR without a status message");
 	t.deepEqual(spanBoom.status, { code: 2, message: "down" }, "the network-failure span is ERROR with the error message");
 	t.strictEqual(attr(spanBoom, "error.type"), "ECONNREFUSED", "error.type captured from the error code");
+	t.ok(spans.some(span => attr(span, "error.type") === "AbortError"), "a numeric code (DOMException) is skipped for the error name");
 	t.end();
 });
 
