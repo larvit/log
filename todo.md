@@ -10,9 +10,10 @@ Findings from the 2026-09-15 README review that need code or CI changes, not doc
   currently strips everything the consumer set, `service.name` included.
 - [ ] A child inherits the parent's `spanName`; `clone()` excludes it. Exclude it in the constructor
   too, so an unnamed child does not masquerade as its parent.
-- [ ] A child's log entries attach to the parent's span (`Log.log` picks `parentLog.span` when it
-  exists), so an operation span carries none of its own log lines. Attach to the child's own span,
-  or state the rule on `LogInt`.
+- [ ] Switch a child's log entries to its own span. Today `Log.log` picks `parentLog.span` when it
+  exists, so an operation span carries none of its own log lines while its `log.fetch` client
+  spans do nest under it. OTel's rule is that a record carries the active span. No test asserts
+  the current behaviour; write one for the new rule first.
 - [ ] `parentLog` and `traceparent` cannot be combined; only `clone({ traceparent })` inherits
   settings and joins an upstream trace, and `clone` is not on `LogInt`. Either let `traceparent`
   win when both are given, or add `clone` to `LogInt`.
