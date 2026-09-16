@@ -83,7 +83,12 @@ async function myRequestHandler(req, res) {
 
 	reqLog.info("Incoming request", { url: req.url });
 
-	// ... request handler logic ...
+	try {
+		// ... request handler logic ...
+	} catch (err) {
+		await reqLog.end({ error: err }); // marks the span failed
+		throw err;
+	}
 
 	await reqLog.end();
 }
@@ -96,10 +101,12 @@ attribute. A child's log entries attach to the parent's span; the child's own sp
 timing and is exported by `end()`.
 
 `end()` closes the span and flushes it and any pending log exports; a span that is never ended is
-never sent. `await` it when delivery must complete before the process exits (a short-lived script);
-fire-and-forget is fine in a long-running process. Each export request is bounded by a 3 s timeout,
-so `await end()` returns within about 6 s against a dead collector, plus however long any
-un-awaited `log.fetch()` takes to complete. An instance is single-use:
+never sent. `end({ error })` also marks the span failed: status `ERROR` with the error's message, and
+an `error.type` attribute from its `code`, else `name`. A logged `log.error()` never fails the span;
+a recovered error is not a failed operation. `await` it when delivery must complete before the
+process exits (a short-lived script); fire-and-forget is fine in a long-running process. Each export
+request is bounded by a 3 s timeout, so `await end()` returns within about 6 s against a dead
+collector, plus however long any un-awaited `log.fetch()` takes to complete. An instance is single-use:
 logging and `fetch()` on an ended instance throw, `end()` rejects.
 
 `log.clone(options?)` (on `Log`, not `LogInt`) makes an independent instance with the same
@@ -243,7 +250,7 @@ delivers a `log.fetch()` you never awaited.
 | `formatTraceparent(traceId, spanId, sampled?)` | Builds a W3C `traceparent` header value. |
 | `generateTraceId()`, `generateSpanId()` | Random 32- and 16-hex-char ids. |
 | `Logger` | The six level methods and `enabled(level)`. Accept this in library code. |
-| `LogInt` | `Logger` plus `fetch`, `traceparent`, `end`, `conf`, `span`. What `parentLog` takes. |
+| `LogInt` | `Logger` plus `fetch`, `traceparent`, `end({ error }?)`, `conf`, `span`. What `parentLog` takes. |
 | `LogConf`, `ResolvedLogConf` | The options object; `ResolvedLogConf` is `log.conf` with defaults applied. |
 | `LogLevel`, `LogShorthand` | Level name union; the signature of one level method. |
 | `Metadata`, `MetadataValue` | `Record<string, string \| number \| boolean \| undefined>` and its value type. |

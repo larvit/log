@@ -181,6 +181,7 @@ function pbDecodeSpans(buf: Uint8Array) {
 			spanId: pbHex(span.get(2)![0]),
 			startTimeUnixNano: String(span.get(7)![0]),
 			statusCode: span.get(15) ? Number(pbMsg(span.get(15)![0]).get(3)?.[0] ?? 0n) : 0,
+			statusMessage: span.get(15) && pbMsg(span.get(15)![0]).get(2) ? pbStr(pbMsg(span.get(15)![0]).get(2)![0]) : undefined,
 			traceId: pbHex(span.get(1)![0]),
 		},
 	};
@@ -426,6 +427,7 @@ test("OTLP/JSON exports one log record and one span sharing trace/span ids", asy
 	});
 
 	log.warn("FOo", { active: true, bar: "baz", "lökig knasnyckel | typ": 17, missing: undefined });
+	log.error("logged and recovered");
 	await log.end();
 
 	t.ok(calls.every(call => call.contentType === "application/json"), "default protocol sends JSON");
@@ -434,7 +436,8 @@ test("OTLP/JSON exports one log record and one span sharing trace/span ids", asy
 	const tracesBody: any = calls.find(call => call.path === "/v1/traces")!.body;
 	const resourceAttr = (attrs: any[], key: string) => attrs.find(attr => attr.key === key)?.value.stringValue;
 
-	// Exactly one resource/scope/record and resource/scope/span.
+	// Exactly one resource/scope/record per call and one resource/scope/span.
+	t.strictEqual(calls.filter(call => call.path === "/v1/logs").length, 2, "one POST per log record");
 	t.strictEqual(logsBody.resourceLogs.length, 1, "one resourceLog");
 	t.strictEqual(logsBody.resourceLogs[0].scopeLogs.length, 1, "one scopeLog");
 	t.strictEqual(logsBody.resourceLogs[0].scopeLogs[0].logRecords.length, 1, "one logRecord");
@@ -476,7 +479,7 @@ test("OTLP/JSON exports one log record and one span sharing trace/span ids", asy
 	t.strictEqual(traceResource.scopeSpans[0].scope.name, "lur-bert", "scope name is the span name");
 	t.strictEqual(span.name, "lur-bert", "span name");
 	t.strictEqual(span.kind, 1, "span kind 1");
-	t.strictEqual(span.status.code, 0, "span status is ok");
+	t.deepEqual(span.status, { code: 0 }, "span status is ok: a logged error does not fail the span");
 	t.strictEqual(span.attributes.length, 0, "no span attributes (context held only service.name and an undefined key)");
 	t.strictEqual(span.links.length, 0, "span has no links");
 	t.strictEqual(span.droppedLinksCount, 0, "span has no dropped links");
@@ -484,6 +487,29 @@ test("OTLP/JSON exports one log record and one span sharing trace/span ids", asy
 	t.strictEqual(span.spanId, logRecord.spanId, "span and log share the spanId");
 	t.ok(isNanoTimestampWithinHour(span.startTimeUnixNano), "span startTimeUnixNano is reasonable");
 	t.ok(isNanoTimestampWithinHour(span.endTimeUnixNano), "span endTimeUnixNano is reasonable");
+	t.end();
+});
+
+test("end({ error }) marks the span failed", async t => {
+	const { calls } = stubFetch();
+	const exportedSpan = (index: number) => calls.filter(call => call.path === "/v1/traces")[index].body.resourceSpans[0].scopeSpans[0].spans[0];
+	const attr = (span: any, key: string) => span.attributes.find((attribute: any) => attribute.key === key)?.value.stringValue;
+	const conf = { context: { region: "eu" }, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} };
+
+	await new Log(conf).end({ error: Object.assign(new TypeError("refused"), { code: "ECONNREFUSED" }) });
+	await new Log(conf).end({ error: new RangeError("too big") });
+	await new Log(conf).end({ error: "plain string" });
+	await new Log(conf).end({ error: undefined });
+
+	t.deepEqual(exportedSpan(0).status, { code: 2, message: "refused" }, "status is ERROR with the error message");
+	t.strictEqual(attr(exportedSpan(0), "error.type"), "ECONNREFUSED", "error.type is the error's code when it has one");
+	t.strictEqual(attr(exportedSpan(0), "region"), "eu", "context attributes are kept beside error.type");
+	t.deepEqual(exportedSpan(1).status, { code: 2, message: "too big" }, "status message from an error without a code");
+	t.strictEqual(attr(exportedSpan(1), "error.type"), "RangeError", "error.type falls back to the error's name");
+	t.deepEqual(exportedSpan(2).status, { code: 2, message: "plain string" }, "a non-Error value is stringified into the status message");
+	t.strictEqual(attr(exportedSpan(2), "error.type"), "_OTHER", "error.type is the semconv fallback when there is neither code nor name");
+	t.deepEqual(exportedSpan(3).status, { code: 0 }, "end({ error: undefined }) leaves the span ok");
+	t.notOk(attr(exportedSpan(3), "error.type"), "no error.type without an error");
 	t.end();
 });
 
@@ -498,7 +524,7 @@ test("OTLP protobuf encodes logs and spans on the wire", async t => {
 	});
 
 	log.warn("protobuf works", { active: true, count: 17, foo: "bar" });
-	await log.end();
+	await log.end({ error: new Error("proto failed") });
 
 	const logsCall = calls.find(call => call.path === "/v1/logs")!;
 	const tracesCall = calls.find(call => call.path === "/v1/traces")!;
@@ -528,7 +554,9 @@ test("OTLP protobuf encodes logs and spans on the wire", async t => {
 	t.strictEqual(scopeName, "proto-span", "scope name is the span name");
 	t.strictEqual(span.name, "proto-span", "decoded span name matches");
 	t.strictEqual(span.kind, 1, "decoded span kind is 1");
-	t.strictEqual(span.statusCode, 0, "decoded span status code is 0");
+	t.strictEqual(span.statusCode, 2, "decoded span status code is ERROR (2)");
+	t.strictEqual(span.statusMessage, "proto failed", "decoded span status message is the error message");
+	t.deepEqual(span.attributes, [{ key: "error.type", value: { stringValue: "Error" } }], "error.type is a span attribute on the wire");
 	t.strictEqual(span.traceId, logRecord.traceId, "span and log share the traceId");
 	t.strictEqual(span.spanId, logRecord.spanId, "span and log share the spanId");
 	t.strictEqual(spanResourceAttrs.find(attr => attr.key === "service.name")!.value.stringValue, "proto-svc", "service.name is on the span resource");
