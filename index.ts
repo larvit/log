@@ -630,50 +630,56 @@ function otlpPath(payload: OtlpPayload): string {
 	return "resourceLogs" in payload ? "/v1/logs" : "/v1/traces";
 }
 
-// Records under one resource share a resourceLogs entry; spans also share a scope by name.
-function mergePayloads(payloads: OtlpPayload[]): OtlpPayload {
-	if ("resourceLogs" in payloads[0]) {
-		const byResource = new Map<string, OtlpLogPayload["resourceLogs"][number]>();
+// Records under one resource share a resourceLogs entry and its single scopeLogs entry.
+function mergeLogPayloads(payloads: OtlpLogPayload[]): OtlpLogPayload {
+	const byResource = new Map<string, OtlpLogPayload["resourceLogs"][number]>();
 
-		for (const payload of payloads) {
-			for (const entry of "resourceLogs" in payload ? payload.resourceLogs : []) {
-				const key = JSON.stringify(entry.resource);
-				const records = entry.scopeLogs.flatMap(scopeLog => scopeLog.logRecords);
-				const merged = byResource.get(key);
+	for (const entry of payloads.flatMap(payload => payload.resourceLogs)) {
+		const key = JSON.stringify(entry.resource);
+		const records = entry.scopeLogs.flatMap(scopeLog => scopeLog.logRecords);
+		const merged = byResource.get(key);
 
-				if (merged) {
-					merged.scopeLogs[0].logRecords.push(...records);
-				} else {
-					byResource.set(key, { resource: entry.resource, scopeLogs: [{ logRecords: records }] });
-				}
-			}
+		if (merged) {
+			merged.scopeLogs[0].logRecords.push(...records);
+		} else {
+			byResource.set(key, { resource: entry.resource, scopeLogs: [{ logRecords: records }] });
 		}
-
-		return { resourceLogs: [...byResource.values()] };
 	}
 
+	return { resourceLogs: [...byResource.values()] };
+}
+
+// Spans under one resource share a resourceSpans entry, and one scopeSpans entry per scope name.
+function mergeSpanPayloads(payloads: OtlpSpanPayload[]): OtlpSpanPayload {
 	const byResource = new Map<string, OtlpSpanPayload["resourceSpans"][number]>();
 
-	for (const payload of payloads) {
-		for (const entry of "resourceSpans" in payload ? payload.resourceSpans : []) {
-			const key = JSON.stringify(entry.resource);
-			const merged = byResource.get(key) ?? { resource: entry.resource, scopeSpans: [] };
+	for (const entry of payloads.flatMap(payload => payload.resourceSpans)) {
+		const key = JSON.stringify(entry.resource);
+		const merged = byResource.get(key) ?? { resource: entry.resource, scopeSpans: [] };
 
-			byResource.set(key, merged);
+		byResource.set(key, merged);
 
-			for (const scopeSpan of entry.scopeSpans) {
-				const scope = merged.scopeSpans.find(candidate => candidate.scope.name === scopeSpan.scope.name);
+		for (const scopeSpan of entry.scopeSpans) {
+			const scope = merged.scopeSpans.find(candidate => candidate.scope.name === scopeSpan.scope.name);
 
-				if (scope) {
-					scope.spans.push(...scopeSpan.spans);
-				} else {
-					merged.scopeSpans.push({ scope: scopeSpan.scope, spans: [...scopeSpan.spans] });
-				}
+			if (scope) {
+				scope.spans.push(...scopeSpan.spans);
+			} else {
+				merged.scopeSpans.push({ scope: scopeSpan.scope, spans: [...scopeSpan.spans] });
 			}
 		}
 	}
 
 	return { resourceSpans: [...byResource.values()] };
+}
+
+// A batch holds one kind, so the first payload decides.
+function mergePayloads(payloads: OtlpPayload[]): OtlpPayload {
+	if ("resourceLogs" in payloads[0]) {
+		return mergeLogPayloads(payloads.filter((payload): payload is OtlpLogPayload => "resourceLogs" in payload));
+	}
+
+	return mergeSpanPayloads(payloads.filter((payload): payload is OtlpSpanPayload => "resourceSpans" in payload));
 }
 
 // Node only: a pending retry must not keep a finished process alive.
