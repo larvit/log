@@ -1,4 +1,4 @@
-import { type DefinedMetadata, formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, type Logger, type LogLevel, LogLevels, msgJsonFormatter, type OtlpQueue, type OtlpQueueItem, parseTraceparent, Queue, type QueueStorage } from "./index.js";
+import { type DefinedMetadata, formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, type Logger, type LogLevel, LogLevels, msgJsonFormatter, type OtlpPayload, type OtlpQueue, parseTraceparent, Queue, type QueueStorage } from "./index.js";
 import test from "./tap.js";
 
 // --- helpers ---------------------------------------------------------------
@@ -10,11 +10,11 @@ async function waitFor(done: () => boolean): Promise<void> {
 	}
 }
 
-// A queue's stderr sink, flattened to one object per line for deepEqual.
+// A queue's report sink, flattened to one object per line for deepEqual.
 function reportSink() {
 	const lines: DefinedMetadata[] = [];
 
-	return { lines, stderr: (msg: string, metadata: DefinedMetadata) => { lines.push({ msg, ...metadata }); } };
+	return { lines, report: (msg: string, metadata: DefinedMetadata) => { lines.push({ msg, ...metadata }); } };
 }
 
 // In-memory QueueStorage. `async` mimics AsyncStorage (promises); sync mimics localStorage.
@@ -91,14 +91,14 @@ function stubFetch(responder?: (path: string, body: unknown) => ReturnType<typeo
 // Read a header from a recorded call, normalising plain-object and Headers shapes.
 const callHeader = (call: { headers: any }, name: string) => new Headers(call.headers ?? {}).get(name);
 
-// Every span in every /v1/traces call, in export order. A batch carries one resourceSpans entry per span.
+// Every span in every /v1/traces call, in export order, across all resource and scope groups.
 function exportedSpans(calls: { body: any, path: string }[]): any[] {
-	return calls.filter(call => call.path === "/v1/traces").flatMap(call => call.body.resourceSpans.flatMap((resourceSpan: any) => resourceSpan.scopeSpans[0].spans));
+	return calls.filter(call => call.path === "/v1/traces").flatMap(call => call.body.resourceSpans.flatMap((resourceSpan: any) => resourceSpan.scopeSpans.flatMap((scopeSpan: any) => scopeSpan.spans)));
 }
 
-// Log record bodies in every /v1/logs call, in export order.
+// Log record bodies in every /v1/logs call, in export order, across all resource and scope groups.
 function exportedRecords(calls: { body: any, path: string }[]): string[] {
-	return calls.filter(call => call.path === "/v1/logs").flatMap(call => call.body.resourceLogs.flatMap((resourceLog: any) => resourceLog.scopeLogs[0].logRecords.map((rec: any) => rec.body.stringValue)));
+	return calls.filter(call => call.path === "/v1/logs").flatMap(call => call.body.resourceLogs.flatMap((resourceLog: any) => resourceLog.scopeLogs.flatMap((scopeLog: any) => scopeLog.logRecords.map((rec: any) => rec.body.stringValue))));
 }
 
 // The exported CLIENT span (kind 3) — the one log.fetch creates.
@@ -436,10 +436,10 @@ test("child log does not share its context object with the parent", t => {
 
 // --- OTLP transport (fetch-stubbed) ----------------------------------------
 
-test("a transient export failure keeps the batch queued, reports one line and the next flush delivers it", async t => {
+test("a transient export failure keeps the batch queued, reports one line and the retry delivers it", async t => {
 	stubFetch(() => { throw new Error("connection refused"); });
 	const stderr: string[] = [];
-	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:1", stderr: line => stderr.push(line) });
+	const log = new Log({ otlpQueue: new Queue({ otlpHttpBaseURI: "http://127.0.0.1:1", report: (msg, metadata) => stderr.push(`${msg} ${JSON.stringify(metadata)}`), retryDelayMs: 20 }), stderr: () => {} });
 
 	log.info("will fail to export");
 	log.info("so will this");
@@ -447,15 +447,34 @@ test("a transient export failure keeps the batch queued, reports one line and th
 
 	t.ok(ret && typeof ret.then === "function", "end() returns a thenable");
 	await ret;
-	t.strictEqual(stderr.length, 1, "one stderr line for the failed batch, not one per record; the span batch is not attempted");
+	t.strictEqual(stderr.length, 1, "one line for the failed batch, not one per record; the span batch is not attempted");
 	t.ok(stderr[0].includes("127.0.0.1:1"), "the line names the endpoint url");
 	t.ok(stderr[0].includes("connection refused"), "the line carries the error message");
 
 	const { calls } = stubFetch();
 
 	await log.flush();
-	t.deepEqual(calls.map(call => call.path), ["/v1/logs", "/v1/traces"], "the next flush delivers the kept records, then the span");
+	t.strictEqual(calls.length, 0, "flush() while a retry is pending attempts nothing; the backoff holds");
+	await waitFor(() => calls.length === 2);
+	t.deepEqual(calls.map(call => call.path), ["/v1/logs", "/v1/traces"], "the retry delivers the kept records, then the span");
 	t.deepEqual(exportedRecords(calls), ["will fail to export", "so will this"], "both records survived the failure in order");
+	t.end();
+});
+
+test("the Log-built queue reports through the instance's stderr and formatter", async t => {
+	stubFetch(() => response({ status: 400 }));
+	const stderr: string[] = [];
+	const log = new Log({ format: "json", otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: line => stderr.push(line) });
+
+	log.info("x");
+	await log.flush();
+	t.strictEqual(stderr.length, 1, "one formatted line");
+
+	const parsed = JSON.parse(stderr[0]);
+
+	t.strictEqual(parsed.msg, "OTLP export rejected, batch dropped", "the message is the static report text");
+	t.strictEqual(parsed.status, 400, "the report metadata are fields of the entry");
+	t.strictEqual(parsed.logLevel, "error", "reported at level error");
 	t.end();
 });
 
@@ -486,7 +505,7 @@ test("Queue retries a failed batch with growing backoff until it is accepted", a
 		return attempts < 3 ? response({ status: 503 }) : undefined;
 	});
 	const reports = reportSink();
-	const log = new Log({ otlpQueue: new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", retryDelayMs: 5, stderr: reports.stderr }), stderr: () => {} });
+	const log = new Log({ otlpQueue: new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report, retryDelayMs: 5 }), stderr: () => {} });
 
 	log.warn("keep me");
 	await log.flush();
@@ -521,7 +540,7 @@ test("Queue batches by time and by size, with keepalive under the browser cap", 
 	t.strictEqual(calls.length, 0, "two records under maxBatchBytes wait for the timer");
 	sized.info("c".repeat(700));
 	await waitFor(() => calls.length === 2);
-	t.deepEqual(calls.map(call => call.body.resourceLogs.length), [2, 1], "reaching maxBatchBytes sends now, split into batches that fit");
+	t.deepEqual(calls.map(call => call.body.resourceLogs[0].scopeLogs[0].logRecords.length), [2, 1], "reaching maxBatchBytes sends now, split into batches that fit");
 
 	calls.length = 0;
 	sized.info("d".repeat(70000));
@@ -533,7 +552,7 @@ test("Queue batches by time and by size, with keepalive under the browser cap", 
 test("Queue is bounded: drops the oldest when full and reports the count once", async t => {
 	const { calls } = stubFetch();
 	const reports = reportSink();
-	const log = new Log({ otlpQueue: new Queue({ batchDelayMs: 10000, maxItems: 2, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: reports.stderr }), stderr: () => {} });
+	const log = new Log({ otlpQueue: new Queue({ batchDelayMs: 10000, maxItems: 2, otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report }), stderr: () => {} });
 
 	log.info("1");
 	log.info("2");
@@ -553,7 +572,7 @@ test("Queue with storage survives a restart: leftovers go first and storage empt
 		const otlpHttpBaseURI = "http://127.0.0.1:4318";
 
 		stubFetch(() => { throw new Error("offline"); });
-		const before = new Log({ otlpQueue: new Queue({ otlpHttpBaseURI, retryDelayMs: 3600000, stderr: () => {}, storage }), stderr: () => {} });
+		const before = new Log({ otlpQueue: new Queue({ otlpHttpBaseURI, report: () => {}, retryDelayMs: 3600000, storage }), stderr: () => {} });
 
 		before.info("before restart");
 		await before.end();
@@ -561,7 +580,7 @@ test("Queue with storage survives a restart: leftovers go first and storage empt
 		t.strictEqual(storage.data.size, 1, `${label}: the undelivered records and span are persisted under the default key`);
 
 		const { calls } = stubFetch();
-		const after = new Log({ otlpQueue: new Queue({ otlpHttpBaseURI, stderr: () => {}, storage }), stderr: () => {} });
+		const after = new Log({ otlpQueue: new Queue({ otlpHttpBaseURI, report: () => {}, storage }), stderr: () => {} });
 
 		after.info("after restart");
 		await after.flush();
@@ -576,7 +595,7 @@ test("Queue with storage survives a restart: leftovers go first and storage empt
 
 	corrupt.data.set("custom-key", "not json");
 	const { calls } = stubFetch();
-	const log = new Log({ otlpQueue: new Queue({ key: "custom-key", otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: reports.stderr, storage: corrupt }), stderr: () => {} });
+	const log = new Log({ otlpQueue: new Queue({ key: "custom-key", otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report, storage: corrupt }), stderr: () => {} });
 
 	log.info("still works");
 	await log.flush();
@@ -629,10 +648,10 @@ test("otlpQueue and the otlp* options are two spellings of one endpoint; inherit
 });
 
 test("a custom OtlpQueue receives every record and span, and end() flushes it", async t => {
-	const items: OtlpQueueItem[] = [];
+	const payloads: OtlpPayload[] = [];
 	let flushes = 0;
 	const otlpQueue: OtlpQueue = {
-		enqueue: item => { items.push(item); },
+		enqueue: payload => { payloads.push(payload); },
 		flush: () => {
 			flushes++;
 
@@ -647,8 +666,7 @@ test("a custom OtlpQueue receives every record and span, and end() flushes it", 
 	await log.fetch("https://api.test/x");
 	await log.end();
 
-	t.deepEqual(items.map(item => item.path), ["/v1/logs", "/v1/traces", "/v1/traces"], "a record, the client span, then the instance span");
-	t.ok("resourceLogs" in items[0].payload, "a log payload under /v1/logs");
+	t.deepEqual(payloads.map(payload => "resourceLogs" in payload ? "logs" : "spans"), ["logs", "spans", "spans"], "a record, the client span, then the instance span");
 	t.strictEqual(flushes, 1, "end() flushed the queue");
 	t.end();
 });
@@ -683,11 +701,11 @@ test("OTLP/JSON batches the records into one POST and exports one span sharing t
 	const tracesBody: any = calls.find(call => call.path === "/v1/traces")!.body;
 	const resourceAttr = (attrs: any[], key: string) => attrs.find(attr => attr.key === key)?.value.stringValue;
 
-	// One POST per batch, one resource/scope/record per batched item, and one resource/scope/span.
+	// One POST per batch; records under one resource share one resourceLog and scopeLog.
 	t.strictEqual(calls.filter(call => call.path === "/v1/logs").length, 1, "both records go in one POST");
-	t.strictEqual(logsBody.resourceLogs.length, 2, "one resourceLog per record");
+	t.strictEqual(logsBody.resourceLogs.length, 1, "one resourceLog for both records");
 	t.strictEqual(logsBody.resourceLogs[0].scopeLogs.length, 1, "one scopeLog");
-	t.strictEqual(logsBody.resourceLogs[0].scopeLogs[0].logRecords.length, 1, "one logRecord");
+	t.strictEqual(logsBody.resourceLogs[0].scopeLogs[0].logRecords.length, 2, "both logRecords under it");
 	t.strictEqual(tracesBody.resourceSpans.length, 1, "one resourceSpan");
 	t.strictEqual(tracesBody.resourceSpans[0].scopeSpans.length, 1, "one scopeSpan");
 	t.strictEqual(tracesBody.resourceSpans[0].scopeSpans[0].spans.length, 1, "one span");
@@ -783,7 +801,7 @@ test("OTLP protobuf encodes logs and spans on the wire", async t => {
 
 	t.strictEqual(logsCall.contentType, "application/x-protobuf", "logs are sent as protobuf");
 	t.strictEqual(tracesCall.contentType, "application/x-protobuf", "traces are sent as protobuf");
-	t.strictEqual(pbDecode(logsCall.rawBody).get(1)!.length, 2, "one resource_logs entry per batched record on the wire");
+	t.strictEqual(pbMsg(pbMsg(pbDecode(logsCall.rawBody).get(1)![0]).get(2)![0]).get(2)!.length, 2, "both records under one resource_logs/scope_logs on the wire");
 
 	const { logRecord, resourceAttrs: logResourceAttrs } = pbDecodeLogs(logsCall.rawBody);
 	const { resourceAttrs: spanResourceAttrs, scopeName, span } = pbDecodeSpans(tracesCall.rawBody);

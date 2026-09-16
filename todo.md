@@ -17,7 +17,7 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
   from the error's `code`, else `name`, and the message as the status message. Keep `log.error()`
   from marking the span; a logged and recovered error is not a failed operation.
 - [x] Add an export queue, pluggable through an `otlpQueue` option: `OtlpQueue` is
-  `enqueue({ path, payload })` + `flush()`; `Queue` is the one implementation, in memory or, with
+  `enqueue(payload)` + `flush()`; `Queue` is the one implementation, in memory or, with
   `storage`, persisted across app restarts. Batching by size and time, retry with backoff,
   `keepalive` and the 64 KB cap, the 1000-item bound and one stderr line per failed batch all live
   in the queue. `log.flush()` flushes without ending; `end()` flushes after closing the span.
@@ -31,8 +31,9 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
   export and an outgoing header saying `00`. Today `ff` is accepted and `sampled` ignored.
   `tracestate` stays out of scope.
 - [ ] Copy the caller's options object in the constructor instead of filling defaults into it.
-- [ ] Inject the clock behind span and record timestamps, so tests assert exact times instead of
-  "within an hour".
+- [ ] Inject one clock (`now`, `setTimeout`, `clearTimeout`) behind span and record timestamps and
+  the `Queue` timers, so tests assert exact times instead of "within an hour" and the retry
+  schedule, its 30 s cap included, without waiting.
 - [ ] Add a size badge to the README (2.3.0: 15.0 KB minified, 4.7 KB gzipped).
 - [ ] Rename `.github/workflows/master.yaml` to `push.yaml` and update the README badge.
 
@@ -61,7 +62,10 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
   records attach to the ended span, entering the queue like any other record, so the queue's
   size/time flush exports them with no further call. `end()` a second time resolves `{ err }`.
   Add `ended` to `LogInt`.
-- [ ] Require `spanName` whenever `otlpHttpBaseURI` is set or inherited: a child or clone of an
+- [ ] Keep `otlpQueue` as the only OTLP representation in `conf`: build the default `Queue` from
+  the three `otlp*` shorthands and clear them, so inheritance needs one rule and `isQueueFor` goes.
+  Today `log.conf.otlpHttpBaseURI` stays readable, which is why this waits for a major.
+- [ ] Require `spanName` whenever `otlpQueue` is set or inherited: a child or clone of an
   OTLP-configured instance must name its span, and the constructor rejects one that does not, so
   no backend shows `unnamed-span`.
 - [ ] Write `MIGRATION.md`: one entry per item above, with the 2.x spelling and the 3.0.0 spelling.

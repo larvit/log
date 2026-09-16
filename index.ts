@@ -556,14 +556,11 @@ function encodeOtlpProtobuf(payload: OtlpLogPayload | OtlpSpanPayload): Uint8Arr
 
 // --- OTLP export queue -----------------------------------------------------
 
-export type OtlpQueueItem = {
-	path: string;
-	payload: OtlpLogPayload | OtlpSpanPayload;
-};
+export type OtlpPayload = OtlpLogPayload | OtlpSpanPayload;
 
 // What Log exports through. Queue is the shipped implementation; any { enqueue, flush } will do.
 export type OtlpQueue = {
-	enqueue: (item: OtlpQueueItem) => void;
+	enqueue: (payload: OtlpPayload) => void;
 	flush: () => Promise<void>;
 };
 
@@ -582,12 +579,14 @@ export type QueueConf = {
 	otlpAdditionalHeaders?: Record<string, string>;
 	otlpHttpBaseURI: string;
 	otlpProtocol?: "http/json" | "http/protobuf";
+	report?: (msg: string, metadata: DefinedMetadata) => void;
 	retryDelayMs?: number;
-	stderr?: (msg: string, metadata: DefinedMetadata) => void;
 	storage?: QueueStorage;
 };
 
-type QueuedItem = OtlpQueueItem & { bytes: number };
+export type ResolvedQueueConf = QueueConf & Required<Pick<QueueConf, "batchDelayMs" | "key" | "maxBatchBytes" | "maxItems" | "otlpProtocol" | "report" | "retryDelayMs">>;
+
+type QueuedItem = { bytes: number, payload: OtlpPayload };
 
 type SendFailure = { message: string, retry: boolean, status?: number };
 
@@ -595,7 +594,6 @@ type SendFailure = { message: string, retry: boolean, status?: number };
 const KEEPALIVE_MAX_BYTES = 65536;
 const OTLP_EXPORT_TIMEOUT_MS = 3000;
 const RETRY_DELAY_MAX_MS = 30000;
-const STORAGE_KEY = "@larvit/log:otlp-queue";
 
 function utf8Length(str: string): number {
 	let bytes = 0;
@@ -619,28 +617,63 @@ function utf8Length(str: string): number {
 }
 
 // The JSON size bounds the protobuf size too, so one measure serves both transports.
-function withBytes(item: OtlpQueueItem): QueuedItem {
-	return { ...item, bytes: utf8Length(JSON.stringify(item.payload)) };
+function withBytes(payload: OtlpPayload): QueuedItem {
+	return { bytes: utf8Length(JSON.stringify(payload)), payload };
 }
 
-function isOtlpQueueItem(value: unknown): value is OtlpQueueItem {
-	if (typeof value !== "object" || value === null) {
-		return false;
-	}
-
-	const path: unknown = Reflect.get(value, "path");
-	const payload: unknown = Reflect.get(value, "payload");
-
-	return typeof path === "string" && typeof payload === "object" && payload !== null
-		&& (Array.isArray(Reflect.get(payload, "resourceLogs")) || Array.isArray(Reflect.get(payload, "resourceSpans")));
+function isOtlpPayload(value: unknown): value is OtlpPayload {
+	return typeof value === "object" && value !== null
+		&& (Array.isArray(Reflect.get(value, "resourceLogs")) || Array.isArray(Reflect.get(value, "resourceSpans")));
 }
 
-function mergePayloads(payloads: (OtlpLogPayload | OtlpSpanPayload)[]): OtlpLogPayload | OtlpSpanPayload {
+function otlpPath(payload: OtlpPayload): string {
+	return "resourceLogs" in payload ? "/v1/logs" : "/v1/traces";
+}
+
+// Records under one resource share a resourceLogs entry; spans also share a scope by name.
+function mergePayloads(payloads: OtlpPayload[]): OtlpPayload {
 	if ("resourceLogs" in payloads[0]) {
-		return { resourceLogs: payloads.flatMap(payload => "resourceLogs" in payload ? payload.resourceLogs : []) };
+		const byResource = new Map<string, OtlpLogPayload["resourceLogs"][number]>();
+
+		for (const payload of payloads) {
+			for (const entry of "resourceLogs" in payload ? payload.resourceLogs : []) {
+				const key = JSON.stringify(entry.resource);
+				const records = entry.scopeLogs.flatMap(scopeLog => scopeLog.logRecords);
+				const merged = byResource.get(key);
+
+				if (merged) {
+					merged.scopeLogs[0].logRecords.push(...records);
+				} else {
+					byResource.set(key, { resource: entry.resource, scopeLogs: [{ logRecords: records }] });
+				}
+			}
+		}
+
+		return { resourceLogs: [...byResource.values()] };
 	}
 
-	return { resourceSpans: payloads.flatMap(payload => "resourceSpans" in payload ? payload.resourceSpans : []) };
+	const byResource = new Map<string, OtlpSpanPayload["resourceSpans"][number]>();
+
+	for (const payload of payloads) {
+		for (const entry of "resourceSpans" in payload ? payload.resourceSpans : []) {
+			const key = JSON.stringify(entry.resource);
+			const merged = byResource.get(key) ?? { resource: entry.resource, scopeSpans: [] };
+
+			byResource.set(key, merged);
+
+			for (const scopeSpan of entry.scopeSpans) {
+				const scope = merged.scopeSpans.find(candidate => candidate.scope.name === scopeSpan.scope.name);
+
+				if (scope) {
+					scope.spans.push(...scopeSpan.spans);
+				} else {
+					merged.scopeSpans.push({ scope: scopeSpan.scope, spans: [...scopeSpan.spans] });
+				}
+			}
+		}
+	}
+
+	return { resourceSpans: [...byResource.values()] };
 }
 
 // Node only: a pending retry must not keep a finished process alive.
@@ -651,11 +684,11 @@ function unref(timer: ReturnType<typeof setTimeout>): void {
 }
 
 export class Queue implements OtlpQueue {
-	readonly conf: QueueConf;
+	readonly conf: ResolvedQueueConf;
 
 	private items: QueuedItem[] = [];
+	private bytes = 0;
 	private readonly url: string;
-	private readonly key: string;
 	private dropped = 0;
 	private failures = 0;
 	private batchTimer?: ReturnType<typeof setTimeout>;
@@ -669,8 +702,16 @@ export class Queue implements OtlpQueue {
 	private saving?: Promise<void>;
 
 	constructor(conf: QueueConf) {
-		this.conf = conf;
-		this.key = conf.key ?? STORAGE_KEY;
+		this.conf = {
+			...conf,
+			batchDelayMs: conf.batchDelayMs ?? 1000,
+			key: conf.key ?? "@larvit/log:otlp-queue",
+			maxBatchBytes: conf.maxBatchBytes ?? KEEPALIVE_MAX_BYTES,
+			maxItems: conf.maxItems ?? 1000,
+			otlpProtocol: conf.otlpProtocol ?? "http/json",
+			report: conf.report ?? console.error,
+			retryDelayMs: conf.retryDelayMs ?? 1000,
+		};
 
 		// Validate the endpoint eagerly: a malformed URI fails here, not as an unhandled rejection mid-log.
 		const base = new URL(conf.otlpHttpBaseURI);
@@ -679,12 +720,11 @@ export class Queue implements OtlpQueue {
 		this.ready = conf.storage ? this.load(conf.storage) : Promise.resolve();
 	}
 
-	enqueue(item: OtlpQueueItem): void {
-		this.items.push(withBytes(item));
-		this.bound();
+	enqueue(payload: OtlpPayload): void {
+		this.add([withBytes(payload)]);
 		this.changed();
 
-		if (this.retryTimer === undefined && this.queuedBytes() >= (this.conf.maxBatchBytes ?? KEEPALIVE_MAX_BYTES)) {
+		if (this.bytes >= this.conf.maxBatchBytes) {
 			void this.flush();
 		} else {
 			this.schedule();
@@ -692,8 +732,13 @@ export class Queue implements OtlpQueue {
 	}
 
 	// One attempt per batch, resolved when that round is over. A batch the collector did not accept
-	// stays queued for the background retry. Concurrent callers share one running and one pending round.
+	// stays queued and, while its retry is pending, flush() attempts nothing new: the timer decides.
+	// Concurrent callers share one running and one pending round.
 	flush(): Promise<void> {
+		if (this.retryTimer !== undefined) {
+			return this.running ?? Promise.resolve();
+		}
+
 		if (!this.running) {
 			this.running = this.round().finally(() => { this.running = undefined; });
 
@@ -717,34 +762,22 @@ export class Queue implements OtlpQueue {
 		this.batchTimer = setTimeout(() => {
 			this.batchTimer = undefined;
 			void this.flush();
-		}, this.conf.batchDelayMs ?? 1000);
+		}, this.conf.batchDelayMs);
 	}
 
 	private async round(): Promise<void> {
 		await this.ready;
 		clearTimeout(this.batchTimer);
-		clearTimeout(this.retryTimer);
 		this.batchTimer = undefined;
-		this.retryTimer = undefined;
 
 		while (this.items.length) {
 			const batch = this.takeBatch();
 			const failure = await this.send(batch);
 
 			if (failure?.retry) {
-				this.items.unshift(...batch);
-				this.bound();
+				this.add(batch, true);
 				this.changed();
-				this.failures++;
-
-				const retryInMs = Math.min((this.conf.retryDelayMs ?? 1000) * (2 ** (this.failures - 1)), RETRY_DELAY_MAX_MS);
-
-				this.retryTimer = setTimeout(() => {
-					this.retryTimer = undefined;
-					void this.flush();
-				}, retryInMs);
-				unref(this.retryTimer);
-				this.report("OTLP export failed, will retry", { ...this.describe(batch, failure), retryInMs });
+				this.scheduleRetry(batch, failure);
 				break;
 			}
 
@@ -756,25 +789,34 @@ export class Queue implements OtlpQueue {
 			}
 		}
 
-		if (this.dropped) {
-			this.report("OTLP queue full, oldest items dropped", { dropped: this.dropped });
-			this.dropped = 0;
-		}
+		this.reportDrops();
 	}
 
-	// The oldest item's path and kind, plus every later item of the same, up to maxBatchBytes.
+	private scheduleRetry(batch: QueuedItem[], failure: SendFailure): void {
+		this.failures++;
+
+		const retryInMs = Math.min(this.conf.retryDelayMs * (2 ** (this.failures - 1)), RETRY_DELAY_MAX_MS);
+
+		this.retryTimer = setTimeout(() => {
+			this.retryTimer = undefined;
+			void this.flush();
+		}, retryInMs);
+		unref(this.retryTimer);
+		this.report("OTLP export failed, will retry", { ...this.describe(batch, failure), retryInMs });
+	}
+
+	// The oldest item's kind, plus every later item of the same, up to maxBatchBytes.
 	private takeBatch(): QueuedItem[] {
-		const { path, payload } = this.items[0];
-		const logs = "resourceLogs" in payload;
+		const logs = "resourceLogs" in this.items[0].payload;
 		const batch: QueuedItem[] = [];
 		let bytes = 0;
 
 		for (const item of this.items) {
-			if (item.path !== path || ("resourceLogs" in item.payload) !== logs) {
+			if (("resourceLogs" in item.payload) !== logs) {
 				continue;
 			}
 
-			if (batch.length && bytes + item.bytes > (this.conf.maxBatchBytes ?? KEEPALIVE_MAX_BYTES)) {
+			if (batch.length && bytes + item.bytes > this.conf.maxBatchBytes) {
 				break;
 			}
 
@@ -785,6 +827,7 @@ export class Queue implements OtlpQueue {
 		const taken = new Set(batch);
 
 		this.items = this.items.filter(item => !taken.has(item));
+		this.bytes -= bytes;
 
 		return batch;
 	}
@@ -800,7 +843,7 @@ export class Queue implements OtlpQueue {
 		const timer = setTimeout(() => controller.abort(), OTLP_EXPORT_TIMEOUT_MS);
 
 		try {
-			const res = await fetch(this.url + batch[0].path, {
+			const res = await fetch(this.url + otlpPath(payload), {
 				body,
 				headers: { "Content-Type": protobuf ? "application/x-protobuf" : "application/json", ...this.conf.otlpAdditionalHeaders },
 				keepalive: bytes <= KEEPALIVE_MAX_BYTES,
@@ -830,33 +873,52 @@ export class Queue implements OtlpQueue {
 	}
 
 	private describe(batch: QueuedItem[], failure: SendFailure): DefinedMetadata {
-		return withoutUndefined({ error: failure.message, items: batch.length, path: batch[0].path, status: failure.status, url: this.url + batch[0].path });
+		const path = otlpPath(batch[0].payload);
+
+		return withoutUndefined({ error: failure.message, items: batch.length, path, status: failure.status, url: this.url + path });
 	}
 
 	private report(msg: string, metadata: DefinedMetadata): void {
 		try {
-			(this.conf.stderr ?? console.error)(msg, metadata);
+			this.conf.report(msg, metadata);
 		} catch {
 			// A sink that throws must not break the export loop.
 		}
 	}
 
-	private bound(): void {
-		const excess = this.items.length - (this.conf.maxItems ?? 1000);
+	private reportDrops(): void {
+		if (this.dropped) {
+			this.report("OTLP queue full, oldest items dropped", { dropped: this.dropped });
+			this.dropped = 0;
+		}
+	}
+
+	// Appends (or, for a failed batch, puts back in front) and drops the oldest over maxItems.
+	private add(items: QueuedItem[], front = false): void {
+		if (front) {
+			this.items.unshift(...items);
+		} else {
+			this.items.push(...items);
+		}
+
+		for (const item of items) {
+			this.bytes += item.bytes;
+		}
+
+		const excess = this.items.length - this.conf.maxItems;
 
 		if (excess > 0) {
-			this.items.splice(0, excess);
+			for (const item of this.items.splice(0, excess)) {
+				this.bytes -= item.bytes;
+			}
+
 			this.dropped += excess;
 		}
 	}
 
-	private queuedBytes(): number {
-		return this.items.reduce((sum, item) => sum + item.bytes, 0);
-	}
-
 	private async load(storage: QueueStorage): Promise<void> {
 		try {
-			const raw = await storage.getItem(this.key);
+			const raw = await storage.getItem(this.conf.key);
 
 			if (!raw) {
 				return;
@@ -864,21 +926,20 @@ export class Queue implements OtlpQueue {
 
 			const parsed: unknown = JSON.parse(raw);
 
-			if (!Array.isArray(parsed) || !parsed.every(isOtlpQueueItem)) {
-				throw new Error("not a list of queue items");
+			if (!Array.isArray(parsed) || !parsed.every(isOtlpPayload)) {
+				throw new Error("not a list of OTLP payloads");
 			}
 
-			this.items.unshift(...parsed.map(withBytes));
-			this.bound();
+			this.add(parsed.map(withBytes), true);
 
 			if (this.items.length) {
 				this.schedule();
 			}
 		} catch (err) {
-			this.report("OTLP queue storage unreadable, discarded", withoutUndefined({ error: stringField(err, "message"), key: this.key }));
+			this.report("OTLP queue storage unreadable, discarded", withoutUndefined({ error: stringField(err, "message"), key: this.conf.key }));
 
 			try {
-				await storage.removeItem(this.key);
+				await storage.removeItem(this.conf.key);
 			} catch {
 				// The next save overwrites it.
 			}
@@ -902,12 +963,12 @@ export class Queue implements OtlpQueue {
 
 			try {
 				if (this.items.length) {
-					await storage.setItem(this.key, JSON.stringify(this.items.map(({ path, payload }) => ({ path, payload }))));
+					await storage.setItem(this.conf.key, JSON.stringify(this.items.map(item => item.payload)));
 				} else {
-					await storage.removeItem(this.key);
+					await storage.removeItem(this.conf.key);
 				}
 			} catch (err) {
-				this.report("OTLP queue storage write failed", withoutUndefined({ error: stringField(err, "message"), key: this.key }));
+				this.report("OTLP queue storage write failed", withoutUndefined({ error: stringField(err, "message"), key: this.conf.key }));
 			}
 		}
 
@@ -958,7 +1019,7 @@ function otlpKeysNotToInherit(conf: LogConf): (keyof LogConf)[] {
 function isQueueFor(queue: OtlpQueue, conf: LogConf): boolean {
 	return queue instanceof Queue
 		&& queue.conf.otlpHttpBaseURI === conf.otlpHttpBaseURI
-		&& (queue.conf.otlpProtocol ?? "http/json") === (conf.otlpProtocol ?? "http/json")
+		&& queue.conf.otlpProtocol === (conf.otlpProtocol ?? "http/json")
 		&& queue.conf.otlpAdditionalHeaders === conf.otlpAdditionalHeaders;
 }
 
@@ -1025,7 +1086,7 @@ export class Log implements LogInt {
 				otlpAdditionalHeaders: this.conf.otlpAdditionalHeaders,
 				otlpHttpBaseURI: this.conf.otlpHttpBaseURI,
 				otlpProtocol: this.conf.otlpProtocol,
-				stderr: (msg, metadata) => this.conf.stderr(this.conf.entryFormatter({ logLevel: "error", metadata, msTimestamp: Date.now(), msg })),
+				report: (msg, metadata) => this.conf.stderr(this.conf.entryFormatter({ logLevel: "error", metadata, msTimestamp: Date.now(), msg })),
 			});
 		}
 
@@ -1260,7 +1321,7 @@ export class Log implements LogInt {
 		// Logs attach to the parent span when there is one, otherwise to this instance's span.
 		const span = this.conf.parentLog?.span.spanId ? this.conf.parentLog.span : this.span;
 
-		this.conf.otlpQueue.enqueue({ path: "/v1/logs", payload: buildLogPayload({ attributes, logLevel, msTimestamp, msg, span }) });
+		this.conf.otlpQueue.enqueue(buildLogPayload({ attributes, logLevel, msTimestamp, msg, span }));
 	}
 
 	private track(promise: Promise<unknown>): void {
@@ -1308,6 +1369,6 @@ export class Log implements LogInt {
 
 	// Queues an ended span, deriving its attributes/resource from `context`.
 	private exportSpan(span: OtlpSpan, context: DefinedMetadata): void {
-		this.conf.otlpQueue?.enqueue({ path: "/v1/traces", payload: buildSpanPayload({ context, span }) });
+		this.conf.otlpQueue?.enqueue(buildSpanPayload({ context, span }));
 	}
 }
