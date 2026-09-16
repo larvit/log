@@ -4,7 +4,7 @@
 
 - Export queue. Records and spans are batched into one POST per path, by time (1 s) or size (64 KiB),
   sent with `keepalive` and retried with backoff on a network error, timeout, 408, 429 or 5xx; other
-  non-2xx drops the batch. One stderr line per failed batch. Bounded at 1000 items, oldest dropped
+  non-2xx drops the batch. One stderr line per failed attempt. Bounded at 1000 items, oldest dropped
   and the count reported once. `otlpHttpBaseURI` builds the default `Queue`, shared by children and
   clones; `otlpQueue` takes your own, e.g. `new Queue({ otlpHttpBaseURI, storage: AsyncStorage })`
   to survive an app restart. `log.flush()` delivers without ending; `end()` flushes after closing

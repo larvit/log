@@ -10,6 +10,17 @@ async function waitFor(done: () => boolean): Promise<void> {
 	}
 }
 
+// The message of what `construct` throws, or "" when it does not.
+function thrown(construct: () => void): string {
+	try {
+		construct();
+
+		return "";
+	} catch (err) {
+		return String(err);
+	}
+}
+
 // A queue's report sink, flattened to one object per line for deepEqual.
 function reportSink() {
 	const lines: DefinedMetadata[] = [];
@@ -552,7 +563,11 @@ test("Queue batches by time and by size, with keepalive under the browser cap", 
 test("Queue is bounded: drops the oldest when full and reports the count once", async t => {
 	const { calls } = stubFetch();
 	const reports = reportSink();
-	const log = new Log({ otlpQueue: new Queue({ batchDelayMs: 10000, maxItems: 2, otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report }), stderr: () => {} });
+	const throwingReport = (msg: string, metadata: DefinedMetadata) => {
+		reports.report(msg, metadata);
+		throw new Error("sink broke");
+	};
+	const log = new Log({ otlpQueue: new Queue({ batchDelayMs: 10000, maxItems: 2, otlpHttpBaseURI: "http://127.0.0.1:4318", report: throwingReport }), stderr: () => {} });
 
 	log.info("1");
 	log.info("2");
@@ -561,7 +576,7 @@ test("Queue is bounded: drops the oldest when full and reports the count once", 
 	await log.flush();
 
 	t.deepEqual(exportedRecords(calls), ["3", "4"], "the two newest records are kept");
-	t.deepEqual(reports.lines, [{ dropped: 2, msg: "OTLP queue full, oldest items dropped" }], "one line with the count");
+	t.deepEqual(reports.lines, [{ dropped: 2, msg: "OTLP queue full, oldest items dropped" }], "one line with the count, and a throwing sink did not break the round");
 	t.end();
 });
 
@@ -603,6 +618,19 @@ test("Queue with storage survives a restart: leftovers go first and storage empt
 	t.deepEqual(reports.lines.map(line => line.msg), ["OTLP queue storage unreadable, discarded"], "corrupt data is reported once");
 	await waitFor(() => corrupt.data.size === 0);
 	t.strictEqual(corrupt.data.size, 0, "the custom key is cleared");
+
+	const broken = fakeStorage(false);
+	const brokenReports = reportSink();
+
+	broken.setItem = () => { throw new Error("quota exceeded"); };
+	calls.length = 0;
+	const unsaved = new Log({ otlpQueue: new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", report: brokenReports.report, storage: broken }), stderr: () => {} });
+
+	unsaved.info("delivered anyway");
+	await unsaved.flush();
+	t.deepEqual(exportedRecords(calls), ["delivered anyway"], "a storage that cannot be written still exports");
+	await waitFor(() => brokenReports.lines.length > 0);
+	t.deepEqual(brokenReports.lines.map(line => line.msg), ["OTLP queue storage write failed"], "the write failure is reported");
 	t.end();
 });
 
@@ -624,8 +652,8 @@ test("log.flush() delivers pending records without ending the span", async t => 
 test("otlpQueue and the otlp* options are two spellings of one endpoint; inheritance never mixes them", t => {
 	const queue = new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318" });
 
-	t.throws(() => new Log({ otlpHttpBaseURI: "http://127.0.0.1:4319", otlpQueue: queue }), "a queue plus a differing endpoint on Log is rejected");
-	t.throws(() => new Log({ otlpProtocol: "http/protobuf", otlpQueue: queue }), "a queue plus a differing protocol on Log is rejected");
+	t.ok(thrown(() => new Log({ otlpHttpBaseURI: "http://127.0.0.1:4319", otlpQueue: queue })).includes("otlpQueue"), "a queue plus a differing endpoint on Log is rejected, naming the option");
+	t.ok(thrown(() => new Log({ otlpProtocol: "http/protobuf", otlpQueue: queue })).includes("otlpQueue"), "a queue plus a differing protocol on Log is rejected");
 
 	const parent = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", otlpProtocol: "http/protobuf" });
 

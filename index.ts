@@ -682,10 +682,19 @@ function mergePayloads(payloads: OtlpPayload[]): OtlpPayload {
 	return mergeSpanPayloads(payloads.filter((payload): payload is OtlpSpanPayload => "resourceSpans" in payload));
 }
 
-// Node only: a pending retry must not keep a finished process alive.
+// A pending retry must not keep a finished Node or Deno process alive.
 function unref(timer: ReturnType<typeof setTimeout>): void {
 	if (typeof timer === "object" && typeof timer.unref === "function") {
 		timer.unref();
+
+		return;
+	}
+
+	const deno: unknown = Reflect.get(globalThis, "Deno");
+	const unrefTimer: unknown = typeof deno === "object" && deno !== null ? Reflect.get(deno, "unrefTimer") : undefined;
+
+	if (typeof timer === "number" && typeof unrefTimer === "function") {
+		unrefTimer(timer);
 	}
 }
 
@@ -737,9 +746,7 @@ export class Queue implements OtlpQueue {
 		}
 	}
 
-	// One attempt per batch, resolved when that round is over. A batch the collector did not accept
-	// stays queued and, while its retry is pending, flush() attempts nothing new: the timer decides.
-	// Concurrent callers share one running and one pending round.
+	// While a retry is pending, flush() attempts nothing new: the timer decides.
 	flush(): Promise<void> {
 		if (this.retryTimer !== undefined) {
 			return this.running ?? Promise.resolve();
@@ -840,8 +847,17 @@ export class Queue implements OtlpQueue {
 
 	private async send(batch: QueuedItem[]): Promise<SendFailure | undefined> {
 		const protobuf = this.conf.otlpProtocol === "http/protobuf";
-		const payload = mergePayloads(batch.map(item => item.payload));
-		const body = protobuf ? encodeOtlpProtobuf(payload) : JSON.stringify(payload);
+		let body: string | Uint8Array<ArrayBuffer>;
+
+		// A payload that cannot be encoded (a corrupt stored item, no TextEncoder) never becomes sendable.
+		try {
+			const payload = mergePayloads(batch.map(item => item.payload));
+
+			body = protobuf ? encodeOtlpProtobuf(payload) : JSON.stringify(payload);
+		} catch (err) {
+			return { message: stringField(err, "message") ?? "Unencodable OTLP payload", retry: false };
+		}
+
 		const bytes = typeof body === "string" ? utf8Length(body) : body.length;
 
 		// AbortController + cleared timer works in browsers and Node, and never leaves a dangling timer.
@@ -849,7 +865,7 @@ export class Queue implements OtlpQueue {
 		const timer = setTimeout(() => controller.abort(), OTLP_EXPORT_TIMEOUT_MS);
 
 		try {
-			const res = await fetch(this.url + otlpPath(payload), {
+			const res = await fetch(this.url + otlpPath(batch[0].payload), {
 				body,
 				headers: { "Content-Type": protobuf ? "application/x-protobuf" : "application/json", ...this.conf.otlpAdditionalHeaders },
 				keepalive: bytes <= KEEPALIVE_MAX_BYTES,
