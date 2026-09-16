@@ -86,7 +86,7 @@ async function myRequestHandler(req, res) {
 	try {
 		// ... request handler logic ...
 	} catch (err) {
-		await reqLog.end({ error: err }); // marks the span failed
+		await reqLog.end({ error: err });
 		throw err;
 	}
 
@@ -102,11 +102,12 @@ timing and is exported by `end()`.
 
 `end()` closes the span and flushes it and any pending log exports; a span that is never ended is
 never sent. `end({ error })` also marks the span failed: status `ERROR` with the error's message, and
-an `error.type` attribute from its `code`, else `name`. A logged `log.error()` never fails the span;
-a recovered error is not a failed operation. `await` it when delivery must complete before the
-process exits (a short-lived script); fire-and-forget is fine in a long-running process. Each export
-request is bounded by a 3 s timeout, so `await end()` returns within about 6 s against a dead
-collector, plus however long any un-awaited `log.fetch()` takes to complete. An instance is single-use:
+an `error.type` attribute from its `code`, else `name`; a `null` or `undefined` error is a plain
+`end()`. A logged `log.error()` never fails the span; a recovered error is not a failed operation.
+`await` it when delivery must complete before the process exits (a short-lived script);
+fire-and-forget is fine in a long-running process. Each export request is bounded by a 3 s timeout,
+so `await end()` returns within about 6 s against a dead collector, plus however long any un-awaited
+`log.fetch()` takes to complete. An instance is single-use:
 logging and `fetch()` on an ended instance throw, `end()` rejects.
 
 `log.clone(options?)` (on `Log`, not `LogInt`) makes an independent instance with the same
@@ -233,8 +234,9 @@ Span attributes follow the OpenTelemetry HTTP semantic conventions:
 | `error.type` | On a thrown error: its `code`, else `name`, else `"_OTHER"` |
 
 A 4xx/5xx response marks the span errored; a thrown error does too, with its message as the status
-message. The response or error reaches the caller unchanged. Bodies are never captured. `captureQuery` and the header allow-lists are read at
-call time from the instance; `clone()` to vary them per call site.
+message. The response or error reaches the caller unchanged. Bodies are never captured.
+`captureQuery` and the header allow-lists are read at call time from the instance; `clone()` to vary
+them per call site.
 
 Spans export in the background and are registered with `end()` at call time, so `await log.end()`
 delivers a `log.fetch()` you never awaited.
