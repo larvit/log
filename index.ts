@@ -1,6 +1,6 @@
 export type EntryFormatterConf = {
 	logLevel: LogLevel;
-	metadata?: Metadata;
+	metadata?: DefinedMetadata;
 	msg: string;
 	msTimestamp?: number;
 };
@@ -62,8 +62,12 @@ export type Metadata = {
 
 // Primitive values only. String() coerces them for OTLP; the JSON formatter keeps them native.
 // bigint/objects are excluded: JSON.stringify throws on bigint and renders objects as "[object Object]".
-// undefined is accepted so optional fields pass straight through; such keys are dropped on output.
 export type MetadataValue = boolean | number | string | undefined;
+
+// What formatters, `log.context` and the OTLP builders receive: the input minus its undefined keys.
+export type DefinedMetadata = {
+	[key: string]: Exclude<MetadataValue, undefined>;
+};
 
 export type OtlpAttribute = {
 	key: string,
@@ -162,8 +166,16 @@ export const LogLevels = {
 	/* eslint-enable sort-keys */
 };
 
-function withoutUndefined(metadata?: Metadata): Metadata {
-	return Object.fromEntries(Object.entries(metadata ?? {}).filter(([, value]) => value !== undefined));
+function withoutUndefined(metadata: Metadata = {}): DefinedMetadata {
+	const defined: DefinedMetadata = {};
+
+	for (const key in metadata) {
+		const value = metadata[key];
+
+		if (value !== undefined) defined[key] = value;
+	}
+
+	return defined;
 }
 
 export function msgJsonFormatter(conf: EntryFormatterConf) {
@@ -279,7 +291,7 @@ function isFetchError(error: unknown): error is FetchError {
 
 // Resource-level OTLP attributes (service.name + telemetry.sdk.*), shared by logs and spans.
 // Grafana/Loki reads service.name from here, not from the records.
-function buildResourceAttributes(context: Metadata): OtlpAttribute[] {
+function buildResourceAttributes(context: DefinedMetadata): OtlpAttribute[] {
 	return [
 		{ key: "service.name", value: { stringValue: String(context["service.name"] || "unnamed-service") } },
 		{ key: "telemetry.sdk.language", value: { stringValue: "ecmascript" } },
@@ -290,7 +302,7 @@ function buildResourceAttributes(context: Metadata): OtlpAttribute[] {
 
 // Pure builder: state in, OTLP log payload out. Kept out of the class so it is trivially testable.
 function buildLogPayload(opts: {
-	attributes: Metadata,
+	attributes: DefinedMetadata,
 	logLevel: LogLevel,
 	msg: string,
 	msTimestamp: number,
@@ -324,7 +336,7 @@ function buildLogPayload(opts: {
 // Span finalizer: writes the resolved attributes/parent onto the span, then returns the OTLP payload.
 // Not pure — it mutates `span` — but kept out of the class so it stays trivially testable.
 function buildSpanPayload(opts: {
-	context: Metadata,
+	context: DefinedMetadata,
 	parentSpan?: OtlpSpan,
 	span: OtlpSpan,
 }): OtlpSpanPayload {
@@ -552,7 +564,7 @@ function buildUrlFull(url: URL, captureQuery: boolean): string {
 }
 
 export class Log implements LogInt {
-	context: Metadata;
+	context: DefinedMetadata;
 	ended: boolean = false;
 
 	readonly conf: ResolvedLogConf;
@@ -724,7 +736,7 @@ export class Log implements LogInt {
 		// childSpan can't throw; everything that can (e.g. `new Headers` on a bad name) is inside the
 		// try, so finally always settles the tracked promise and end() can never hang on this fetch.
 		const span = this.childSpan(url.host, 3); // CLIENT; name refined below
-		const context: Metadata = { ...this.context };
+		const context: DefinedMetadata = { ...this.context };
 
 		try {
 			const method = (init?.method ?? "GET").toUpperCase();
@@ -808,10 +820,10 @@ export class Log implements LogInt {
 		if (!this.enabled(logLevel)) return;
 
 		const msTimestamp = Date.now();
-		const attributes: Metadata = { ...withoutUndefined(metadata), ...this.context };
+		const attributes = Object.assign(withoutUndefined(metadata), this.context);
 
 		// Console output, optionally enriched with span/trace info.
-		const consoleMetadata: Metadata = { ...attributes };
+		const consoleMetadata: DefinedMetadata = { ...attributes };
 		if (this.conf.printTraceInfo) {
 			consoleMetadata.spanId = this.span.spanId;
 			consoleMetadata.traceId = this.span.traceId;
@@ -836,7 +848,7 @@ export class Log implements LogInt {
 		void promise.catch(() => {}).finally(() => this.inFlight.delete(promise));
 	}
 
-	private outputToConsole(logLevel: LogLevel, msg: string, metadata: Metadata, msTimestamp: number) {
+	private outputToConsole(logLevel: LogLevel, msg: string, metadata: DefinedMetadata, msTimestamp: number) {
 		const output = this.conf.entryFormatter({
 			logLevel,
 			metadata,
@@ -961,7 +973,7 @@ export class Log implements LogInt {
 	}
 
 	// Stamps the end time and exports a child span, deriving its attributes/resource from `context`.
-	private exportChildSpan(span: OtlpSpan, context: Metadata): Promise<unknown> {
+	private exportChildSpan(span: OtlpSpan, context: DefinedMetadata): Promise<unknown> {
 		span.endTimeUnixNano = getNsTimestamp(Date.now());
 
 		return this.otlpCall({ path: "/v1/traces", payload: buildSpanPayload({ context, span }) });

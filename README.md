@@ -247,6 +247,7 @@ delivers a `log.fetch()` you never awaited.
 | `LogConf`, `ResolvedLogConf` | The options object; `ResolvedLogConf` is `log.conf` with defaults applied. |
 | `LogLevel`, `LogShorthand` | Level name union; the signature of one level method. |
 | `Metadata`, `MetadataValue` | `Record<string, string \| number \| boolean \| undefined>` and its value type. |
+| `DefinedMetadata` | `Metadata` without `undefined` values: what a formatter and `log.context` see. |
 | `EntryFormatterConf` | The argument to `entryFormatter`. |
 | `OtlpSpan`, `OtlpAttribute`, `OtlpLogPayload`, `OtlpSpanPayload` | The OTLP wire shapes; `log.span` is an `OtlpSpan`. |
 
