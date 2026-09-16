@@ -7,60 +7,67 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
 
 ### Additive
 
-- [ ] `Logger` type: the six level methods plus `enabled(level)`, so a library can skip building
-  expensive metadata. `LogInt = Logger & { conf, end, fetch, flush, span, traceparent }`.
-  Libraries accept `Logger`; `parentLog` stays `LogInt`.
-- [ ] `MetadataValue` accepts `undefined`; such keys are dropped on output.
-- [ ] `end({ error })` marks the instance's span failed: status `ERROR`, `error.type` from the
-  error's `code`, else `name`, and the message as the status message. `log.error()` does not
-  mark the span; a logged and recovered error is not a failed operation.
-- [ ] Export queue, pluggable through an `otlpQueue` option:
-  - `OtlpQueue` interface: `enqueue({ path, payload })`, `flush(): Promise<void>`. Batching by
-    size and time, retry with backoff, `keepalive: true` on the fetch and the 64 KB keepalive cap
-    per batch all live in the queue, not in `Log`.
-  - `MemoryQueue`, the default. Bounded; drops oldest when full and reports the count once.
-  - `PersistentQueue({ storage })`, where `storage` is `{ getItem, setItem, removeItem }`, sync or
-    async: AsyncStorage on React Native, `localStorage` in browsers. Survives app restarts.
-  - `log.flush()` flushes without ending. `end()` flushes after closing the span.
-  - One stderr line per failed batch, not per record.
-  - `OtlpLogPayload`/`OtlpSpanPayload` stay exported: queue implementers need them.
-- [ ] `colors?: boolean` for the text format. Default: on when `process.stdout.isTTY` is true
-  and `NO_COLOR` is unset, else off.
-- [ ] Protobuf on React Native: replace `new TextEncoder()` in `ProtoWriter.string` with a UTF-8
-  fallback when the global is missing. Confirm the absence on-device first.
-- [ ] JSON export: any 2xx is success; warn on a non-zero `partialSuccess` rejected count.
-- [ ] W3C: reject version `ff`; honour the incoming `sampled` flag (unsampled: no export, header
-  says `00`). `tracestate` stays out of scope.
-- [ ] Constructor copies the caller's options object instead of filling defaults into it.
-- [ ] Size badge in the README (2.3.0: 15.0 KB minified, 4.7 KB gzipped).
-- [ ] Rename `.github/workflows/master.yaml` to `push.yaml`; update the README badge.
+- [ ] Add a `Logger` type: the six level methods plus `enabled(level)`, so a library can skip
+  building expensive metadata. Redefine `LogInt = Logger & { conf, end, fetch, flush, span,
+  traceparent }`. Libraries accept `Logger`; `parentLog` stays `LogInt`.
+- [ ] Accept `undefined` in `MetadataValue` and drop such keys on output, so `{ port: options.port }`
+  with an optional field type-checks.
+- [ ] Add `end({ error })`, which marks the instance's span failed: status `ERROR`, `error.type`
+  from the error's `code`, else `name`, and the message as the status message. Keep `log.error()`
+  from marking the span; a logged and recovered error is not a failed operation.
+- [ ] Add an export queue, pluggable through an `otlpQueue` option. Today every record and every
+  span is its own POST, with no retry and no `keepalive`.
+  - Define `OtlpQueue`: `enqueue({ path, payload })`, `flush(): Promise<void>`. Batching by size
+    and time, retry with backoff, `keepalive: true` on the fetch and the 64 KB keepalive cap per
+    batch all live in the queue, not in `Log`.
+  - Ship `MemoryQueue` as the default. Bounded; drops oldest when full and reports the count once.
+  - Ship `PersistentQueue({ storage })`, where `storage` is `{ getItem, setItem, removeItem }`,
+    sync or async: AsyncStorage on React Native, `localStorage` in browsers. Survives app restarts.
+  - Add `log.flush()`, which flushes without ending. Make `end()` flush after closing the span.
+  - Write one stderr line per failed batch, not per record.
+  - Keep `OtlpLogPayload`/`OtlpSpanPayload` exported: queue implementers need them.
+- [ ] Add `colors?: boolean` to the text format, defaulting to on when `process.stdout.isTTY` is
+  true and `NO_COLOR` is unset, else off. Today ANSI codes are always emitted.
+- [ ] Replace `new TextEncoder()` in `ProtoWriter.string` with a UTF-8 fallback when the global
+  is missing, so protobuf export works on React Native. Confirm the absence on-device first.
+- [ ] Treat any 2xx as JSON export success and warn on a non-zero `partialSuccess` rejected
+  count. Today only a body of exactly `{}` or `{"partialSuccess":{}}` passes.
+- [ ] Reject `traceparent` version `ff` and honour the incoming `sampled` flag: unsampled means no
+  export and an outgoing header saying `00`. Today `ff` is accepted and `sampled` ignored.
+  `tracestate` stays out of scope.
+- [ ] Copy the caller's options object in the constructor instead of filling defaults into it.
+- [ ] Add a size badge to the README (2.3.0: 15.0 KB minified, 4.7 KB gzipped).
+- [ ] Rename `.github/workflows/master.yaml` to `push.yaml` and update the README badge.
 
 ### Deprecations (warn once on stderr)
 
-- [ ] `new Log("level")` and `clone("level")`: use `{ logLevel }`.
-- [ ] `entryFormatter`: use `format`, which also accepts `(entry) => string`.
-- [ ] `parentLog` together with `traceparent` (today `traceparent` is silently ignored).
+- [ ] Deprecate `new Log("level")` and `clone("level")` in favour of `{ logLevel }`.
+- [ ] Deprecate `entryFormatter` in favour of `format`, and make `format` also accept
+  `(entry) => string`.
+- [ ] Deprecate `parentLog` together with `traceparent`. Today `traceparent` is silently ignored.
 
 ## 3.0.0, breaking
 
 - [ ] Remove the level-string shorthand from `Log` and `clone`.
-- [ ] Remove `entryFormatter`. `format` is `"text" | "json" | ((entry) => string)`.
-- [ ] A child's log records attach to its own span. OTel's rule is that a record carries the
-  active span, and a child's `log.fetch` spans already nest under it. No test asserts the old
-  behaviour; write one for the new rule first.
-- [ ] Per-call metadata wins over `context` on a key collision; the more specific value wins.
-- [ ] A child merges `context` per key with the parent's, as `clone()` does.
-- [ ] A child does not inherit `spanName`; default `"unnamed-span"` for both derivations.
-- [ ] `parentLog` with `traceparent`: settings inherit from `parentLog`, the span nests under the
-  upstream `traceparent`. This is the request-handler case and today it silently loses the trace.
-- [ ] Nothing throws after `end()`. Level methods still write to the console and their OTLP
+- [ ] Remove `entryFormatter`; `format` is `"text" | "json" | ((entry) => string)`.
+- [ ] Attach a child's log records to its own span instead of the parent's. OTel's rule is that a
+  record carries the active span, and a child's `log.fetch` spans already nest under it. No test
+  asserts the old behaviour; write one for the new rule first.
+- [ ] Let per-call metadata win over `context` on a key collision; the more specific value wins.
+  Today `context` wins.
+- [ ] Merge a child's `context` per key with the parent's, as `clone()` does. Today a child's
+  `context` replaces the parent's wholesale.
+- [ ] Stop a child inheriting `spanName`; default to `"unnamed-span"` for both derivations.
+- [ ] Allow `parentLog` with `traceparent`: settings inherit from `parentLog`, the span nests under
+  the upstream `traceparent`. This is the request-handler case; today it silently loses the trace.
+- [ ] Make nothing throw after `end()`. Level methods still write to the console and their OTLP
   records attach to the ended span, entering the queue like any other record, so the queue's
   size/time flush exports them with no further call. `end()` a second time resolves `{ err }`.
-  `ended` joins `LogInt`.
+  Add `ended` to `LogInt`.
 - [ ] Require `spanName` whenever `otlpHttpBaseURI` is set or inherited: a child or clone of an
-  OTLP-configured instance must name its span, and the constructor rejects one that does not.
-  No backend shows `unnamed-span`.
-- [ ] `MIGRATION.md`: one entry per item above, with the 2.x spelling and the 3.0.0 spelling.
+  OTLP-configured instance must name its span, and the constructor rejects one that does not, so
+  no backend shows `unnamed-span`.
+- [ ] Write `MIGRATION.md`: one entry per item above, with the 2.x spelling and the 3.0.0 spelling.
 
 ## Kept as is, decided 2026-09-16
 
