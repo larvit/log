@@ -300,6 +300,14 @@ function stringField(value: unknown, key: string): string | undefined {
 	return typeof field === "string" ? field : undefined;
 }
 
+// OTel semconv: error.type is the error's code, else its class name, else "_OTHER".
+function spanFailure(error: unknown): { message: string, type: string } {
+	return {
+		message: stringField(error, "message") ?? String(error),
+		type: stringField(error, "code") ?? stringField(error, "name") ?? "_OTHER",
+	};
+}
+
 // Resource-level OTLP attributes (service.name + telemetry.sdk.*), shared by logs and spans.
 // Grafana/Loki reads service.name from here, not from the records.
 function buildResourceAttributes(context: DefinedMetadata): OtlpAttribute[] {
@@ -344,14 +352,13 @@ function buildLogPayload(opts: {
 	};
 }
 
-// Span finalizer: writes the resolved attributes/parent onto the span, then returns the OTLP payload.
+// Span finalizer: writes the resolved attributes onto the span, then returns the OTLP payload.
 // Not pure — it mutates `span` — but kept out of the class so it stays trivially testable.
 function buildSpanPayload(opts: {
 	context: DefinedMetadata,
-	parentSpan?: OtlpSpan,
 	span: OtlpSpan,
 }): OtlpSpanPayload {
-	const { context, parentSpan, span } = opts;
+	const { context, span } = opts;
 
 	// service.name is carried on the resource scope below, so it is excluded from the span attributes.
 	const attributes: OtlpAttribute[] = Object.entries(context)
@@ -360,10 +367,6 @@ function buildSpanPayload(opts: {
 
 	if (attributes.length) {
 		span.attributes = attributes;
-	}
-
-	if (parentSpan && parentSpan.spanId) {
-		span.parentSpanId = parentSpan.spanId;
 	}
 
 	return {
@@ -715,15 +718,15 @@ export class Log implements LogInt {
 		const context: DefinedMetadata = { ...this.context };
 
 		if (options?.error !== undefined) {
-			const { error } = options;
+			const failure = spanFailure(options.error);
 
-			this.span.status = { code: 2, message: stringField(error, "message") ?? String(error) };
-			context["error.type"] = stringField(error, "code") ?? stringField(error, "name") ?? "_OTHER";
+			this.span.status = { code: 2, message: failure.message };
+			context["error.type"] = failure.type;
 		}
 
 		// All logs must be sent before the trace/span.
 		await Promise.all([...this.inFlight]);
-		await this.otlpCreateSpan(this.span, context);
+		await this.exportSpan(this.span, context);
 	}
 
 	// The current span's context as a W3C `traceparent` header, for propagating to non-fetch clients.
@@ -805,15 +808,18 @@ export class Log implements LogInt {
 
 			return res;
 		} catch (err) {
-			span.status.code = 2; // ERROR
-			context["error.type"] = stringField(err, "code") ?? stringField(err, "name") ?? "fetch_error";
+			const failure = spanFailure(err);
+
+			span.status = { code: 2, message: failure.message };
+			context["error.type"] = failure.type;
 
 			throw err;
 		} finally {
+			span.endTimeUnixNano = getNsTimestamp(Date.now());
 			// Always settle the tracked promise so end() can never hang on this fetch, even if the
 			// export call itself throws synchronously (it normally resolves once the span is delivered).
 			try {
-				void this.exportChildSpan(span, context).then(settle, settle);
+				void this.exportSpan(span, context).then(settle, settle);
 			} catch {
 				settle();
 			}
@@ -996,20 +1002,8 @@ export class Log implements LogInt {
 		};
 	}
 
-	// Stamps the end time and exports a child span, deriving its attributes/resource from `context`.
-	private exportChildSpan(span: OtlpSpan, context: DefinedMetadata): Promise<unknown> {
-		span.endTimeUnixNano = getNsTimestamp(Date.now());
-
+	// Exports an ended span, deriving its attributes/resource from `context`.
+	private exportSpan(span: OtlpSpan, context: DefinedMetadata): Promise<boolean> {
 		return this.otlpCall({ path: "/v1/traces", payload: buildSpanPayload({ context, span }) });
-	}
-
-	private async otlpCreateSpan(span: OtlpSpan, context: DefinedMetadata): Promise<boolean> {
-		const payload = buildSpanPayload({
-			context,
-			parentSpan: this.conf.parentLog?.span,
-			span,
-		});
-
-		return this.otlpCall({ path: "/v1/traces", payload });
 	}
 }

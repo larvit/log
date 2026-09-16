@@ -754,8 +754,8 @@ test("log.fetch marks error spans for 4xx and for network failures, propagating 
 	const span404 = spans.find(span => attr(span, "http.response.status_code") === "404")!;
 	const spanBoom = spans.find(span => attr(span, "error.type") === "ECONNREFUSED")!;
 
-	t.strictEqual(span404.status.code, 2, "the 4xx span is ERROR");
-	t.strictEqual(spanBoom.status.code, 2, "the network-failure span is ERROR");
+	t.deepEqual(span404.status, { code: 2 }, "the 4xx span is ERROR without a status message");
+	t.deepEqual(spanBoom.status, { code: 2, message: "down" }, "the network-failure span is ERROR with the error message");
 	t.strictEqual(attr(spanBoom, "error.type"), "ECONNREFUSED", "error.type captured from the error code");
 	t.end();
 });

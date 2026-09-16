@@ -37,6 +37,8 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
   export and an outgoing header saying `00`. Today `ff` is accepted and `sampled` ignored.
   `tracestate` stays out of scope.
 - [ ] Copy the caller's options object in the constructor instead of filling defaults into it.
+- [ ] Inject the clock behind span and record timestamps, so tests assert exact times instead of
+  "within an hour".
 - [ ] Add a size badge to the README (2.3.0: 15.0 KB minified, 4.7 KB gzipped).
 - [ ] Rename `.github/workflows/master.yaml` to `push.yaml` and update the README badge.
 
