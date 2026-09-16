@@ -32,11 +32,8 @@ export type LogConf = {
 // conf after the constructor fills its defaults: the always-set fields are no longer optional.
 export type ResolvedLogConf = LogConf & Required<Pick<LogConf, "entryFormatter" | "logLevel" | "stderr" | "stdout">>;
 
-export type LogInt = {
-	conf: LogConf;
-	fetch: (input: string | URL, init?: RequestInit) => Promise<Response>;
-	span: OtlpSpan;
-	traceparent: () => string;
+export type Logger = {
+	enabled: (logLevel: LogLevel) => boolean;
 	/* eslint-disable perfectionist/sort-object-types */
 	error: LogShorthand;
 	warn: LogShorthand;
@@ -44,8 +41,15 @@ export type LogInt = {
 	verbose: LogShorthand;
 	debug: LogShorthand;
 	silly: LogShorthand;
-	end: () => Promise<void>;
 	/* eslint-enable perfectionist/sort-object-types */
+};
+
+export type LogInt = Logger & {
+	conf: LogConf;
+	end: () => Promise<void>;
+	fetch: (input: string | URL, init?: RequestInit) => Promise<Response>;
+	span: OtlpSpan;
+	traceparent: () => string;
 };
 
 export type LogLevel = keyof typeof LogLevels;
@@ -775,6 +779,15 @@ export class Log implements LogInt {
 		}
 	}
 
+	public enabled(logLevel: LogLevel): boolean {
+		if (this.conf.logLevel === "none") {
+			return false;
+		}
+
+		// LogLevels.severityNumber is the single source of truth for ordering.
+		return LogLevels[logLevel].severityNumber >= LogLevels[this.conf.logLevel as LogLevel].severityNumber;
+	}
+
 	public error(msg: string, metadata?: Metadata) { this.log("error", msg, metadata); }
 	public warn(msg: string, metadata?: Metadata) { this.log("warn", msg, metadata); }
 	public info(msg: string, metadata?: Metadata) { this.log("info", msg, metadata); }
@@ -787,7 +800,7 @@ export class Log implements LogInt {
 			throw new Error("Logging instance is already ended");
 		}
 
-		if (this.shouldSkipLog(logLevel)) return;
+		if (!this.enabled(logLevel)) return;
 
 		const msTimestamp = Date.now();
 		const attributes: Metadata = { ...metadata, ...this.context };
@@ -816,15 +829,6 @@ export class Log implements LogInt {
 		this.inFlight.add(promise);
 		// otlpCall never rejects, but stay defensive so a stray rejection can't become unhandled.
 		void promise.catch(() => {}).finally(() => this.inFlight.delete(promise));
-	}
-
-	private shouldSkipLog(logLevel: LogLevel): boolean {
-		if (this.conf.logLevel === "none") {
-			return true;
-		}
-
-		// LogLevels.severityNumber is the single source of truth for ordering.
-		return LogLevels[logLevel].severityNumber < LogLevels[this.conf.logLevel as LogLevel].severityNumber;
 	}
 
 	private outputToConsole(logLevel: LogLevel, msg: string, metadata: Metadata, msTimestamp: number) {
