@@ -13,7 +13,7 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
   stays `LogInt`.
 - [x] Accept `undefined` in `MetadataValue` and drop such keys on output, so `{ port: options.port }`
   with an optional field type-checks.
-- [ ] Add `end({ error })`, which marks the instance's span failed: status `ERROR`, `error.type`
+- [x] Add `end({ error })`, which marks the instance's span failed: status `ERROR`, `error.type`
   from the error's `code`, else `name`, and the message as the status message. Keep `log.error()`
   from marking the span; a logged and recovered error is not a failed operation.
 - [ ] Add an export queue, pluggable through an `otlpQueue` option. Today every record and every

@@ -46,7 +46,7 @@ export type Logger = {
 
 export type LogInt = Logger & {
 	conf: LogConf;
-	end: () => Promise<void>;
+	end: (options?: { error?: unknown }) => Promise<void>;
 	fetch: (input: string | URL, init?: RequestInit) => Promise<Response>;
 	span: OtlpSpan;
 	traceparent: () => string;
@@ -110,7 +110,7 @@ export type OtlpSpan = {
 	parentSpanId?: string,
 	spanId: string,
 	startTimeUnixNano: string,
-	status: { code: number },
+	status: { code: number, message?: string },
 	traceId: string,
 };
 
@@ -287,6 +287,17 @@ function getNsTimestamp(msTimestamp: number): string {
 
 function isFetchError(error: unknown): error is FetchError {
 	return typeof error === "object" && error !== null && "message" in error;
+}
+
+// A string field off a caught value of unknown shape; undefined when absent or not a string.
+function stringField(value: unknown, key: string): string | undefined {
+	if (typeof value !== "object" || value === null) {
+		return undefined;
+	}
+
+	const field: unknown = Reflect.get(value, key);
+
+	return typeof field === "string" ? field : undefined;
 }
 
 // Resource-level OTLP attributes (service.name + telemetry.sdk.*), shared by logs and spans.
@@ -522,7 +533,12 @@ function encodeOtlpSpanPayload(payload: OtlpSpanPayload): Uint8Array<ArrayBuffer
 							spanMsg.fixed64(7, span.startTimeUnixNano); // start_time_unix_nano = 7
 							spanMsg.fixed64(8, span.endTimeUnixNano); // end_time_unix_nano = 8
 							writeAttributes(spanMsg, 9, span.attributes); // attributes = 9
-							if (span.status.code) spanMsg.message(15, status => status.uint(3, span.status.code)); // status = 15 (Status.code = 3)
+							if (span.status.code) {
+								spanMsg.message(15, status => { // status = 15
+									if (span.status.message !== undefined) status.string(2, span.status.message); // Status.message = 2
+									status.uint(3, span.status.code); // Status.code = 3
+								});
+							}
 						});
 					}
 				});
@@ -688,16 +704,26 @@ export class Log implements LogInt {
 
 	// Ends the span and flushes OTLP. Awaitable: `await log.end()` guarantees delivery before exit.
 	// Fire-and-forget (`log.end()`) still works for callers that do not care.
-	public async end(): Promise<void> {
+	// `error` marks the span failed; a logged error does not, since a recovered error is not a failed operation.
+	public async end(options?: { error?: unknown }): Promise<void> {
 		if (this.ended) {
 			throw new Error("Logging instance is already ended");
 		}
 		this.ended = true;
 		this.span.endTimeUnixNano = getNsTimestamp(Date.now());
 
+		const context: DefinedMetadata = { ...this.context };
+
+		if (options?.error !== undefined) {
+			const { error } = options;
+
+			this.span.status = { code: 2, message: stringField(error, "message") ?? String(error) };
+			context["error.type"] = stringField(error, "code") ?? stringField(error, "name") ?? "_OTHER";
+		}
+
 		// All logs must be sent before the trace/span.
 		await Promise.all([...this.inFlight]);
-		await this.otlpCreateSpan(this.span);
+		await this.otlpCreateSpan(this.span, context);
 	}
 
 	// The current span's context as a W3C `traceparent` header, for propagating to non-fetch clients.
@@ -779,10 +805,8 @@ export class Log implements LogInt {
 
 			return res;
 		} catch (err) {
-			const cause = err as { code?: string, name?: string };
-
 			span.status.code = 2; // ERROR
-			context["error.type"] = cause.code ?? cause.name ?? "fetch_error";
+			context["error.type"] = stringField(err, "code") ?? stringField(err, "name") ?? "fetch_error";
 
 			throw err;
 		} finally {
@@ -979,9 +1003,9 @@ export class Log implements LogInt {
 		return this.otlpCall({ path: "/v1/traces", payload: buildSpanPayload({ context, span }) });
 	}
 
-	private async otlpCreateSpan(span: OtlpSpan): Promise<boolean> {
+	private async otlpCreateSpan(span: OtlpSpan, context: DefinedMetadata): Promise<boolean> {
 		const payload = buildSpanPayload({
-			context: this.context,
+			context,
 			parentSpan: this.conf.parentLog?.span,
 			span,
 		});
