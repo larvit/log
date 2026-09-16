@@ -148,11 +148,11 @@ metadata is built only when it will be seen:
 ```typescript
 import { Log, type Logger } from "@larvit/log";
 
-export function createClient(options: { log?: Logger }) {
+export function createClient(options: { log?: Logger, settings: Settings }) {
 	const log = options.log ?? new Log("none");
-	log.debug("createClient() - connecting", { host: "example.com" });
+	log.debug("createClient() - connecting", { host: options.settings.host });
 	if (log.enabled("silly")) {
-		log.silly("createClient() - full config", { config: JSON.stringify(options) });
+		log.silly("createClient() - full settings", { settings: JSON.stringify(options.settings) });
 	}
 }
 ```

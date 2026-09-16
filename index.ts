@@ -785,7 +785,7 @@ export class Log implements LogInt {
 		}
 
 		// LogLevels.severityNumber is the single source of truth for ordering.
-		return LogLevels[logLevel].severityNumber >= LogLevels[this.conf.logLevel as LogLevel].severityNumber;
+		return LogLevels[logLevel].severityNumber >= LogLevels[this.conf.logLevel].severityNumber;
 	}
 
 	public error(msg: string, metadata?: Metadata) { this.log("error", msg, metadata); }
