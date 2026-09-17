@@ -471,6 +471,17 @@ test("constructor throws on malformed otlpHttpBaseURI", t => {
 	t.end();
 });
 
+test("the constructor and clone copy the caller's options object instead of filling it", t => {
+	const conf: LogConf = { context: { service: "x" }, format: "json" };
+	const parent = new Log(conf);
+
+	new Log({ ...conf, parentLog: parent });
+	parent.clone(conf);
+	t.deepEqual(conf, { context: { service: "x" }, format: "json" }, "no default, inherited setting or formatter is written into it");
+	t.strictEqual(parent.conf.logLevel, "info", "the instance still resolves its defaults");
+	t.end();
+});
+
 test("child log does not share its context object with the parent", t => {
 	const parent = new Log({ context: { service: "x" } });
 	const child = new Log({ parentLog: parent });

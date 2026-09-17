@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- The constructor and `clone()` copy the options object they are given; before, defaults and
+  inherited settings were written into it, so one object reused for a second instance carried the
+  first one's formatter and sinks.
 - An incoming `traceparent` with the sampled flag off is honoured: the instance and its children
   export no records or spans, and `log.traceparent()` and `log.fetch` pass `00` downstream. Console
   output is unchanged. New `log.sampled` field, on `LogInt`; `parseTraceparent` returns `sampled`

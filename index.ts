@@ -1096,12 +1096,8 @@ export class Log implements LogInt {
 
 	span: OtlpSpan;
 
-	constructor(conf?: LogConf | LogLevel | "none") {
-		if (conf === undefined) {
-			conf = {};
-		} else if (typeof conf === "string") {
-			conf = { logLevel: conf };
-		}
+	constructor(options?: LogConf | LogLevel | "none") {
+		const conf: LogConf = typeof options === "string" ? { logLevel: options } : { ...options };
 
 		// Inherit conf from parent log if provided
 		if (typeof conf.parentLog === "object") {
@@ -1185,12 +1181,8 @@ export class Log implements LogInt {
 
 	// Create a new instance based on the current instance
 	// All options sent in will override the current instance settings
-	public clone(conf?: LogConf | LogLevel | "none") {
-		if (conf === undefined) {
-			conf = {};
-		} else if (typeof conf === "string") {
-			conf = { logLevel: conf };
-		}
+	public clone(options?: LogConf | LogLevel | "none") {
+		const conf: LogConf = typeof options === "string" ? { logLevel: options } : { ...options };
 
 		// Resolve the formatter from the effective format, so json<->text can be changed in either direction.
 		if (conf.entryFormatter === undefined) {
