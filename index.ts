@@ -195,6 +195,26 @@ const TEXT_LEVEL_TAGS: Record<LogLevel, { ansi: number, tag: string }> = {
 	warn: { ansi: 33, tag: "war" },
 };
 
+// NO_COLOR wins over FORCE_COLOR; FORCE_COLOR=0 disables, as in supports-color.
+function colorsFromEnv(): boolean | undefined {
+	try {
+		const processGlobal: unknown = Reflect.get(globalThis, "process");
+		const env: unknown = typeof processGlobal === "object" && processGlobal !== null ? Reflect.get(processGlobal, "env") : undefined;
+
+		if (typeof env !== "object" || env === null) return undefined;
+		if (Reflect.get(env, "NO_COLOR")) return false;
+
+		const forceColor: unknown = Reflect.get(env, "FORCE_COLOR");
+
+		if (forceColor === "0") return false;
+
+		return forceColor ? true : undefined;
+	} catch {
+		// Deno without --allow-env throws on the env read.
+		return undefined;
+	}
+}
+
 export function msgTextFormatter(conf: EntryFormatterConf) {
 	const level = TEXT_LEVEL_TAGS[conf.logLevel];
 
@@ -1082,7 +1102,7 @@ export class Log implements LogInt {
 		}
 
 		if (conf.colors === undefined) {
-			conf.colors = true;
+			conf.colors = colorsFromEnv() ?? true;
 		}
 
 		if (conf.entryFormatter === undefined && conf.format === "json") {

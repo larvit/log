@@ -31,6 +31,11 @@ Structured logging with a tiny API and first-class OTLP (logs + traces) over `fe
   and `ResolvedLogConf` stay exported. `log.span` and `log.conf` are public, so declaration emit
   requires the first two and the last; queue implementers need the payloads.
 - 2026-09-16: no level-string shorthand; `{ logLevel }` is the one spelling from 3.0.0.
+- 2026-09-17: `colors` precedence is code, then `NO_COLOR`, then `FORCE_COLOR`, then the default.
+  The default stays on through 2.x: a terminal is a new user's first sight of the library, and a
+  minor never changes existing output. Following the TTY is a 3.0.0 change; Rails' always-on
+  `colorize_logging` is the precedent for what unconditional colour costs log pipelines. Valid
+  while text is the default format.
 - 2026-09-16: the OTLP endpoint belongs to the queue. `otlpHttpBaseURI`, `otlpProtocol` and
   `otlpAdditionalHeaders` on `Log` are shorthand for a default `Queue` and are rejected beside an
   `otlpQueue` they did not build. One `Queue` class, in memory or persisted through `storage`; a

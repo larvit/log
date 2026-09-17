@@ -237,7 +237,7 @@ instance you were handed; it is single-use and the consumer owns it.
 | `captureQuery` | `boolean` | `false` | `log.fetch` only: keep the query string in `url.full`. Known-sensitive keys such as `Signature` stay redacted. |
 | `captureRequestHeaders` | `string[]` | none | `log.fetch` only: request header names to record as `http.request.header.*`. |
 | `captureResponseHeaders` | `string[]` | none | `log.fetch` only: response header names to record as `http.response.header.*`. |
-| `colors` | `boolean` | `true` | ANSI colour codes in text output. |
+| `colors` | `boolean` | `true` | ANSI colour codes in text output. Unset in code, the env decides: `NO_COLOR` (non-empty) or `FORCE_COLOR=0` turns it off, any other `FORCE_COLOR` turns it on. |
 | `context` | `Metadata` | `{}` | Added to every entry. Wins over a per-call key of the same name. |
 | `entryFormatter` | `(EntryFormatterConf) => string` | text formatter | Formats console output. Use `msTimestamp` rather than `new Date()` so console and OTLP timestamps of one entry match. |
 | `format` | `"text" \| "json"` | `"text"` | Console output format. Ignored when `entryFormatter` is set. |

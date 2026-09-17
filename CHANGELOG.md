@@ -2,9 +2,11 @@
 
 ## Unreleased
 
-- `colors: false` turns off the ANSI colour codes in text output. Inherited by children and clones.
-  Formatters receive the setting as `EntryFormatterConf.colors`; `msgTextFormatter` colours unless
-  it is `false`.
+- `colors: false` turns off the ANSI colour codes in text output. Unset in code, `NO_COLOR`
+  (non-empty) or `FORCE_COLOR=0` turns it off and any other `FORCE_COLOR` turns it on; `NO_COLOR`
+  wins over `FORCE_COLOR`, and a value set in code wins over both. Inherited by children and
+  clones. Formatters receive the setting as `EntryFormatterConf.colors`; `msgTextFormatter`
+  colours unless it is `false`.
 - Export queue. Records and spans are batched into one POST per path, by time (1 s) or size (64 KiB),
   sent with `keepalive` and retried with backoff on a network error, timeout, 408, 429 or 5xx; other
   non-2xx drops the batch. One stderr line per failed attempt. Bounded at 1000 items, oldest dropped
