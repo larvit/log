@@ -1,5 +1,6 @@
 {
   "name": "@larvit/log",
+  "description": "Structured logging with a tiny API, OTLP export of logs and traces, and auto-instrumented HTTP tracing. No dependencies.",
   "version": "2.3.0",
   "type": "module",
   "license": "MIT",
