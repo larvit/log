@@ -1,22 +1,23 @@
 # @larvit/log
 
 [![npm](https://img.shields.io/npm/v/@larvit/log)](https://www.npmjs.com/package/@larvit/log)
+[![bundle size](https://deno.bundlejs.com/badge?q=@larvit/log)](https://bundlejs.com/?q=%40larvit%2Flog)
 [![CI](https://github.com/larvit/log/actions/workflows/master.yaml/badge.svg?branch=main)](https://github.com/larvit/log/actions/workflows/master.yaml)
 
-Structured logging with a tiny API, OTLP export of logs and traces, and auto-instrumented HTTP
-tracing. No dependencies.
+Structured logging with a tiny API, plus OTLP export of logs and traces from Node, Bun, Deno,
+browsers and React Native. No OpenTelemetry SDK, no dependencies.
 
-- **Runs anywhere.** Node 18+, Bun, Deno, browsers and React Native. Built on global `fetch`.
+- **One file, every runtime.** Built on the global `fetch`, so a browser and a React Native app
+  export the same way a server does. No SDK, no bundler config, no native module.
+- **Exports survive a restart.** Records and spans are batched and retried with backoff; give the
+  queue a storage and an offline phone holds them until the network is back.
 - **Just log.** `log.info("msg", { key: "value" })` to stdout/stderr, text or JSON.
 - **Traces without an SDK.** Set `otlpHttpBaseURI` and every instance is a span, its logs exported
   with it. OTLP (OpenTelemetry's export protocol) over HTTP, JSON or protobuf.
-- **Composable.** Nest instances under a parent, join an upstream trace from a `traceparent` header,
-  hand the current context on to any client.
 - **HTTP client tracing.** `log.fetch()` is a drop-in `fetch` that records a client span and
   propagates the trace downstream.
-- **Queued exports.** Records and spans are batched and retried with backoff; give the queue a
-  storage and they survive an app restart.
-- **Zero install weight.** One file, no runtime dependencies.
+- **Composable.** Nest instances under a parent, join an upstream trace from a `traceparent` header,
+  hand the current context on to any client.
 
 [Install](#install) · [Log something](#log-something) · [Group logs into a trace](#group-logs-into-a-trace) ·
 [Trace outgoing HTTP](#trace-outgoing-http) · [Join an incoming trace](#join-an-incoming-trace) ·

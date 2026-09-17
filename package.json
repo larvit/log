@@ -1,6 +1,6 @@
 {
   "name": "@larvit/log",
-  "description": "Structured logging with a tiny API, OTLP export of logs and traces, and auto-instrumented HTTP tracing. No dependencies.",
+  "description": "Structured logging with a tiny API, plus OTLP export of logs and traces from Node, Bun, Deno, browsers and React Native. No OpenTelemetry SDK, no dependencies.",
   "version": "2.3.0",
   "type": "module",
   "license": "MIT",
