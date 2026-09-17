@@ -14,7 +14,6 @@ export type LogConf = {
 	captureRequestHeaders?: string[];
 	// log.fetch only: response header names to record as http.response.header.* (allow-list, none by default).
 	captureResponseHeaders?: string[];
-	// ANSI colour in text output. Default: on when process.stdout is a TTY and NO_COLOR is empty or unset.
 	colors?: boolean;
 	context?: Metadata;
 	entryFormatter?: (conf: EntryFormatterConf) => string;
@@ -195,24 +194,6 @@ const TEXT_LEVEL_TAGS: Record<LogLevel, { ansi: number, tag: string }> = {
 	verbose: { ansi: 34, tag: "ver" },
 	warn: { ansi: 33, tag: "war" },
 };
-
-// Per https://no-color.org: NO_COLOR counts when present and non-empty.
-function colorsByDefault(): boolean {
-	try {
-		const processGlobal: unknown = Reflect.get(globalThis, "process");
-
-		if (typeof processGlobal !== "object" || processGlobal === null) return false;
-
-		const stdout: unknown = Reflect.get(processGlobal, "stdout");
-		const env: unknown = Reflect.get(processGlobal, "env");
-		const noColor: unknown = typeof env === "object" && env !== null ? Reflect.get(env, "NO_COLOR") : undefined;
-
-		return typeof stdout === "object" && stdout !== null && Reflect.get(stdout, "isTTY") === true && !noColor;
-	} catch {
-		// Deno without --allow-env throws on the env read.
-		return false;
-	}
-}
 
 export function msgTextFormatter(conf: EntryFormatterConf) {
 	const level = TEXT_LEVEL_TAGS[conf.logLevel];
@@ -1101,7 +1082,7 @@ export class Log implements LogInt {
 		}
 
 		if (conf.colors === undefined) {
-			conf.colors = colorsByDefault();
+			conf.colors = true;
 		}
 
 		if (conf.entryFormatter === undefined && conf.format === "json") {

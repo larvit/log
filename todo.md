@@ -21,8 +21,7 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
   `storage`, persisted across app restarts. Batching by size and time, retry with backoff,
   `keepalive` and the 64 KB cap, the 1000-item bound and one stderr line per failed attempt all live
   in the queue. `log.flush()` flushes without ending; `end()` flushes after closing the span.
-- [x] Add `colors?: boolean` to the text format, defaulting to on when `process.stdout.isTTY` is
-  true and `NO_COLOR` is unset, else off. Today ANSI codes are always emitted.
+- [x] Add `colors?: boolean` to the text format, defaulting to on as today.
 - [ ] Replace `new TextEncoder()` in `ProtoWriter.string` with a UTF-8 fallback when the global
   is missing, so protobuf export works on React Native. Confirm the absence on-device first.
 - [ ] Treat any 2xx as JSON export success and warn on a non-zero `partialSuccess` rejected
@@ -43,11 +42,15 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
 - [ ] Deprecate `entryFormatter` in favour of `format`, and make `format` also accept
   `(entry) => string`.
 - [ ] Deprecate `parentLog` together with `traceparent`. Today `traceparent` is silently ignored.
+- [ ] Warn once when `colors` is unset and `process.stdout.isTTY` is false or `NO_COLOR` is set,
+  where 3.0.0 turns colour off.
 
 ## 3.0.0, breaking
 
 - [ ] Remove the level-string shorthand from `Log` and `clone`.
 - [ ] Remove `entryFormatter`; `format` is `"text" | "json" | ((entry) => string)`.
+- [ ] Default `colors` to on only when `process.stdout.isTTY` is true and `NO_COLOR` is empty or
+  unset. The detection and its tests are in commit 9706b0a.
 - [ ] Attach a child's log records to its own span instead of the parent's. OTel's rule is that a
   record carries the active span, and a child's `log.fetch` spans already nest under it. No test
   asserts the old behaviour; write one for the new rule first.

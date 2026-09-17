@@ -254,7 +254,7 @@ test("each level writes its colored token to the right stream", t => {
 	];
 
 	for (const { level, stream, token } of cases) {
-		const cap = capture({ colors: true, logLevel: "silly" }); // silly passes every level through the filter
+		const cap = capture("silly"); // silly passes every level through the filter
 
 		cap.log[level]("msg");
 		t.strictEqual(cap[stream][0]?.substring(19), `Z [${token}] msg`, `${level} -> ${stream} with its token`);
@@ -265,28 +265,6 @@ test("each level writes its colored token to the right stream", t => {
 	plain.log.info("msg");
 	t.strictEqual(plain.stdout[0]?.substring(19), "Z [inf] msg", "colors: false writes the bare tag");
 	t.ok(msgTextFormatter({ logLevel: "info", msg: "msg" }).includes("\x1b[1;32minf\x1b[0m"), "msgTextFormatter colours unless colors is false");
-	t.end();
-});
-
-test("colors default to on for a TTY stdout without NO_COLOR, else off", t => {
-	const original: unknown = Reflect.get(globalThis, "process");
-	const setProcess = (value: unknown) => value === undefined ? Reflect.deleteProperty(globalThis, "process") : Reflect.set(globalThis, "process", value);
-	const colorsWith = (fakeProcess: unknown, conf?: LogConf) => {
-		setProcess(fakeProcess);
-		try {
-			return new Log(conf).conf.colors;
-		} finally {
-			setProcess(original);
-		}
-	};
-
-	t.strictEqual(colorsWith({ env: {}, stdout: { isTTY: true } }), true, "on for a TTY");
-	t.strictEqual(colorsWith({ env: { NO_COLOR: "1" }, stdout: { isTTY: true } }), false, "NO_COLOR turns it off");
-	t.strictEqual(colorsWith({ env: { NO_COLOR: "" }, stdout: { isTTY: true } }), true, "an empty NO_COLOR does not count");
-	t.strictEqual(colorsWith({ env: {}, stdout: {} }), false, "off when stdout is not a TTY");
-	t.strictEqual(colorsWith({ env: {} }), false, "off without process.stdout (React Native)");
-	t.strictEqual(colorsWith(undefined), false, "off without a process global (browsers)");
-	t.strictEqual(colorsWith(undefined, { colors: true }), true, "an explicit colors wins over the default");
 	t.end();
 });
 
@@ -423,12 +401,11 @@ test("clone can downgrade json format to text", t => {
 test("clone inherits config (OTLP, printTraceInfo, fetch policy) but keeps its own span", async t => {
 	const { calls } = stubFetch();
 	const stdout: string[] = [];
-	const colors = !new Log().conf.colors; // the opposite of this runtime's default, so inheritance is observable
 	const base = new Log({
 		captureQuery: true,
 		captureRequestHeaders: ["x-req"],
 		captureResponseHeaders: ["x-resp"],
-		colors,
+		colors: false,
 		otlpHttpBaseURI: "http://127.0.0.1:4318",
 		otlpProtocol: "http/protobuf",
 		printTraceInfo: true,
@@ -454,8 +431,8 @@ test("clone inherits config (OTLP, printTraceInfo, fetch policy) but keeps its o
 	// printTraceInfo inherited.
 	t.ok(stdout[0].includes("spanId"), "clone inherited printTraceInfo");
 
-	t.strictEqual(child.conf.colors, colors, "clone inherited colors");
-	t.strictEqual(new Log({ parentLog: base }).conf.colors, colors, "a child inherits colors");
+	t.strictEqual(child.conf.colors, false, "clone inherited colors");
+	t.strictEqual(new Log({ parentLog: base }).conf.colors, false, "a child inherits colors");
 
 	// ...but the clone is its own span, not a child of base.
 	t.notStrictEqual(child.span.traceId, base.span.traceId, "clone has its own traceId, not base's");
