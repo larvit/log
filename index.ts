@@ -1,4 +1,6 @@
 export type EntryFormatterConf = {
+	// The instance's resolved `colors`. Unset means on.
+	colors?: boolean;
 	logLevel: LogLevel;
 	metadata?: DefinedMetadata;
 	msg: string;
@@ -12,6 +14,8 @@ export type LogConf = {
 	captureRequestHeaders?: string[];
 	// log.fetch only: response header names to record as http.response.header.* (allow-list, none by default).
 	captureResponseHeaders?: string[];
+	// ANSI colour in text output. Default: on when process.stdout is a TTY and NO_COLOR is empty or unset.
+	colors?: boolean;
 	context?: Metadata;
 	entryFormatter?: (conf: EntryFormatterConf) => string;
 	format?: "text" | "json";
@@ -32,7 +36,7 @@ export type LogConf = {
 };
 
 // conf after the constructor fills its defaults: the always-set fields are no longer optional.
-export type ResolvedLogConf = LogConf & Required<Pick<LogConf, "entryFormatter" | "logLevel" | "stderr" | "stdout">>;
+export type ResolvedLogConf = LogConf & Required<Pick<LogConf, "colors" | "entryFormatter" | "logLevel" | "stderr" | "stdout">>;
 
 export type Logger = {
 	enabled: (logLevel: LogLevel) => boolean;
@@ -183,25 +187,41 @@ export function msgJsonFormatter(conf: EntryFormatterConf) {
 	});
 }
 
-export function msgTextFormatter(conf: EntryFormatterConf) {
-	let levelOut: string;
+const TEXT_LEVEL_TAGS: Record<LogLevel, { ansi: number, tag: string }> = {
+	debug: { ansi: 35, tag: "deb" },
+	error: { ansi: 31, tag: "err" },
+	info: { ansi: 32, tag: "inf" },
+	silly: { ansi: 37, tag: "sil" },
+	verbose: { ansi: 34, tag: "ver" },
+	warn: { ansi: 33, tag: "war" },
+};
 
-	if (conf.logLevel === "silly") {
-		levelOut = "\x1b[1;37msil\x1b[0m";
-	} else if (conf.logLevel === "debug") {
-		levelOut = "\x1b[1;35mdeb\x1b[0m";
-	} else if (conf.logLevel === "verbose") {
-		levelOut = "\x1b[1;34mver\x1b[0m";
-	} else if (conf.logLevel === "info") {
-		levelOut = "\x1b[1;32minf\x1b[0m";
-	} else if (conf.logLevel === "warn") {
-		levelOut = "\x1b[1;33mwar\x1b[0m";
-	} else if (conf.logLevel === "error") {
-		levelOut = "\x1b[1;31merr\x1b[0m";
-	} else {
+// Per https://no-color.org: NO_COLOR counts when present and non-empty.
+function colorsByDefault(): boolean {
+	try {
+		const processGlobal: unknown = Reflect.get(globalThis, "process");
+
+		if (typeof processGlobal !== "object" || processGlobal === null) return false;
+
+		const stdout: unknown = Reflect.get(processGlobal, "stdout");
+		const env: unknown = Reflect.get(processGlobal, "env");
+		const noColor: unknown = typeof env === "object" && env !== null ? Reflect.get(env, "NO_COLOR") : undefined;
+
+		return typeof stdout === "object" && stdout !== null && Reflect.get(stdout, "isTTY") === true && !noColor;
+	} catch {
+		// Deno without --allow-env throws on the env read.
+		return false;
+	}
+}
+
+export function msgTextFormatter(conf: EntryFormatterConf) {
+	const level = TEXT_LEVEL_TAGS[conf.logLevel];
+
+	if (!level) {
 		throw new Error(`Invalid conf.logLevel: "${conf.logLevel}"`);
 	}
 
+	const levelOut = conf.colors === false ? level.tag : `\x1b[1;${level.ansi}m${level.tag}\x1b[0m`;
 	const date = new Date(conf.msTimestamp ?? Date.now());
 	let str = `${date.toISOString().substring(0, 19)}Z [${levelOut}] ${conf.msg}`;
 	const metadataStr = JSON.stringify(conf.metadata ?? {});
@@ -1080,6 +1100,10 @@ export class Log implements LogInt {
 			conf.logLevel = "info";
 		}
 
+		if (conf.colors === undefined) {
+			conf.colors = colorsByDefault();
+		}
+
 		if (conf.entryFormatter === undefined && conf.format === "json") {
 			conf.entryFormatter = msgJsonFormatter;
 		} else if (conf.entryFormatter === undefined) {
@@ -1108,7 +1132,7 @@ export class Log implements LogInt {
 				otlpAdditionalHeaders: this.conf.otlpAdditionalHeaders,
 				otlpHttpBaseURI: this.conf.otlpHttpBaseURI,
 				otlpProtocol: this.conf.otlpProtocol,
-				report: (msg, metadata) => this.conf.stderr(this.conf.entryFormatter({ logLevel: "error", metadata, msTimestamp: Date.now(), msg })),
+				report: (msg, metadata) => this.conf.stderr(this.conf.entryFormatter({ colors: this.conf.colors, logLevel: "error", metadata, msTimestamp: Date.now(), msg })),
 			});
 		}
 
@@ -1354,6 +1378,7 @@ export class Log implements LogInt {
 
 	private outputToConsole(logLevel: LogLevel, msg: string, metadata: DefinedMetadata, msTimestamp: number) {
 		const output = this.conf.entryFormatter({
+			colors: this.conf.colors,
 			logLevel,
 			metadata,
 			msTimestamp,

@@ -237,6 +237,7 @@ instance you were handed; it is single-use and the consumer owns it.
 | `captureQuery` | `boolean` | `false` | `log.fetch` only: keep the query string in `url.full`. Known-sensitive keys such as `Signature` stay redacted. |
 | `captureRequestHeaders` | `string[]` | none | `log.fetch` only: request header names to record as `http.request.header.*`. |
 | `captureResponseHeaders` | `string[]` | none | `log.fetch` only: response header names to record as `http.response.header.*`. |
+| `colors` | `boolean` | on for a TTY | ANSI colour in text output: on when `process.stdout.isTTY` and `NO_COLOR` is empty or unset, else off. |
 | `context` | `Metadata` | `{}` | Added to every entry. Wins over a per-call key of the same name. |
 | `entryFormatter` | `(EntryFormatterConf) => string` | text formatter | Formats console output. Use `msTimestamp` rather than `new Date()` so console and OTLP timestamps of one entry match. |
 | `format` | `"text" \| "json"` | `"text"` | Console output format. Ignored when `entryFormatter` is set. |
@@ -255,7 +256,7 @@ instance you were handed; it is single-use and the consumer owns it.
 ## Output formats
 
 Text (default). The level is a three-letter tag, `err`/`war`/`inf`/`ver`/`deb`/`sil`, wrapped in
-ANSI colour codes; parse `format: "json"` instead of this:
+ANSI colour codes when `colors` is on; parse `format: "json"` instead of this:
 
 ```
 2022-09-24T23:40:39Z [inf] Order placed {"orderId":"…","total":199}
@@ -313,7 +314,7 @@ Spans are queued when the response arrives and are registered with `flush()` at 
 | `LogLevel`, `LogShorthand` | Level name union; the signature of one level method. |
 | `Metadata`, `MetadataValue` | `Record<string, string \| number \| boolean \| undefined>` and its value type. |
 | `DefinedMetadata` | `Metadata` without `undefined` values: what a formatter and `log.context` see. |
-| `EntryFormatterConf` | The argument to `entryFormatter`. |
+| `EntryFormatterConf` | The argument to `entryFormatter`; carries the instance's `colors`. |
 | `OtlpSpan`, `OtlpAttribute`, `OtlpLogPayload`, `OtlpSpanPayload` | The OTLP wire shapes; `log.span` is an `OtlpSpan`. |
 | `OtlpQueue`, `OtlpPayload` | What `otlpQueue` takes, `{ enqueue, flush }`, and what `enqueue` receives, a log or span payload. |
 | `QueueConf`, `ResolvedQueueConf`, `QueueStorage` | `Queue`'s options, `queue.conf` with defaults applied, and the `storage` shape, `{ getItem, setItem, removeItem }`. |
