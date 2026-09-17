@@ -1091,8 +1091,7 @@ export class Log implements LogInt {
 	// Un-awaited log.fetch calls, awaited by flush() so their spans are queued before the queue flushes.
 	private inFlight = new Set<Promise<unknown>>();
 
-	// W3C sampled flag: false means nothing exports and `traceparent()` says 00. From the incoming
-	// header or the parentLog; a fresh trace is sampled.
+	// W3C sampled flag; false exports nothing and propagates 00.
 	readonly sampled: boolean;
 
 	span: OtlpSpan;
