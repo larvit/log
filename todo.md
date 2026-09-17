@@ -42,15 +42,15 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
 - [ ] Deprecate `entryFormatter` in favour of `format`, and make `format` also accept
   `(entry) => string`.
 - [ ] Deprecate `parentLog` together with `traceparent`. Today `traceparent` is silently ignored.
-- [ ] Warn once when `colors` is unset and `process.stdout.isTTY` is false or `NO_COLOR` is set,
-  where 3.0.0 turns colour off.
+- [ ] Warn once when `colors` is unset, `process.stdout.isTTY` is false and neither `NO_COLOR` nor
+  `FORCE_COLOR` is set, where 3.0.0 turns colour off.
 
 ## 3.0.0, breaking
 
 - [ ] Remove the level-string shorthand from `Log` and `clone`.
 - [ ] Remove `entryFormatter`; `format` is `"text" | "json" | ((entry) => string)`.
-- [ ] Default `colors` to on only when `process.stdout.isTTY` is true and `NO_COLOR` is empty or
-  unset. The detection and its tests are in commit 9706b0a.
+- [ ] Default `colors` to `process.stdout.isTTY` when neither `NO_COLOR` nor `FORCE_COLOR` is set.
+  The TTY detection and its tests are in commit 9706b0a.
 - [ ] Attach a child's log records to its own span instead of the parent's. OTel's rule is that a
   record carries the active span, and a child's `log.fetch` spans already nest under it. No test
   asserts the old behaviour; write one for the new rule first.

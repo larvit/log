@@ -268,6 +268,30 @@ test("each level writes its colored token to the right stream", t => {
 	t.end();
 });
 
+test("colors unset in code follows NO_COLOR and FORCE_COLOR; set in code it ignores them", t => {
+	const original: unknown = Reflect.get(globalThis, "process");
+	const setProcess = (value: unknown) => value === undefined ? Reflect.deleteProperty(globalThis, "process") : Reflect.set(globalThis, "process", value);
+	const colorsWith = (env: Record<string, string> | undefined, conf?: LogConf) => {
+		setProcess(env && { env });
+		try {
+			return new Log(conf).conf.colors;
+		} finally {
+			setProcess(original);
+		}
+	};
+
+	t.strictEqual(colorsWith({}), true, "on by default");
+	t.strictEqual(colorsWith(undefined), true, "on without a process global (browsers)");
+	t.strictEqual(colorsWith({ NO_COLOR: "1" }), false, "NO_COLOR turns it off");
+	t.strictEqual(colorsWith({ NO_COLOR: "" }), true, "an empty NO_COLOR does not count");
+	t.strictEqual(colorsWith({ FORCE_COLOR: "1" }), true, "FORCE_COLOR turns it on");
+	t.strictEqual(colorsWith({ FORCE_COLOR: "0" }), false, "FORCE_COLOR=0 turns it off");
+	t.strictEqual(colorsWith({ FORCE_COLOR: "1", NO_COLOR: "1" }), false, "NO_COLOR wins over FORCE_COLOR");
+	t.strictEqual(colorsWith({ NO_COLOR: "1" }, { colors: true }), true, "colors: true in code wins over NO_COLOR");
+	t.strictEqual(colorsWith({ FORCE_COLOR: "1" }, { colors: false }), false, "colors: false in code wins over FORCE_COLOR");
+	t.end();
+});
+
 test("respects the configured log-level threshold", t => {
 	const def = capture(); // default level is info
 
