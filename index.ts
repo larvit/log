@@ -313,20 +313,18 @@ function stringField(value: unknown, key: string): string | undefined {
 }
 
 // OTLP partialSuccess: proto3 JSON writes the int64 count as a string, some collectors as a number.
-function partialRejection(body: unknown): { error?: string, rejected: number } | undefined {
-	let partial: unknown;
-
+function partialRejection(body: unknown): { message?: string, rejected: number } | undefined {
 	try {
-		partial = typeof body === "object" && body !== null ? Reflect.get(body, "partialSuccess") : undefined;
+		const partial: unknown = typeof body === "object" && body !== null ? Reflect.get(body, "partialSuccess") : undefined;
+
+		if (typeof partial !== "object" || partial === null) return undefined;
+
+		const rejected = Number(Reflect.get(partial, "rejectedLogRecords") ?? Reflect.get(partial, "rejectedSpans") ?? 0);
+
+		return rejected > 0 ? { message: stringField(partial, "errorMessage"), rejected } : undefined;
 	} catch {
 		return undefined;
 	}
-
-	if (typeof partial !== "object" || partial === null) return undefined;
-
-	const rejected = Number(Reflect.get(partial, "rejectedLogRecords") ?? Reflect.get(partial, "rejectedSpans") ?? 0);
-
-	return rejected > 0 ? { error: stringField(partial, "errorMessage"), rejected } : undefined;
 }
 
 // error.type per OTel semconv; "_OTHER" is its fallback.
@@ -836,7 +834,7 @@ export class Queue implements OtlpQueue {
 			this.changed();
 
 			if (failure) {
-				this.report("OTLP export rejected, batch dropped", this.describe(batch, { error: failure.message, status: failure.status }));
+				this.report("OTLP export rejected, batch dropped", this.describe(batch, failure));
 			}
 		}
 
@@ -853,7 +851,7 @@ export class Queue implements OtlpQueue {
 			void this.flush();
 		}, retryInMs);
 		unref(this.retryTimer);
-		this.report("OTLP export failed, will retry", { ...this.describe(batch, { error: failure.message, status: failure.status }), retryInMs });
+		this.report("OTLP export failed, will retry", { ...this.describe(batch, failure), retryInMs });
 	}
 
 	// The oldest item's kind, plus every later item of the same, up to maxBatchBytes.
@@ -920,7 +918,7 @@ export class Queue implements OtlpQueue {
 				const rejection = partialRejection(await res.json().catch(() => undefined));
 
 				if (rejection) {
-					this.report("OTLP export partially rejected", { ...this.describe(batch, { error: rejection.error, status: res.status }), rejected: rejection.rejected });
+					this.report("OTLP export partially rejected", { ...this.describe(batch, { message: rejection.message, status: res.status }), rejected: rejection.rejected });
 				}
 			}
 
@@ -932,10 +930,10 @@ export class Queue implements OtlpQueue {
 		}
 	}
 
-	private describe(batch: QueuedItem[], outcome: { error?: string, status?: number }): DefinedMetadata {
+	private describe(batch: QueuedItem[], outcome: { message?: string, status?: number }): DefinedMetadata {
 		const path = otlpPath(batch[0].payload);
 
-		return withoutUndefined({ error: outcome.error, items: batch.length, path, status: outcome.status, url: this.url + path });
+		return withoutUndefined({ error: outcome.message, items: batch.length, path, status: outcome.status, url: this.url + path });
 	}
 
 	private report(msg: string, metadata: DefinedMetadata): void {
