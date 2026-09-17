@@ -54,6 +54,7 @@ export type LogInt = Logger & {
 	end: (options?: { error?: unknown }) => Promise<void>;
 	fetch: (input: string | URL, init?: RequestInit) => Promise<Response>;
 	flush: () => Promise<void>;
+	sampled: boolean;
 	span: OtlpSpan;
 	traceparent: () => string;
 };
@@ -272,23 +273,23 @@ export function formatTraceparent(traceId: string, spanId: string, sampled: bool
 	return `00-${traceId}-${spanId}-${sampled ? "01" : "00"}`;
 }
 
-// Parses a W3C `traceparent`. Untrusted input: returns null (never throws) for any malformed or
-// all-zero value, so the caller cleanly starts a fresh trace instead of continuing.
-export function parseTraceparent(header: string): { flags: string, spanId: string, traceId: string } | null {
-	const match = /^[0-9a-f]{2}-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$/.exec(header.trim().toLowerCase());
+// Parses a W3C `traceparent`. Untrusted input: returns null (never throws) for any malformed,
+// version-ff or all-zero value, so the caller cleanly starts a fresh trace instead of continuing.
+export function parseTraceparent(header: string): { flags: string, sampled: boolean, spanId: string, traceId: string } | null {
+	const match = /^([0-9a-f]{2})-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$/.exec(header.trim().toLowerCase());
 
 	if (!match) {
 		return null;
 	}
 
-	const [, traceId, spanId, flags] = match;
+	const [, version, traceId, spanId, flags] = match;
 
-	// All-zero ids are invalid per the spec; treat them as absent.
-	if (/^0+$/.test(traceId) || /^0+$/.test(spanId)) {
+	// ff is reserved and all-zero ids are invalid per the spec; treat them as absent.
+	if (version === "ff" || /^0+$/.test(traceId) || /^0+$/.test(spanId)) {
 		return null;
 	}
 
-	return { flags, spanId, traceId };
+	return { flags, sampled: (parseInt(flags, 16) & 1) === 1, spanId, traceId };
 }
 
 // msTimestamp should be generated from Date.now()
@@ -1090,6 +1091,10 @@ export class Log implements LogInt {
 	// Un-awaited log.fetch calls, awaited by flush() so their spans are queued before the queue flushes.
 	private inFlight = new Set<Promise<unknown>>();
 
+	// W3C sampled flag: false means nothing exports and `traceparent()` says 00. From the incoming
+	// header or the parentLog; a fresh trace is sampled.
+	readonly sampled: boolean;
+
 	span: OtlpSpan;
 
 	constructor(conf?: LogConf | LogLevel | "none") {
@@ -1160,6 +1165,7 @@ export class Log implements LogInt {
 			incoming = parseTraceparent(this.conf.traceparent);
 		}
 
+		this.sampled = this.conf.parentLog?.sampled ?? incoming?.sampled ?? true;
 		this.span = {
 			attributes: [],
 			droppedAttributesCount: 0,
@@ -1246,7 +1252,7 @@ export class Log implements LogInt {
 
 	// The current span's context as a W3C `traceparent` header, for propagating to non-fetch clients.
 	public traceparent(): string {
-		return formatTraceparent(this.span.traceId, this.span.spanId);
+		return formatTraceparent(this.span.traceId, this.span.spanId, this.sampled);
 	}
 
 	// Drop-in `fetch`: auto-creates a CLIENT span (nested under this log's span), injects a
@@ -1298,7 +1304,7 @@ export class Log implements LogInt {
 			const headers = new Headers(init?.headers);
 
 			if (!headers.has("traceparent")) {
-				headers.set("traceparent", formatTraceparent(span.traceId, span.spanId));
+				headers.set("traceparent", formatTraceparent(span.traceId, span.spanId, this.sampled));
 			}
 
 			for (const name of this.conf.captureRequestHeaders ?? []) {
@@ -1376,7 +1382,7 @@ export class Log implements LogInt {
 		}
 		this.outputToConsole(logLevel, msg, consoleMetadata, msTimestamp);
 
-		if (!this.conf.otlpQueue) {
+		if (!this.conf.otlpQueue || !this.sampled) {
 			return;
 		}
 
@@ -1432,6 +1438,8 @@ export class Log implements LogInt {
 
 	// Queues an ended span, deriving its attributes/resource from `context`.
 	private exportSpan(span: OtlpSpan, context: DefinedMetadata): void {
-		this.conf.otlpQueue?.enqueue(buildSpanPayload({ context, span }));
+		if (this.sampled) {
+			this.conf.otlpQueue?.enqueue(buildSpanPayload({ context, span }));
+		}
 	}
 }

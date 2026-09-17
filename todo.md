@@ -24,9 +24,8 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
 - [x] Add `colors?: boolean` to the text format, defaulting to on.
 - [x] Treat any 2xx as JSON export success and warn on a non-zero `partialSuccess` rejected
   count.
-- [ ] Reject `traceparent` version `ff` and honour the incoming `sampled` flag: unsampled means no
-  export and an outgoing header saying `00`. Today `ff` is accepted and `sampled` ignored.
-  `tracestate` stays out of scope.
+- [x] Reject `traceparent` version `ff` and honour the incoming `sampled` flag: unsampled means no
+  export and an outgoing header saying `00`. `tracestate` stays out of scope.
 - [ ] Copy the caller's options object in the constructor instead of filling defaults into it.
 - [ ] Inject one clock (`now`, `setTimeout`, `clearTimeout`) behind span and record timestamps and
   the `Queue` timers, so tests assert exact times instead of "within an hour" and the retry

@@ -147,9 +147,13 @@ myClient.send({ headers: { traceparent: reqLog.traceparent() } });
 ```
 
 `clone()` rather than `parentLog`: when `parentLog` is set, `traceparent` is ignored and the
-instance nests under the parent instead. A malformed header is ignored and a fresh trace starts, so
-an untrusted header is safe to pass. `traceparent` applies only to the instance it is given to;
-children and clones do not inherit it.
+instance nests under the parent instead. A malformed or version `ff` header is ignored and a fresh
+trace starts, so an untrusted header is safe to pass. `traceparent` applies only to the instance it
+is given to; children and clones do not inherit it.
+
+An unsampled header (flags `00`) is honoured: the instance and its children export no records or
+spans, `log.traceparent()` and `log.fetch` pass `00` on, and console output is unchanged.
+`log.sampled` tells which. `tracestate` is not read or forwarded.
 
 ## Queue exports
 
@@ -252,7 +256,7 @@ instance you were handed; it is single-use and the consumer owns it.
 | `spanName` | `string` | `"unnamed-span"` | The instance's span name. Inherited from `parentLog` when set there. |
 | `stderr` | `(msg: string) => void` | `console.error` | Sink for `error` and `warn`. |
 | `stdout` | `(msg: string) => void` | `console.log` | Sink for the other levels. |
-| `traceparent` | `string` | none | Incoming W3C `traceparent` to nest under. Ignored when malformed or when `parentLog` is set. |
+| `traceparent` | `string` | none | Incoming W3C `traceparent` to nest under; its sampled flag is honoured. Ignored when malformed or when `parentLog` is set. |
 
 ## Output formats
 
@@ -306,11 +310,11 @@ Spans are queued when the response arrives and are registered with `flush()` at 
 | `Queue` | The export queue; `new Queue(options)`, see [Queue exports](#queue-exports). |
 | `LogLevels` | Level → OTLP `severityNumber`/`severityText`, most to least severe. |
 | `msgTextFormatter`, `msgJsonFormatter` | The built-in `entryFormatter`s; wrap one to extend it. |
-| `parseTraceparent(header)` | `{ traceId, spanId, flags }` or `null` when malformed. |
+| `parseTraceparent(header)` | `{ traceId, spanId, flags, sampled }` or `null` when malformed or version `ff`. |
 | `formatTraceparent(traceId, spanId, sampled?)` | Builds a W3C `traceparent` header value. |
 | `generateTraceId()`, `generateSpanId()` | Random 32- and 16-hex-char ids. |
 | `Logger` | The six level methods and `enabled(level)`. Accept this in library code. |
-| `LogInt` | `Logger` plus `fetch`, `traceparent`, `end({ error }?)`, `flush`, `conf`, `span`. What `parentLog` takes. |
+| `LogInt` | `Logger` plus `fetch`, `traceparent`, `end({ error }?)`, `flush`, `conf`, `sampled`, `span`. What `parentLog` takes. |
 | `LogConf`, `ResolvedLogConf` | The options object; `ResolvedLogConf` is `log.conf` with defaults applied. |
 | `LogLevel`, `LogShorthand` | Level name union; the signature of one level method. |
 | `Metadata`, `MetadataValue` | `Record<string, string \| number \| boolean \| undefined>` and its value type. |
@@ -320,7 +324,7 @@ Spans are queued when the response arrives and are registered with `flush()` at 
 | `OtlpQueue`, `OtlpPayload` | What `otlpQueue` takes, `{ enqueue, flush }`, and what `enqueue` receives, a log or span payload. |
 | `QueueConf`, `ResolvedQueueConf`, `QueueStorage` | `Queue`'s options, `queue.conf` with defaults applied, and the `storage` shape, `{ getItem, setItem, removeItem }`. |
 
-Instance fields: `log.conf`, `log.context`, `log.span`, `log.ended`.
+Instance fields: `log.conf`, `log.context`, `log.span`, `log.sampled`, `log.ended`.
 
 ## Development
 
