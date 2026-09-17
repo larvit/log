@@ -21,7 +21,7 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
   `storage`, persisted across app restarts. Batching by size and time, retry with backoff,
   `keepalive` and the 64 KB cap, the 1000-item bound and one stderr line per failed attempt all live
   in the queue. `log.flush()` flushes without ending; `end()` flushes after closing the span.
-- [x] Add `colors?: boolean` to the text format, defaulting to on as today.
+- [x] Add `colors?: boolean` to the text format, defaulting to on.
 - [ ] Replace `new TextEncoder()` in `ProtoWriter.string` with a UTF-8 fallback when the global
   is missing, so protobuf export works on React Native. Confirm the absence on-device first.
 - [ ] Treat any 2xx as JSON export success and warn on a non-zero `partialSuccess` rejected
