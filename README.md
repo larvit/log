@@ -153,7 +153,7 @@ is given to; children and clones do not inherit it.
 
 An unsampled header (flags `00`) is honoured: the instance and its children export no records or
 spans, `log.traceparent()` and `log.fetch` pass `00` on, and console output is unchanged.
-`log.sampled` tells which. `tracestate` is not read or forwarded.
+`log.sampled` tells which.
 
 ## Queue exports
 
