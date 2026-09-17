@@ -30,7 +30,7 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
 - [ ] Inject one clock (`now`, `setTimeout`, `clearTimeout`) behind span and record timestamps and
   the `Queue` timers, so tests assert exact times instead of "within an hour" and the retry
   schedule, its 30 s cap included, without waiting.
-- [ ] Add a size badge to the README (2.3.0: 15.0 KB minified, 4.7 KB gzipped).
+- [x] Add a size badge to the README (2.3.0: 15.0 KB minified, 4.7 KB gzipped).
 - [ ] Rename `.github/workflows/master.yaml` to `push.yaml` and update the README badge.
 
 ### Deprecations (warn once on stderr)
@@ -55,6 +55,11 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
   Today `context` wins.
 - [ ] Merge a child's `context` per key with the parent's, as `clone()` does. Today a child's
   `context` replaces the parent's wholesale.
+- [ ] Export metadata as typed OTLP attribute values instead of coercing every one to
+  `stringValue`: `boolValue` for a boolean, `intValue` for a safe integer, `doubleValue` for any
+  other number, so OTLP carries what the JSON formatter already emits. Breaking because a backend
+  that indexed these as strings re-types the field, and queries and dashboards built on the string
+  change with it.
 - [ ] Stop a child inheriting `spanName`; default to `"unnamed-span"` for both derivations.
 - [ ] Allow `parentLog` with `traceparent`: settings inherit from `parentLog`, the span nests under
   the upstream `traceparent`. This is the request-handler case; today it silently loses the trace.
