@@ -544,6 +544,28 @@ test("a rejected export (4xx) drops the batch, reports one line per batch and do
 	t.end();
 });
 
+test("any 2xx is JSON export success; a partialSuccess rejected count is reported once and never retried", async t => {
+	const { calls } = stubFetch(path => {
+		if (path === "/v1/logs") return response({ json: { partialSuccess: { errorMessage: "too old", rejectedLogRecords: "1" } } });
+
+		return { ...response({ status: 202 }), json: () => Promise.reject(new SyntaxError("Unexpected end of JSON input")) };
+	});
+	const reports = reportSink();
+	const log = new Log({ otlpQueue: new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report }), stderr: () => {} });
+
+	log.info("x");
+	log.info("y");
+	await log.end();
+
+	t.deepEqual(calls.map(call => call.path), ["/v1/logs", "/v1/traces"], "both batches are sent");
+	t.deepEqual(reports.lines, [{ error: "too old", items: 2, msg: "OTLP export partially rejected", path: "/v1/logs", rejected: 1, status: 200, url: "http://127.0.0.1:4318/v1/logs" }], "the rejection is one line with the count; the 202 with no body is plain success");
+
+	calls.length = 0;
+	await log.flush();
+	t.strictEqual(calls.length, 0, "neither batch is retried");
+	t.end();
+});
+
 test("Queue retries a failed batch with growing backoff until it is accepted", async t => {
 	let attempts = 0;
 	const { calls } = stubFetch(() => {

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Any 2xx is JSON export success; before, a body other than `{}` or `{"partialSuccess":{}}` was
+  reported as a rejection. A `partialSuccess` with a rejected count is reported through `report`
+  as `OTLP export partially rejected`, with `rejected` and the collector's `errorMessage` as `error`.
 - `colors: false` turns off the ANSI colour codes in text output. Unset in code, `NO_COLOR`
   (non-empty) turns it off; otherwise `FORCE_COLOR` turns it on, except `0` or `false` which turn
   it off. A value set in code wins over both. Inherited by children and clones. Formatters receive the setting as `EntryFormatterConf.colors`; `msgTextFormatter`

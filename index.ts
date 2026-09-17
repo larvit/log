@@ -312,6 +312,23 @@ function stringField(value: unknown, key: string): string | undefined {
 	}
 }
 
+// OTLP partialSuccess: proto3 JSON writes the int64 count as a string, some collectors as a number.
+function partialRejection(body: unknown): { error?: string, rejected: number } | undefined {
+	let partial: unknown;
+
+	try {
+		partial = typeof body === "object" && body !== null ? Reflect.get(body, "partialSuccess") : undefined;
+	} catch {
+		return undefined;
+	}
+
+	if (typeof partial !== "object" || partial === null) return undefined;
+
+	const rejected = Number(Reflect.get(partial, "rejectedLogRecords") ?? Reflect.get(partial, "rejectedSpans") ?? 0);
+
+	return rejected > 0 ? { error: stringField(partial, "errorMessage"), rejected } : undefined;
+}
+
 // error.type per OTel semconv; "_OTHER" is its fallback.
 function spanFailure(error: unknown): { message: string, type: string } {
 	let message = stringField(error, "message");
@@ -819,7 +836,7 @@ export class Queue implements OtlpQueue {
 			this.changed();
 
 			if (failure) {
-				this.report("OTLP export rejected, batch dropped", this.describe(batch, failure));
+				this.report("OTLP export rejected, batch dropped", this.describe(batch, { error: failure.message, status: failure.status }));
 			}
 		}
 
@@ -836,7 +853,7 @@ export class Queue implements OtlpQueue {
 			void this.flush();
 		}, retryInMs);
 		unref(this.retryTimer);
-		this.report("OTLP export failed, will retry", { ...this.describe(batch, failure), retryInMs });
+		this.report("OTLP export failed, will retry", { ...this.describe(batch, { error: failure.message, status: failure.status }), retryInMs });
 	}
 
 	// The oldest item's kind, plus every later item of the same, up to maxBatchBytes.
@@ -898,12 +915,12 @@ export class Queue implements OtlpQueue {
 				return { message: "Non-ok return status", retry: res.status === 408 || res.status === 429 || res.status >= 500, status: res.status };
 			}
 
-			// Protobuf responses are binary (usually empty); a 2xx is success. Only the JSON transport inspects the body.
+			// Protobuf responses are binary; only the JSON transport reads the body, for a partialSuccess.
 			if (!protobuf) {
-				const resBodyStr = JSON.stringify(await res.json().catch(() => undefined));
+				const rejection = partialRejection(await res.json().catch(() => undefined));
 
-				if (resBodyStr !== "{\"partialSuccess\":{}}" && resBodyStr !== "{}") {
-					return { message: `Invalid response body from OTLP service. Expected '{"partialSuccess":{}}' or '{}' but got: '${resBodyStr}'`, retry: false, status: res.status };
+				if (rejection) {
+					this.report("OTLP export partially rejected", { ...this.describe(batch, { error: rejection.error, status: res.status }), rejected: rejection.rejected });
 				}
 			}
 
@@ -915,10 +932,10 @@ export class Queue implements OtlpQueue {
 		}
 	}
 
-	private describe(batch: QueuedItem[], failure: SendFailure): DefinedMetadata {
+	private describe(batch: QueuedItem[], outcome: { error?: string, status?: number }): DefinedMetadata {
 		const path = otlpPath(batch[0].payload);
 
-		return withoutUndefined({ error: failure.message, items: batch.length, path, status: failure.status, url: this.url + path });
+		return withoutUndefined({ error: outcome.error, items: batch.length, path, status: outcome.status, url: this.url + path });
 	}
 
 	private report(msg: string, metadata: DefinedMetadata): void {
