@@ -22,10 +22,8 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
   `keepalive` and the 64 KB cap, the 1000-item bound and one stderr line per failed attempt all live
   in the queue. `log.flush()` flushes without ending; `end()` flushes after closing the span.
 - [x] Add `colors?: boolean` to the text format, defaulting to on.
-- [ ] Replace `new TextEncoder()` in `ProtoWriter.string` with a UTF-8 fallback when the global
-  is missing, so protobuf export works on React Native. Confirm the absence on-device first.
-- [ ] Treat any 2xx as JSON export success and warn on a non-zero `partialSuccess` rejected
-  count. Today only a body of exactly `{}` or `{"partialSuccess":{}}` passes.
+- [x] Treat any 2xx as JSON export success and warn on a non-zero `partialSuccess` rejected
+  count.
 - [ ] Reject `traceparent` version `ff` and honour the incoming `sampled` flag: unsampled means no
   export and an outgoing header saying `00`. Today `ff` is accepted and `sampled` ignored.
   `tracestate` stays out of scope.
@@ -75,6 +73,9 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
 
 ## Kept as is, decided 2026-09-16
 
+- `new TextEncoder()` in `ProtoWriter.string` stays without a fallback (decided 2026-09-17): Hermes
+  has had the global since React Native 0.74 (Expo SDK 51 changelog, 2024-05-07), and every
+  supported React Native is newer.
 - Protobuf encoder stays; collectors that reject JSON are real, and the whole file is 4.7 KB gz.
 - Not added: sampling beyond the incoming flag, `tracestate`, span events, resource attributes
   beyond `service.name`. Each pulls toward being an SDK, against priority 2.

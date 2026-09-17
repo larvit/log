@@ -185,14 +185,15 @@ queue is in memory only.
 | `otlpAdditionalHeaders` | `Record<string, string>` | none | Extra headers on every request, e.g. `{ Authorization: "Bearer …" }`. |
 | `otlpHttpBaseURI` | `string` | required | OTLP/HTTP endpoint, e.g. `http://127.0.0.1:4318`. Logs go to `/v1/logs`, spans to `/v1/traces` under it; a base path is kept. A malformed URI throws in the constructor. |
 | `otlpProtocol` | `"http/json" \| "http/protobuf"` | `"http/json"` | Wire format. Both use the same endpoint; use protobuf for collectors that reject JSON. |
-| `report` | `(msg, metadata) => void` | `console.error` | Sink for one line per failed attempt, dropped batch or drop round. The `Log`-built queue writes through the instance's `stderr` and `entryFormatter`. |
+| `report` | `(msg, metadata) => void` | `console.error` | Sink for one line per failed attempt, dropped batch, drop round or partially rejected batch. The `Log`-built queue writes through the instance's `stderr` and `entryFormatter`. |
 | `retryDelayMs` | `number` | `1000` | Delay before the first retry; doubles per consecutive failure, capped at 30 s. |
 | `storage` | `QueueStorage` | none | Persists the queue, see above. |
 
-A send has a 3 s timeout. A network error, timeout, 408, 429 or 5xx keeps the batch for retry; any
-other non-2xx drops it. A retry timer never keeps a Node or Deno process alive, so a script whose
-first attempt fails loses the batch at exit, `await end()` or not; give the queue a `storage` to
-carry it into the next run.
+A send has a 3 s timeout. Any 2xx is success; a JSON response whose `partialSuccess` has a rejected
+count is reported with the count and the collector's message, and the batch is not resent. A
+network error, timeout, 408, 429 or 5xx keeps the batch for retry; any other non-2xx drops it. A
+retry timer never keeps a Node or Deno process alive, so a script whose first attempt fails loses
+the batch at exit, `await end()` or not; give the queue a `storage` to carry it into the next run.
 
 `flush()` on `Log` or `Queue` sends everything queued, one attempt per batch, and resolves when that
 round is done. A failed batch stays queued for the retry, and until that fires `flush()` attempts
