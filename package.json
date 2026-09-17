@@ -1,5 +1,6 @@
 {
   "name": "@larvit/log",
+  "description": "Structured logging with a tiny API, OTLP export of logs and traces, and auto-instrumented HTTP tracing. No dependencies.",
   "version": "2.3.0",
   "type": "module",
   "license": "MIT",
@@ -23,7 +24,7 @@
   },
   "devDependencies": {
     "@larvit/eslint-config-typescript-esm": "2.0.0",
-    "@types/node": "25.9.4",
+    "@types/node": "25.9.6",
     "eslint": "10.5.0",
     "globals": "17.12.0",
     "playwright": "1.61.0",

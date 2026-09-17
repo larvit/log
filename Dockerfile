@@ -1,7 +1,7 @@
 # Runs the test suite with dependencies installed *inside* the container, so a local run is
 # byte-for-byte the same as CI. BASE_IMAGE switches between the Node matrix (node:<version>) and
 # the official Playwright image (browsers preinstalled) used for the browser tests.
-ARG BASE_IMAGE=node:22-bookworm-slim
+ARG BASE_IMAGE=node:24-bookworm-slim
 FROM ${BASE_IMAGE}
 
 # Browsers ship inside the Playwright base image; never let the npm install download them.
