@@ -2,10 +2,9 @@
 
 ## Unreleased
 
-- `colors` option: ANSI colour in text output. On by default only when `process.stdout.isTTY` and
-  `NO_COLOR` is empty or unset, so piped, file and browser output is now plain; `colors: true`
-  restores the old always-on behaviour. Inherited by children and clones. Formatters receive it as
-  `EntryFormatterConf.colors`; `msgTextFormatter` colours unless it is `false`.
+- `colors: false` turns off the ANSI colour codes in text output. Inherited by children and clones.
+  Formatters receive the setting as `EntryFormatterConf.colors`; `msgTextFormatter` colours unless
+  it is `false`.
 - Export queue. Records and spans are batched into one POST per path, by time (1 s) or size (64 KiB),
   sent with `keepalive` and retried with backoff on a network error, timeout, 408, 429 or 5xx; other
   non-2xx drops the batch. One stderr line per failed attempt. Bounded at 1000 items, oldest dropped
