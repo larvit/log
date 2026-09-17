@@ -195,7 +195,7 @@ const TEXT_LEVEL_TAGS: Record<LogLevel, { ansi: number, tag: string }> = {
 	warn: { ansi: 33, tag: "war" },
 };
 
-// NO_COLOR wins over FORCE_COLOR; FORCE_COLOR=0 disables, as in supports-color.
+// NO_COLOR wins over FORCE_COLOR; FORCE_COLOR=0 and =false disable, as in Node's tty.hasColors.
 function colorsFromEnv(): boolean | undefined {
 	try {
 		const processGlobal: unknown = Reflect.get(globalThis, "process");
@@ -206,11 +206,11 @@ function colorsFromEnv(): boolean | undefined {
 
 		const forceColor: unknown = Reflect.get(env, "FORCE_COLOR");
 
-		if (forceColor === "0") return false;
+		if (forceColor === undefined) return undefined;
 
-		return forceColor ? true : undefined;
+		return forceColor !== "0" && forceColor !== "false";
 	} catch {
-		// Deno without --allow-env throws on the env read.
+		// A permission-gated env may throw on read.
 		return undefined;
 	}
 }

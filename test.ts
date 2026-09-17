@@ -254,7 +254,7 @@ test("each level writes its colored token to the right stream", t => {
 	];
 
 	for (const { level, stream, token } of cases) {
-		const cap = capture("silly"); // silly passes every level through the filter
+		const cap = capture({ colors: true, logLevel: "silly" }); // silly passes every level through the filter
 
 		cap.log[level]("msg");
 		t.strictEqual(cap[stream][0]?.substring(19), `Z [${token}] msg`, `${level} -> ${stream} with its token`);
@@ -285,7 +285,9 @@ test("colors unset in code follows NO_COLOR and FORCE_COLOR; set in code it igno
 	t.strictEqual(colorsWith({ NO_COLOR: "1" }), false, "NO_COLOR turns it off");
 	t.strictEqual(colorsWith({ NO_COLOR: "" }), true, "an empty NO_COLOR does not count");
 	t.strictEqual(colorsWith({ FORCE_COLOR: "1" }), true, "FORCE_COLOR turns it on");
+	t.strictEqual(colorsWith({ FORCE_COLOR: "" }), true, "an empty FORCE_COLOR turns it on, as in Node");
 	t.strictEqual(colorsWith({ FORCE_COLOR: "0" }), false, "FORCE_COLOR=0 turns it off");
+	t.strictEqual(colorsWith({ FORCE_COLOR: "false" }), false, "FORCE_COLOR=false turns it off");
 	t.strictEqual(colorsWith({ FORCE_COLOR: "1", NO_COLOR: "1" }), false, "NO_COLOR wins over FORCE_COLOR");
 	t.strictEqual(colorsWith({ NO_COLOR: "1" }, { colors: true }), true, "colors: true in code wins over NO_COLOR");
 	t.strictEqual(colorsWith({ FORCE_COLOR: "1" }, { colors: false }), false, "colors: false in code wins over FORCE_COLOR");
