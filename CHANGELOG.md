@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- An incoming `traceparent` with the sampled flag off is honoured: the instance and its children
+  export no records or spans, and `log.traceparent()` and `log.fetch` pass `00` downstream. Console
+  output is unchanged. New `log.sampled` field, on `LogInt`; `parseTraceparent` returns `sampled`
+  and rejects version `ff`.
 - Any 2xx is JSON export success; before, a body other than `{}` or `{"partialSuccess":{}}` was
   reported as a rejection. A `partialSuccess` with a rejected count is reported through `report`
   as `OTLP export partially rejected`, with `rejected` and the collector's `errorMessage` as `error`.

@@ -983,6 +983,17 @@ test("parseTraceparent rejects malformed headers", t => {
 	t.strictEqual(parseTraceparent(`00-${"0".repeat(32)}-${"a".repeat(16)}-01`), null, "all-zero traceId is rejected");
 	t.strictEqual(parseTraceparent(`00-${"a".repeat(32)}-${"0".repeat(16)}-01`), null, "all-zero spanId is rejected");
 	t.strictEqual(parseTraceparent(`00-${"a".repeat(31)}-${"b".repeat(16)}-01`), null, "wrong-length traceId is rejected");
+	t.strictEqual(parseTraceparent(`ff-${"a".repeat(32)}-${"b".repeat(16)}-01`), null, "version ff is rejected");
+	t.end();
+});
+
+test("parseTraceparent reads the sampled flag", t => {
+	const ids = `${generateTraceId()}-${generateSpanId()}`;
+
+	t.strictEqual(parseTraceparent(`00-${ids}-01`)?.sampled, true, "01 is sampled");
+	t.strictEqual(parseTraceparent(`00-${ids}-00`)?.sampled, false, "00 is unsampled");
+	t.strictEqual(parseTraceparent(`00-${ids}-03`)?.sampled, true, "only the lowest bit decides");
+	t.strictEqual(parseTraceparent(`00-${ids}-02`)?.sampled, false, "a higher bit alone is unsampled");
 	t.end();
 });
 
@@ -1019,6 +1030,40 @@ test("log.traceparent() emits the current span context", t => {
 	const log = new Log();
 
 	t.strictEqual(log.traceparent(), formatTraceparent(log.span.traceId, log.span.spanId), "emitted header carries this span's context");
+	t.strictEqual(log.sampled, true, "a fresh trace is sampled");
+	t.end();
+});
+
+test("an unsampled traceparent exports nothing, passes 00 on and still prints", async t => {
+	const { calls } = stubFetch();
+	const stdout: string[] = [];
+	const traceparent = formatTraceparent(generateTraceId(), generateSpanId(), false);
+	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {}, stdout: line => { stdout.push(line); }, traceparent });
+	const child = new Log({ parentLog: log, spanName: "child" });
+	const clone = log.clone({ spanName: "clone" });
+
+	t.strictEqual(log.sampled, false, "the incoming flag is honoured");
+	t.strictEqual(child.sampled, false, "a child inherits the flag");
+	t.strictEqual(clone.sampled, true, "a clone is its own, sampled, trace");
+	t.ok(log.traceparent().endsWith("-00"), "the outgoing header says unsampled");
+	t.ok(child.traceparent().endsWith("-00"), "a child's outgoing header says unsampled");
+	t.ok(clone.traceparent().endsWith("-01"), "a clone's outgoing header says sampled");
+
+	log.info("kept on the console");
+	child.info("child record");
+	await log.fetch("https://api.test/x");
+	await child.end();
+	await log.end();
+
+	t.ok(callHeader(calls.find(call => call.path === "/x")!, "traceparent")?.endsWith("-00"), "log.fetch propagates the unsampled flag");
+	t.strictEqual(calls.filter(call => call.path !== "/x").length, 0, "no record or span reaches the collector");
+	t.strictEqual(stdout.length, 2, "console output is unaffected");
+
+	clone.info("clone record");
+	await clone.end();
+
+	t.strictEqual(calls.filter(call => call.path === "/v1/logs").length, 1, "the clone's record exports");
+	t.strictEqual(exportedSpans(calls).map(span => span.name).join(","), "clone", "only the clone's span exports");
 	t.end();
 });
 
