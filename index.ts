@@ -1,6 +1,8 @@
 export type EntryFormatterConf = {
+	// The instance's resolved `colors`. Unset means on.
+	colors?: boolean;
 	logLevel: LogLevel;
-	metadata?: Metadata;
+	metadata?: DefinedMetadata;
 	msg: string;
 	msTimestamp?: number;
 };
@@ -12,13 +14,16 @@ export type LogConf = {
 	captureRequestHeaders?: string[];
 	// log.fetch only: response header names to record as http.response.header.* (allow-list, none by default).
 	captureResponseHeaders?: string[];
+	colors?: boolean;
 	context?: Metadata;
 	entryFormatter?: (conf: EntryFormatterConf) => string;
 	format?: "text" | "json";
 	logLevel?: LogLevel | "none";
+	// The three otlp* transport options are shorthand for `otlpQueue: new Queue({ ...them })`; never both.
 	otlpAdditionalHeaders?: Record<string, string>;
 	otlpHttpBaseURI?: string;
 	otlpProtocol?: "http/json" | "http/protobuf";
+	otlpQueue?: OtlpQueue;
 	parentLog?: LogInt;
 	printTraceInfo?: boolean;
 	spanName?: string;
@@ -30,13 +35,10 @@ export type LogConf = {
 };
 
 // conf after the constructor fills its defaults: the always-set fields are no longer optional.
-export type ResolvedLogConf = LogConf & Required<Pick<LogConf, "entryFormatter" | "logLevel" | "stderr" | "stdout">>;
+export type ResolvedLogConf = LogConf & Required<Pick<LogConf, "colors" | "entryFormatter" | "logLevel" | "stderr" | "stdout">>;
 
-export type LogInt = {
-	conf: LogConf;
-	fetch: (input: string | URL, init?: RequestInit) => Promise<Response>;
-	span: OtlpSpan;
-	traceparent: () => string;
+export type Logger = {
+	enabled: (logLevel: LogLevel) => boolean;
 	/* eslint-disable perfectionist/sort-object-types */
 	error: LogShorthand;
 	warn: LogShorthand;
@@ -44,8 +46,17 @@ export type LogInt = {
 	verbose: LogShorthand;
 	debug: LogShorthand;
 	silly: LogShorthand;
-	end: () => Promise<void>;
 	/* eslint-enable perfectionist/sort-object-types */
+};
+
+export type LogInt = Logger & {
+	conf: LogConf;
+	end: (options?: { error?: unknown }) => Promise<void>;
+	fetch: (input: string | URL, init?: RequestInit) => Promise<Response>;
+	flush: () => Promise<void>;
+	sampled: boolean;
+	span: OtlpSpan;
+	traceparent: () => string;
 };
 
 export type LogLevel = keyof typeof LogLevels;
@@ -58,7 +69,12 @@ export type Metadata = {
 
 // Primitive values only. String() coerces them for OTLP; the JSON formatter keeps them native.
 // bigint/objects are excluded: JSON.stringify throws on bigint and renders objects as "[object Object]".
-export type MetadataValue = boolean | number | string;
+export type MetadataValue = boolean | number | string | undefined;
+
+// What formatters, `log.context` and the OTLP builders receive: the input minus its undefined keys.
+export type DefinedMetadata = {
+	[key: string]: Exclude<MetadataValue, undefined>;
+};
 
 export type OtlpAttribute = {
 	key: string,
@@ -101,7 +117,7 @@ export type OtlpSpan = {
 	parentSpanId?: string,
 	spanId: string,
 	startTimeUnixNano: string,
-	status: { code: number },
+	status: { code: number, message?: string },
 	traceId: string,
 };
 
@@ -119,14 +135,6 @@ export type OtlpSpanPayload = {
 		}[],
 	}[],
 };
-
-type FetchError = {
-	message: string;
-	status?: number;
-};
-
-// Fixed OTLP export timeout (ms). Bounds each fetch so end() can never hang on an unresponsive collector.
-const OTLP_EXPORT_TIMEOUT_MS = 3000;
 
 export const LogLevels = {
 	/* eslint-disable sort-keys */
@@ -157,6 +165,18 @@ export const LogLevels = {
 	/* eslint-enable sort-keys */
 };
 
+function withoutUndefined(metadata: Metadata = {}): DefinedMetadata {
+	const defined: DefinedMetadata = {};
+
+	for (const key in metadata) {
+		const value = metadata[key];
+
+		if (value !== undefined) defined[key] = value;
+	}
+
+	return defined;
+}
+
 export function msgJsonFormatter(conf: EntryFormatterConf) {
 	// New object: never mutate the caller's metadata. Framework keys win over metadata.
 	return JSON.stringify({
@@ -167,25 +187,43 @@ export function msgJsonFormatter(conf: EntryFormatterConf) {
 	});
 }
 
-export function msgTextFormatter(conf: EntryFormatterConf) {
-	let levelOut: string;
+const TEXT_LEVEL_TAGS: Record<LogLevel, { ansi: number, tag: string }> = {
+	debug: { ansi: 35, tag: "deb" },
+	error: { ansi: 31, tag: "err" },
+	info: { ansi: 32, tag: "inf" },
+	silly: { ansi: 37, tag: "sil" },
+	verbose: { ansi: 34, tag: "ver" },
+	warn: { ansi: 33, tag: "war" },
+};
 
-	if (conf.logLevel === "silly") {
-		levelOut = "\x1b[1;37msil\x1b[0m";
-	} else if (conf.logLevel === "debug") {
-		levelOut = "\x1b[1;35mdeb\x1b[0m";
-	} else if (conf.logLevel === "verbose") {
-		levelOut = "\x1b[1;34mver\x1b[0m";
-	} else if (conf.logLevel === "info") {
-		levelOut = "\x1b[1;32minf\x1b[0m";
-	} else if (conf.logLevel === "warn") {
-		levelOut = "\x1b[1;33mwar\x1b[0m";
-	} else if (conf.logLevel === "error") {
-		levelOut = "\x1b[1;31merr\x1b[0m";
-	} else {
+// NO_COLOR wins over FORCE_COLOR; FORCE_COLOR=0 and =false disable, as in Node's tty.hasColors.
+function colorsFromEnv(): boolean | undefined {
+	try {
+		const processGlobal: unknown = Reflect.get(globalThis, "process");
+		const env: unknown = typeof processGlobal === "object" && processGlobal !== null ? Reflect.get(processGlobal, "env") : undefined;
+
+		if (typeof env !== "object" || env === null) return undefined;
+		if (Reflect.get(env, "NO_COLOR")) return false;
+
+		const forceColor: unknown = Reflect.get(env, "FORCE_COLOR");
+
+		if (forceColor === undefined) return undefined;
+
+		return forceColor !== "0" && forceColor !== "false";
+	} catch {
+		// A permission-gated env may throw on read.
+		return undefined;
+	}
+}
+
+export function msgTextFormatter(conf: EntryFormatterConf) {
+	const level = TEXT_LEVEL_TAGS[conf.logLevel];
+
+	if (!level) {
 		throw new Error(`Invalid conf.logLevel: "${conf.logLevel}"`);
 	}
 
+	const levelOut = conf.colors === false ? level.tag : `\x1b[1;${level.ansi}m${level.tag}\x1b[0m`;
 	const date = new Date(conf.msTimestamp ?? Date.now());
 	let str = `${date.toISOString().substring(0, 19)}Z [${levelOut}] ${conf.msg}`;
 	const metadataStr = JSON.stringify(conf.metadata ?? {});
@@ -235,23 +273,23 @@ export function formatTraceparent(traceId: string, spanId: string, sampled: bool
 	return `00-${traceId}-${spanId}-${sampled ? "01" : "00"}`;
 }
 
-// Parses a W3C `traceparent`. Untrusted input: returns null (never throws) for any malformed or
-// all-zero value, so the caller cleanly starts a fresh trace instead of continuing.
-export function parseTraceparent(header: string): { flags: string, spanId: string, traceId: string } | null {
-	const match = /^[0-9a-f]{2}-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$/.exec(header.trim().toLowerCase());
+// Parses a W3C `traceparent`. Untrusted input: returns null (never throws) for any malformed,
+// version-ff or all-zero value, so the caller cleanly starts a fresh trace instead of continuing.
+export function parseTraceparent(header: string): { flags: string, sampled: boolean, spanId: string, traceId: string } | null {
+	const match = /^([0-9a-f]{2})-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$/.exec(header.trim().toLowerCase());
 
 	if (!match) {
 		return null;
 	}
 
-	const [, traceId, spanId, flags] = match;
+	const [, version, traceId, spanId, flags] = match;
 
-	// All-zero ids are invalid per the spec; treat them as absent.
-	if (/^0+$/.test(traceId) || /^0+$/.test(spanId)) {
+	// ff is reserved and all-zero ids are invalid per the spec; treat them as absent.
+	if (version === "ff" || /^0+$/.test(traceId) || /^0+$/.test(spanId)) {
 		return null;
 	}
 
-	return { flags, spanId, traceId };
+	return { flags, sampled: (parseInt(flags, 16) & 1) === 1, spanId, traceId };
 }
 
 // msTimestamp should be generated from Date.now()
@@ -264,13 +302,50 @@ function getNsTimestamp(msTimestamp: number): string {
 	return totalNanos.toString();
 }
 
-function isFetchError(error: unknown): error is FetchError {
-	return typeof error === "object" && error !== null && "message" in error;
+// Total: a throwing getter yields undefined, so the flush path never rejects on its input.
+function stringField(value: unknown, key: string): string | undefined {
+	try {
+		const field: unknown = typeof value === "object" && value !== null ? Reflect.get(value, key) : undefined;
+
+		return typeof field === "string" ? field : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+// OTLP partialSuccess: proto3 JSON writes the int64 count as a string, some collectors as a number.
+function partialRejection(body: unknown): { message?: string, rejected: number } | undefined {
+	try {
+		const partial: unknown = typeof body === "object" && body !== null ? Reflect.get(body, "partialSuccess") : undefined;
+
+		if (typeof partial !== "object" || partial === null) return undefined;
+
+		const rejected = Number(Reflect.get(partial, "rejectedLogRecords") ?? Reflect.get(partial, "rejectedSpans") ?? 0);
+
+		return rejected > 0 ? { message: stringField(partial, "errorMessage"), rejected } : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+// error.type per OTel semconv; "_OTHER" is its fallback.
+function spanFailure(error: unknown): { message: string, type: string } {
+	let message = stringField(error, "message");
+
+	if (message === undefined) {
+		try {
+			message = String(error);
+		} catch {
+			message = "_OTHER";
+		}
+	}
+
+	return { message, type: stringField(error, "code") ?? stringField(error, "name") ?? "_OTHER" };
 }
 
 // Resource-level OTLP attributes (service.name + telemetry.sdk.*), shared by logs and spans.
 // Grafana/Loki reads service.name from here, not from the records.
-function buildResourceAttributes(context: Metadata): OtlpAttribute[] {
+function buildResourceAttributes(context: DefinedMetadata): OtlpAttribute[] {
 	return [
 		{ key: "service.name", value: { stringValue: String(context["service.name"] || "unnamed-service") } },
 		{ key: "telemetry.sdk.language", value: { stringValue: "ecmascript" } },
@@ -281,7 +356,7 @@ function buildResourceAttributes(context: Metadata): OtlpAttribute[] {
 
 // Pure builder: state in, OTLP log payload out. Kept out of the class so it is trivially testable.
 function buildLogPayload(opts: {
-	attributes: Metadata,
+	attributes: DefinedMetadata,
 	logLevel: LogLevel,
 	msg: string,
 	msTimestamp: number,
@@ -312,14 +387,13 @@ function buildLogPayload(opts: {
 	};
 }
 
-// Span finalizer: writes the resolved attributes/parent onto the span, then returns the OTLP payload.
+// Span finalizer: writes the resolved attributes onto the span, then returns the OTLP payload.
 // Not pure — it mutates `span` — but kept out of the class so it stays trivially testable.
 function buildSpanPayload(opts: {
-	context: Metadata,
-	parentSpan?: OtlpSpan,
+	context: DefinedMetadata,
 	span: OtlpSpan,
 }): OtlpSpanPayload {
-	const { context, parentSpan, span } = opts;
+	const { context, span } = opts;
 
 	// service.name is carried on the resource scope below, so it is excluded from the span attributes.
 	const attributes: OtlpAttribute[] = Object.entries(context)
@@ -328,10 +402,6 @@ function buildSpanPayload(opts: {
 
 	if (attributes.length) {
 		span.attributes = attributes;
-	}
-
-	if (parentSpan && parentSpan.spanId) {
-		span.parentSpanId = parentSpan.spanId;
 	}
 
 	return {
@@ -501,7 +571,12 @@ function encodeOtlpSpanPayload(payload: OtlpSpanPayload): Uint8Array<ArrayBuffer
 							spanMsg.fixed64(7, span.startTimeUnixNano); // start_time_unix_nano = 7
 							spanMsg.fixed64(8, span.endTimeUnixNano); // end_time_unix_nano = 8
 							writeAttributes(spanMsg, 9, span.attributes); // attributes = 9
-							if (span.status.code) spanMsg.message(15, status => status.uint(3, span.status.code)); // status = 15 (Status.code = 3)
+							if (span.status.code) {
+								spanMsg.message(15, status => { // status = 15
+									if (span.status.message !== undefined) status.string(2, span.status.message); // Status.message = 2
+									status.uint(3, span.status.code); // Status.code = 3
+								});
+							}
 						});
 					}
 				});
@@ -514,6 +589,450 @@ function encodeOtlpSpanPayload(payload: OtlpSpanPayload): Uint8Array<ArrayBuffer
 
 function encodeOtlpProtobuf(payload: OtlpLogPayload | OtlpSpanPayload): Uint8Array<ArrayBuffer> {
 	return "resourceLogs" in payload ? encodeOtlpLogPayload(payload) : encodeOtlpSpanPayload(payload);
+}
+
+// --- OTLP export queue -----------------------------------------------------
+
+export type OtlpPayload = OtlpLogPayload | OtlpSpanPayload;
+
+// What Log exports through. Queue is the shipped implementation; any { enqueue, flush } will do.
+export type OtlpQueue = {
+	enqueue: (payload: OtlpPayload) => void;
+	flush: () => Promise<void>;
+};
+
+// localStorage and React Native's AsyncStorage satisfy this as they are.
+export type QueueStorage = {
+	getItem: (key: string) => Promise<string | null | undefined> | string | null | undefined;
+	removeItem: (key: string) => Promise<void> | void;
+	setItem: (key: string, value: string) => Promise<void> | void;
+};
+
+export type QueueConf = {
+	batchDelayMs?: number;
+	key?: string;
+	maxBatchBytes?: number;
+	maxItems?: number;
+	otlpAdditionalHeaders?: Record<string, string>;
+	otlpHttpBaseURI: string;
+	otlpProtocol?: "http/json" | "http/protobuf";
+	report?: (msg: string, metadata: DefinedMetadata) => void;
+	retryDelayMs?: number;
+	storage?: QueueStorage;
+};
+
+export type ResolvedQueueConf = QueueConf & Required<Pick<QueueConf, "batchDelayMs" | "key" | "maxBatchBytes" | "maxItems" | "otlpProtocol" | "report" | "retryDelayMs">>;
+
+type QueuedItem = { bytes: number, payload: OtlpPayload };
+
+type SendFailure = { message: string, retry: boolean, status?: number };
+
+// Browsers reject a keepalive request whose body is over 64 KiB.
+const KEEPALIVE_MAX_BYTES = 65536;
+const OTLP_EXPORT_TIMEOUT_MS = 3000;
+const RETRY_DELAY_MAX_MS = 30000;
+
+function utf8Length(str: string): number {
+	let bytes = 0;
+
+	for (let i = 0; i < str.length; i++) {
+		const code = str.charCodeAt(i);
+
+		if (code < 0x80) {
+			bytes += 1;
+		} else if (code < 0x800) {
+			bytes += 2;
+		} else if (code >= 0xd800 && code < 0xdc00) {
+			bytes += 4;
+			i++;
+		} else {
+			bytes += 3;
+		}
+	}
+
+	return bytes;
+}
+
+// The JSON size bounds the protobuf size too, so one measure serves both transports.
+function withBytes(payload: OtlpPayload): QueuedItem {
+	return { bytes: utf8Length(JSON.stringify(payload)), payload };
+}
+
+function isOtlpPayload(value: unknown): value is OtlpPayload {
+	return typeof value === "object" && value !== null
+		&& (Array.isArray(Reflect.get(value, "resourceLogs")) || Array.isArray(Reflect.get(value, "resourceSpans")));
+}
+
+function otlpPath(payload: OtlpPayload): string {
+	return "resourceLogs" in payload ? "/v1/logs" : "/v1/traces";
+}
+
+// Records under one resource share a resourceLogs entry and its single scopeLogs entry.
+function mergeLogPayloads(payloads: OtlpLogPayload[]): OtlpLogPayload {
+	const byResource = new Map<string, OtlpLogPayload["resourceLogs"][number]>();
+
+	for (const entry of payloads.flatMap(payload => payload.resourceLogs)) {
+		const key = JSON.stringify(entry.resource);
+		const records = entry.scopeLogs.flatMap(scopeLog => scopeLog.logRecords);
+		const merged = byResource.get(key);
+
+		if (merged) {
+			merged.scopeLogs[0].logRecords.push(...records);
+		} else {
+			byResource.set(key, { resource: entry.resource, scopeLogs: [{ logRecords: records }] });
+		}
+	}
+
+	return { resourceLogs: [...byResource.values()] };
+}
+
+// Spans under one resource share a resourceSpans entry, and one scopeSpans entry per scope name.
+function mergeSpanPayloads(payloads: OtlpSpanPayload[]): OtlpSpanPayload {
+	const byResource = new Map<string, OtlpSpanPayload["resourceSpans"][number]>();
+
+	for (const entry of payloads.flatMap(payload => payload.resourceSpans)) {
+		const key = JSON.stringify(entry.resource);
+		const merged = byResource.get(key) ?? { resource: entry.resource, scopeSpans: [] };
+
+		byResource.set(key, merged);
+
+		for (const scopeSpan of entry.scopeSpans) {
+			const scope = merged.scopeSpans.find(candidate => candidate.scope.name === scopeSpan.scope.name);
+
+			if (scope) {
+				scope.spans.push(...scopeSpan.spans);
+			} else {
+				merged.scopeSpans.push({ scope: scopeSpan.scope, spans: [...scopeSpan.spans] });
+			}
+		}
+	}
+
+	return { resourceSpans: [...byResource.values()] };
+}
+
+// A batch holds one kind, so the first payload decides.
+function mergePayloads(payloads: OtlpPayload[]): OtlpPayload {
+	if ("resourceLogs" in payloads[0]) {
+		return mergeLogPayloads(payloads.filter((payload): payload is OtlpLogPayload => "resourceLogs" in payload));
+	}
+
+	return mergeSpanPayloads(payloads.filter((payload): payload is OtlpSpanPayload => "resourceSpans" in payload));
+}
+
+// A pending retry must not keep a finished Node or Deno process alive.
+function unref(timer: ReturnType<typeof setTimeout>): void {
+	if (typeof timer === "object" && typeof timer.unref === "function") {
+		timer.unref();
+
+		return;
+	}
+
+	const deno: unknown = Reflect.get(globalThis, "Deno");
+	const unrefTimer: unknown = typeof deno === "object" && deno !== null ? Reflect.get(deno, "unrefTimer") : undefined;
+
+	if (typeof timer === "number" && typeof unrefTimer === "function") {
+		unrefTimer(timer);
+	}
+}
+
+export class Queue implements OtlpQueue {
+	readonly conf: ResolvedQueueConf;
+
+	private items: QueuedItem[] = [];
+	private bytes = 0;
+	private readonly url: string;
+	private dropped = 0;
+	private failures = 0;
+	private batchTimer?: ReturnType<typeof setTimeout>;
+	private retryTimer?: ReturnType<typeof setTimeout>;
+	private running?: Promise<void>;
+	private pending?: Promise<void>;
+
+	// Storage only: leftovers load before the first round, and saves coalesce into one writer.
+	private readonly ready: Promise<void>;
+	private dirty = false;
+	private saving?: Promise<void>;
+
+	constructor(conf: QueueConf) {
+		this.conf = {
+			...conf,
+			batchDelayMs: conf.batchDelayMs ?? 1000,
+			key: conf.key ?? "@larvit/log:otlp-queue",
+			maxBatchBytes: conf.maxBatchBytes ?? KEEPALIVE_MAX_BYTES,
+			maxItems: conf.maxItems ?? 1000,
+			otlpProtocol: conf.otlpProtocol ?? "http/json",
+			report: conf.report ?? console.error,
+			retryDelayMs: conf.retryDelayMs ?? 1000,
+		};
+
+		// Validate the endpoint eagerly: a malformed URI fails here, not as an unhandled rejection mid-log.
+		const base = new URL(conf.otlpHttpBaseURI);
+
+		this.url = `${base.protocol}//${base.username ? `${base.username}:${base.password}@` : ""}${base.host}${base.pathname.replace(/\/$/, "")}`;
+		this.ready = conf.storage ? this.load(conf.storage) : Promise.resolve();
+	}
+
+	enqueue(payload: OtlpPayload): void {
+		this.add([withBytes(payload)]);
+		this.changed();
+
+		if (this.bytes >= this.conf.maxBatchBytes) {
+			void this.flush();
+		} else {
+			this.schedule();
+		}
+	}
+
+	// While a retry is pending, flush() attempts nothing new: the timer decides.
+	flush(): Promise<void> {
+		if (this.retryTimer !== undefined) {
+			return this.running ?? Promise.resolve();
+		}
+
+		if (!this.running) {
+			this.running = this.round().finally(() => { this.running = undefined; });
+
+			return this.running;
+		}
+
+		this.pending ??= this.running.then(() => {
+			this.pending = undefined;
+
+			return this.flush();
+		});
+
+		return this.pending;
+	}
+
+	private schedule(): void {
+		if (this.batchTimer !== undefined || this.retryTimer !== undefined) {
+			return;
+		}
+
+		this.batchTimer = setTimeout(() => {
+			this.batchTimer = undefined;
+			void this.flush();
+		}, this.conf.batchDelayMs);
+	}
+
+	private async round(): Promise<void> {
+		await this.ready;
+		clearTimeout(this.batchTimer);
+		this.batchTimer = undefined;
+
+		while (this.items.length) {
+			const batch = this.takeBatch();
+			const failure = await this.send(batch);
+
+			if (failure?.retry) {
+				this.add(batch, true);
+				this.changed();
+				this.scheduleRetry(batch, failure);
+				break;
+			}
+
+			this.failures = 0;
+			this.changed();
+
+			if (failure) {
+				this.report("OTLP export rejected, batch dropped", this.describe(batch, failure));
+			}
+		}
+
+		this.reportDrops();
+	}
+
+	private scheduleRetry(batch: QueuedItem[], failure: SendFailure): void {
+		this.failures++;
+
+		const retryInMs = Math.min(this.conf.retryDelayMs * (2 ** (this.failures - 1)), RETRY_DELAY_MAX_MS);
+
+		this.retryTimer = setTimeout(() => {
+			this.retryTimer = undefined;
+			void this.flush();
+		}, retryInMs);
+		unref(this.retryTimer);
+		this.report("OTLP export failed, will retry", { ...this.describe(batch, failure), retryInMs });
+	}
+
+	// The oldest item's kind, plus every later item of the same, up to maxBatchBytes.
+	private takeBatch(): QueuedItem[] {
+		const logs = "resourceLogs" in this.items[0].payload;
+		const batch: QueuedItem[] = [];
+		let bytes = 0;
+
+		for (const item of this.items) {
+			if (("resourceLogs" in item.payload) !== logs) {
+				continue;
+			}
+
+			if (batch.length && bytes + item.bytes > this.conf.maxBatchBytes) {
+				break;
+			}
+
+			batch.push(item);
+			bytes += item.bytes;
+		}
+
+		const taken = new Set(batch);
+
+		this.items = this.items.filter(item => !taken.has(item));
+		this.bytes -= bytes;
+
+		return batch;
+	}
+
+	private async send(batch: QueuedItem[]): Promise<SendFailure | undefined> {
+		const protobuf = this.conf.otlpProtocol === "http/protobuf";
+		let body: string | Uint8Array<ArrayBuffer>;
+
+		// A payload that cannot be encoded (a corrupt stored item, no TextEncoder) never becomes sendable.
+		try {
+			const payload = mergePayloads(batch.map(item => item.payload));
+
+			body = protobuf ? encodeOtlpProtobuf(payload) : JSON.stringify(payload);
+		} catch (err) {
+			return { message: stringField(err, "message") ?? "Unencodable OTLP payload", retry: false };
+		}
+
+		const bytes = typeof body === "string" ? utf8Length(body) : body.length;
+
+		// AbortController + cleared timer works in browsers and Node, and never leaves a dangling timer.
+		const controller = new AbortController();
+		const timer = setTimeout(() => controller.abort(), OTLP_EXPORT_TIMEOUT_MS);
+
+		try {
+			const res = await fetch(this.url + otlpPath(batch[0].payload), {
+				body,
+				headers: { "Content-Type": protobuf ? "application/x-protobuf" : "application/json", ...this.conf.otlpAdditionalHeaders },
+				keepalive: bytes <= KEEPALIVE_MAX_BYTES,
+				method: "POST",
+				signal: controller.signal,
+			});
+
+			if (!res.ok) {
+				return { message: "Non-ok return status", retry: res.status === 408 || res.status === 429 || res.status >= 500, status: res.status };
+			}
+
+			// Protobuf responses are binary; only the JSON transport reads the body, for a partialSuccess.
+			if (!protobuf) {
+				const rejection = partialRejection(await res.json().catch(() => undefined));
+
+				if (rejection) {
+					this.report("OTLP export partially rejected", { ...this.describe(batch, { message: rejection.message, status: res.status }), rejected: rejection.rejected });
+				}
+			}
+
+			return undefined;
+		} catch (err) {
+			return { message: stringField(err, "message") ?? "Unknown error sending to OTLP", retry: true };
+		} finally {
+			clearTimeout(timer);
+		}
+	}
+
+	private describe(batch: QueuedItem[], outcome: { message?: string, status?: number }): DefinedMetadata {
+		const path = otlpPath(batch[0].payload);
+
+		return withoutUndefined({ error: outcome.message, items: batch.length, path, status: outcome.status, url: this.url + path });
+	}
+
+	private report(msg: string, metadata: DefinedMetadata): void {
+		try {
+			this.conf.report(msg, metadata);
+		} catch {
+			// A sink that throws must not break the export loop.
+		}
+	}
+
+	private reportDrops(): void {
+		if (this.dropped) {
+			this.report("OTLP queue full, oldest items dropped", { dropped: this.dropped });
+			this.dropped = 0;
+		}
+	}
+
+	// Appends (or, for a failed batch, puts back in front) and drops the oldest over maxItems.
+	private add(items: QueuedItem[], front = false): void {
+		if (front) {
+			this.items.unshift(...items);
+		} else {
+			this.items.push(...items);
+		}
+
+		for (const item of items) {
+			this.bytes += item.bytes;
+		}
+
+		const excess = this.items.length - this.conf.maxItems;
+
+		if (excess > 0) {
+			for (const item of this.items.splice(0, excess)) {
+				this.bytes -= item.bytes;
+			}
+
+			this.dropped += excess;
+		}
+	}
+
+	private async load(storage: QueueStorage): Promise<void> {
+		try {
+			const raw = await storage.getItem(this.conf.key);
+
+			if (!raw) {
+				return;
+			}
+
+			const parsed: unknown = JSON.parse(raw);
+
+			if (!Array.isArray(parsed) || !parsed.every(isOtlpPayload)) {
+				throw new Error("not a list of OTLP payloads");
+			}
+
+			this.add(parsed.map(withBytes), true);
+
+			if (this.items.length) {
+				this.schedule();
+			}
+		} catch (err) {
+			this.report("OTLP queue storage unreadable, discarded", withoutUndefined({ error: stringField(err, "message"), key: this.conf.key }));
+
+			try {
+				await storage.removeItem(this.conf.key);
+			} catch {
+				// The next save overwrites it.
+			}
+		}
+	}
+
+	private changed(): void {
+		if (!this.conf.storage) {
+			return;
+		}
+
+		this.dirty = true;
+		this.saving ??= this.save(this.conf.storage);
+	}
+
+	private async save(storage: QueueStorage): Promise<void> {
+		await this.ready;
+
+		while (this.dirty) {
+			this.dirty = false;
+
+			try {
+				if (this.items.length) {
+					await storage.setItem(this.conf.key, JSON.stringify(this.items.map(item => item.payload)));
+				} else {
+					await storage.removeItem(this.conf.key);
+				}
+			} catch (err) {
+				this.report("OTLP queue storage write failed", withoutUndefined({ error: stringField(err, "message"), key: this.conf.key }));
+			}
+		}
+
+		this.saving = undefined;
+	}
 }
 
 // --- log.fetch helpers -----------------------------------------------------
@@ -542,17 +1061,38 @@ function buildUrlFull(url: URL, captureQuery: boolean): string {
 	return `${base}?${params.toString()}`;
 }
 
+const OTLP_TRANSPORT_KEYS = ["otlpAdditionalHeaders", "otlpHttpBaseURI", "otlpProtocol"] as const;
+
+// The keys of the OTLP spelling `conf` does not use, so inheriting never puts a queue beside an
+// endpoint it was not built from.
+function otlpKeysNotToInherit(conf: LogConf): (keyof LogConf)[] {
+	if (conf.otlpQueue) {
+		return [...OTLP_TRANSPORT_KEYS];
+	}
+
+	return OTLP_TRANSPORT_KEYS.some(key => conf[key] !== undefined) ? ["otlpQueue"] : [];
+}
+
+// A Queue built from exactly these transport options: the one case where both spellings may sit
+// together (a clone, a child, a spread conf).
+function isQueueFor(queue: OtlpQueue, conf: LogConf): boolean {
+	return queue instanceof Queue
+		&& queue.conf.otlpHttpBaseURI === conf.otlpHttpBaseURI
+		&& queue.conf.otlpProtocol === (conf.otlpProtocol ?? "http/json")
+		&& queue.conf.otlpAdditionalHeaders === conf.otlpAdditionalHeaders;
+}
+
 export class Log implements LogInt {
-	context: Metadata;
+	context: DefinedMetadata;
 	ended: boolean = false;
 
 	readonly conf: ResolvedLogConf;
 
-	// In-flight OTLP log exports, awaited by end() so all logs are sent before the trace/span.
+	// Un-awaited log.fetch calls, awaited by flush() so their spans are queued before the queue flushes.
 	private inFlight = new Set<Promise<unknown>>();
 
-	// Validated + parsed once in the constructor (instead of re-parsing on every log call).
-	private otlpBaseUrl?: URL;
+	// W3C sampled flag; false exports nothing and propagates 00.
+	readonly sampled: boolean;
 
 	span: OtlpSpan;
 
@@ -566,9 +1106,10 @@ export class Log implements LogInt {
 		// Inherit conf from parent log if provided
 		if (typeof conf.parentLog === "object") {
 			const parentConf = conf.parentLog.conf;
+			const skip = new Set<keyof LogConf>(otlpKeysNotToInherit(conf));
 
 			for (const key of Object.keys(parentConf) as (keyof LogConf)[]) {
-				if (conf[key] === undefined) {
+				if (!skip.has(key) && conf[key] === undefined) {
 					// Same key on both sides, so the value type matches; `as never` satisfies the writer.
 					conf[key] = parentConf[key] as never;
 				}
@@ -577,6 +1118,10 @@ export class Log implements LogInt {
 
 		if (conf.logLevel === undefined) {
 			conf.logLevel = "info";
+		}
+
+		if (conf.colors === undefined) {
+			conf.colors = colorsFromEnv() ?? true;
 		}
 
 		if (conf.entryFormatter === undefined && conf.format === "json") {
@@ -596,11 +1141,19 @@ export class Log implements LogInt {
 		// Every optional field the resolved type requires has been defaulted above.
 		this.conf = conf as ResolvedLogConf;
 		// Own copy, so a clone/child never mutates a context object shared with another instance.
-		this.context = { ...this.conf.context ?? {} };
+		this.context = withoutUndefined(this.conf.context);
 
-		// Validate the endpoint eagerly: a malformed URI fails here, not as an unhandled rejection mid-log.
-		if (this.conf.otlpHttpBaseURI) {
-			this.otlpBaseUrl = new URL(this.conf.otlpHttpBaseURI);
+		if (this.conf.otlpQueue) {
+			if (OTLP_TRANSPORT_KEYS.some(key => this.conf[key] !== undefined) && !isQueueFor(this.conf.otlpQueue, this.conf)) {
+				throw new Error("otlpQueue carries the endpoint: set otlpHttpBaseURI, otlpProtocol and otlpAdditionalHeaders on the queue, not beside it");
+			}
+		} else if (this.conf.otlpHttpBaseURI) {
+			this.conf.otlpQueue = new Queue({
+				otlpAdditionalHeaders: this.conf.otlpAdditionalHeaders,
+				otlpHttpBaseURI: this.conf.otlpHttpBaseURI,
+				otlpProtocol: this.conf.otlpProtocol,
+				report: (msg, metadata) => this.conf.stderr(this.conf.entryFormatter({ colors: this.conf.colors, logLevel: "error", metadata, msTimestamp: Date.now(), msg })),
+			});
 		}
 
 		// An in-process parentLog wins; otherwise adopt an incoming traceparent (cross-process parent);
@@ -611,6 +1164,7 @@ export class Log implements LogInt {
 			incoming = parseTraceparent(this.conf.traceparent);
 		}
 
+		this.sampled = this.conf.parentLog?.sampled ?? incoming?.sampled ?? true;
 		this.span = {
 			attributes: [],
 			droppedAttributesCount: 0,
@@ -650,14 +1204,16 @@ export class Log implements LogInt {
 		// Merge context per-key (overrides win) instead of replacing it wholesale.
 		conf.context = {
 			...this.context,
-			...conf.context,
+			...withoutUndefined(conf.context),
 		};
 
 		// Inherit every other setting not overridden (log level, sinks, OTLP config, printTraceInfo…),
 		// like the constructor does from a parentLog. parentLog/spanName/traceparent are excluded: a
 		// clone is its own span, not a child. (A manual allow-list here once dropped newer OTLP options.)
+		const skip = new Set<keyof LogConf>(["parentLog", "spanName", "traceparent", ...otlpKeysNotToInherit(conf)]);
+
 		for (const key of Object.keys(this.conf) as (keyof LogConf)[]) {
-			if (key !== "parentLog" && key !== "spanName" && key !== "traceparent" && conf[key] === undefined) {
+			if (!skip.has(key) && conf[key] === undefined) {
 				conf[key] = this.conf[key] as never;
 			}
 		}
@@ -667,28 +1223,43 @@ export class Log implements LogInt {
 
 	// Ends the span and flushes OTLP. Awaitable: `await log.end()` guarantees delivery before exit.
 	// Fire-and-forget (`log.end()`) still works for callers that do not care.
-	public async end(): Promise<void> {
+	public async end(options?: { error?: unknown }): Promise<void> {
 		if (this.ended) {
 			throw new Error("Logging instance is already ended");
 		}
 		this.ended = true;
 		this.span.endTimeUnixNano = getNsTimestamp(Date.now());
 
-		// All logs must be sent before the trace/span.
+		const context: DefinedMetadata = { ...this.context };
+
+		if (options?.error !== undefined && options.error !== null) {
+			const failure = spanFailure(options.error);
+
+			this.span.status = { code: 2, message: failure.message };
+			context["error.type"] = failure.type;
+		}
+
+		this.exportSpan(this.span, context);
+		await this.flush();
+	}
+
+	// Delivers everything queued so far, un-awaited log.fetch spans included, without ending the span.
+	public async flush(): Promise<void> {
 		await Promise.all([...this.inFlight]);
-		await this.otlpCreateSpan(this.span);
+		await this.conf.otlpQueue?.flush();
 	}
 
 	// The current span's context as a W3C `traceparent` header, for propagating to non-fetch clients.
 	public traceparent(): string {
-		return formatTraceparent(this.span.traceId, this.span.spanId);
+		return formatTraceparent(this.span.traceId, this.span.spanId, this.sampled);
 	}
 
 	// Drop-in `fetch`: auto-creates a CLIENT span (nested under this log's span), injects a
 	// `traceparent`, records the OTel http.* attributes, and is the only output (no log line). The
-	// span exports in the background and is registered with end() at call time, so `await log.end()`
-	// delivers it even when the fetch wasn't awaited. Only `string`/`URL` inputs are traced; anything
-	// else (a `Request`, or a relative URL with no base) passes through to a plain, untraced fetch.
+	// span is queued when the response arrives and is registered with flush() at call time, so
+	// `await log.end()` delivers it even when the fetch wasn't awaited. Only `string`/`URL` inputs are
+	// traced; anything else (a `Request`, or a relative URL with no base) passes through to a plain,
+	// untraced fetch.
 	public fetch(input: string | URL, init?: RequestInit): Promise<Response> {
 		if (this.ended) {
 			throw new Error("Logging instance is already ended");
@@ -703,7 +1274,7 @@ export class Log implements LogInt {
 		}
 
 		// Register the whole operation synchronously, so a fire-and-forget log.fetch() is still
-		// delivered by a later await log.end().
+		// delivered by a later await log.flush().
 		let settle!: () => void;
 
 		this.track(new Promise<void>(resolve => { settle = resolve; }));
@@ -713,9 +1284,9 @@ export class Log implements LogInt {
 
 	private async tracedFetch(url: URL, init: RequestInit | undefined, settle: () => void): Promise<Response> {
 		// childSpan can't throw; everything that can (e.g. `new Headers` on a bad name) is inside the
-		// try, so finally always settles the tracked promise and end() can never hang on this fetch.
+		// try, so finally always settles the tracked promise and flush() can never hang on this fetch.
 		const span = this.childSpan(url.host, 3); // CLIENT; name refined below
-		const context: Metadata = { ...this.context };
+		const context: DefinedMetadata = { ...this.context };
 
 		try {
 			const method = (init?.method ?? "GET").toUpperCase();
@@ -732,7 +1303,7 @@ export class Log implements LogInt {
 			const headers = new Headers(init?.headers);
 
 			if (!headers.has("traceparent")) {
-				headers.set("traceparent", formatTraceparent(span.traceId, span.spanId));
+				headers.set("traceparent", formatTraceparent(span.traceId, span.spanId, this.sampled));
 			}
 
 			for (const name of this.conf.captureRequestHeaders ?? []) {
@@ -758,21 +1329,30 @@ export class Log implements LogInt {
 
 			return res;
 		} catch (err) {
-			const cause = err as { code?: string, name?: string };
+			const failure = spanFailure(err);
 
-			span.status.code = 2; // ERROR
-			context["error.type"] = cause.code ?? cause.name ?? "fetch_error";
+			span.status = { code: 2, message: failure.message };
+			context["error.type"] = failure.type;
 
 			throw err;
 		} finally {
-			// Always settle the tracked promise so end() can never hang on this fetch, even if the
-			// export call itself throws synchronously (it normally resolves once the span is delivered).
+			span.endTimeUnixNano = getNsTimestamp(Date.now());
+			// settle() must run even if the queue throws, else flush() hangs on this fetch.
 			try {
-				void this.exportChildSpan(span, context).then(settle, settle);
-			} catch {
+				this.exportSpan(span, context);
+			} finally {
 				settle();
 			}
 		}
+	}
+
+	public enabled(logLevel: LogLevel): boolean {
+		if (this.conf.logLevel === "none") {
+			return false;
+		}
+
+		// LogLevels.severityNumber is the single source of truth for ordering.
+		return LogLevels[logLevel].severityNumber >= LogLevels[this.conf.logLevel].severityNumber;
 	}
 
 	public error(msg: string, metadata?: Metadata) { this.log("error", msg, metadata); }
@@ -787,13 +1367,13 @@ export class Log implements LogInt {
 			throw new Error("Logging instance is already ended");
 		}
 
-		if (this.shouldSkipLog(logLevel)) return;
+		if (!this.enabled(logLevel)) return;
 
 		const msTimestamp = Date.now();
-		const attributes: Metadata = { ...metadata, ...this.context };
+		const attributes = Object.assign(withoutUndefined(metadata), this.context);
 
 		// Console output, optionally enriched with span/trace info.
-		const consoleMetadata: Metadata = { ...attributes };
+		const consoleMetadata: DefinedMetadata = { ...attributes };
 		if (this.conf.printTraceInfo) {
 			consoleMetadata.spanId = this.span.spanId;
 			consoleMetadata.traceId = this.span.traceId;
@@ -801,34 +1381,25 @@ export class Log implements LogInt {
 		}
 		this.outputToConsole(logLevel, msg, consoleMetadata, msTimestamp);
 
-		if (!this.otlpBaseUrl) {
+		if (!this.conf.otlpQueue || !this.sampled) {
 			return;
 		}
 
 		// Logs attach to the parent span when there is one, otherwise to this instance's span.
 		const span = this.conf.parentLog?.span.spanId ? this.conf.parentLog.span : this.span;
-		const payload = buildLogPayload({ attributes, logLevel, msTimestamp, msg, span });
 
-		this.track(this.otlpCall({ path: "/v1/logs", payload }));
+		this.conf.otlpQueue.enqueue(buildLogPayload({ attributes, logLevel, msTimestamp, msg, span }));
 	}
 
 	private track(promise: Promise<unknown>): void {
 		this.inFlight.add(promise);
-		// otlpCall never rejects, but stay defensive so a stray rejection can't become unhandled.
+		// The tracked promise only resolves, but stay defensive so a stray rejection can't become unhandled.
 		void promise.catch(() => {}).finally(() => this.inFlight.delete(promise));
 	}
 
-	private shouldSkipLog(logLevel: LogLevel): boolean {
-		if (this.conf.logLevel === "none") {
-			return true;
-		}
-
-		// LogLevels.severityNumber is the single source of truth for ordering.
-		return LogLevels[logLevel].severityNumber < LogLevels[this.conf.logLevel as LogLevel].severityNumber;
-	}
-
-	private outputToConsole(logLevel: LogLevel, msg: string, metadata: Metadata, msTimestamp: number) {
+	private outputToConsole(logLevel: LogLevel, msg: string, metadata: DefinedMetadata, msTimestamp: number) {
 		const output = this.conf.entryFormatter({
+			colors: this.conf.colors,
 			logLevel,
 			metadata,
 			msTimestamp,
@@ -839,93 +1410,6 @@ export class Log implements LogInt {
 			this.conf.stderr(output);
 		} else {
 			this.conf.stdout(output);
-		}
-	}
-
-	private async otlpCall({
-		path,
-		payload,
-	}: {
-		path: string,
-		payload: OtlpSpanPayload | OtlpLogPayload,
-	}): Promise<boolean> {
-		if (!this.otlpBaseUrl) {
-			return true;
-		}
-
-		const base = this.otlpBaseUrl;
-		const basePath = base.pathname.replace(/\/$/, ""); // keep any base path prefix, drop a trailing slash
-		const url = `${base.protocol}//${base.username ? `${base.username}:${base.password}@` : "" }${base.host}${basePath}${path}`;
-
-		const protobuf = this.conf.otlpProtocol === "http/protobuf";
-
-		const headers: Record<string, string> = {
-			"Content-Type": protobuf ? "application/x-protobuf" : "application/json",
-		};
-
-		if (this.conf.otlpAdditionalHeaders) {
-			Object.assign(headers, this.conf.otlpAdditionalHeaders);
-		}
-
-		// AbortController + cleared timer works in browsers and Node, and never leaves a dangling timer.
-		const controller = new AbortController();
-		const timer = setTimeout(() => controller.abort(), OTLP_EXPORT_TIMEOUT_MS);
-
-		try {
-			const res = await fetch(url, {
-				body: protobuf ? encodeOtlpProtobuf(payload) : JSON.stringify(payload),
-				headers,
-				method: "POST",
-				signal: controller.signal,
-			});
-
-			if (!res.ok) {
-				const err = (new Error("Non-ok return status")) as FetchError;
-
-				err.status = res.status;
-
-				throw err;
-			}
-
-			// Protobuf responses are binary (usually empty); a 2xx is success. Only the JSON
-			// transport inspects the response body.
-			if (!protobuf) {
-				const resBody = await res.json();
-
-				const resBodyStr = JSON.stringify(resBody);
-				if (resBodyStr !== "{\"partialSuccess\":{}}" && resBodyStr !== "{}") {
-					throw new Error("Invalid response body from OTLP service. Expected '{\"partialSuccess\":{}}' or '{}' but got: '" + JSON.stringify(resBody) + "'");
-				}
-			}
-
-			return true;
-		} catch (err: unknown) {
-			if (isFetchError(err)) {
-				this.conf.stderr(this.conf.entryFormatter({
-					logLevel: "error",
-					metadata: {
-						fetchStatus: String(err.status),
-						url,
-					},
-					msg: err.message,
-				}));
-			} else if (err instanceof Error) {
-				this.conf.stderr(this.conf.entryFormatter({
-					logLevel: "error",
-					metadata: { url },
-					msg: err.message,
-				}));
-			} else {
-				this.conf.stderr(this.conf.entryFormatter({
-					logLevel: "error",
-					metadata: { url },
-					msg: "Unknown error sending to OTLP",
-				}));
-			}
-
-			return false;
-		} finally {
-			clearTimeout(timer);
 		}
 	}
 
@@ -951,20 +1435,10 @@ export class Log implements LogInt {
 		};
 	}
 
-	// Stamps the end time and exports a child span, deriving its attributes/resource from `context`.
-	private exportChildSpan(span: OtlpSpan, context: Metadata): Promise<unknown> {
-		span.endTimeUnixNano = getNsTimestamp(Date.now());
-
-		return this.otlpCall({ path: "/v1/traces", payload: buildSpanPayload({ context, span }) });
-	}
-
-	private async otlpCreateSpan(span: OtlpSpan): Promise<boolean> {
-		const payload = buildSpanPayload({
-			context: this.context,
-			parentSpan: this.conf.parentLog?.span,
-			span,
-		});
-
-		return this.otlpCall({ path: "/v1/traces", payload });
+	// Queues an ended span, deriving its attributes/resource from `context`.
+	private exportSpan(span: OtlpSpan, context: DefinedMetadata): void {
+		if (this.sampled) {
+			this.conf.otlpQueue?.enqueue(buildSpanPayload({ context, span }));
+		}
 	}
 }
