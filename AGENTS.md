@@ -95,13 +95,17 @@ Structured logging with a tiny API and first-class OTLP (logs + traces) over `fe
 - 2026-09-19: `log.fetch` traces only absolute `http:`/`https:` URLs, the floor the queue's endpoint
   already takes. A scheme written without `//` parses to an opaque path, where `URL.origin` is the
   string `"null"` and the userinfo stays in `pathname`, so `url.full` cannot be rebuilt from the
-  parts without shipping what the url holds — credentials, or a whole `data:` payload. Nothing else
-  is fetchable over WHATWG `fetch` on a server, and a `blob:` or `data:` read is a local one, not a
-  network call worth a client span. Valid while `url.full` is built from `origin` + `pathname`.
-
+  parts without shipping what the url holds — credentials, or a whole `data:` payload. A `blob:`,
+  `data:` or `file:` read is a local one, not a network call worth a client span. It ships in a
+  minor rather than waiting for 3.0.0: the spans it drops were malformed — `nulluser:pass@host/x`,
+  `https://example.comhttps://example.com/uuid` — so nothing correct depends on them, and they
+  carried the credentials that make this a security fix. Valid while `url.full` is built from
+  `origin` + `pathname`.
 
 ## Working here
 
 - Source is a single `index.ts`, compiled + uglified to `index.js` for publish.
+- A done `todo.md` item leaves the file, reworded for the consumer into `CHANGELOG.md` under
+  `## Unreleased`; the `[x]` items still in the file predate that rule.
 - Tests-first. The suite (`test.ts`) injects `stdout`/`stderr` and stubs the global `fetch`, so the same tests cover console + OTLP in both Node and the browser.
 - See [README](README.md) for build/test/release commands. Keep the README and this file in sync with any priority or workflow change.

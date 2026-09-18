@@ -1382,15 +1382,13 @@ test("log.fetch leaves a non-http(s) URL untraced", async t => {
 	const { calls } = stubFetch();
 	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 
-	// Written without "//", these parse to an opaque path: url.origin is the string "null" and the
-	// userinfo or the payload sits in url.pathname, which is what url.full used to be built from.
 	await log.fetch("myapp:user:hunter2@api.test/x");
 	await log.fetch("data:text/plain,secret-payload");
 	await log.end();
 
 	const exported = JSON.stringify(calls.filter(call => call.path.startsWith("/v1/")));
 
-	t.strictEqual(exportedSpans(calls).filter(span => span.kind === 3).length, 0, "no client span is exported");
+	t.strictEqual(exportedSpans(calls).length, 1, "only the root span is exported, no client span");
 	t.ok(!exported.includes("hunter2"), "userinfo never reaches the collector");
 	t.ok(!exported.includes("secret-payload"), "a data: payload never reaches the collector");
 
