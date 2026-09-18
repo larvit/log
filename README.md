@@ -238,7 +238,7 @@ instance you were handed; it is single-use and the consumer owns it.
 
 `new Log(options)` or `new Log()`. Every option is optional. A level string in place of the object,
 `new Log("debug")` or `log.clone("debug")`, is deprecated: it still sets the level, warns once per
-`stderr` sink and is removed in 3.0.0, so pass `{ logLevel }` instead. `entryFormatter` is
+`stderr` sink per message and is removed in 3.0.0, so pass `{ logLevel }` instead. `entryFormatter` is
 deprecated the same way: pass the function as `format`.
 
 | Option | Type | Default | |
@@ -331,7 +331,7 @@ Spans are queued when the response arrives and are registered with `flush()` at 
 | `LogLevel`, `LogShorthand` | Level name union; the signature of one level method. |
 | `Metadata`, `MetadataValue` | `Record<string, string \| number \| boolean \| undefined>` and its value type. |
 | `DefinedMetadata` | `Metadata` without `undefined` values: what a formatter and `log.context` see. |
-| `EntryFormatter`, `EntryFormatterConf` | A formatter, `(entry) => string`, and the entry it takes: `{ colors?, logLevel, metadata?, msg, msTimestamp? }`. |
+| `EntryFormatter`, `EntryFormatterConf` | A formatter, `(entry) => string`, and the entry it takes: `{ colors? (unset = on), logLevel, metadata?, msg, msTimestamp? }`. |
 | `OtlpSpan`, `OtlpAttribute`, `OtlpLogPayload`, `OtlpSpanPayload` | The OTLP wire shapes; `log.span` is an `OtlpSpan`. |
 | `OtlpQueue`, `OtlpPayload` | What `otlpQueue` takes, `{ enqueue, flush }`, and what `enqueue` receives, a log or span payload. |
 | `Clock`, `TimerHandle` | The `clock` option, `{ now, setTimeout, clearTimeout }` with `now()` in integer epoch milliseconds, and what its `setTimeout` hands back. |

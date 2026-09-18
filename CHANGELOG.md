@@ -4,15 +4,17 @@
 
 - `format` also takes a formatter function, `(entry) => string`, and is what children and clones
   inherit. `entryFormatter` is deprecated: it still formats and still wins over a `"text"`/`"json"`
-  `format`, writes one `warn` line per `stderr` sink and 3.0.0 removes it. Two different
+  `format`, writes one `warn` line per `stderr` sink per message whatever `logLevel` says, and
+  3.0.0 removes it. Two different
   formatters, one per spelling, throw. New export: `EntryFormatter`; `ResolvedLogConf["format"]`
   widens to include a function, and `log.conf.entryFormatter` is now non-enumerable, so it no
-  longer shows up in a spread, `Object.keys` or `JSON.stringify` of the conf.
+  longer shows up in a spread or `Object.keys` of the conf. A `format` function drops out of
+  `JSON.stringify(log.conf)`, as any function does, where the string always showed.
 - A `format` set on a child (`parentLog`) or on a spread of `log.conf` now applies; before, the
   parent's resolved formatter silently kept winning.
 - Every deprecation line names the package: `@larvit/log: …`.
 - The level-string shorthand, `new Log("debug")` and `log.clone("debug")`, is deprecated: it still
-  sets the level, writes one `warn` line per `stderr` sink whatever `logLevel` says, and 3.0.0
+  sets the level, writes one `warn` line per `stderr` sink per message whatever `logLevel` says, and 3.0.0
   removes it. Pass `{ logLevel }` instead.
 - `clock` option on `Log` and `Queue`: `{ now, setTimeout, clearTimeout }` behind every span and
   record timestamp and behind the queue's batch, retry and send-timeout timers, so a test drives

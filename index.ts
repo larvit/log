@@ -1222,7 +1222,7 @@ export class Log implements LogInt {
 		}
 
 		if (overriddenFormat) {
-			warnDeprecated(this.conf, this.context, "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format — it overrides the format set beside it");
+			warnDeprecated(this.conf, this.context, "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format — entryFormatter wins and the format beside it is ignored");
 		} else if (deprecatedFormatter) {
 			warnDeprecated(this.conf, this.context, "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format");
 		}
@@ -1279,8 +1279,6 @@ export class Log implements LogInt {
 
 		const conf: LogConf = typeof options === "string" ? { logLevel: options } : { ...options };
 
-		foldEntryFormatter(conf);
-
 		// Merge context per-key (overrides win) instead of replacing it wholesale.
 		conf.context = {
 			...this.context,
@@ -1291,6 +1289,11 @@ export class Log implements LogInt {
 		// like the constructor does from a parentLog. parentLog/spanName/traceparent are excluded: a
 		// clone is its own span, not a child. (A manual allow-list here once dropped newer OTLP options.)
 		const skip = new Set<keyof LogConf>(["parentLog", "spanName", "traceparent", ...otlpKeysNotToInherit(conf)]);
+
+		// The caller's entryFormatter is their format; leave the pair for the constructor to fold and warn about.
+		if (conf.entryFormatter !== undefined) {
+			skip.add("format");
+		}
 
 		for (const key of Object.keys(this.conf) as (keyof LogConf)[]) {
 			if (!skip.has(key) && conf[key] === undefined) {
