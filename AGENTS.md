@@ -97,10 +97,10 @@ Structured logging with a tiny API and first-class OTLP (logs + traces) over `fe
   string `"null"` and the userinfo stays in `pathname`, so `url.full` cannot be rebuilt from the
   parts without shipping what the url holds — credentials, or a whole `data:` payload. A `blob:`,
   `data:` or `file:` read is a local one, not a network call worth a client span. It ships in a
-  minor rather than waiting for 3.0.0: the spans it drops were malformed — `nulluser:pass@host/x`,
-  `https://example.comhttps://example.com/uuid` — so nothing correct depends on them, and they
-  carried the credentials that make this a security fix. Valid while `url.full` is built from
-  `origin` + `pathname`.
+  minor rather than waiting for 3.0.0 because it is the security fix itself, and what it drops is
+  telemetry for urls nobody traces over the network: the timing and status of those spans were
+  right, their `url.full` (`nulluser:pass@host/x`, `https://example.comhttps://example.com/uuid`)
+  was not. Valid while `url.full` is built from `origin` + `pathname`.
 
 ## Working here
 

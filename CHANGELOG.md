@@ -2,15 +2,17 @@
 
 ## Unreleased
 
-- `log.fetch` traces only absolute `http:`/`https:` URLs; any other scheme is fetched untraced,
-  where it used to export a span whose `url.full` held whatever the url did. Written without `//`,
-  such a url parses to an opaque path, so `log.fetch("myapp:user:pass@host/x")` exported
-  `nulluser:pass@host/x` and a `data:` url exported its whole payload.
-  **If you have ever passed credentials or private data in such a url, treat them as exported** and
-  rotate them: they are in whatever your spans reach. `log.fetch("https://user:pass@host/x")`
-  exports them too and is not fixed yet: `fetch` refuses a url carrying credentials and quotes the
-  whole url into the error, which becomes the span's status message. Keep credentials out of a
-  `log.fetch` url and pass an `Authorization` header instead.
+- Not fixed, and live in 2.3.0 and earlier: `log.fetch("https://user:pass@host/x")` exports those
+  credentials. `fetch` refuses a url carrying them and quotes the whole url into its `TypeError`,
+  which becomes the span's status message. Pass an `Authorization` header instead, and strip
+  userinfo from a url you did not build.
+- `log.fetch` traces only a URL that resolves to `http:` or `https:`; anything else is fetched
+  untraced — no span, and no `traceparent` sent. It used to export a span whose `url.full` held
+  whatever the url did: written without `//`, a url parses to an opaque path, so
+  `log.fetch("myapp:user:pass@host/x")` exported `nulluser:pass@host/x` and a `data:` url exported
+  its whole payload. **If you have passed credentials or private data in such a url, rotate them**:
+  search your tracing backend for spans whose `url.full` starts with `null`, which is every
+  affected call.
 - Credentials in `otlpHttpBaseURI` no longer reach `stderr`, and basic auth works. `fetch` rejects
   a `user:pass@` url outright on Node and in browsers, and that rejection quoted the whole url —
   credentials included — into the error line of every failed export. `user:pass@` is now sent as an
