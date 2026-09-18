@@ -784,6 +784,7 @@ export class Queue implements OtlpQueue {
 	private items: QueuedItem[] = [];
 	private bytes = 0;
 	private readonly url: string;
+	private readonly reportUrl: string;
 	private dropped = 0;
 	private failures = 0;
 	private batchTimer?: TimerHandle;
@@ -817,8 +818,11 @@ export class Queue implements OtlpQueue {
 		}
 
 		const base = new URL(conf.otlpHttpBaseURI);
+		const basePath = base.pathname.replace(/\/$/, "");
 
-		this.url = `${base.protocol}//${base.username ? `${base.username}:${base.password}@` : ""}${base.host}${base.pathname.replace(/\/$/, "")}`;
+		this.url = `${base.protocol}//${base.username ? `${base.username}:${base.password}@` : ""}${base.host}${basePath}`;
+		// Userinfo never leaves this.url: a report reaches stderr, where basic-auth credentials must not.
+		this.reportUrl = `${base.protocol}//${base.host}${basePath}`;
 		this.ready = conf.storage ? this.load(conf.storage) : Promise.resolve();
 	}
 
@@ -984,7 +988,7 @@ export class Queue implements OtlpQueue {
 	private describe(batch: QueuedItem[], outcome: { message?: string, status?: number }): DefinedMetadata {
 		const path = otlpPath(batch[0].payload);
 
-		return withoutUndefined({ error: outcome.message, items: batch.length, path, status: outcome.status, url: this.url + path });
+		return withoutUndefined({ error: outcome.message, items: batch.length, path, status: outcome.status, url: this.reportUrl + path });
 	}
 
 	private report(msg: string, metadata: DefinedMetadata): void {
