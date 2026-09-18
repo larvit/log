@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- `log.fetch` traces only absolute `http:`/`https:` URLs; any other scheme is fetched untraced,
+  where it used to export a span whose `url.full` held whatever the url did. Written without `//`,
+  such a url parses to an opaque path, so `log.fetch("myapp:user:pass@host/x")` exported
+  `nulluser:pass@host/x` and a `data:` url exported its whole payload.
+  **If you have ever passed credentials or private data in such a url, treat them as exported** and
+  rotate them: they are in whatever your spans reach.
 - Credentials in `otlpHttpBaseURI` no longer reach `stderr`, and basic auth works. `fetch` rejects
   a `user:pass@` url outright on Node and in browsers, and that rejection quoted the whole url —
   credentials included — into the error line of every failed export. `user:pass@` is now sent as an

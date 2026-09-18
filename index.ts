@@ -1153,7 +1153,22 @@ export class Queue implements OtlpQueue {
 // default deny-list of the official OTel HTTP instrumentations. Matched case-insensitively.
 const SENSITIVE_QUERY_KEYS = new Set(["awsaccesskeyid", "signature", "sig", "x-goog-signature"]);
 
-// Builds the `url.full` span attribute. Userinfo is always dropped (origin omits it); the query is
+// The URL log.fetch traces. Anything else is fetched untraced: a scheme without "//" parses to an
+// opaque path, where url.origin is the string "null" and the userinfo, or a data: payload, sits in
+// url.pathname and would ride into url.full.
+function traceableUrl(input: string | URL): URL | undefined {
+	let url: URL;
+
+	try {
+		url = new URL(String(input), (globalThis as { location?: { href?: string } }).location?.href);
+	} catch {
+		return undefined;
+	}
+
+	return url.protocol === "http:" || url.protocol === "https:" ? url : undefined;
+}
+
+// Builds the `url.full` span attribute for an http(s) URL, whose origin omits userinfo; the query is
 // dropped unless captureQuery is set, in which case sensitive values are redacted.
 function buildUrlFull(url: URL, captureQuery: boolean): string {
 	const base = url.origin + url.pathname;
@@ -1402,19 +1417,17 @@ export class Log implements LogInt {
 	// Drop-in `fetch`: auto-creates a CLIENT span (nested under this log's span), injects a
 	// `traceparent`, records the OTel http.* attributes, and is the only output (no log line). The
 	// span is queued when the response arrives and is registered with flush() at call time, so
-	// `await log.end()` delivers it even when the fetch wasn't awaited. Only `string`/`URL` inputs are
-	// traced; anything else (a `Request`, or a relative URL with no base) passes through to a plain,
+	// `await log.end()` delivers it even when the fetch wasn't awaited. Only absolute http(s) URLs are
+	// traced; anything else (a relative URL with no base, another scheme) passes through to a plain,
 	// untraced fetch.
 	public fetch(input: string | URL, init?: RequestInit): Promise<Response> {
 		if (this.ended) {
 			throw new Error("Logging instance is already ended");
 		}
 
-		let url: URL;
+		const url = traceableUrl(input);
 
-		try {
-			url = new URL(String(input), (globalThis as { location?: { href?: string } }).location?.href);
-		} catch {
+		if (!url) {
 			return globalThis.fetch(input, init);
 		}
 
