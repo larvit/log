@@ -1107,6 +1107,25 @@ function isQueueFor(queue: OtlpQueue, conf: LogConf): boolean {
 		&& queue.conf.otlpAdditionalHeaders === conf.otlpAdditionalHeaders;
 }
 
+// Keyed per stderr sink, not per process: a library and its consumer each hear about their own call.
+const warnedDeprecations = new WeakMap<(msg: string) => void, Set<string>>();
+
+function warnDeprecated(conf: ResolvedLogConf, msg: string): void {
+	let warned = warnedDeprecations.get(conf.stderr);
+
+	if (!warned) {
+		warned = new Set();
+		warnedDeprecations.set(conf.stderr, warned);
+	}
+
+	if (warned.has(msg)) {
+		return;
+	}
+
+	warned.add(msg);
+	conf.stderr(conf.entryFormatter({ colors: conf.colors, logLevel: "warn", msTimestamp: conf.clock.now(), msg }));
+}
+
 export class Log implements LogInt {
 	context: DefinedMetadata;
 	ended: boolean = false;
@@ -1168,6 +1187,10 @@ export class Log implements LogInt {
 		// Own copy, so a clone/child never mutates a context object shared with another instance.
 		this.context = withoutUndefined(this.conf.context);
 
+		if (typeof options === "string") {
+			warnDeprecated(this.conf, "new Log(\"level\") is deprecated and removed in 3.0.0, use new Log({ logLevel })");
+		}
+
 		if (this.conf.otlpQueue) {
 			if (OTLP_TRANSPORT_KEYS.some(key => this.conf[key] !== undefined) && !isQueueFor(this.conf.otlpQueue, this.conf)) {
 				throw new Error("otlpQueue carries the endpoint: set otlpHttpBaseURI, otlpProtocol and otlpAdditionalHeaders on the queue, not beside it");
@@ -1214,6 +1237,10 @@ export class Log implements LogInt {
 	// Create a new instance based on the current instance
 	// All options sent in will override the current instance settings
 	public clone(options?: LogConf | LogLevel | "none") {
+		if (typeof options === "string") {
+			warnDeprecated(this.conf, "log.clone(\"level\") is deprecated and removed in 3.0.0, use log.clone({ logLevel })");
+		}
+
 		const conf: LogConf = typeof options === "string" ? { logLevel: options } : { ...options };
 
 		// Resolve the formatter from the effective format, so json<->text can be changed in either direction.
