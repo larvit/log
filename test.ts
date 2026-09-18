@@ -694,22 +694,41 @@ test("the Log-built queue reports through the instance's stderr and formatter", 
 test("a rejected export (4xx) drops the batch, reports one line per batch and does not retry", async t => {
 	const { calls } = stubFetch(() => response({ status: 400 }));
 	const stderr: string[] = [];
-	const log = new Log({ otlpHttpBaseURI: "http://collector:s3cret@127.0.0.1:4318", stderr: line => stderr.push(line) });
+	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: line => stderr.push(line) });
 
 	log.info("x");
 	log.info("y");
 	await log.end();
 
 	t.deepEqual(calls.map(call => call.path), ["/v1/logs", "/v1/traces"], "each batch is attempted once");
-	t.strictEqual(calls[0].url, "http://collector:s3cret@127.0.0.1:4318/v1/logs", "the request carries the endpoint's basic-auth credentials");
 	t.strictEqual(stderr.length, 2, "one line per rejected batch");
 	t.ok(stderr[0].includes("400"), "the line carries the status");
-	t.ok(stderr[0].includes("http://127.0.0.1:4318/v1/logs"), "the line names the endpoint it failed against");
-	t.notOk(stderr.join("").includes("s3cret"), "no reported line carries the credentials");
 
 	calls.length = 0;
 	await log.flush();
 	t.strictEqual(calls.length, 0, "nothing is left to send");
+	t.end();
+});
+
+test("endpoint userinfo authenticates through an Authorization header, never through the url", async t => {
+	const { calls } = stubFetch(() => response({ status: 400 }));
+	const stderr: string[] = [];
+	const endpoint = "http://collector:s3cr%40t@127.0.0.1:4318";
+	const log = new Log({ otlpHttpBaseURI: endpoint, stderr: line => stderr.push(line) });
+
+	log.info("x");
+	await log.flush();
+
+	t.strictEqual(calls[0].url, "http://127.0.0.1:4318/v1/logs", "the request url holds no credentials, which fetch rejects outright");
+	t.strictEqual(callHeader(calls[0], "Authorization"), "Basic Y29sbGVjdG9yOnMzY3JAdA==", "they are sent as percent-decoded Basic credentials");
+	t.strictEqual(stderr.length, 1, "the rejected batch is reported");
+	t.notOk(stderr.join("").includes("s3cr"), "no reported line carries the password");
+
+	const explicit = new Log({ otlpAdditionalHeaders: { Authorization: "Bearer token" }, otlpHttpBaseURI: endpoint, stderr: () => {} });
+
+	explicit.info("y");
+	await explicit.flush();
+	t.strictEqual(callHeader(calls[1], "Authorization"), "Bearer token", "an explicit Authorization header wins over the endpoint's userinfo");
 	t.end();
 });
 

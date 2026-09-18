@@ -2,8 +2,11 @@
 
 ## Unreleased
 
-- Basic-auth credentials in `otlpHttpBaseURI` no longer reach `stderr`: the `url` a queue reports
-  drops the `username:password@`, which every export-failure line carried. Requests still send them.
+- Basic auth in `otlpHttpBaseURI` works, and its credentials no longer reach `stderr`. `user:pass@`
+  is sent as an `Authorization: Basic` header, percent-decoded, and an explicit `Authorization` in
+  `otlpAdditionalHeaders` overrides it; neither the request url nor a reported one carries the
+  credentials. Before, `fetch` rejected such a url outright on Node and in browsers and quoted it,
+  credentials included, into the report line of every failed attempt and every retry.
 - `format` also takes a formatter function, `(entry) => string`, and is what children and clones
   inherit. `entryFormatter` is deprecated: it still formats and still wins over a `"text"`/`"json"`
   `format`, writes one `warn` line per `stderr` sink for each distinct warning text, whatever

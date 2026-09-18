@@ -695,6 +695,42 @@ function utf8Length(str: string): number {
 	return bytes;
 }
 
+const BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+// Hand-rolled because Hermes has no btoa, and a polyfill weighs more than the eight lines.
+function base64(bytes: Uint8Array): string {
+	let out = "";
+
+	for (let i = 0; i < bytes.length; i += 3) {
+		const chunk = (bytes[i] << 16) | ((bytes[i + 1] ?? 0) << 8) | (bytes[i + 2] ?? 0);
+
+		out += BASE64_ALPHABET[(chunk >> 18) & 63]
+			+ BASE64_ALPHABET[(chunk >> 12) & 63]
+			+ (i + 1 < bytes.length ? BASE64_ALPHABET[(chunk >> 6) & 63] : "=")
+			+ (i + 2 < bytes.length ? BASE64_ALPHABET[chunk & 63] : "=");
+	}
+
+	return out;
+}
+
+// RFC 7617 credentials out of a url's userinfo. A malformed percent escape passes through
+// undecoded rather than throwing, so an odd password cannot break the constructor.
+function basicAuth(base: URL): string | undefined {
+	if (!base.username) {
+		return undefined;
+	}
+
+	const decoded = [base.username, base.password].map(part => {
+		try {
+			return decodeURIComponent(part);
+		} catch {
+			return part;
+		}
+	});
+
+	return `Basic ${base64(new TextEncoder().encode(decoded.join(":")))}`;
+}
+
 // The JSON size bounds the protobuf size too, so one measure serves both transports.
 function withBytes(payload: OtlpPayload): QueuedItem {
 	return { bytes: utf8Length(JSON.stringify(payload)), payload };
@@ -783,8 +819,8 @@ export class Queue implements OtlpQueue {
 
 	private items: QueuedItem[] = [];
 	private bytes = 0;
+	private readonly authorization?: string;
 	private readonly url: string;
-	private readonly reportUrl: string;
 	private dropped = 0;
 	private failures = 0;
 	private batchTimer?: TimerHandle;
@@ -818,11 +854,11 @@ export class Queue implements OtlpQueue {
 		}
 
 		const base = new URL(conf.otlpHttpBaseURI);
-		const basePath = base.pathname.replace(/\/$/, "");
 
-		this.url = `${base.protocol}//${base.username ? `${base.username}:${base.password}@` : ""}${base.host}${basePath}`;
-		// Userinfo never leaves this.url: a report reaches stderr, where basic-auth credentials must not.
-		this.reportUrl = `${base.protocol}//${base.host}${basePath}`;
+		// Userinfo becomes a header: fetch rejects a url carrying credentials, and its rejection message
+		// quotes that url into every report line, so the url must never hold them in the first place.
+		this.authorization = basicAuth(base);
+		this.url = `${base.protocol}//${base.host}${base.pathname.replace(/\/$/, "")}`;
 		this.ready = conf.storage ? this.load(conf.storage) : Promise.resolve();
 	}
 
@@ -958,7 +994,7 @@ export class Queue implements OtlpQueue {
 		try {
 			const res = await fetch(this.url + otlpPath(batch[0].payload), {
 				body,
-				headers: { "Content-Type": protobuf ? "application/x-protobuf" : "application/json", ...this.conf.otlpAdditionalHeaders },
+				headers: { "Content-Type": protobuf ? "application/x-protobuf" : "application/json", ...this.authorization ? { Authorization: this.authorization } : {}, ...this.conf.otlpAdditionalHeaders },
 				keepalive: bytes <= KEEPALIVE_MAX_BYTES,
 				method: "POST",
 				signal: controller.signal,
@@ -988,7 +1024,7 @@ export class Queue implements OtlpQueue {
 	private describe(batch: QueuedItem[], outcome: { message?: string, status?: number }): DefinedMetadata {
 		const path = otlpPath(batch[0].payload);
 
-		return withoutUndefined({ error: outcome.message, items: batch.length, path, status: outcome.status, url: this.reportUrl + path });
+		return withoutUndefined({ error: outcome.message, items: batch.length, path, status: outcome.status, url: this.url + path });
 	}
 
 	private report(msg: string, metadata: DefinedMetadata): void {
