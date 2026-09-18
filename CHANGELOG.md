@@ -5,9 +5,12 @@
 - `format` also takes a formatter function, `(entry) => string`, and is what children and clones
   inherit. `entryFormatter` is deprecated: it still formats and still wins over a `"text"`/`"json"`
   `format`, writes one `warn` line per `stderr` sink and 3.0.0 removes it. Two different
-  formatters, one per spelling, throw. New export: `EntryFormatter`.
+  formatters, one per spelling, throw. New export: `EntryFormatter`; `ResolvedLogConf["format"]`
+  widens to include a function, and `log.conf.entryFormatter` is now non-enumerable, so it no
+  longer shows up in a spread, `Object.keys` or `JSON.stringify` of the conf.
 - A `format` set on a child (`parentLog`) or on a spread of `log.conf` now applies; before, the
   parent's resolved formatter silently kept winning.
+- Every deprecation line names the package: `@larvit/log: …`.
 - The level-string shorthand, `new Log("debug")` and `log.clone("debug")`, is deprecated: it still
   sets the level, writes one `warn` line per `stderr` sink whatever `logLevel` says, and 3.0.0
   removes it. Pass `{ logLevel }` instead.

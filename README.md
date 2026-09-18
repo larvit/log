@@ -280,9 +280,9 @@ the same name:
 ```
 
 A formatter of your own takes the entry and returns the line, and is inherited by children and
-clones, which switch back with `format: "text"`:
+clones; either can switch back with `format: "text"`:
 
-```js
+```javascript
 new Log({ format: entry => `${entry.logLevel} ${entry.msg}` });
 ```
 
@@ -331,7 +331,7 @@ Spans are queued when the response arrives and are registered with `flush()` at 
 | `LogLevel`, `LogShorthand` | Level name union; the signature of one level method. |
 | `Metadata`, `MetadataValue` | `Record<string, string \| number \| boolean \| undefined>` and its value type. |
 | `DefinedMetadata` | `Metadata` without `undefined` values: what a formatter and `log.context` see. |
-| `EntryFormatter`, `EntryFormatterConf` | A formatter, `(entry) => string`, and the entry it takes, which carries the instance's `colors`. |
+| `EntryFormatter`, `EntryFormatterConf` | A formatter, `(entry) => string`, and the entry it takes: `{ colors?, logLevel, metadata?, msg, msTimestamp? }`. |
 | `OtlpSpan`, `OtlpAttribute`, `OtlpLogPayload`, `OtlpSpanPayload` | The OTLP wire shapes; `log.span` is an `OtlpSpan`. |
 | `OtlpQueue`, `OtlpPayload` | What `otlpQueue` takes, `{ enqueue, flush }`, and what `enqueue` receives, a log or span payload. |
 | `Clock`, `TimerHandle` | The `clock` option, `{ now, setTimeout, clearTimeout }` with `now()` in integer epoch milliseconds, and what its `setTimeout` hands back. |

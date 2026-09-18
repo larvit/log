@@ -1168,6 +1168,7 @@ export class Log implements LogInt {
 	constructor(options?: LogConf | LogLevel | "none") {
 		const conf: LogConf = typeof options === "string" ? { logLevel: options } : { ...options };
 		const deprecatedFormatter = conf.entryFormatter !== undefined;
+		const overriddenFormat = deprecatedFormatter && typeof conf.format === "string";
 
 		foldEntryFormatter(conf);
 
@@ -1217,11 +1218,13 @@ export class Log implements LogInt {
 		this.context = withoutUndefined(this.conf.context);
 
 		if (typeof options === "string") {
-			warnDeprecated(this.conf, this.context, "new Log(\"level\") is deprecated and removed in 3.0.0, use new Log({ logLevel })");
+			warnDeprecated(this.conf, this.context, "@larvit/log: new Log(\"level\") is deprecated and removed in 3.0.0, use new Log({ logLevel })");
 		}
 
-		if (deprecatedFormatter) {
-			warnDeprecated(this.conf, this.context, "entryFormatter is deprecated and removed in 3.0.0, use format");
+		if (overriddenFormat) {
+			warnDeprecated(this.conf, this.context, "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format — it overrides the format set beside it");
+		} else if (deprecatedFormatter) {
+			warnDeprecated(this.conf, this.context, "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format");
 		}
 
 		if (this.conf.otlpQueue) {
@@ -1271,7 +1274,7 @@ export class Log implements LogInt {
 	// All options sent in will override the current instance settings
 	public clone(options?: LogConf | LogLevel | "none") {
 		if (typeof options === "string") {
-			warnDeprecated(this.conf, this.context, "log.clone(\"level\") is deprecated and removed in 3.0.0, use log.clone({ logLevel })");
+			warnDeprecated(this.conf, this.context, "@larvit/log: log.clone(\"level\") is deprecated and removed in 3.0.0, use log.clone({ logLevel })");
 		}
 
 		const conf: LogConf = typeof options === "string" ? { logLevel: options } : { ...options };

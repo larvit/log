@@ -69,8 +69,9 @@ Structured logging with a tiny API and first-class OTLP (logs + traces) over `fe
 - 2026-09-18: a deprecation warns once per `stderr` sink per message, through the instance's
   formatter at `warn` and whatever `logLevel` says. Instances sharing the default `console.error`
   share that one warning; a sink the caller injects gets its own, which keeps a test independent of
-  run order. The key is the sink plus the message text, so keep the messages literal. Valid while
-  2.x carries deprecations.
+  run order. The key is the sink plus the message text, so keep the messages literal. Every line
+  opens with `@larvit/log: `, part of that literal, so an app developer can tell which dependency
+  emitted one. Valid while 2.x carries deprecations.
 
 ## Working here
 
