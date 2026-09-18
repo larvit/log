@@ -74,6 +74,11 @@ Structured logging with a tiny API and first-class OTLP (logs + traces) over `fe
   tell which dependency emitted one about code they may not own. A `Queue`'s `report` lines carry no
   prefix: they report that developer's own setup, not this library's own API. Valid
   while 2.x carries deprecations.
+- 2026-09-19: `otlpHttpBaseURI` userinfo is sent as an `Authorization: Basic` header, never in the
+  request url. WHATWG `fetch` refuses a url carrying credentials and quotes that url into the
+  `TypeError`, so keeping them there made basic auth unusable on Node and in browsers and leaked
+  them into the report line of every failed attempt. An explicit `otlpAdditionalHeaders`
+  `Authorization` wins. Valid while a queue owns the transport.
 
 ## Working here
 
