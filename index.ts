@@ -14,7 +14,7 @@ const systemClock: Clock = {
 	setTimeout: (callback, delayMs) => setTimeout(callback, delayMs),
 };
 
-export type EntryFormatter = (conf: EntryFormatterConf) => string;
+export type EntryFormatter = (entry: EntryFormatterConf) => string;
 
 export type EntryFormatterConf = {
 	// The instance's resolved `colors`. Unset means on.
@@ -1200,8 +1200,7 @@ export class Log implements LogInt {
 			conf.format = "text";
 		}
 
-		// Non-enumerable: this mirror of the resolved format is the library's, so a conf spread into a new
-		// instance carries the caller's spellings only. 3.0.0 drops it.
+		// Non-enumerable, so a conf spread into a new instance carries the caller's spellings only; 3.0.0 drops it.
 		Object.defineProperty(conf, "entryFormatter", { configurable: true, enumerable: false, value: resolveFormatter(conf.format), writable: true });
 
 		if (conf.stderr === undefined) {
