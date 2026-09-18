@@ -380,7 +380,7 @@ test("metadata and context appear in the output", t => {
 
 	const seen: string[][] = [];
 	const custom = capture({
-		entryFormatter: entry => {
+		format: entry => {
 			seen.push(Object.keys(entry.metadata ?? {}));
 
 			return "";
@@ -389,6 +389,22 @@ test("metadata and context appear in the output", t => {
 
 	custom.log.info("x", { keep: 1, skip: undefined });
 	t.deepEqual(seen, [["keep"]], "a custom formatter never sees undefined keys");
+	t.end();
+});
+
+test("format takes a formatter function, inherited by clones and children", t => {
+	const { log, stderr, stdout } = capture({ format: entry => `${entry.logLevel}|${entry.msg}` });
+
+	log.info("hi");
+	log.clone().info("cloned");
+	new Log({ parentLog: log }).info("child");
+	t.deepEqual(stdout, ["info|hi", "info|cloned", "info|child"], "the function formats the instance's output and is inherited");
+	t.deepEqual(stderr, [], "the supported spelling warns about nothing");
+
+	const base = capture({ format: entry => entry.msg });
+
+	base.log.clone({ format: "text" }).info("plain");
+	t.ok(base.stdout[0].includes("inf") && base.stdout[0].endsWith(" plain"), "a clone switches a function format back to text");
 	t.end();
 });
 
@@ -560,6 +576,35 @@ test("the level-string shorthand still works and warns once per stderr sink", t 
 	new Log({ context: { service: "x" }, format: "json", stderr: line => { secondStderr.push(line); } }).clone("error");
 	t.strictEqual(secondStderr.length, 1, "a second sink hears the same warning again");
 	t.strictEqual(JSON.parse(secondStderr[0]).service, "x", "the warning carries the instance's context, like every other line");
+	t.end();
+});
+
+test("entryFormatter still formats and warns once per stderr sink", t => {
+	const { log, stderr, stdout } = capture({ entryFormatter: entry => `custom ${entry.msg}`, format: "json" });
+
+	log.info("hi");
+	t.strictEqual(stdout[0], "custom hi", "the deprecated formatter still formats output, and still wins over format: \"json\"");
+	t.strictEqual(stderr.length, 1, "one warning per sink");
+	t.strictEqual(stderr[0], "custom entryFormatter is deprecated and removed in 3.0.0, use format", "the warning goes through the instance's formatter and names the spelling to use instead");
+	log.info("again");
+	t.strictEqual(stderr.length, 1, "a second entry on the same sink stays quiet");
+
+	const cloneStderr: string[] = [];
+	const clone = log.clone({ stderr: line => { cloneStderr.push(line); } });
+
+	clone.info("cloned");
+	t.deepEqual(cloneStderr, [], "a clone inherits the formatter without repeating the warning on its own sink");
+	t.strictEqual(stdout[stdout.length - 1], "custom cloned", "the clone kept the inherited formatter");
+	t.ok(
+		thrown(() => new Log({ entryFormatter: entry => entry.msg, format: entry => entry.msg })).includes("format"),
+		"entryFormatter beside a function format is rejected, naming format",
+	);
+
+	const spreadStderr: string[] = [];
+	const fnLog = new Log({ format: entry => entry.msg, stderr: line => { spreadStderr.push(line); } });
+
+	new Log({ ...fnLog.conf, spanName: "sibling" });
+	t.deepEqual(spreadStderr, [], "a resolved conf spread into a new instance is neither a second spelling nor a deprecated one");
 	t.end();
 });
 

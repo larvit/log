@@ -14,6 +14,8 @@ const systemClock: Clock = {
 	setTimeout: (callback, delayMs) => setTimeout(callback, delayMs),
 };
 
+export type EntryFormatter = (conf: EntryFormatterConf) => string;
+
 export type EntryFormatterConf = {
 	// The instance's resolved `colors`. Unset means on.
 	colors?: boolean;
@@ -33,8 +35,9 @@ export type LogConf = {
 	clock?: Clock;
 	colors?: boolean;
 	context?: Metadata;
-	entryFormatter?: (conf: EntryFormatterConf) => string;
-	format?: "text" | "json";
+	// Deprecated, removed in 3.0.0: pass the function as `format`.
+	entryFormatter?: EntryFormatter;
+	format?: "text" | "json" | EntryFormatter;
 	logLevel?: LogLevel | "none";
 	// The three otlp* transport options are shorthand for `otlpQueue: new Queue({ ...them })`; never both.
 	otlpAdditionalHeaders?: Record<string, string>;
@@ -52,7 +55,7 @@ export type LogConf = {
 };
 
 // conf after the constructor fills its defaults: the always-set fields are no longer optional.
-export type ResolvedLogConf = LogConf & Required<Pick<LogConf, "clock" | "colors" | "entryFormatter" | "logLevel" | "stderr" | "stdout">>;
+export type ResolvedLogConf = LogConf & Required<Pick<LogConf, "clock" | "colors" | "entryFormatter" | "format" | "logLevel" | "stderr" | "stdout">>;
 
 export type Logger = {
 	enabled: (logLevel: LogLevel) => boolean;
@@ -249,6 +252,14 @@ export function msgTextFormatter(conf: EntryFormatterConf) {
 	}
 
 	return str;
+}
+
+function resolveFormatter(format: LogConf["format"]): EntryFormatter {
+	if (typeof format === "function") {
+		return format;
+	}
+
+	return format === "json" ? msgJsonFormatter : msgTextFormatter;
 }
 
 function bytesToHex(bytes: Uint8Array): string {
@@ -1142,11 +1153,21 @@ export class Log implements LogInt {
 
 	constructor(options?: LogConf | LogLevel | "none") {
 		const conf: LogConf = typeof options === "string" ? { logLevel: options } : { ...options };
+		// A resolved conf spread back in carries the mirror below; only a formatter that disagrees is the caller's own.
+		const deprecatedFormatter = conf.entryFormatter === resolveFormatter(conf.format) ? undefined : conf.entryFormatter;
+
+		if (deprecatedFormatter) {
+			if (typeof conf.format === "function") {
+				throw new Error("entryFormatter and a format function are the same setting: pass only format");
+			}
+
+			conf.format = deprecatedFormatter;
+		}
 
 		// Inherit conf from parent log if provided
 		if (typeof conf.parentLog === "object") {
 			const parentConf = conf.parentLog.conf;
-			const skip = new Set<keyof LogConf>(otlpKeysNotToInherit(conf));
+			const skip = new Set<keyof LogConf>(["entryFormatter", ...otlpKeysNotToInherit(conf)]);
 
 			for (const key of Object.keys(parentConf) as (keyof LogConf)[]) {
 				if (!skip.has(key) && conf[key] === undefined) {
@@ -1168,11 +1189,12 @@ export class Log implements LogInt {
 			conf.colors = colorsFromEnv() ?? true;
 		}
 
-		if (conf.entryFormatter === undefined && conf.format === "json") {
-			conf.entryFormatter = msgJsonFormatter;
-		} else if (conf.entryFormatter === undefined) {
-			conf.entryFormatter = msgTextFormatter;
+		if (conf.format === undefined) {
+			conf.format = "text";
 		}
+
+		// entryFormatter mirrors the resolved format, so inheritance carries format alone; 3.0.0 drops it.
+		conf.entryFormatter = resolveFormatter(conf.format);
 
 		if (conf.stderr === undefined) {
 			conf.stderr = console.error;
@@ -1189,6 +1211,10 @@ export class Log implements LogInt {
 
 		if (typeof options === "string") {
 			warnDeprecated(this.conf, this.context, "new Log(\"level\") is deprecated and removed in 3.0.0, use new Log({ logLevel })");
+		}
+
+		if (deprecatedFormatter) {
+			warnDeprecated(this.conf, this.context, "entryFormatter is deprecated and removed in 3.0.0, use format");
 		}
 
 		if (this.conf.otlpQueue) {
@@ -1243,15 +1269,6 @@ export class Log implements LogInt {
 
 		const conf: LogConf = typeof options === "string" ? { logLevel: options } : { ...options };
 
-		// Resolve the formatter from the effective format, so json<->text can be changed in either direction.
-		if (conf.entryFormatter === undefined) {
-			if (conf.format === "json") {
-				conf.entryFormatter = msgJsonFormatter;
-			} else if (conf.format === "text") {
-				conf.entryFormatter = msgTextFormatter;
-			}
-		}
-
 		// Merge context per-key (overrides win) instead of replacing it wholesale.
 		conf.context = {
 			...this.context,
@@ -1261,7 +1278,7 @@ export class Log implements LogInt {
 		// Inherit every other setting not overridden (log level, sinks, OTLP config, printTraceInfo…),
 		// like the constructor does from a parentLog. parentLog/spanName/traceparent are excluded: a
 		// clone is its own span, not a child. (A manual allow-list here once dropped newer OTLP options.)
-		const skip = new Set<keyof LogConf>(["parentLog", "spanName", "traceparent", ...otlpKeysNotToInherit(conf)]);
+		const skip = new Set<keyof LogConf>(["entryFormatter", "parentLog", "spanName", "traceparent", ...otlpKeysNotToInherit(conf)]);
 
 		for (const key of Object.keys(this.conf) as (keyof LogConf)[]) {
 			if (!skip.has(key) && conf[key] === undefined) {
