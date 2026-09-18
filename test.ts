@@ -529,19 +529,22 @@ test("the constructor and clone copy the caller's options object instead of fill
 test("the level-string shorthand still works and warns once per stderr sink", t => {
 	const stderr: string[] = [];
 	const realConsoleError = console.error;
+	let afterSilent: number;
 	let shorthand: Log;
 
 	console.error = (line: string) => { stderr.push(line); };
 	try {
 		new Log("none");
+		afterSilent = stderr.length;
 		shorthand = new Log("debug");
 	} finally {
 		console.error = realConsoleError;
 	}
 
 	t.strictEqual(shorthand.conf.logLevel, "debug", "the shorthand still sets the level");
-	t.strictEqual(stderr.length, 1, "logLevel \"none\" does not silence it and the second instance on the same sink stays quiet");
-	t.ok(stderr[0].includes("new Log({ logLevel })"), "the constructor warning names the spelling to use instead");
+	t.strictEqual(afterSilent, 1, "logLevel \"none\" does not silence the warning");
+	t.strictEqual(stderr.length, 1, "a second instance on the same sink stays quiet");
+	t.ok(stderr[0].includes("war") && stderr[0].includes("new Log({ logLevel })"), "the constructor warning is a warn line naming the spelling to use instead");
 
 	const cloneStderr: string[] = [];
 	const parent = new Log({ colors: false, stderr: line => { cloneStderr.push(line); } });
@@ -551,6 +554,12 @@ test("the level-string shorthand still works and warns once per stderr sink", t 
 	t.strictEqual(clone.conf.logLevel, "silly", "clone's shorthand still sets the level");
 	t.strictEqual(cloneStderr.length, 1, "clone warns once per sink, through the instance's stderr");
 	t.ok(cloneStderr[0].includes("[war]") && cloneStderr[0].includes("log.clone({ logLevel })"), "the clone warning is a warn line naming the spelling to use instead");
+
+	const secondStderr: string[] = [];
+
+	new Log({ context: { service: "x" }, format: "json", stderr: line => { secondStderr.push(line); } }).clone("error");
+	t.strictEqual(secondStderr.length, 1, "a second sink hears the same warning again");
+	t.strictEqual(JSON.parse(secondStderr[0]).service, "x", "the warning carries the instance's context, like every other line");
 	t.end();
 });
 
