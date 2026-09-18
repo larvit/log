@@ -191,7 +191,7 @@ queue is in memory only.
 | `otlpAdditionalHeaders` | `Record<string, string>` | none | Extra headers on every request, e.g. `{ Authorization: "Bearer …" }`. |
 | `otlpHttpBaseURI` | `string` | required | OTLP/HTTP endpoint, e.g. `http://127.0.0.1:4318`. Logs go to `/v1/logs`, spans to `/v1/traces` under it; a base path is kept. A malformed URI throws in the constructor. |
 | `otlpProtocol` | `"http/json" \| "http/protobuf"` | `"http/json"` | Wire format. Both use the same endpoint; use protobuf for collectors that reject JSON. |
-| `report` | `(msg, metadata) => void` | `console.error` | Sink for one line per failed attempt, dropped batch, drop round or partially rejected batch. The `Log`-built queue writes through the instance's `stderr` and `entryFormatter`. |
+| `report` | `(msg, metadata) => void` | `console.error` | Sink for one line per failed attempt, dropped batch, drop round or partially rejected batch. The `Log`-built queue writes through the instance's `stderr` and formatter. |
 | `retryDelayMs` | `number` | `1000` | Delay before the first retry; doubles per consecutive failure, capped at 30 s. |
 | `storage` | `QueueStorage` | none | Persists the queue, see above. |
 
@@ -238,7 +238,8 @@ instance you were handed; it is single-use and the consumer owns it.
 
 `new Log(options)` or `new Log()`. Every option is optional. A level string in place of the object,
 `new Log("debug")` or `log.clone("debug")`, is deprecated: it still sets the level, warns once per
-`stderr` sink and is removed in 3.0.0, so pass `{ logLevel }` instead.
+`stderr` sink and is removed in 3.0.0, so pass `{ logLevel }` instead. `entryFormatter` is
+deprecated the same way: pass the function as `format`.
 
 | Option | Type | Default | |
 |---|---|---|---|
@@ -248,8 +249,8 @@ instance you were handed; it is single-use and the consumer owns it.
 | `clock` | `Clock` | system clock | `{ now, setTimeout, clearTimeout }` behind every span and record timestamp. Passed on to the default `Queue`; a `Queue` you build takes its own. |
 | `colors` | `boolean` | `true` | ANSI colour codes in text output. Unset in code, the env decides: `NO_COLOR` (non-empty) turns it off; otherwise `FORCE_COLOR` turns it on, except `0` or `false` which turn it off. |
 | `context` | `Metadata` | `{}` | Added to every entry. Wins over a per-call key of the same name. |
-| `entryFormatter` | `(EntryFormatterConf) => string` | text formatter | Formats console output. Use `msTimestamp` rather than `new Date()` so console and OTLP timestamps of one entry match. |
-| `format` | `"text" \| "json"` | `"text"` | Console output format. Ignored when `entryFormatter` is set. |
+| `entryFormatter` | `EntryFormatter` | none | Deprecated, removed in 3.0.0: pass the function as `format`. Wins over a `"text"`/`"json"` `format`; beside a function `format` it is rejected. |
+| `format` | `"text" \| "json" \| EntryFormatter` | `"text"` | Console output format, or a formatter of your own. Use the entry's `msTimestamp` rather than `new Date()` so console and OTLP timestamps of one entry match. |
 | `logLevel` | `LogLevel \| "none"` | `"info"` | Minimum level to output. |
 | `otlpAdditionalHeaders` | `Record<string, string>` | none | Shorthand: the same option on the default `Queue`. |
 | `otlpHttpBaseURI` | `string` | none | Shorthand for `otlpQueue: new Queue({ otlpHttpBaseURI, otlpProtocol, otlpAdditionalHeaders })`. |
@@ -276,6 +277,13 @@ the same name:
 
 ```json
 {"orderId":"…","total":199,"logLevel":"info","msg":"Order placed","time":"2022-09-24T23:40:39.123Z"}
+```
+
+A formatter of your own takes the entry and returns the line, and is inherited by children and
+clones, which switch back with `format: "text"`:
+
+```js
+new Log({ format: entry => `${entry.logLevel} ${entry.msg}` });
 ```
 
 OTLP receives every metadata value as a string (`{ total: 199 }` → `"199"`); the JSON formatter
@@ -313,7 +321,7 @@ Spans are queued when the response arrives and are registered with `flush()` at 
 | `Log` | The logger class. |
 | `Queue` | The export queue; `new Queue(options)`, see [Queue exports](#queue-exports). |
 | `LogLevels` | Level → OTLP `severityNumber`/`severityText`, most to least severe. |
-| `msgTextFormatter`, `msgJsonFormatter` | The built-in `entryFormatter`s; wrap one to extend it. |
+| `msgTextFormatter`, `msgJsonFormatter` | The built-in formatters; wrap one to extend it. |
 | `parseTraceparent(header)` | `{ traceId, spanId, flags, sampled }` or `null` when malformed or version `ff`. |
 | `formatTraceparent(traceId, spanId, sampled?)` | Builds a W3C `traceparent` header value. |
 | `generateTraceId()`, `generateSpanId()` | Random 32- and 16-hex-char ids. |
@@ -323,7 +331,7 @@ Spans are queued when the response arrives and are registered with `flush()` at 
 | `LogLevel`, `LogShorthand` | Level name union; the signature of one level method. |
 | `Metadata`, `MetadataValue` | `Record<string, string \| number \| boolean \| undefined>` and its value type. |
 | `DefinedMetadata` | `Metadata` without `undefined` values: what a formatter and `log.context` see. |
-| `EntryFormatterConf` | The argument to `entryFormatter`; carries the instance's `colors`. |
+| `EntryFormatter`, `EntryFormatterConf` | A formatter, `(conf) => string`, and its argument, which carries the instance's `colors`. |
 | `OtlpSpan`, `OtlpAttribute`, `OtlpLogPayload`, `OtlpSpanPayload` | The OTLP wire shapes; `log.span` is an `OtlpSpan`. |
 | `OtlpQueue`, `OtlpPayload` | What `otlpQueue` takes, `{ enqueue, flush }`, and what `enqueue` receives, a log or span payload. |
 | `Clock`, `TimerHandle` | The `clock` option, `{ now, setTimeout, clearTimeout }` with `now()` in integer epoch milliseconds, and what its `setTimeout` hands back. |
