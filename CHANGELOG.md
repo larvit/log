@@ -7,7 +7,10 @@
   such a url parses to an opaque path, so `log.fetch("myapp:user:pass@host/x")` exported
   `nulluser:pass@host/x` and a `data:` url exported its whole payload.
   **If you have ever passed credentials or private data in such a url, treat them as exported** and
-  rotate them: they are in whatever your spans reach.
+  rotate them: they are in whatever your spans reach. `log.fetch("https://user:pass@host/x")`
+  exports them too and is not fixed yet: `fetch` refuses a url carrying credentials and quotes the
+  whole url into the error, which becomes the span's status message. Keep credentials out of a
+  `log.fetch` url and pass an `Authorization` header instead.
 - Credentials in `otlpHttpBaseURI` no longer reach `stderr`, and basic auth works. `fetch` rejects
   a `user:pass@` url outright on Node and in browsers, and that rejection quoted the whole url —
   credentials included — into the error line of every failed export. `user:pass@` is now sent as an

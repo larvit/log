@@ -1153,9 +1153,7 @@ export class Queue implements OtlpQueue {
 // default deny-list of the official OTel HTTP instrumentations. Matched case-insensitively.
 const SENSITIVE_QUERY_KEYS = new Set(["awsaccesskeyid", "signature", "sig", "x-goog-signature"]);
 
-// The URL log.fetch traces. Anything else is fetched untraced: a scheme without "//" parses to an
-// opaque path, where url.origin is the string "null" and the userinfo, or a data: payload, sits in
-// url.pathname and would ride into url.full.
+// The URL log.fetch traces. A scheme written without "//" parses to an opaque path, where userinfo, or a data: payload, sits in pathname and would ride into url.full.
 function traceableUrl(input: string | URL): URL | undefined {
 	let url: URL;
 
