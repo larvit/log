@@ -83,8 +83,9 @@ Structured logging with a tiny API and first-class OTLP (logs + traces) over `fe
   rotated token reaches the next send, and a header the caller got wrong fails that export instead
   of the construction of their `Log`. A colon in the user-id is passed through rather than
   rejected: RFC 7617 forbids it and a server splits on the first one, so there is no reading to
-  salvage. `btoa` is assumed present beside `TextEncoder`, on the same runtime floor as the
-  2026-09-17 `TextEncoder` decision. Both credential spellings stand meanwhile: a collector vendor
+  salvage. `btoa` is assumed present beside `TextEncoder`, on the same floor as the `TextEncoder`
+  entry under `todo.md`'s "Kept as is": Hermes added both (facebook/hermes#1178) and React Native
+  has shipped them since 0.74. Both credential spellings stand meanwhile: a collector vendor
   hands `user:pass@` over as one string, and dropping it in a minor would break those consumers,
   so `todo.md` carries the question rather than this entry settling it. Valid while a queue owns
   the transport.

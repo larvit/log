@@ -667,7 +667,7 @@ export type ResolvedQueueConf = QueueConf & Required<Pick<QueueConf, "batchDelay
 
 type QueuedItem = { bytes: number, payload: OtlpPayload };
 
-type SendFailure = { message: string, retry: boolean, status?: number };
+type SendFailure = { message: string, reportAs?: string, retry: boolean, status?: number };
 
 // Browsers reject a keepalive request whose body is over 64 KiB.
 const KEEPALIVE_MAX_BYTES = 65536;
@@ -842,7 +842,7 @@ export class Queue implements OtlpQueue {
 			base = new URL(conf.otlpHttpBaseURI);
 		} catch {
 			// Never the URI itself: the thrown error is printed, and a password may be in it.
-			throw new Error("otlpHttpBaseURI is not a valid URI; percent-encode any @ : / ? # in a password");
+			throw new Error("otlpHttpBaseURI is not a valid URI; check the scheme, and percent-encode any / ? # in a password");
 		}
 
 		const auth = basicAuth(base);
@@ -921,7 +921,7 @@ export class Queue implements OtlpQueue {
 			this.changed();
 
 			if (failure) {
-				this.report("OTLP export rejected, batch dropped", this.describe(batch, failure));
+				this.report(failure.reportAs ?? "OTLP export rejected, batch dropped", this.describe(batch, failure));
 			}
 		}
 
@@ -968,9 +968,7 @@ export class Queue implements OtlpQueue {
 		return batch;
 	}
 
-	// Per send, so a token rotated in otlpAdditionalHeaders takes effect and a header the caller got
-	// wrong fails the export rather than the construction of their Log. The value never joins the
-	// message; it is the likeliest place for a credential.
+	// The value never joins the message; it is the likeliest place for a credential.
 	private buildHeaders(): { failure?: string, headers: Headers } {
 		const headers = new Headers(this.headers);
 
@@ -989,7 +987,7 @@ export class Queue implements OtlpQueue {
 		const { failure, headers } = this.buildHeaders();
 
 		if (failure) {
-			return { message: failure, retry: false };
+			return { message: failure, reportAs: "OTLP export headers invalid, batch dropped", retry: false };
 		}
 
 		let body: string | Uint8Array<ArrayBuffer>;
