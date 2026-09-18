@@ -588,7 +588,7 @@ test("entryFormatter still formats and warns once per stderr sink", t => {
 	log.info("hi");
 	t.strictEqual(stdout[0], "custom hi", "the deprecated formatter still formats output, and still wins over format: \"json\"");
 	t.strictEqual(stderr.length, 1, "one warning per sink");
-	t.strictEqual(stderr[0], "custom @larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format — it overrides the format set beside it", "the warning goes through the instance's formatter, names the spelling to use instead and says the format beside it is overridden");
+	t.strictEqual(stderr[0], "custom @larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format — entryFormatter wins and the format beside it is ignored", "the warning goes through the instance's formatter, names the spelling to use instead and says which of the two wins");
 	log.info("again");
 	t.strictEqual(stderr.length, 1, "a second entry on the same sink stays quiet");
 
@@ -618,6 +618,11 @@ test("format and entryFormatter are one setting, and a resolved conf carries nei
 	parent.log.clone({ entryFormatter: own }).info("hi");
 	new Log({ entryFormatter: own, parentLog: parent.log }).info("hi");
 	t.deepEqual(parent.stdout, ["own hi", "own hi"], "a clone and a child take the caller's formatter over the inherited format, alike");
+
+	const pairStderr: string[] = [];
+
+	parent.log.clone({ entryFormatter: own, format: "json", stderr: line => { pairStderr.push(line); } });
+	t.ok(pairStderr[0]?.endsWith("@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format — entryFormatter wins and the format beside it is ignored"), "a clone holding both spellings hears the same warning the constructor gives");
 
 	const spread = capture({ ...parent.log.conf, format: (entry: EntryFormatterConf) => `spread ${entry.msg}` });
 
