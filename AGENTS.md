@@ -49,7 +49,14 @@ Structured logging with a tiny API and first-class OTLP (logs + traces) over `fe
   `setTimeout` returning a cancel function. `unref` needs the real handle to keep a pending retry
   from holding a Node or Deno process alive, and only the retry timer is unref'd; the `| number`
   arm is what lets a browser, React Native or test clock type-check against types built with
-  `"types": ["node"]`. Valid while a pending retry must not hold the process open.
+  `"types": ["node"]`. A clock that delegates to platform timers is unref'd like the system one;
+  only Deno's numeric `unrefTimer` is skipped for an injected clock, since the id is not its own.
+  Valid while a pending retry must not hold the process open.
+- 2026-09-18: `clock` is a supported option, not a test-only seam. Valid while a delegating clock
+  leaves process-exit behaviour intact.
+- 2026-09-18: adding a key to `ResolvedLogConf`/`ResolvedQueueConf`'s required half ships in a
+  minor. They are output types describing what the library produces; a consumer hand-building one
+  is writing a test double, not running existing code. Precedent: `colors` did the same.
 
 ## Working here
 
