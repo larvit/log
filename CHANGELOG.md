@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Basic-auth credentials in `otlpHttpBaseURI` no longer reach `stderr`: the `url` a queue reports
+  drops the `username:password@`, which every export-failure line carried. Requests still send them.
 - `format` also takes a formatter function, `(entry) => string`, and is what children and clones
   inherit. `entryFormatter` is deprecated: it still formats and still wins over a `"text"`/`"json"`
   `format`, writes one `warn` line per `stderr` sink for each distinct warning text, whatever

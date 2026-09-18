@@ -5,7 +5,7 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
 
 ## Security
 
-- [ ] Strip `username:password@` from the url the queue reports: basic-auth credentials a consumer
+- [x] Strip `username:password@` from the url the queue reports: basic-auth credentials a consumer
   puts in `otlpHttpBaseURI` reach `stderr` today, in the metadata of every export-failure line,
   through the default `console.error` sink as readily as through a configured one.
 

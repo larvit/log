@@ -694,15 +694,18 @@ test("the Log-built queue reports through the instance's stderr and formatter", 
 test("a rejected export (4xx) drops the batch, reports one line per batch and does not retry", async t => {
 	const { calls } = stubFetch(() => response({ status: 400 }));
 	const stderr: string[] = [];
-	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: line => stderr.push(line) });
+	const log = new Log({ otlpHttpBaseURI: "http://collector:s3cret@127.0.0.1:4318", stderr: line => stderr.push(line) });
 
 	log.info("x");
 	log.info("y");
 	await log.end();
 
 	t.deepEqual(calls.map(call => call.path), ["/v1/logs", "/v1/traces"], "each batch is attempted once");
+	t.strictEqual(calls[0].url, "http://collector:s3cret@127.0.0.1:4318/v1/logs", "the request carries the endpoint's basic-auth credentials");
 	t.strictEqual(stderr.length, 2, "one line per rejected batch");
 	t.ok(stderr[0].includes("400"), "the line carries the status");
+	t.ok(stderr[0].includes("http://127.0.0.1:4318/v1/logs"), "the line names the endpoint it failed against");
+	t.notOk(stderr.join("").includes("s3cret"), "no reported line carries the credentials");
 
 	calls.length = 0;
 	await log.flush();
