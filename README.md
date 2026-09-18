@@ -2,7 +2,7 @@
 
 [![npm](https://img.shields.io/npm/v/@larvit/log)](https://www.npmjs.com/package/@larvit/log)
 [![bundle size](https://deno.bundlejs.com/badge?q=@larvit/log)](https://bundlejs.com/?q=%40larvit%2Flog)
-[![CI](https://github.com/larvit/log/actions/workflows/master.yaml/badge.svg?branch=main)](https://github.com/larvit/log/actions/workflows/master.yaml)
+[![CI](https://github.com/larvit/log/actions/workflows/push.yaml/badge.svg?branch=main)](https://github.com/larvit/log/actions/workflows/push.yaml)
 
 Structured logging with a tiny API, plus OTLP export of logs and traces from Node, Bun, Deno,
 browsers and React Native. No OpenTelemetry SDK, no dependencies.

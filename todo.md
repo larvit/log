@@ -31,7 +31,7 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
   the `Queue` timers, so tests assert exact times instead of "within an hour" and the retry
   schedule, its 30 s cap included, without waiting.
 - [x] Add a size badge to the README (2.3.0: 15.0 KB minified, 4.7 KB gzipped).
-- [ ] Rename `.github/workflows/master.yaml` to `push.yaml` and update the README badge.
+- [x] Rename `.github/workflows/master.yaml` to `push.yaml` and update the README badge.
 
 ### Deprecations (warn once on stderr)
 
