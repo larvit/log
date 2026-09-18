@@ -106,6 +106,6 @@ Structured logging with a tiny API and first-class OTLP (logs + traces) over `fe
 
 - Source is a single `index.ts`, compiled + uglified to `index.js` for publish.
 - A done `todo.md` item leaves the file, reworded for the consumer into `CHANGELOG.md` under
-  `## Unreleased`; the `[x]` items still in the file predate that rule.
+  `## Unreleased`; the `[x]` items still in the file are debt for a separate chunk.
 - Tests-first. The suite (`test.ts`) injects `stdout`/`stderr` and stubs the global `fetch`, so the same tests cover console + OTLP in both Node and the browser.
 - See [README](README.md) for build/test/release commands. Keep the README and this file in sync with any priority or workflow change.

@@ -1153,7 +1153,8 @@ export class Queue implements OtlpQueue {
 // default deny-list of the official OTel HTTP instrumentations. Matched case-insensitively.
 const SENSITIVE_QUERY_KEYS = new Set(["awsaccesskeyid", "signature", "sig", "x-goog-signature"]);
 
-// The URL log.fetch traces. A scheme written without "//" parses to an opaque path, where userinfo, or a data: payload, sits in pathname and would ride into url.full.
+// The URL log.fetch traces: a scheme written without "//" parses to an opaque path, where
+// userinfo, or a data: payload, sits in pathname and would ride into url.full.
 function traceableUrl(input: string | URL): URL | undefined {
 	let url: URL;
 
@@ -1415,9 +1416,7 @@ export class Log implements LogInt {
 	// Drop-in `fetch`: auto-creates a CLIENT span (nested under this log's span), injects a
 	// `traceparent`, records the OTel http.* attributes, and is the only output (no log line). The
 	// span is queued when the response arrives and is registered with flush() at call time, so
-	// `await log.end()` delivers it even when the fetch wasn't awaited. Only absolute http(s) URLs are
-	// traced; anything else (a relative URL with no base, another scheme) passes through to a plain,
-	// untraced fetch.
+	// `await log.end()` delivers it even when the fetch wasn't awaited.
 	public fetch(input: string | URL, init?: RequestInit): Promise<Response> {
 		if (this.ended) {
 			throw new Error("Logging instance is already ended");

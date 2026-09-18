@@ -12,7 +12,10 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
   class as the `otlpHttpBaseURI` leak already fixed: decide whether `log.fetch` sends the userinfo
   as an `Authorization: Basic` header the way the queue now does, or strips it and reports. The
   suite stubs the global `fetch`, so no test can reach the rejection today: drive it with a real
-  `fetch` or a stub that throws the same `TypeError`.
+  `fetch` or a stub that throws the same `TypeError`. Settle React Native in the same item: its
+  `fetch` is an `XMLHttpRequest` polyfill, which may put the credentials on the wire instead of
+  refusing them — CWE-319 rather than a span leak, and the README and CHANGELOG say only what is
+  verified on Node and in browsers until someone checks.
 - [ ] Decide what to do about Basic credentials sent over plain `http:` to a non-loopback host,
   now that they are really sent: anything on the network path can read them (CWE-319). Either warn
   once per `report` sink when the endpoint is `http:` and carries userinfo, or require `https:`
@@ -57,8 +60,8 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
 - [x] Inject one clock (`now`, `setTimeout`, `clearTimeout`) behind span and record timestamps and
   the `Queue` timers, so tests assert exact times instead of "within an hour" and the retry
   schedule, its 30 s cap included, without waiting.
-- [ ] Leave a `Request` untraced in `log.fetch`. A JS consumer passing one gets `String(request)` = `"[object Request]"`, which in a browser
-  resolves against `location.href` to an http(s) url: `log.fetch` then traces that invented url and
+- [ ] Leave a `Request` untraced in `log.fetch`. A JS consumer passing one gets `String(request)` =
+  `"[object Request]"`, which in a browser resolves against `location.href` to an http(s) url: `log.fetch` then traces that invented url and
   fetches it with `init` alone, dropping the request's own method, body and headers. The signature
   says `string | URL`, so a TypeScript consumer cannot reach it.
 - [ ] Report a 401 or 403 export as `OTLP export unauthorized, batch dropped`, not as the generic
