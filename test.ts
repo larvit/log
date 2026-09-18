@@ -527,16 +527,20 @@ test("clone inherits config (OTLP, printTraceInfo, fetch policy) but keeps its o
 
 test("constructor throws on malformed otlpHttpBaseURI", t => {
 	t.throws(() => new Log({ otlpHttpBaseURI: "not a valid uri" }), "malformed otlpHttpBaseURI throws at construction");
+	// "otlp:" parses to an opaque path, which leaves the credentials sitting in pathname.
+	t.throws(() => new Log({ otlpHttpBaseURI: "otlp:u:s3cr3t@127.0.0.1:4318" }), "a scheme other than http(s) throws at construction");
 
-	let caught: unknown;
+	for (const uri of ["http://u:s3cr3t/w@127.0.0.1:4318", "otlp:u:s3cr3t@127.0.0.1:4318"]) {
+		let caught: unknown;
 
-	try {
-		new Log({ otlpHttpBaseURI: "http://u:s3cr%40t/w@127.0.0.1:4318" });
-	} catch (err) {
-		caught = err;
+		try {
+			new Log({ otlpHttpBaseURI: uri });
+		} catch (err) {
+			caught = err;
+		}
+
+		t.notOk(JSON.stringify(caught, Object.getOwnPropertyNames(caught as object)).includes("s3cr3t"), `the error thrown for ${uri.slice(0, 5)} carries no part of the URI, cause and input included`);
 	}
-
-	t.notOk(JSON.stringify(caught, Object.getOwnPropertyNames(caught as object)).includes("s3cr"), "the thrown error carries no part of the URI, cause and input included");
 	t.doesNotThrow(() => new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318" }), "valid uri does not throw");
 	t.end();
 });
