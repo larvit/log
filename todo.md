@@ -3,6 +3,12 @@
 Plan for 3.0.0. Per AGENTS.md → Audience, everything breaking is deprecated in a 2.x minor
 first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x as it is done.
 
+## Security
+
+- [ ] Strip `username:password@` from the url the queue reports: basic-auth credentials a consumer
+  puts in `otlpHttpBaseURI` reach `stderr` today, in the metadata of every export-failure line,
+  through the default `console.error` sink as readily as through a configured one.
+
 ## 2.x minors, before 3.0.0
 
 ### Additive
@@ -30,8 +36,6 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
 - [x] Inject one clock (`now`, `setTimeout`, `clearTimeout`) behind span and record timestamps and
   the `Queue` timers, so tests assert exact times instead of "within an hour" and the retry
   schedule, its 30 s cap included, without waiting.
-- [ ] Strip `username:password@` from the url the queue reports: basic-auth credentials a consumer
-  puts in `otlpHttpBaseURI` reach `stderr` today, in the metadata of every export-failure line.
 - [x] Add a size badge to the README (2.3.0: 15.0 KB minified, 4.7 KB gzipped).
 - [x] Rename `.github/workflows/master.yaml` to `push.yaml` and update the README badge.
 
