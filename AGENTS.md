@@ -77,11 +77,17 @@ Structured logging with a tiny API and first-class OTLP (logs + traces) over `fe
 - 2026-09-19: `otlpHttpBaseURI` userinfo is sent as an `Authorization: Basic` header, never in the
   request url. WHATWG `fetch` refuses a url carrying credentials and quotes that url into the
   `TypeError`, so keeping them there made basic auth unusable on Node and in browsers and leaked
-  them into the report line of every failed attempt. A `Queue` builds one `Headers` in its
-  constructor, so `otlpAdditionalHeaders` overrides what it sets by any casing, which the object
-  spread this replaced could not do. A colon in the user-id is passed through rather than
+  them into the report line of every failed attempt. A `Queue` keeps its `Content-Type` and any
+  endpoint `Authorization` in one `Headers` and applies `otlpAdditionalHeaders` onto a copy per
+  send, so a name overrides by any casing where the object spread this replaced could not, a
+  rotated token reaches the next send, and a header the caller got wrong fails that export instead
+  of the construction of their `Log`. A colon in the user-id is passed through rather than
   rejected: RFC 7617 forbids it and a server splits on the first one, so there is no reading to
-  salvage. Valid while a queue owns the transport.
+  salvage. `btoa` is assumed present beside `TextEncoder`, on the same runtime floor as the
+  2026-09-17 `TextEncoder` decision. Both credential spellings stand meanwhile: a collector vendor
+  hands `user:pass@` over as one string, and dropping it in a minor would break those consumers,
+  so `todo.md` carries the question rather than this entry settling it. Valid while a queue owns
+  the transport.
 
 ## Working here
 

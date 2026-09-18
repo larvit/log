@@ -695,8 +695,8 @@ function utf8Length(str: string): number {
 	return bytes;
 }
 
-// RFC 7617 credentials out of a url's userinfo. A malformed percent escape passes through
-// undecoded rather than throwing, so an odd password cannot break the constructor.
+// A malformed percent escape passes through undecoded rather than throwing, so an odd password
+// cannot break the constructor.
 function basicAuth(base: URL): string | undefined {
 	if (!base.username && !base.password) {
 		return undefined;
@@ -802,6 +802,7 @@ export class Queue implements OtlpQueue {
 	private items: QueuedItem[] = [];
 	private bytes = 0;
 	private readonly headers: Headers;
+	private readonly protobuf: boolean;
 	private readonly url: string;
 	private dropped = 0;
 	private failures = 0;
@@ -835,18 +836,23 @@ export class Queue implements OtlpQueue {
 			throw new Error("clock must be { now, setTimeout, clearTimeout }");
 		}
 
-		const base = new URL(conf.otlpHttpBaseURI);
+		let base: URL;
+
+		try {
+			base = new URL(conf.otlpHttpBaseURI);
+		} catch {
+			// Never the URI itself: the thrown error is printed, and a password may be in it.
+			throw new Error("otlpHttpBaseURI is not a valid URI; percent-encode any @ : / ? # in a password");
+		}
+
 		const auth = basicAuth(base);
 
+		this.protobuf = this.conf.otlpProtocol === "http/protobuf";
 		this.url = `${base.protocol}//${base.host}${base.pathname.replace(/\/$/, "")}`;
-		this.headers = new Headers({ "Content-Type": this.conf.otlpProtocol === "http/protobuf" ? "application/x-protobuf" : "application/json" });
+		this.headers = new Headers({ "Content-Type": this.protobuf ? "application/x-protobuf" : "application/json" });
 
 		if (auth) {
 			this.headers.set("Authorization", auth);
-		}
-
-		for (const [name, value] of Object.entries(this.conf.otlpAdditionalHeaders ?? {})) {
-			this.headers.set(name, value);
 		}
 
 		this.ready = conf.storage ? this.load(conf.storage) : Promise.resolve();
@@ -962,15 +968,37 @@ export class Queue implements OtlpQueue {
 		return batch;
 	}
 
+	// Per send, so a token rotated in otlpAdditionalHeaders takes effect and a header the caller got
+	// wrong fails the export rather than the construction of their Log. The value never joins the
+	// message; it is the likeliest place for a credential.
+	private buildHeaders(): { failure?: string, headers: Headers } {
+		const headers = new Headers(this.headers);
+
+		for (const [name, value] of Object.entries(this.conf.otlpAdditionalHeaders ?? {})) {
+			try {
+				headers.set(name, value);
+			} catch {
+				return { failure: `otlpAdditionalHeaders carries an invalid ${name} header`, headers };
+			}
+		}
+
+		return { headers };
+	}
+
 	private async send(batch: QueuedItem[]): Promise<SendFailure | undefined> {
-		const protobuf = this.conf.otlpProtocol === "http/protobuf";
+		const { failure, headers } = this.buildHeaders();
+
+		if (failure) {
+			return { message: failure, retry: false };
+		}
+
 		let body: string | Uint8Array<ArrayBuffer>;
 
 		// A payload that cannot be encoded (a corrupt stored item, no TextEncoder) never becomes sendable.
 		try {
 			const payload = mergePayloads(batch.map(item => item.payload));
 
-			body = protobuf ? encodeOtlpProtobuf(payload) : JSON.stringify(payload);
+			body = this.protobuf ? encodeOtlpProtobuf(payload) : JSON.stringify(payload);
 		} catch (err) {
 			return { message: stringField(err, "message") ?? "Unencodable OTLP payload", retry: false };
 		}
@@ -984,7 +1012,7 @@ export class Queue implements OtlpQueue {
 		try {
 			const res = await fetch(this.url + otlpPath(batch[0].payload), {
 				body,
-				headers: this.headers,
+				headers,
 				keepalive: bytes <= KEEPALIVE_MAX_BYTES,
 				method: "POST",
 				signal: controller.signal,
@@ -995,7 +1023,7 @@ export class Queue implements OtlpQueue {
 			}
 
 			// Protobuf responses are binary; only the JSON transport reads the body, for a partialSuccess.
-			if (!protobuf) {
+			if (!this.protobuf) {
 				const rejection = partialRejection(await res.json().catch(() => undefined));
 
 				if (rejection) {

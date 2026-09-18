@@ -2,14 +2,18 @@
 
 ## Unreleased
 
-- Basic auth in `otlpHttpBaseURI` works, and its credentials no longer reach `stderr`. `user:pass@`
-  is sent as an `Authorization: Basic` header, percent-decoded; neither the request url nor a
-  reported one carries the credentials. Before, `fetch` rejected such a url outright on Node and in
-  browsers and quoted it, credentials included, into the report line of every failed attempt and
-  every retry — rotate any credentials that have been in an endpoint.
-- A header in `otlpAdditionalHeaders` overrides the one the queue sets itself whatever its casing;
-  before, `{ authorization: … }` was sent alongside the queue's own `Authorization` rather than in
-  place of it, combining the two into one invalid header value.
+- Credentials in `otlpHttpBaseURI` no longer reach `stderr`, and basic auth works. `fetch` rejects
+  a `user:pass@` url outright on Node and in browsers, and that rejection quoted the whole url —
+  credentials included — as the export error of every attempt and every retry. `user:pass@` is now
+  sent as an `Authorization: Basic` header, percent-decoded, and the request url carries none.
+  **If you have ever set `user:pass@` in `otlpHttpBaseURI`, rotate those credentials**: they are in
+  whatever collects your `stderr`, findable by searching it for your collector's hostname. The URI
+  stays on `log.conf` and `queue.conf` as you gave it, so don't log your `conf`.
+- A header in `otlpAdditionalHeaders` replaces the one the queue sets itself whatever its casing;
+  before, `{ authorization: … }` went out beside the queue's own `Authorization` as one
+  comma-joined value no collector accepts. Headers are read afresh on each send, so a rotated token
+  takes effect, and a name or value the runtime rejects drops that batch with one report line
+  naming the header, where it used to be retried for the life of the process.
 - `format` also takes a formatter function, `(entry) => string`, and is what children and clones
   inherit. `entryFormatter` is deprecated: it still formats and still wins over a `"text"`/`"json"`
   `format`, writes one `warn` line per `stderr` sink for each distinct warning text, whatever

@@ -5,6 +5,12 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
 
 ## Security
 
+- [ ] Keep `otlpHttpBaseURI` credentials off `log.conf` and `queue.conf`, which the README
+  documents as public: the URI sits there verbatim, so a consumer who logs their own conf — as
+  the README's own library example spells `JSON.stringify(options.settings)` — puts the password
+  in their log store. No library path emits it. `isQueueFor` compares that exact string, so
+  stripping it means carrying the endpoint through child and clone inheritance another way;
+  the 3.0.0 `otlpQueue`-only item below already moves that ground.
 - [x] Send `username:password@` from `otlpHttpBaseURI` as an `Authorization: Basic` header instead
   of leaving it in the url: basic-auth credentials a consumer puts there reached `stderr` in the
   metadata of every export-failure line, through the default `console.error` sink as readily as
@@ -37,15 +43,22 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
 - [x] Inject one clock (`now`, `setTimeout`, `clearTimeout`) behind span and record timestamps and
   the `Queue` timers, so tests assert exact times instead of "within an hour" and the retry
   schedule, its 30 s cap included, without waiting.
+- [ ] Report a 401 or 403 export as `OTLP export unauthorized, batch dropped`, not as the generic
+  rejection. Working auth makes a wrong credential reachable for the first time, and it is the
+  likeliest misconfiguration of `otlpHttpBaseURI` userinfo; today it reads as any other 4xx.
 - [x] Add a size badge to the README (2.3.0: 15.0 KB minified, 4.7 KB gzipped).
 - [x] Rename `.github/workflows/master.yaml` to `push.yaml` and update the README badge.
 
 ### Deprecations (warn once on stderr)
 
-- [ ] Deprecate `user:pass@` in `otlpHttpBaseURI` in favour of `otlpAdditionalHeaders:
-  { Authorization }`, and add the 3.0.0 item that rejects it. Both spellings now build the same
-  header, which "one spelling per goal" says to collapse; keeping both needs a reason in
-  `AGENTS.md` instead.
+- [ ] Settle the two credential spellings: `user:pass@` in `otlpHttpBaseURI` and
+  `otlpAdditionalHeaders: { Authorization }` now build the same header, which "one spelling per
+  goal" says to collapse. The product-owner review argues for keeping both — a collector vendor
+  hands the endpoint over as one `https://id:token@host` string, which is also the only shape a
+  single env var carries — and rejecting the *combination* in the constructor instead, the way
+  two different formatters already throw. That combination has never produced a working request,
+  so rejecting it is safe in a minor. Either take that, or deprecate the userinfo spelling here
+  and reject it in 3.0.0.
 - [x] Deprecate `new Log("level")` and `clone("level")` in favour of `{ logLevel }`.
 - [x] Deprecate `entryFormatter` in favour of `format`, and make `format` also accept
   `(entry) => string`.
