@@ -4,9 +4,10 @@
 
 - Not fixed: `log.fetch("https://user:pass@host/x")` exposes those credentials. On Node and in
   browsers `fetch` refuses a url carrying them and quotes the whole url into its `TypeError`, which
-  becomes the span's status message; a runtime whose `fetch` is an `XMLHttpRequest` polyfill may
-  send them instead. Pass an `Authorization` header, and strip userinfo from a url you did not
-  build.
+  becomes the span's status message; React Native, whose `fetch` is an `XMLHttpRequest` polyfill,
+  may send them instead. Pass an `Authorization` header, and strip userinfo from a url you did not
+  build. **If you have done this on Node or in a browser, rotate those credentials**: they are in
+  your tracing backend, on every failed client span whose status message quotes the url.
 - `log.fetch` traces only a URL that resolves to `http:` or `https:`; anything else is fetched
   untraced — no span, and no `traceparent` sent. It used to export a span whose `url.full` held
   whatever the url did: written without `//`, a url parses to an opaque path, so

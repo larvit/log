@@ -15,7 +15,10 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
   `fetch` or a stub that throws the same `TypeError`. Settle React Native in the same item: its
   `fetch` is an `XMLHttpRequest` polyfill, which may put the credentials on the wire instead of
   refusing them — CWE-319 rather than a span leak, and the README and CHANGELOG say only what is
-  verified on Node and in browsers until someone checks.
+  verified on Node and in browsers until someone checks. That chunk also deletes the README
+  paragraph, and its CHANGELOG entry names the unfixed bullet it supersedes, which stays where it
+  is. Sending `Authorization: Basic` is what `otlpHttpBaseURI` already does with the same spelling,
+  so stripping instead owes the README a clause saying why the two differ.
 - [ ] Decide what to do about Basic credentials sent over plain `http:` to a non-loopback host,
   now that they are really sent: anything on the network path can read them (CWE-319). Either warn
   once per `report` sink when the endpoint is `http:` and carries userinfo, or require `https:`
@@ -61,9 +64,10 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
   the `Queue` timers, so tests assert exact times instead of "within an hour" and the retry
   schedule, its 30 s cap included, without waiting.
 - [ ] Leave a `Request` untraced in `log.fetch`. A JS consumer passing one gets `String(request)` =
-  `"[object Request]"`, which in a browser resolves against `location.href` to an http(s) url: `log.fetch` then traces that invented url and
-  fetches it with `init` alone, dropping the request's own method, body and headers. The signature
-  says `string | URL`, so a TypeScript consumer cannot reach it.
+  `"[object Request]"`, which in a browser resolves against `location.href` to an http(s) url:
+  `log.fetch` then traces that invented url and fetches it with `init` alone, dropping the request's
+  own method, body and headers. The signature says `string | URL`, so a TypeScript consumer cannot
+  reach it.
 - [ ] Report a 401 or 403 export as `OTLP export unauthorized, batch dropped`, not as the generic
   rejection. Working auth makes a wrong credential reachable for the first time, and it is the
   likeliest misconfiguration of `otlpHttpBaseURI` userinfo; today it reads as any other 4xx.
