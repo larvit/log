@@ -121,7 +121,7 @@ function stubFetch(responder?: (path: string, body: unknown) => ReturnType<typeo
 		const contentType = new Headers(init.headers ?? {}).get("Content-Type");
 		const path = new URL(String(url)).pathname;
 		// Only JSON bodies are parsed; protobuf bodies are raw bytes, inspected via rawBody.
-		const body = contentType === "application/json" ? JSON.parse(init.body) : undefined;
+		const body = init.body !== undefined && contentType === "application/json" ? JSON.parse(init.body) : undefined;
 
 		calls.push({ body, contentType, headers: init.headers, keepalive: init.keepalive, path, rawBody: init.body, url: String(url) });
 
@@ -713,14 +713,14 @@ test("a rejected export (4xx) drops the batch, reports one line per batch and do
 test("endpoint userinfo authenticates through an Authorization header, never through the url", async t => {
 	const { calls } = stubFetch(() => response({ status: 400 }));
 	const stderr: string[] = [];
-	const endpoint = "http://collector:s3cr%40t@127.0.0.1:4318";
+	const endpoint = "http://collector:s3cr%40t%C3%A5@127.0.0.1:4318";
 	const log = new Log({ otlpHttpBaseURI: endpoint, stderr: line => stderr.push(line) });
 
 	log.info("x");
 	await log.flush();
 
 	t.strictEqual(calls[0].url, "http://127.0.0.1:4318/v1/logs", "the request url holds no credentials");
-	t.strictEqual(callHeader(calls[0], "Authorization"), "Basic Y29sbGVjdG9yOnMzY3JAdA==", "they are sent as percent-decoded Basic credentials");
+	t.strictEqual(callHeader(calls[0], "Authorization"), "Basic Y29sbGVjdG9yOnMzY3JAdMOl", "they are sent as percent-decoded Basic credentials, UTF-8 before base64");
 	t.strictEqual(stderr.length, 1, "the rejected batch is reported");
 	t.notOk(stderr.join("").includes("s3cr"), "no reported line carries the password");
 
@@ -741,6 +741,29 @@ test("endpoint userinfo authenticates through an Authorization header, never thr
 	plain.info("w");
 	await plain.flush();
 	t.strictEqual(callHeader(calls[3], "Authorization"), null, "an endpoint without userinfo sends no Authorization header");
+	t.end();
+});
+
+test("otlpAdditionalHeaders is read per send, and an invalid one fails the export, not the Log", async t => {
+	const { calls } = stubFetch();
+	const rotating = { Authorization: "Bearer first" };
+	const log = new Log({ otlpAdditionalHeaders: rotating, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+
+	log.info("x");
+	await log.flush();
+	rotating.Authorization = "Bearer second";
+	log.info("y");
+	await log.flush();
+	t.deepEqual(calls.map(call => callHeader(call, "Authorization")), ["Bearer first", "Bearer second"], "a rotated token reaches the next send without a new queue");
+
+	const reports = reportSink();
+	const invalid = new Log({ otlpQueue: new Queue({ otlpAdditionalHeaders: { "X-Bad Name": "s3cr3t" }, otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report }), stderr: () => {} });
+
+	invalid.info("z");
+	await invalid.flush();
+	t.strictEqual(calls.length, 2, "nothing is sent with a header the runtime rejects");
+	t.deepEqual(reports.lines.map(line => line.error), ["otlpAdditionalHeaders carries an invalid X-Bad Name header"], "the batch is dropped, naming the header but never its value");
+	t.notOk(JSON.stringify(reports.lines).includes("s3cr3t"), "the rejected header value is not reported");
 	t.end();
 });
 
