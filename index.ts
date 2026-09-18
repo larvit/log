@@ -842,7 +842,7 @@ export class Queue implements OtlpQueue {
 			base = new URL(conf.otlpHttpBaseURI);
 		} catch {
 			// Never the URI itself: the thrown error is printed, and a password may be in it.
-			throw new Error("otlpHttpBaseURI is not a valid URI; it needs an http:// or https:// prefix, and any / ? # in a password percent-encoded");
+			throw new Error("otlpHttpBaseURI is not a valid URI; it needs an http:// or https:// prefix, and any / ? # \\ in a password percent-encoded");
 		}
 
 		// Any other scheme parses to an opaque path, leaving userinfo in pathname for this.url to
