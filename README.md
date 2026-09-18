@@ -297,8 +297,9 @@ keeps it native. Levels map to OTLP severity through the exported `LogLevels` ta
 ## `log.fetch` in depth
 
 Input is a `string` or `URL`; a `Request` is not supported. Only a URL that resolves to `http:` or
-`https:` is traced — a relative one resolves against the page, so it is untraced on a server, which
-has none, and under a `file:` or app-scheme origin. Anything else passes straight through to an untraced `fetch`: no span, and no
+`https:` is traced — a relative one resolves against the page, so it is untraced where there is no
+page, as on a server, and where the page is not `http:`/`https:`, as under a `file:` or app-scheme
+origin. Anything else passes straight through to an untraced `fetch`: no span, and no
 `traceparent` sent. The span is the only output; no log line is written.
 
 Span attributes follow the OpenTelemetry HTTP semantic conventions:
@@ -319,9 +320,9 @@ message. The response or error reaches the caller unchanged. Bodies are never ca
 them per call site.
 
 Never put credentials in the url. On Node and in browsers `fetch` refuses one carrying them and
-quotes that url in full into its rejection, which becomes the span's status message; a runtime whose
-`fetch` is an `XMLHttpRequest` polyfill may send them instead. Pass an `Authorization` header, and
-strip userinfo from a url you did not build.
+quotes that url in full into its rejection, which becomes the span's status message; React Native,
+whose `fetch` is an `XMLHttpRequest` polyfill, may send them instead. Pass an `Authorization`
+header, and strip userinfo from a url you did not build.
 
 Spans are queued when the response arrives and are registered with `flush()` at call time, so
 `await log.end()` delivers a `log.fetch()` you never awaited.
