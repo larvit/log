@@ -1107,10 +1107,9 @@ function isQueueFor(queue: OtlpQueue, conf: LogConf): boolean {
 		&& queue.conf.otlpAdditionalHeaders === conf.otlpAdditionalHeaders;
 }
 
-// Keyed per stderr sink, not per process: a library and its consumer each hear about their own call.
 const warnedDeprecations = new WeakMap<(msg: string) => void, Set<string>>();
 
-function warnDeprecated(conf: ResolvedLogConf, msg: string): void {
+function warnDeprecated(conf: ResolvedLogConf, metadata: DefinedMetadata, msg: string): void {
 	let warned = warnedDeprecations.get(conf.stderr);
 
 	if (!warned) {
@@ -1122,8 +1121,9 @@ function warnDeprecated(conf: ResolvedLogConf, msg: string): void {
 		return;
 	}
 
+	// Added before the sink runs, so a sink that itself uses the deprecated spelling cannot recurse.
 	warned.add(msg);
-	conf.stderr(conf.entryFormatter({ colors: conf.colors, logLevel: "warn", msTimestamp: conf.clock.now(), msg }));
+	conf.stderr(conf.entryFormatter({ colors: conf.colors, logLevel: "warn", metadata, msTimestamp: conf.clock.now(), msg }));
 }
 
 export class Log implements LogInt {
@@ -1188,7 +1188,7 @@ export class Log implements LogInt {
 		this.context = withoutUndefined(this.conf.context);
 
 		if (typeof options === "string") {
-			warnDeprecated(this.conf, "new Log(\"level\") is deprecated and removed in 3.0.0, use new Log({ logLevel })");
+			warnDeprecated(this.conf, this.context, "new Log(\"level\") is deprecated and removed in 3.0.0, use new Log({ logLevel })");
 		}
 
 		if (this.conf.otlpQueue) {
@@ -1238,7 +1238,7 @@ export class Log implements LogInt {
 	// All options sent in will override the current instance settings
 	public clone(options?: LogConf | LogLevel | "none") {
 		if (typeof options === "string") {
-			warnDeprecated(this.conf, "log.clone(\"level\") is deprecated and removed in 3.0.0, use log.clone({ logLevel })");
+			warnDeprecated(this.conf, this.context, "log.clone(\"level\") is deprecated and removed in 3.0.0, use log.clone({ logLevel })");
 		}
 
 		const conf: LogConf = typeof options === "string" ? { logLevel: options } : { ...options };
