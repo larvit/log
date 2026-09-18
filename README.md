@@ -296,9 +296,10 @@ keeps it native. Levels map to OTLP severity through the exported `LogLevels` ta
 
 ## `log.fetch` in depth
 
-Input is a `string` or `URL`. Only an absolute `http:`/`https:` URL is traced; anything else — a
-relative URL with no base (Node), another scheme — passes straight through to an untraced `fetch`.
-The span is the only output; no log line is written.
+Input is a `string` or `URL`; a `Request` is not supported. Only a URL that resolves to `http:` or
+`https:` is traced — a relative one resolves against the page, so under a `file:` or app-scheme
+origin it is not. Anything else passes straight through to an untraced `fetch`: no span, and no
+`traceparent` sent. The span is the only output; no log line is written.
 
 Span attributes follow the OpenTelemetry HTTP semantic conventions:
 
@@ -316,6 +317,10 @@ A 4xx/5xx response marks the span errored; a thrown error does too, with its mes
 message. The response or error reaches the caller unchanged. Bodies are never captured.
 `captureQuery` and the header allow-lists are read at call time from the instance; `clone()` to vary
 them per call site.
+
+Credentials in the url never reach the network — `fetch` refuses a url carrying them — but its
+rejection quotes that url in full and the message becomes the span's status message, so pass an
+`Authorization` header instead, and strip userinfo from a url you did not build.
 
 Spans are queued when the response arrives and are registered with `flush()` at call time, so
 `await log.end()` delivers a `log.fetch()` you never awaited.
