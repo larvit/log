@@ -10,6 +10,10 @@
   whatever collects your `stderr`, findable by searching it for your collector's hostname. The URI
   stays on `log.conf` and `queue.conf` as you gave it, so don't log your `conf`. Percent-encode any
   `/ ? #` in a password, and a literal `%` as `%25`.
+- An `otlpHttpBaseURI` that is not `http:` or `https:` is rejected in the constructor, where
+  `otlp:collector.example.com` used to build a queue that could never export. Written without
+  `//`, such a URI parses to an opaque path, which put any `user:pass@` in it straight back into
+  the reported url.
 - A header in `otlpAdditionalHeaders` replaces the one the queue sets itself whatever its casing,
   and is read afresh on each send, so a rotated token takes effect. A name or value the runtime
   rejects drops that batch, reported as `OTLP export headers invalid, batch dropped` naming the
