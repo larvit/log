@@ -57,10 +57,13 @@ Structured logging with a tiny API and first-class OTLP (logs + traces) over `fe
 - 2026-09-18: adding a key to `ResolvedLogConf`/`ResolvedQueueConf`'s required half ships in a
   minor. They are output types describing what the library produces; a consumer hand-building one
   is writing a test double, not running existing code. Precedent: `colors` did the same.
-- 2026-09-18: `entryFormatter` beside a function `format` throws; beside `"text"`/`"json"` it keeps
-  winning, as 2.x documented. Nothing can hold the new combination yet, while rejecting the old one
-  would break a minor. `conf.entryFormatter` mirrors the resolved `format`, so `conf` spread into a
-  new instance is not a second spelling. Valid until 3.0.0 removes `entryFormatter`.
+- 2026-09-18: `format` and `entryFormatter` are one setting. `entryFormatter` folds into `format`,
+  winning over a `"text"`/`"json"` one as 2.x documented, and two *different* formatters throw:
+  nothing can hold that combination yet, while rejecting the documented one would break a minor.
+  `conf.entryFormatter` mirrors the resolved `format` as a non-enumerable property, so a `conf`
+  spread into a new instance carries the caller's spellings alone and an explicit `format` there now
+  applies, where 2.x silently discarded it. `ResolvedLogConf["format"]` widens to include a function
+  on the same ground as the required-half rule above. Valid until 3.0.0 removes `entryFormatter`.
 - 2026-09-18: a deprecation warns once per `stderr` sink per message, through the instance's
   formatter at `warn` and whatever `logLevel` says. Instances sharing the default `console.error`
   share that one warning; a sink the caller injects gets its own, which keeps a test independent of

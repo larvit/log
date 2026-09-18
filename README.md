@@ -249,7 +249,7 @@ deprecated the same way: pass the function as `format`.
 | `clock` | `Clock` | system clock | `{ now, setTimeout, clearTimeout }` behind every span and record timestamp. Passed on to the default `Queue`; a `Queue` you build takes its own. |
 | `colors` | `boolean` | `true` | ANSI colour codes in text output. Unset in code, the env decides: `NO_COLOR` (non-empty) turns it off; otherwise `FORCE_COLOR` turns it on, except `0` or `false` which turn it off. |
 | `context` | `Metadata` | `{}` | Added to every entry. Wins over a per-call key of the same name. |
-| `entryFormatter` | `EntryFormatter` | none | Deprecated, removed in 3.0.0: pass the function as `format`. Wins over a `"text"`/`"json"` `format`; beside a function `format` it is rejected. |
+| `entryFormatter` | `EntryFormatter` | none | Deprecated, removed in 3.0.0: pass the function as `format`. Wins over a `"text"`/`"json"` `format`; two different formatters, one per spelling, are rejected. |
 | `format` | `"text" \| "json" \| EntryFormatter` | `"text"` | Console output format, or a formatter of your own. Use the entry's `msTimestamp` rather than `new Date()` so console and OTLP timestamps of one entry match. |
 | `logLevel` | `LogLevel \| "none"` | `"info"` | Minimum level to output. |
 | `otlpAdditionalHeaders` | `Record<string, string>` | none | Shorthand: the same option on the default `Queue`. |
@@ -331,7 +331,7 @@ Spans are queued when the response arrives and are registered with `flush()` at 
 | `LogLevel`, `LogShorthand` | Level name union; the signature of one level method. |
 | `Metadata`, `MetadataValue` | `Record<string, string \| number \| boolean \| undefined>` and its value type. |
 | `DefinedMetadata` | `Metadata` without `undefined` values: what a formatter and `log.context` see. |
-| `EntryFormatter`, `EntryFormatterConf` | A formatter, `(conf) => string`, and its argument, which carries the instance's `colors`. |
+| `EntryFormatter`, `EntryFormatterConf` | A formatter, `(entry) => string`, and the entry it takes, which carries the instance's `colors`. |
 | `OtlpSpan`, `OtlpAttribute`, `OtlpLogPayload`, `OtlpSpanPayload` | The OTLP wire shapes; `log.span` is an `OtlpSpan`. |
 | `OtlpQueue`, `OtlpPayload` | What `otlpQueue` takes, `{ enqueue, flush }`, and what `enqueue` receives, a log or span payload. |
 | `Clock`, `TimerHandle` | The `clock` option, `{ now, setTimeout, clearTimeout }` with `now()` in integer epoch milliseconds, and what its `setTimeout` hands back. |
