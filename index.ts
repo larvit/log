@@ -1,3 +1,19 @@
+// The one source of time: span and record timestamps, and the queue's batch, retry and send timers.
+export type Clock = {
+	clearTimeout: (timer?: TimerHandle) => void;
+	now: () => number;
+	setTimeout: (callback: () => void, delayMs: number) => TimerHandle;
+};
+
+// setTimeout's return: an object in Node, Bun and Deno, a number in browsers and in a test clock.
+export type TimerHandle = ReturnType<typeof setTimeout> | number;
+
+const systemClock: Clock = {
+	clearTimeout: timer => clearTimeout(timer),
+	now: () => Date.now(),
+	setTimeout: (callback, delayMs) => setTimeout(callback, delayMs),
+};
+
 export type EntryFormatterConf = {
 	// The instance's resolved `colors`. Unset means on.
 	colors?: boolean;
@@ -14,6 +30,7 @@ export type LogConf = {
 	captureRequestHeaders?: string[];
 	// log.fetch only: response header names to record as http.response.header.* (allow-list, none by default).
 	captureResponseHeaders?: string[];
+	clock?: Clock;
 	colors?: boolean;
 	context?: Metadata;
 	entryFormatter?: (conf: EntryFormatterConf) => string;
@@ -35,7 +52,7 @@ export type LogConf = {
 };
 
 // conf after the constructor fills its defaults: the always-set fields are no longer optional.
-export type ResolvedLogConf = LogConf & Required<Pick<LogConf, "colors" | "entryFormatter" | "logLevel" | "stderr" | "stdout">>;
+export type ResolvedLogConf = LogConf & Required<Pick<LogConf, "clock" | "colors" | "entryFormatter" | "logLevel" | "stderr" | "stdout">>;
 
 export type Logger = {
 	enabled: (logLevel: LogLevel) => boolean;
@@ -610,6 +627,7 @@ export type QueueStorage = {
 
 export type QueueConf = {
 	batchDelayMs?: number;
+	clock?: Clock;
 	key?: string;
 	maxBatchBytes?: number;
 	maxItems?: number;
@@ -621,7 +639,7 @@ export type QueueConf = {
 	storage?: QueueStorage;
 };
 
-export type ResolvedQueueConf = QueueConf & Required<Pick<QueueConf, "batchDelayMs" | "key" | "maxBatchBytes" | "maxItems" | "otlpProtocol" | "report" | "retryDelayMs">>;
+export type ResolvedQueueConf = QueueConf & Required<Pick<QueueConf, "batchDelayMs" | "clock" | "key" | "maxBatchBytes" | "maxItems" | "otlpProtocol" | "report" | "retryDelayMs">>;
 
 type QueuedItem = { bytes: number, payload: OtlpPayload };
 
@@ -720,7 +738,7 @@ function mergePayloads(payloads: OtlpPayload[]): OtlpPayload {
 }
 
 // A pending retry must not keep a finished Node or Deno process alive.
-function unref(timer: ReturnType<typeof setTimeout>): void {
+function unref(timer: TimerHandle): void {
 	if (typeof timer === "object" && typeof timer.unref === "function") {
 		timer.unref();
 
@@ -743,8 +761,8 @@ export class Queue implements OtlpQueue {
 	private readonly url: string;
 	private dropped = 0;
 	private failures = 0;
-	private batchTimer?: ReturnType<typeof setTimeout>;
-	private retryTimer?: ReturnType<typeof setTimeout>;
+	private batchTimer?: TimerHandle;
+	private retryTimer?: TimerHandle;
 	private running?: Promise<void>;
 	private pending?: Promise<void>;
 
@@ -757,6 +775,7 @@ export class Queue implements OtlpQueue {
 		this.conf = {
 			...conf,
 			batchDelayMs: conf.batchDelayMs ?? 1000,
+			clock: conf.clock ?? systemClock,
 			key: conf.key ?? "@larvit/log:otlp-queue",
 			maxBatchBytes: conf.maxBatchBytes ?? KEEPALIVE_MAX_BYTES,
 			maxItems: conf.maxItems ?? 1000,
@@ -809,7 +828,7 @@ export class Queue implements OtlpQueue {
 			return;
 		}
 
-		this.batchTimer = setTimeout(() => {
+		this.batchTimer = this.conf.clock.setTimeout(() => {
 			this.batchTimer = undefined;
 			void this.flush();
 		}, this.conf.batchDelayMs);
@@ -817,7 +836,7 @@ export class Queue implements OtlpQueue {
 
 	private async round(): Promise<void> {
 		await this.ready;
-		clearTimeout(this.batchTimer);
+		this.conf.clock.clearTimeout(this.batchTimer);
 		this.batchTimer = undefined;
 
 		while (this.items.length) {
@@ -847,7 +866,7 @@ export class Queue implements OtlpQueue {
 
 		const retryInMs = Math.min(this.conf.retryDelayMs * (2 ** (this.failures - 1)), RETRY_DELAY_MAX_MS);
 
-		this.retryTimer = setTimeout(() => {
+		this.retryTimer = this.conf.clock.setTimeout(() => {
 			this.retryTimer = undefined;
 			void this.flush();
 		}, retryInMs);
@@ -899,7 +918,7 @@ export class Queue implements OtlpQueue {
 
 		// AbortController + cleared timer works in browsers and Node, and never leaves a dangling timer.
 		const controller = new AbortController();
-		const timer = setTimeout(() => controller.abort(), OTLP_EXPORT_TIMEOUT_MS);
+		const timer = this.conf.clock.setTimeout(() => controller.abort(), OTLP_EXPORT_TIMEOUT_MS);
 
 		try {
 			const res = await fetch(this.url + otlpPath(batch[0].payload), {
@@ -927,7 +946,7 @@ export class Queue implements OtlpQueue {
 		} catch (err) {
 			return { message: stringField(err, "message") ?? "Unknown error sending to OTLP", retry: true };
 		} finally {
-			clearTimeout(timer);
+			this.conf.clock.clearTimeout(timer);
 		}
 	}
 
@@ -1116,6 +1135,10 @@ export class Log implements LogInt {
 			conf.logLevel = "info";
 		}
 
+		if (conf.clock === undefined) {
+			conf.clock = systemClock;
+		}
+
 		if (conf.colors === undefined) {
 			conf.colors = colorsFromEnv() ?? true;
 		}
@@ -1145,10 +1168,11 @@ export class Log implements LogInt {
 			}
 		} else if (this.conf.otlpHttpBaseURI) {
 			this.conf.otlpQueue = new Queue({
+				clock: this.conf.clock,
 				otlpAdditionalHeaders: this.conf.otlpAdditionalHeaders,
 				otlpHttpBaseURI: this.conf.otlpHttpBaseURI,
 				otlpProtocol: this.conf.otlpProtocol,
-				report: (msg, metadata) => this.conf.stderr(this.conf.entryFormatter({ colors: this.conf.colors, logLevel: "error", metadata, msTimestamp: Date.now(), msg })),
+				report: (msg, metadata) => this.conf.stderr(this.conf.entryFormatter({ colors: this.conf.colors, logLevel: "error", metadata, msTimestamp: this.conf.clock.now(), msg })),
 			});
 		}
 
@@ -1160,20 +1184,22 @@ export class Log implements LogInt {
 			incoming = parseTraceparent(this.conf.traceparent);
 		}
 
+		const startedAt = getNsTimestamp(this.conf.clock.now());
+
 		this.sampled = this.conf.parentLog?.sampled ?? incoming?.sampled ?? true;
 		this.span = {
 			attributes: [],
 			droppedAttributesCount: 0,
 			droppedEventsCount: 0,
 			droppedLinksCount: 0,
-			endTimeUnixNano: getNsTimestamp(Date.now()),
+			endTimeUnixNano: startedAt,
 			events: [],
 			kind: 1,
 			links: [],
 			name: this.conf.spanName || "unnamed-span",
 			parentSpanId: this.conf.parentLog?.span.spanId ?? incoming?.spanId,
 			spanId: generateSpanId(),
-			startTimeUnixNano: getNsTimestamp(Date.now()),
+			startTimeUnixNano: startedAt,
 			status: { code: 0 },
 			traceId: this.conf.parentLog?.span.traceId || incoming?.traceId || generateTraceId(),
 		};
@@ -1220,7 +1246,7 @@ export class Log implements LogInt {
 			throw new Error("Logging instance is already ended");
 		}
 		this.ended = true;
-		this.span.endTimeUnixNano = getNsTimestamp(Date.now());
+		this.span.endTimeUnixNano = getNsTimestamp(this.conf.clock.now());
 
 		const context: DefinedMetadata = { ...this.context };
 
@@ -1328,7 +1354,7 @@ export class Log implements LogInt {
 
 			throw err;
 		} finally {
-			span.endTimeUnixNano = getNsTimestamp(Date.now());
+			span.endTimeUnixNano = getNsTimestamp(this.conf.clock.now());
 			// settle() must run even if the queue throws, else flush() hangs on this fetch.
 			try {
 				this.exportSpan(span, context);
@@ -1361,7 +1387,7 @@ export class Log implements LogInt {
 
 		if (!this.enabled(logLevel)) return;
 
-		const msTimestamp = Date.now();
+		const msTimestamp = this.conf.clock.now();
 		const attributes = Object.assign(withoutUndefined(metadata), this.context);
 
 		// Console output, optionally enriched with span/trace info.
@@ -1407,7 +1433,7 @@ export class Log implements LogInt {
 
 	// A fresh child span under this log's span/trace, with its kind set at birth (no later mutation).
 	private childSpan(name: string, kind: OtlpSpan["kind"]): OtlpSpan {
-		const now = getNsTimestamp(Date.now());
+		const now = getNsTimestamp(this.conf.clock.now());
 
 		return {
 			attributes: [],
