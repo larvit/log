@@ -238,7 +238,7 @@ instance you were handed; it is single-use and the consumer owns it.
 
 `new Log(options)` or `new Log()`. Every option is optional. A level string in place of the object,
 `new Log("debug")` or `log.clone("debug")`, is deprecated: it still sets the level, warns once per
-`stderr` sink per message and is removed in 3.0.0, so pass `{ logLevel }` instead. `entryFormatter` is
+`stderr` sink for each distinct warning text and is removed in 3.0.0, so pass `{ logLevel }` instead. `entryFormatter` is
 deprecated the same way: pass the function as `format`.
 
 | Option | Type | Default | |
