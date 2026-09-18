@@ -5,6 +5,13 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
 
 ## Security
 
+- [ ] Keep credentials a caller puts in a `log.fetch` url out of the exported span. WHATWG `fetch`
+  refuses a url carrying userinfo and quotes that whole url into the `TypeError`, so
+  `log.fetch("http://user:pass@host/x")` never reaches the network and `spanFailure` puts the
+  password into `span.status.message`, which the queue exports to the tracing backend. The same
+  class as the `otlpHttpBaseURI` leak already fixed: decide whether `log.fetch` sends the userinfo
+  as an `Authorization: Basic` header the way the queue now does, or strips it and reports.
+
 - [ ] Decide what to do about Basic credentials sent over plain `http:` to a non-loopback host,
   now that they are really sent: anything on the network path can read them (CWE-319). Either warn
   once per `report` sink when the endpoint is `http:` and carries userinfo, or require `https:`
