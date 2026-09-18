@@ -58,6 +58,12 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
 - [ ] Report a 401 or 403 export as `OTLP export unauthorized, batch dropped`, not as the generic
   rejection. Working auth makes a wrong credential reachable for the first time, and it is the
   likeliest misconfiguration of `otlpHttpBaseURI` userinfo; today it reads as any other 4xx.
+- [ ] Pin every Node base image to its full patch version, so one commit builds one image on any
+  day. Three places float: `ARG BASE_IMAGE=node:24-bookworm-slim` in the `Dockerfile`,
+  `${NODE_IMAGE:-node:22-bookworm-slim}` in `test-docker`, and the major-only `node-version`
+  matrix `push.yaml` builds its `NODE_IMAGE` from. The first two are one default written twice
+  at two versions, so drop the npm script's and leave the `ARG`. Renovate already bumps a
+  `Dockerfile` pin; a matrix of patch versions needs a `customManagers` rule to get the same.
 - [x] Add a size badge to the README (2.3.0: 15.0 KB minified, 4.7 KB gzipped).
 - [x] Rename `.github/workflows/master.yaml` to `push.yaml` and update the README badge.
 
