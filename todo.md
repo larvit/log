@@ -5,6 +5,12 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
 
 ## Security
 
+- [ ] Decide what to do about Basic credentials sent over plain `http:` to a non-loopback host,
+  now that they are really sent: anything on the network path can read them (CWE-319). Either warn
+  once per `report` sink when the endpoint is `http:` and carries userinfo, or require `https:`
+  with an opt-out, which is breaking and so wants the 2.x deprecation first. The rule matters more
+  than the mechanism: a loopback-only test warns for `http://otel-collector.observability.svc.
+  cluster.local:4318`, which is a deliberate and common setup, not a mistake.
 - [ ] Drop userinfo from the `url.full` span attribute for a scheme `buildUrlFull` cannot take
   apart. `URL.origin` is the string `"null"` for an opaque path, so `log.fetch` on
   `myapp:user:pass@host/x` exports `nulluser:pass@host/x`, credentials and all, and a `data:` URL
