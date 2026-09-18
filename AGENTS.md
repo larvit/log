@@ -72,7 +72,7 @@ Structured logging with a tiny API and first-class OTLP (logs + traces) over `fe
   independent of run order. The key is the sink plus the message text, so keep the messages literal.
   Every deprecation line opens with `@larvit/log: `, part of that literal, so an app developer can
   tell which dependency emitted one about code they may not own. A `Queue`'s `report` lines carry no
-  prefix: they report the transport that developer configured, not this library's own API. Valid
+  prefix: they report that developer's own setup, not this library's own API. Valid
   while 2.x carries deprecations.
 
 ## Working here
