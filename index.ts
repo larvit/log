@@ -1,4 +1,4 @@
-// The library's one source of time: span and record timestamps, and the queue's timers.
+// The library's one source of time; now() returns integer epoch milliseconds.
 export type Clock = {
 	clearTimeout: (timer?: TimerHandle) => void;
 	now: () => number;
@@ -309,7 +309,6 @@ export function parseTraceparent(header: string): { flags: string, sampled: bool
 	return { flags, sampled: (parseInt(flags, 16) & 1) === 1, spanId, traceId };
 }
 
-// msTimestamp should be generated from Date.now()
 function getNsTimestamp(msTimestamp: number): string {
 	const seconds = Math.floor(msTimestamp / 1000);
 	const nanos = (msTimestamp % 1000) * 1000000;
@@ -738,7 +737,7 @@ function mergePayloads(payloads: OtlpPayload[]): OtlpPayload {
 }
 
 // A pending retry must not keep a finished Node or Deno process alive.
-function unref(timer: TimerHandle): void {
+function unref(timer: TimerHandle, fromSystemClock: boolean): void {
 	if (typeof timer === "object" && typeof timer.unref === "function") {
 		timer.unref();
 
@@ -748,7 +747,8 @@ function unref(timer: TimerHandle): void {
 	const deno: unknown = Reflect.get(globalThis, "Deno");
 	const unrefTimer: unknown = typeof deno === "object" && deno !== null ? Reflect.get(deno, "unrefTimer") : undefined;
 
-	if (typeof timer === "number" && typeof unrefTimer === "function") {
+	// An injected clock's number is not a Deno timer id, so unrefing it would hit a stranger's timer.
+	if (fromSystemClock && typeof timer === "number" && typeof unrefTimer === "function") {
 		unrefTimer(timer);
 	}
 }
@@ -784,7 +784,13 @@ export class Queue implements OtlpQueue {
 			retryDelayMs: conf.retryDelayMs ?? 1000,
 		};
 
-		// Validate the endpoint eagerly: a malformed URI fails here, not as an unhandled rejection mid-log.
+		// Validate eagerly: a malformed endpoint or clock fails here, not as an unhandled rejection mid-log.
+		const { clock } = this.conf;
+
+		if (typeof clock.clearTimeout !== "function" || typeof clock.now !== "function" || typeof clock.setTimeout !== "function") {
+			throw new Error("clock must be { now, setTimeout, clearTimeout }");
+		}
+
 		const base = new URL(conf.otlpHttpBaseURI);
 
 		this.url = `${base.protocol}//${base.username ? `${base.username}:${base.password}@` : ""}${base.host}${base.pathname.replace(/\/$/, "")}`;
@@ -870,10 +876,7 @@ export class Queue implements OtlpQueue {
 			this.retryTimer = undefined;
 			void this.flush();
 		}, retryInMs);
-		// Only a handle we minted: Deno.unrefTimer on an injected clock's id would hit a stranger's timer.
-		if (this.conf.clock === systemClock) {
-			unref(this.retryTimer);
-		}
+		unref(this.retryTimer, this.conf.clock === systemClock);
 		this.report("OTLP export failed, will retry", { ...this.describe(batch, failure), retryInMs });
 	}
 

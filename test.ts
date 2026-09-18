@@ -52,18 +52,14 @@ function fakeStorage(async: boolean): QueueStorage & { data: Map<string, string>
 // The OTLP nanosecond spelling of a millisecond instant; ns overflows Number, so build the string.
 const nanos = (msTimestamp: number) => `${msTimestamp}000000`;
 
-// A Clock the test drives. `now` moves only in advance(), which fires every timer that comes due
-// and lets the awaited work between them (the fetch stub, storage) run to completion.
+// A Clock the test drives: `now` moves only in advance(), which fires every timer that comes due.
 function fakeClock(startMs = 1758150000000) {
 	const timers = new Map<number, { callback: () => void, dueAt: number }>();
 	let now = startMs;
 	let nextTimer = 1;
 
-	async function settle(): Promise<void> {
-		for (let i = 0; i < 10; i++) {
-			await new Promise(resolve => setTimeout(resolve, 0));
-		}
-	}
+	// One macrotask tick, which drains the queue's awaited work: it is promises all the way down.
+	const settle = () => new Promise(resolve => setTimeout(resolve, 0));
 
 	return {
 		advance: async (deltaMs: number) => {
@@ -93,6 +89,7 @@ function fakeClock(startMs = 1758150000000) {
 
 			return timer;
 		},
+		settle,
 	};
 }
 
@@ -496,6 +493,11 @@ test("clone inherits config (OTLP, printTraceInfo, fetch policy) but keeps its o
 
 	t.strictEqual(child.conf.colors, false, "clone inherited colors");
 	t.strictEqual(child.conf.clock, clock, "clone inherited the clock");
+
+	const ownQueue = new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318" });
+
+	new Log({ clock, otlpQueue: ownQueue });
+	t.notStrictEqual(ownQueue.conf.clock, clock, "a queue the consumer built keeps its own clock, like its endpoint");
 	t.strictEqual(new Log({ parentLog: base }).conf.colors, false, "a child inherits colors");
 	t.strictEqual(new Log({ parentLog: base }).conf.clock, clock, "a child inherits the clock");
 
@@ -685,12 +687,12 @@ test("Queue batches by time and by size, with keepalive under the browser cap", 
 	sized.info("b".repeat(700));
 	t.strictEqual(calls.length, 0, "two records under maxBatchBytes wait for the timer");
 	sized.info("c".repeat(700));
-	await clock.advance(0);
+	await clock.settle();
 	t.deepEqual(calls.map(call => call.body.resourceLogs[0].scopeLogs[0].logRecords.length), [2, 1], "reaching maxBatchBytes sends now, split into batches that fit");
 
 	calls.length = 0;
 	sized.info("d".repeat(70000));
-	await clock.advance(0);
+	await clock.settle();
 	t.strictEqual(calls[0].keepalive, false, "a body over 64 KiB is sent without keepalive rather than rejected by the browser");
 	t.end();
 });
