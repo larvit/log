@@ -92,7 +92,7 @@ Structured logging with a tiny API and first-class OTLP (logs + traces) over `fe
   hands `user:pass@` over as one string, and dropping it in a minor would break those consumers,
   so `todo.md` carries the question rather than this entry settling it. Valid while a queue owns
   the transport.
-- 2026-09-19: `log.fetch` traces only absolute `http:`/`https:` URLs, the floor the queue's endpoint
+- 2026-09-19: `log.fetch` traces only urls that resolve to `http:`/`https:`, the floor the queue's endpoint
   already takes. A scheme written without `//` parses to an opaque path, where `URL.origin` is the
   string `"null"` and the userinfo stays in `pathname`, so `url.full` cannot be rebuilt from the
   parts without shipping what the url holds — credentials, or a whole `data:` payload. A `blob:`,
