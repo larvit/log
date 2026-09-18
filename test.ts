@@ -400,6 +400,8 @@ test("format takes a formatter function, inherited by clones and children", t =>
 	new Log({ parentLog: log }).info("child");
 	t.deepEqual(stdout, ["info|hi", "info|cloned", "info|child"], "the function formats the instance's output and is inherited");
 	t.deepEqual(stderr, [], "the supported spelling warns about nothing");
+	new Log({ format: "json", parentLog: log }).info("own");
+	t.strictEqual(JSON.parse(stdout[3]).msg, "own", "a child's own format wins over the inherited one");
 
 	const base = capture({ format: entry => entry.msg });
 
