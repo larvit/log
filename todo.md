@@ -5,9 +5,10 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
 
 ## Security
 
-- [x] Strip `username:password@` from the url the queue reports: basic-auth credentials a consumer
-  puts in `otlpHttpBaseURI` reach `stderr` today, in the metadata of every export-failure line,
-  through the default `console.error` sink as readily as through a configured one.
+- [x] Send `username:password@` from `otlpHttpBaseURI` as an `Authorization: Basic` header instead
+  of leaving it in the url: basic-auth credentials a consumer puts there reached `stderr` in the
+  metadata of every export-failure line, through the default `console.error` sink as readily as
+  through a configured one, and `fetch` refused the url outright on Node and in browsers.
 
 ## 2.x minors, before 3.0.0
 
@@ -41,10 +42,10 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
 
 ### Deprecations (warn once on stderr)
 
-- [ ] Decide whether `user:pass@` in `otlpHttpBaseURI` stays a second spelling of
-  `otlpAdditionalHeaders: { Authorization }`. Both now reach the same header, which "one spelling
-  per goal" says to collapse; deprecate the userinfo here and reject it in 3.0.0, or record the
-  reason it stays.
+- [ ] Deprecate `user:pass@` in `otlpHttpBaseURI` in favour of `otlpAdditionalHeaders:
+  { Authorization }`, and add the 3.0.0 item that rejects it. Both spellings now build the same
+  header, which "one spelling per goal" says to collapse; keeping both needs a reason in
+  `AGENTS.md` instead.
 - [x] Deprecate `new Log("level")` and `clone("level")` in favour of `{ logLevel }`.
 - [x] Deprecate `entryFormatter` in favour of `format`, and make `format` also accept
   `(entry) => string`.

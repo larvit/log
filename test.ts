@@ -115,10 +115,10 @@ function response({ headers, json = { partialSuccess: {} }, status = 200 }: { he
 // Replace global fetch with a recording stub (Node + browser), so the OTLP transport is asserted
 // without a real server. The harness restores globalThis.fetch after each test.
 function stubFetch(responder?: (path: string, body: unknown) => ReturnType<typeof response> | undefined) {
-	const calls: { body: any, contentType: string, headers: any, keepalive: unknown, path: string, rawBody: any, url: string }[] = [];
+	const calls: { body: any, contentType: string | null, headers: any, keepalive: unknown, path: string, rawBody: any, url: string }[] = [];
 
-	globalThis.fetch = (async (url: string, init: { body: any, headers: Record<string, string>, keepalive?: boolean }) => {
-		const contentType = init.headers?.["Content-Type"];
+	globalThis.fetch = (async (url: string, init: { body: any, headers: HeadersInit, keepalive?: boolean }) => {
+		const contentType = new Headers(init.headers ?? {}).get("Content-Type");
 		const path = new URL(String(url)).pathname;
 		// Only JSON bodies are parsed; protobuf bodies are raw bytes, inspected via rawBody.
 		const body = contentType === "application/json" ? JSON.parse(init.body) : undefined;
@@ -719,16 +719,28 @@ test("endpoint userinfo authenticates through an Authorization header, never thr
 	log.info("x");
 	await log.flush();
 
-	t.strictEqual(calls[0].url, "http://127.0.0.1:4318/v1/logs", "the request url holds no credentials, which fetch rejects outright");
+	t.strictEqual(calls[0].url, "http://127.0.0.1:4318/v1/logs", "the request url holds no credentials");
 	t.strictEqual(callHeader(calls[0], "Authorization"), "Basic Y29sbGVjdG9yOnMzY3JAdA==", "they are sent as percent-decoded Basic credentials");
 	t.strictEqual(stderr.length, 1, "the rejected batch is reported");
 	t.notOk(stderr.join("").includes("s3cr"), "no reported line carries the password");
 
-	const explicit = new Log({ otlpAdditionalHeaders: { Authorization: "Bearer token" }, otlpHttpBaseURI: endpoint, stderr: () => {} });
+	const explicit = new Log({ otlpAdditionalHeaders: { authorization: "Bearer token" }, otlpHttpBaseURI: endpoint, stderr: () => {} });
 
 	explicit.info("y");
 	await explicit.flush();
-	t.strictEqual(callHeader(calls[1], "Authorization"), "Bearer token", "an explicit Authorization header wins over the endpoint's userinfo");
+	t.strictEqual(callHeader(calls[1], "Authorization"), "Bearer token", "an explicit Authorization header wins over the userinfo, whatever its casing");
+
+	const passwordOnly = new Log({ otlpHttpBaseURI: "http://:t0ken@127.0.0.1:4318", stderr: () => {} });
+
+	passwordOnly.info("z");
+	await passwordOnly.flush();
+	t.strictEqual(callHeader(calls[2], "Authorization"), "Basic OnQwa2Vu", "an empty user-id still authenticates, as RFC 7617 allows");
+
+	const plain = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+
+	plain.info("w");
+	await plain.flush();
+	t.strictEqual(callHeader(calls[3], "Authorization"), null, "an endpoint without userinfo sends no Authorization header");
 	t.end();
 });
 
