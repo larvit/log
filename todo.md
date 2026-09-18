@@ -27,7 +27,7 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
 - [x] Reject `traceparent` version `ff` and honour the incoming `sampled` flag: unsampled means no
   export and an outgoing header saying `00`. `tracestate` stays out of scope.
 - [x] Copy the caller's options object in the constructor instead of filling defaults into it.
-- [ ] Inject one clock (`now`, `setTimeout`, `clearTimeout`) behind span and record timestamps and
+- [x] Inject one clock (`now`, `setTimeout`, `clearTimeout`) behind span and record timestamps and
   the `Queue` timers, so tests assert exact times instead of "within an hour" and the retry
   schedule, its 30 s cap included, without waiting.
 - [x] Add a size badge to the README (2.3.0: 15.0 KB minified, 4.7 KB gzipped).

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- `clock` option on `Log` and `Queue`: `{ now, setTimeout, clearTimeout }` behind every span and
+  record timestamp and behind the queue's batch, retry and send-timeout timers, so a test drives
+  time instead of waiting on it. Defaults to the system clock, inherited by children and clones.
+  New exports: `Clock`, `TimerHandle`.
 - The constructor and `clone()` no longer write defaults, inherited settings or the built `Queue`
   into the options object they are given, so one object reused for several instances no longer
   makes them share a queue.

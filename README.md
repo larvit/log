@@ -184,6 +184,7 @@ queue is in memory only.
 | Option | Type | Default | |
 |---|---|---|---|
 | `batchDelayMs` | `number` | `1000` | How long a queued item waits for company before a send. |
+| `clock` | `Clock` | system clock | `{ now, setTimeout, clearTimeout }` behind the batch, retry and send-timeout timers. Inject one to drive time in a test rather than wait on it. |
 | `key` | `string` | `"@larvit/log:otlp-queue"` | The `storage` key. |
 | `maxBatchBytes` | `number` | `65536` | Items per POST are cut here, measured as their JSON size. The default is the browser `keepalive` limit; a batch over 64 KiB is sent without `keepalive`. |
 | `maxItems` | `number` | `1000` | Queue bound. The oldest items are dropped when exceeded, reported in one stderr line with the count. |
@@ -243,6 +244,7 @@ instance you were handed; it is single-use and the consumer owns it.
 | `captureQuery` | `boolean` | `false` | `log.fetch` only: keep the query string in `url.full`. Known-sensitive keys such as `Signature` stay redacted. |
 | `captureRequestHeaders` | `string[]` | none | `log.fetch` only: request header names to record as `http.request.header.*`. |
 | `captureResponseHeaders` | `string[]` | none | `log.fetch` only: response header names to record as `http.response.header.*`. |
+| `clock` | `Clock` | system clock | `{ now, setTimeout, clearTimeout }` behind every span and record timestamp. Passed on to the default `Queue`; a `Queue` you build takes its own. |
 | `colors` | `boolean` | `true` | ANSI colour codes in text output. Unset in code, the env decides: `NO_COLOR` (non-empty) turns it off; otherwise `FORCE_COLOR` turns it on, except `0` or `false` which turn it off. |
 | `context` | `Metadata` | `{}` | Added to every entry. Wins over a per-call key of the same name. |
 | `entryFormatter` | `(EntryFormatterConf) => string` | text formatter | Formats console output. Use `msTimestamp` rather than `new Date()` so console and OTLP timestamps of one entry match. |
@@ -323,6 +325,7 @@ Spans are queued when the response arrives and are registered with `flush()` at 
 | `EntryFormatterConf` | The argument to `entryFormatter`; carries the instance's `colors`. |
 | `OtlpSpan`, `OtlpAttribute`, `OtlpLogPayload`, `OtlpSpanPayload` | The OTLP wire shapes; `log.span` is an `OtlpSpan`. |
 | `OtlpQueue`, `OtlpPayload` | What `otlpQueue` takes, `{ enqueue, flush }`, and what `enqueue` receives, a log or span payload. |
+| `Clock`, `TimerHandle` | The `clock` option, `{ now, setTimeout, clearTimeout }`, and what its `setTimeout` hands back. |
 | `QueueConf`, `ResolvedQueueConf`, `QueueStorage` | `Queue`'s options, `queue.conf` with defaults applied, and the `storage` shape, `{ getItem, setItem, removeItem }`. |
 
 Instance fields: `log.conf`, `log.context`, `log.span`, `log.sampled`, `log.ended`.

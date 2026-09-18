@@ -1,4 +1,4 @@
-import { type DefinedMetadata, formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, type Logger, type LogLevel, LogLevels, msgJsonFormatter, msgTextFormatter, type OtlpPayload, type OtlpQueue, parseTraceparent, Queue, type QueueStorage } from "./index.js";
+import { type DefinedMetadata, formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, type Logger, type LogLevel, LogLevels, msgJsonFormatter, msgTextFormatter, type OtlpPayload, type OtlpQueue, parseTraceparent, Queue, type QueueStorage, type TimerHandle } from "./index.js";
 import test from "./tap.js";
 
 // --- helpers ---------------------------------------------------------------
@@ -49,16 +49,51 @@ function fakeStorage(async: boolean): QueueStorage & { data: Map<string, string>
 	};
 }
 
-function isNanoTimestampWithinHour(str: string): boolean {
-	if (!/^\d+$/.test(str)) {
-		return false;
+// The OTLP nanosecond spelling of a millisecond instant; ns overflows Number, so build the string.
+const nanos = (msTimestamp: number) => `${msTimestamp}000000`;
+
+// A Clock the test drives. `now` moves only in advance(), which fires every timer that comes due
+// and lets the awaited work between them (the fetch stub, storage) run to completion.
+function fakeClock(startMs = 1758150000000) {
+	const timers = new Map<number, { callback: () => void, dueAt: number }>();
+	let now = startMs;
+	let nextTimer = 1;
+
+	async function settle(): Promise<void> {
+		for (let i = 0; i < 10; i++) {
+			await new Promise(resolve => setTimeout(resolve, 0));
+		}
 	}
 
-	const unixTimestamp = Math.round(parseInt(str) / 1000000000); // ns -> s
-	const now = Math.floor(Date.now() / 1000);
+	return {
+		advance: async (deltaMs: number) => {
+			const until = now + deltaMs;
 
-	// A plausible recent Unix timestamp: after 2020-01-01 and within an hour of now.
-	return unixTimestamp > 1577836800 && Math.abs(now - unixTimestamp) <= 3600;
+			for (;;) {
+				const due = [...timers].filter(([, timer]) => timer.dueAt <= until).sort((left, right) => left[1].dueAt - right[1].dueAt)[0];
+
+				if (!due) break;
+
+				timers.delete(due[0]);
+				now = due[1].dueAt;
+				due[1].callback();
+				await settle();
+			}
+
+			now = until;
+			await settle();
+		},
+		clearTimeout: (timer?: TimerHandle) => { timers.delete(Number(timer)); },
+		now: () => now,
+		pending: timers,
+		setTimeout: (callback: () => void, delayMs: number) => {
+			const timer = nextTimer++;
+
+			timers.set(timer, { callback, dueAt: now + delayMs });
+
+			return timer;
+		},
+	};
 }
 
 // Build a Log capturing console output into arrays (runtime-agnostic, no process.stdout patching).
@@ -427,10 +462,12 @@ test("clone can downgrade json format to text", t => {
 test("clone inherits config (OTLP, printTraceInfo, fetch policy) but keeps its own span", async t => {
 	const { calls } = stubFetch();
 	const stdout: string[] = [];
+	const clock = fakeClock();
 	const base = new Log({
 		captureQuery: true,
 		captureRequestHeaders: ["x-req"],
 		captureResponseHeaders: ["x-resp"],
+		clock,
 		colors: false,
 		otlpHttpBaseURI: "http://127.0.0.1:4318",
 		otlpProtocol: "http/protobuf",
@@ -458,7 +495,9 @@ test("clone inherits config (OTLP, printTraceInfo, fetch policy) but keeps its o
 	t.ok(stdout[0].includes("spanId"), "clone inherited printTraceInfo");
 
 	t.strictEqual(child.conf.colors, false, "clone inherited colors");
+	t.strictEqual(child.conf.clock, clock, "clone inherited the clock");
 	t.strictEqual(new Log({ parentLog: base }).conf.colors, false, "a child inherits colors");
+	t.strictEqual(new Log({ parentLog: base }).conf.clock, clock, "a child inherits the clock");
 
 	// ...but the clone is its own span, not a child of base.
 	t.notStrictEqual(child.span.traceId, base.span.traceId, "clone has its own traceId, not base's");
@@ -592,54 +631,66 @@ test("any 2xx is JSON export success; a partialSuccess rejected count is reporte
 	t.end();
 });
 
-test("Queue retries a failed batch with growing backoff until it is accepted", async t => {
+test("Queue retries a failed batch with doubling backoff, capped at 30 s, until it is accepted", async t => {
+	const clock = fakeClock();
+	const delays = [1000, 2000, 4000, 8000, 16000, 30000, 30000];
 	let attempts = 0;
 	const { calls } = stubFetch(() => {
 		attempts++;
 
-		return attempts < 3 ? response({ status: 503 }) : undefined;
+		return attempts <= delays.length ? response({ status: 503 }) : undefined;
 	});
 	const reports = reportSink();
-	const log = new Log({ otlpQueue: new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report, retryDelayMs: 5 }), stderr: () => {} });
+	const log = new Log({ clock, otlpQueue: new Queue({ clock, otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report }), stderr: () => {} });
 
 	log.warn("keep me");
 	await log.flush();
 	t.strictEqual(attempts, 1, "flush() attempts once and returns");
 
-	await waitFor(() => attempts === 3);
-	t.deepEqual(exportedRecords(calls), ["keep me", "keep me", "keep me"], "the same batch is retried until accepted");
-	t.deepEqual(reports.lines.map(line => line.msg), ["OTLP export failed, will retry", "OTLP export failed, will retry"], "one line per failed attempt");
-	t.deepEqual(reports.lines.map(line => line.retryInMs), [5, 10], "the retry delay doubles");
+	for (const [index, delay] of delays.entries()) {
+		await clock.advance(delay - 1);
+		t.strictEqual(attempts, index + 1, `no retry before ${delay} ms have passed`);
+		await clock.advance(1);
+	}
+
+	t.strictEqual(attempts, delays.length + 1, "the accepted attempt is the last one");
+	t.deepEqual(exportedRecords(calls), Array(attempts).fill("keep me"), "the same batch is retried until accepted");
+	t.deepEqual(reports.lines.map(line => line.msg), Array(delays.length).fill("OTLP export failed, will retry"), "one line per failed attempt");
+	t.deepEqual(reports.lines.map(line => line.retryInMs), delays, "the delay doubles from retryDelayMs and stops at the 30 s cap");
 	t.strictEqual(reports.lines[0].status, 503, "the status is in the metadata");
 	t.strictEqual(reports.lines[0].items, 1, "the batch size is in the metadata");
+	t.strictEqual(clock.pending.size, 0, "no timer is left pending once the batch is delivered");
 	t.end();
 });
 
 test("Queue batches by time and by size, with keepalive under the browser cap", async t => {
 	const { calls } = stubFetch();
-	const log = new Log({ otlpQueue: new Queue({ batchDelayMs: 10, otlpHttpBaseURI: "http://127.0.0.1:4318" }), stderr: () => {} });
+	const clock = fakeClock();
+	const log = new Log({ clock, otlpQueue: new Queue({ clock, otlpHttpBaseURI: "http://127.0.0.1:4318" }), stderr: () => {} });
 
 	log.info("one");
 	log.info("two");
 	t.strictEqual(calls.length, 0, "nothing is sent synchronously");
-	await waitFor(() => calls.length > 0);
+	await clock.advance(999);
+	t.strictEqual(calls.length, 0, "nothing is sent before batchDelayMs has passed");
+	await clock.advance(1);
 	t.strictEqual(calls.length, 1, "the timer sends both records in one POST");
 	t.deepEqual(exportedRecords(calls), ["one", "two"], "both records, in order");
 	t.strictEqual(calls[0].keepalive, true, "a batch under 64 KiB is sent with keepalive");
 
 	calls.length = 0;
-	const sized = new Log({ otlpQueue: new Queue({ batchDelayMs: 10000, maxBatchBytes: 2500, otlpHttpBaseURI: "http://127.0.0.1:4318" }), stderr: () => {} });
+	const sized = new Log({ clock, otlpQueue: new Queue({ batchDelayMs: 10000, clock, maxBatchBytes: 2500, otlpHttpBaseURI: "http://127.0.0.1:4318" }), stderr: () => {} });
 
 	sized.info("a".repeat(700));
 	sized.info("b".repeat(700));
 	t.strictEqual(calls.length, 0, "two records under maxBatchBytes wait for the timer");
 	sized.info("c".repeat(700));
-	await waitFor(() => calls.length === 2);
+	await clock.advance(0);
 	t.deepEqual(calls.map(call => call.body.resourceLogs[0].scopeLogs[0].logRecords.length), [2, 1], "reaching maxBatchBytes sends now, split into batches that fit");
 
 	calls.length = 0;
 	sized.info("d".repeat(70000));
-	await waitFor(() => calls.length === 1);
+	await clock.advance(0);
 	t.strictEqual(calls[0].keepalive, false, "a body over 64 KiB is sent without keepalive rather than rejected by the browser");
 	t.end();
 });
@@ -796,7 +847,10 @@ test("OTLP preserves a base path from otlpHttpBaseURI", async t => {
 
 test("OTLP/JSON batches the records into one POST and exports one span sharing trace/span ids", async t => {
 	const { calls } = stubFetch();
+	const clock = fakeClock();
+	const startedAt = clock.now();
 	const log = new Log({
+		clock,
 		context: { region: undefined, "service.name": "eva-bosse" },
 		otlpHttpBaseURI: "http://127.0.0.1:4318",
 		spanName: "lur-bert",
@@ -804,7 +858,9 @@ test("OTLP/JSON batches the records into one POST and exports one span sharing t
 	});
 
 	log.warn("FOo", { active: true, bar: "baz", "lökig knasnyckel | typ": 17, missing: undefined });
+	await clock.advance(250);
 	log.error("logged and recovered");
+	await clock.advance(250);
 	await log.end();
 
 	t.ok(calls.every(call => call.contentType === "application/json"), "default protocol sends JSON");
@@ -827,7 +883,8 @@ test("OTLP/JSON batches the records into one POST and exports one span sharing t
 	t.strictEqual(logRecord.body.stringValue, "FOo", "log body");
 	t.strictEqual(logRecord.severityNumber, 13, "severityNumber is WARN (13)");
 	t.strictEqual(logRecord.severityText, "WARN", "severityText is WARN");
-	t.ok(isNanoTimestampWithinHour(logRecord.timeUnixNano), "log timeUnixNano is reasonable");
+	t.strictEqual(logRecord.timeUnixNano, nanos(startedAt), "log timeUnixNano is the instant the entry was written");
+	t.strictEqual(logsBody.resourceLogs[0].scopeLogs[0].logRecords[1].timeUnixNano, nanos(startedAt + 250), "the second record carries its own, later instant");
 	t.deepEqual(
 		logRecord.attributes,
 		[
@@ -862,8 +919,8 @@ test("OTLP/JSON batches the records into one POST and exports one span sharing t
 	t.strictEqual(span.droppedLinksCount, 0, "span has no dropped links");
 	t.strictEqual(span.traceId, logRecord.traceId, "span and log share the traceId");
 	t.strictEqual(span.spanId, logRecord.spanId, "span and log share the spanId");
-	t.ok(isNanoTimestampWithinHour(span.startTimeUnixNano), "span startTimeUnixNano is reasonable");
-	t.ok(isNanoTimestampWithinHour(span.endTimeUnixNano), "span endTimeUnixNano is reasonable");
+	t.strictEqual(span.startTimeUnixNano, nanos(startedAt), "span startTimeUnixNano is the construction instant");
+	t.strictEqual(span.endTimeUnixNano, nanos(startedAt + 500), "span endTimeUnixNano is the end() instant");
 	t.end();
 });
 
@@ -896,7 +953,10 @@ test("end({ error }) marks the span failed", async t => {
 
 test("OTLP protobuf encodes logs and spans on the wire", async t => {
 	const { calls } = stubFetch();
+	const clock = fakeClock();
+	const startedAt = clock.now();
 	const log = new Log({
+		clock,
 		context: { "service.name": "proto-svc" },
 		otlpHttpBaseURI: "http://127.0.0.1:4318",
 		otlpProtocol: "http/protobuf",
@@ -906,6 +966,7 @@ test("OTLP protobuf encodes logs and spans on the wire", async t => {
 
 	log.warn("protobuf works", { active: true, count: 17, foo: "bar" });
 	log.warn("batched too");
+	await clock.advance(400);
 	await log.end({ error: new Error("proto failed") });
 
 	const logsCall = calls.find(call => call.path === "/v1/logs")!;
@@ -932,7 +993,7 @@ test("OTLP protobuf encodes logs and spans on the wire", async t => {
 	);
 	t.strictEqual(logResourceAttrs.find(attr => attr.key === "service.name")!.value.stringValue, "proto-svc", "service.name is on the log resource");
 	t.notOk(logRecord.attributes.find(attr => attr.key === "service.name"), "service.name is not duplicated in record attributes");
-	t.ok(isNanoTimestampWithinHour(logRecord.timeUnixNano), "log timeUnixNano is reasonable");
+	t.strictEqual(logRecord.timeUnixNano, nanos(startedAt), "decoded log timeUnixNano is the instant the entry was written");
 
 	t.strictEqual(scopeName, "proto-span", "scope name is the span name");
 	t.strictEqual(span.name, "proto-span", "decoded span name matches");
@@ -943,8 +1004,8 @@ test("OTLP protobuf encodes logs and spans on the wire", async t => {
 	t.strictEqual(span.traceId, logRecord.traceId, "span and log share the traceId");
 	t.strictEqual(span.spanId, logRecord.spanId, "span and log share the spanId");
 	t.strictEqual(spanResourceAttrs.find(attr => attr.key === "service.name")!.value.stringValue, "proto-svc", "service.name is on the span resource");
-	t.ok(isNanoTimestampWithinHour(span.startTimeUnixNano), "span startTimeUnixNano is reasonable");
-	t.ok(isNanoTimestampWithinHour(span.endTimeUnixNano), "span endTimeUnixNano is reasonable");
+	t.strictEqual(span.startTimeUnixNano, nanos(startedAt), "decoded span startTimeUnixNano is the construction instant");
+	t.strictEqual(span.endTimeUnixNano, nanos(startedAt + 400), "decoded span endTimeUnixNano is the end() instant");
 	t.end();
 });
 
