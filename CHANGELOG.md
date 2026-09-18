@@ -3,10 +3,13 @@
 ## Unreleased
 
 - Basic auth in `otlpHttpBaseURI` works, and its credentials no longer reach `stderr`. `user:pass@`
-  is sent as an `Authorization: Basic` header, percent-decoded, and an explicit `Authorization` in
-  `otlpAdditionalHeaders` overrides it; neither the request url nor a reported one carries the
-  credentials. Before, `fetch` rejected such a url outright on Node and in browsers and quoted it,
-  credentials included, into the report line of every failed attempt and every retry.
+  is sent as an `Authorization: Basic` header, percent-decoded; neither the request url nor a
+  reported one carries the credentials. Before, `fetch` rejected such a url outright on Node and in
+  browsers and quoted it, credentials included, into the report line of every failed attempt and
+  every retry — rotate any credentials that have been in an endpoint.
+- A header in `otlpAdditionalHeaders` overrides the one the queue sets itself whatever its casing;
+  before, `{ authorization: … }` was sent alongside the queue's own `Authorization` rather than in
+  place of it, combining the two into one invalid header value.
 - `format` also takes a formatter function, `(entry) => string`, and is what children and clones
   inherit. `entryFormatter` is deprecated: it still formats and still wins over a `"text"`/`"json"`
   `format`, writes one `warn` line per `stderr` sink for each distinct warning text, whatever
