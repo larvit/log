@@ -527,6 +527,16 @@ test("clone inherits config (OTLP, printTraceInfo, fetch policy) but keeps its o
 
 test("constructor throws on malformed otlpHttpBaseURI", t => {
 	t.throws(() => new Log({ otlpHttpBaseURI: "not a valid uri" }), "malformed otlpHttpBaseURI throws at construction");
+
+	let caught: unknown;
+
+	try {
+		new Log({ otlpHttpBaseURI: "http://u:s3cr%40t/w@127.0.0.1:4318" });
+	} catch (err) {
+		caught = err;
+	}
+
+	t.notOk(JSON.stringify(caught, Object.getOwnPropertyNames(caught as object)).includes("s3cr"), "the thrown error carries no part of the URI, cause and input included");
 	t.doesNotThrow(() => new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318" }), "valid uri does not throw");
 	t.end();
 });
@@ -762,7 +772,7 @@ test("otlpAdditionalHeaders is read per send, and an invalid one fails the expor
 	invalid.info("z");
 	await invalid.flush();
 	t.strictEqual(calls.length, 2, "nothing is sent with a header the runtime rejects");
-	t.deepEqual(reports.lines.map(line => line.error), ["otlpAdditionalHeaders carries an invalid X-Bad Name header"], "the batch is dropped, naming the header but never its value");
+	t.deepEqual(reports.lines, [{ error: "otlpAdditionalHeaders carries an invalid X-Bad Name header", items: 1, msg: "OTLP export headers invalid, batch dropped", path: "/v1/logs", url: "http://127.0.0.1:4318/v1/logs" }], "the batch is dropped under its own message, naming the header but never its value");
 	t.notOk(JSON.stringify(reports.lines).includes("s3cr3t"), "the rejected header value is not reported");
 	t.end();
 });

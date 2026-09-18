@@ -4,16 +4,16 @@
 
 - Credentials in `otlpHttpBaseURI` no longer reach `stderr`, and basic auth works. `fetch` rejects
   a `user:pass@` url outright on Node and in browsers, and that rejection quoted the whole url —
-  credentials included — as the export error of every attempt and every retry. `user:pass@` is now
-  sent as an `Authorization: Basic` header, percent-decoded, and the request url carries none.
+  credentials included — into the error line of every failed export. `user:pass@` is now sent as an
+  `Authorization: Basic` header, percent-decoded, and the request url carries none.
   **If you have ever set `user:pass@` in `otlpHttpBaseURI`, rotate those credentials**: they are in
   whatever collects your `stderr`, findable by searching it for your collector's hostname. The URI
-  stays on `log.conf` and `queue.conf` as you gave it, so don't log your `conf`.
-- A header in `otlpAdditionalHeaders` replaces the one the queue sets itself whatever its casing;
-  before, `{ authorization: … }` went out beside the queue's own `Authorization` as one
-  comma-joined value no collector accepts. Headers are read afresh on each send, so a rotated token
-  takes effect, and a name or value the runtime rejects drops that batch with one report line
-  naming the header, where it used to be retried for the life of the process.
+  stays on `log.conf` and `queue.conf` as you gave it, so don't log your `conf`. Percent-encode any
+  `/ ? #` in a password, and a literal `%` as `%25`.
+- A header in `otlpAdditionalHeaders` replaces the one the queue sets itself whatever its casing,
+  and is read afresh on each send, so a rotated token takes effect. A name or value the runtime
+  rejects drops that batch, reported as `OTLP export headers invalid, batch dropped` naming the
+  header, never its value.
 - `format` also takes a formatter function, `(entry) => string`, and is what children and clones
   inherit. `entryFormatter` is deprecated: it still formats and still wins over a `"text"`/`"json"`
   `format`, writes one `warn` line per `stderr` sink for each distinct warning text, whatever
