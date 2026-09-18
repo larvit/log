@@ -41,6 +41,15 @@ Structured logging with a tiny API and first-class OTLP (logs + traces) over `fe
   minor never changes output for a consumer whose env says nothing. Following the TTY is a 3.0.0
   change; Rails' always-on `colorize_logging` is the precedent for what unconditional colour costs
   log pipelines. Valid while text is the default format.
+- 2026-09-18: `Log` and `Queue` each own a `clock`, because each is usable without the other. A
+  `Log` passes its clock to the default `Queue` it builds; a `Queue` the consumer built keeps its
+  own, like its endpoint, since a `Log` must not mutate a queue it may share. Valid while a queue
+  is independently constructible.
+- 2026-09-18: `Clock` is `{ now, setTimeout, clearTimeout }` with an exported `TimerHandle`, not a
+  `setTimeout` returning a cancel function. `unref` needs the real handle to keep a pending retry
+  from holding a Node or Deno process alive, and only the retry timer is unref'd; the `| number`
+  arm is what lets a browser, React Native or test clock type-check against types built with
+  `"types": ["node"]`. Valid while a pending retry must not hold the process open.
 
 ## Working here
 

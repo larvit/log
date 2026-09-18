@@ -1,4 +1,4 @@
-// The one source of time: span and record timestamps, and the queue's batch, retry and send timers.
+// The library's one source of time: span and record timestamps, and the queue's timers.
 export type Clock = {
 	clearTimeout: (timer?: TimerHandle) => void;
 	now: () => number;
@@ -870,7 +870,10 @@ export class Queue implements OtlpQueue {
 			this.retryTimer = undefined;
 			void this.flush();
 		}, retryInMs);
-		unref(this.retryTimer);
+		// Only a handle we minted: Deno.unrefTimer on an injected clock's id would hit a stranger's timer.
+		if (this.conf.clock === systemClock) {
+			unref(this.retryTimer);
+		}
 		this.report("OTLP export failed, will retry", { ...this.describe(batch, failure), retryInMs });
 	}
 
