@@ -117,7 +117,7 @@ function response({ headers, json = { partialSuccess: {} }, status = 200 }: { he
 function stubFetch(responder?: (path: string, body: unknown) => ReturnType<typeof response> | undefined) {
 	const calls: { body: any, contentType: string | null, headers: any, keepalive: unknown, path: string, rawBody: any, url: string }[] = [];
 
-	globalThis.fetch = (async (url: string, init: { body: any, headers: HeadersInit, keepalive?: boolean }) => {
+	globalThis.fetch = (async (url: string, init: { body?: any, headers?: HeadersInit, keepalive?: boolean } = {}) => {
 		const contentType = new Headers(init.headers ?? {}).get("Content-Type");
 		const path = new URL(String(url)).pathname;
 		// Only JSON bodies are parsed; protobuf bodies are raw bytes, inspected via rawBody.
@@ -1375,6 +1375,29 @@ test("log.fetch captureQuery keeps the query but redacts known-sensitive keys", 
 	t.ok(urlFull.includes("q=hi"), "non-sensitive query param is kept");
 	t.ok(urlFull.includes("Signature=REDACTED"), "sensitive query value is redacted");
 	t.ok(!urlFull.includes("abc"), "the sensitive value is not leaked");
+	t.end();
+});
+
+test("log.fetch leaves a non-http(s) URL untraced", async t => {
+	const { calls } = stubFetch();
+	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+
+	// Written without "//", these parse to an opaque path: url.origin is the string "null" and the
+	// userinfo or the payload sits in url.pathname, which is what url.full used to be built from.
+	await log.fetch("myapp:user:hunter2@api.test/x");
+	await log.fetch("data:text/plain,secret-payload");
+	await log.end();
+
+	const exported = JSON.stringify(calls.filter(call => call.path.startsWith("/v1/")));
+
+	t.strictEqual(exportedSpans(calls).filter(span => span.kind === 3).length, 0, "no client span is exported");
+	t.ok(!exported.includes("hunter2"), "userinfo never reaches the collector");
+	t.ok(!exported.includes("secret-payload"), "a data: payload never reaches the collector");
+
+	const passed = calls.find(call => call.url.startsWith("myapp:"));
+
+	t.strictEqual(passed?.url, "myapp:user:hunter2@api.test/x", "the input reaches fetch unchanged");
+	t.strictEqual(callHeader(passed!, "traceparent"), null, "no trace context is propagated");
 	t.end();
 });
 

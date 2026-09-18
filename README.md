@@ -296,8 +296,9 @@ keeps it native. Levels map to OTLP severity through the exported `LogLevels` ta
 
 ## `log.fetch` in depth
 
-Input is a `string` or `URL`. A relative URL with no base (Node) passes straight through to an
-untraced `fetch`. The span is the only output; no log line is written.
+Input is a `string` or `URL`. Only an absolute `http:`/`https:` URL is traced; anything else — a
+relative URL with no base (Node), another scheme — passes straight through to an untraced `fetch`.
+The span is the only output; no log line is written.
 
 Span attributes follow the OpenTelemetry HTTP semantic conventions:
 

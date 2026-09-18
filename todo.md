@@ -11,12 +11,6 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
   with an opt-out, which is breaking and so wants the 2.x deprecation first. The rule matters more
   than the mechanism: a loopback-only test warns for `http://otel-collector.observability.svc.
   cluster.local:4318`, which is a deliberate and common setup, not a mistake.
-- [ ] Drop userinfo from the `url.full` span attribute for a scheme `buildUrlFull` cannot take
-  apart. `URL.origin` is the string `"null"` for an opaque path, so `log.fetch` on
-  `myapp:user:pass@host/x` exports `nulluser:pass@host/x`, credentials and all, and a `data:` URL
-  exports its whole payload. The span ships from the `finally`, so an unsupported scheme that
-  never fetches still sends it. The same parsing flaw the queue's endpoint now rejects; the
-  function's own comment still claims userinfo is always dropped.
 - [ ] Keep `otlpHttpBaseURI` credentials off `log.conf` and `queue.conf`, which the README
   documents as public: the URI sits there verbatim, so a consumer who logs their own conf — as
   the README's own library example spells `JSON.stringify(options.settings)` — puts the password
