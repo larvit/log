@@ -563,6 +563,7 @@ test("the level-string shorthand still works and warns once per stderr sink", t 
 	t.strictEqual(afterSilent, 1, "logLevel \"none\" does not silence the warning");
 	t.strictEqual(stderr.length, 1, "a second instance on the same sink stays quiet");
 	t.ok(stderr[0].includes("war") && stderr[0].includes("new Log({ logLevel })"), "the constructor warning is a warn line naming the spelling to use instead");
+	t.ok(stderr[0].includes("@larvit/log: "), "and names the package, so an app developer can tell which dependency emitted it");
 
 	const cloneStderr: string[] = [];
 	const parent = new Log({ colors: false, stderr: line => { cloneStderr.push(line); } });
@@ -587,7 +588,7 @@ test("entryFormatter still formats and warns once per stderr sink", t => {
 	log.info("hi");
 	t.strictEqual(stdout[0], "custom hi", "the deprecated formatter still formats output, and still wins over format: \"json\"");
 	t.strictEqual(stderr.length, 1, "one warning per sink");
-	t.strictEqual(stderr[0], "custom entryFormatter is deprecated and removed in 3.0.0, use format", "the warning goes through the instance's formatter and names the spelling to use instead");
+	t.strictEqual(stderr[0], "custom @larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format — it overrides the format set beside it", "the warning goes through the instance's formatter, names the spelling to use instead and says the format beside it is overridden");
 	log.info("again");
 	t.strictEqual(stderr.length, 1, "a second entry on the same sink stays quiet");
 
@@ -602,6 +603,7 @@ test("entryFormatter still formats and warns once per stderr sink", t => {
 
 	builtIn.log.info("x");
 	t.strictEqual(builtIn.stderr.length, 1, "a built-in formatter warns too; the warning does not depend on which function it is");
+	t.ok(builtIn.stderr[0].endsWith("@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format"), "with no format beside it, the warning stops at the spelling to use");
 	t.end();
 });
 
