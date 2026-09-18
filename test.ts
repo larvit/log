@@ -860,7 +860,10 @@ test("OTLP/JSON batches the records into one POST and exports one span sharing t
 	log.warn("FOo", { active: true, bar: "baz", "lökig knasnyckel | typ": 17, missing: undefined });
 	await clock.advance(250);
 	log.error("logged and recovered");
-	await clock.advance(250);
+	await clock.advance(749);
+	t.strictEqual(calls.length, 0, "the queue the Log built has not batched yet");
+	await clock.advance(1);
+	t.deepEqual(calls.map(call => call.path), ["/v1/logs"], "the queue the Log built batches on the instance's clock, without an end()");
 	await log.end();
 
 	t.ok(calls.every(call => call.contentType === "application/json"), "default protocol sends JSON");
@@ -920,7 +923,7 @@ test("OTLP/JSON batches the records into one POST and exports one span sharing t
 	t.strictEqual(span.traceId, logRecord.traceId, "span and log share the traceId");
 	t.strictEqual(span.spanId, logRecord.spanId, "span and log share the spanId");
 	t.strictEqual(span.startTimeUnixNano, nanos(startedAt), "span startTimeUnixNano is the construction instant");
-	t.strictEqual(span.endTimeUnixNano, nanos(startedAt + 500), "span endTimeUnixNano is the end() instant");
+	t.strictEqual(span.endTimeUnixNano, nanos(startedAt + 1000), "span endTimeUnixNano is the end() instant");
 	t.end();
 });
 

@@ -69,7 +69,9 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
   Add `ended` to `LogInt`.
 - [ ] Keep `otlpQueue` as the only OTLP representation in `conf`: build the default `Queue` from
   the three `otlp*` shorthands and clear them, so inheritance needs one rule and `isQueueFor` goes.
-  Today `log.conf.otlpHttpBaseURI` stays readable, which is why this waits for a major.
+  Today `log.conf.otlpHttpBaseURI` stays readable, which is why this waits for a major. Split the
+  constructor into named steps in the same change; it is ~90 lines doing five jobs and this touches
+  three of them.
 - [ ] Require `spanName` whenever `otlpQueue` is set or inherited: a child or clone of an
   OTLP-configured instance must name its span, and the constructor rejects one that does not, so
   no backend shows `unnamed-span`.
