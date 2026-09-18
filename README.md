@@ -184,7 +184,7 @@ queue is in memory only.
 | Option | Type | Default | |
 |---|---|---|---|
 | `batchDelayMs` | `number` | `1000` | How long a queued item waits for company before a send. |
-| `clock` | `Clock` | system clock | `{ now, setTimeout, clearTimeout }` behind the batch, retry and send-timeout timers. Inject one to drive time in a test rather than wait on it. |
+| `clock` | `Clock` | system clock | `{ now, setTimeout, clearTimeout }` behind the batch, retry and send-timeout timers. Supply one to control time: a deterministic test, or a corrected `now()`. |
 | `key` | `string` | `"@larvit/log:otlp-queue"` | The `storage` key. |
 | `maxBatchBytes` | `number` | `65536` | Items per POST are cut here, measured as their JSON size. The default is the browser `keepalive` limit; a batch over 64 KiB is sent without `keepalive`. |
 | `maxItems` | `number` | `1000` | Queue bound. The oldest items are dropped when exceeded, reported in one stderr line with the count. |

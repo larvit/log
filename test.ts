@@ -495,9 +495,10 @@ test("clone inherits config (OTLP, printTraceInfo, fetch policy) but keeps its o
 	t.strictEqual(child.conf.clock, clock, "clone inherited the clock");
 
 	const ownQueue = new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318" });
+	const ownClock = ownQueue.conf.clock;
 
 	new Log({ clock, otlpQueue: ownQueue });
-	t.notStrictEqual(ownQueue.conf.clock, clock, "a queue the consumer built keeps its own clock, like its endpoint");
+	t.strictEqual(ownQueue.conf.clock, ownClock, "a queue the consumer built keeps its own clock, like its endpoint");
 	t.strictEqual(new Log({ parentLog: base }).conf.colors, false, "a child inherits colors");
 	t.strictEqual(new Log({ parentLog: base }).conf.clock, clock, "a child inherits the clock");
 
