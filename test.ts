@@ -1,4 +1,4 @@
-import { type DefinedMetadata, formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, type Logger, type LogLevel, LogLevels, msgJsonFormatter, msgTextFormatter, type OtlpPayload, type OtlpQueue, parseTraceparent, Queue, type QueueStorage, type TimerHandle } from "./index.js";
+import { type DefinedMetadata, type EntryFormatterConf, formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, type Logger, type LogLevel, LogLevels, msgJsonFormatter, msgTextFormatter, type OtlpPayload, type OtlpQueue, parseTraceparent, Queue, type QueueStorage, type TimerHandle } from "./index.js";
 import test from "./tap.js";
 
 // --- helpers ---------------------------------------------------------------
@@ -595,16 +595,36 @@ test("entryFormatter still formats and warns once per stderr sink", t => {
 	clone.info("cloned");
 	t.deepEqual(cloneStderr, [], "a clone inherits the formatter without repeating the warning on its own sink");
 	t.strictEqual(stdout[stdout.length - 1], "custom cloned", "the clone kept the inherited formatter");
-	t.ok(
-		thrown(() => new Log({ entryFormatter: entry => entry.msg, format: entry => entry.msg })).includes("format"),
-		"entryFormatter beside a function format is rejected, naming format",
-	);
 
-	const spreadStderr: string[] = [];
-	const fnLog = new Log({ format: entry => entry.msg, stderr: line => { spreadStderr.push(line); } });
+	const builtIn = capture({ entryFormatter: msgTextFormatter });
 
-	new Log({ ...fnLog.conf, spanName: "sibling" });
-	t.deepEqual(spreadStderr, [], "a resolved conf spread into a new instance is neither a second spelling nor a deprecated one");
+	builtIn.log.info("x");
+	t.strictEqual(builtIn.stderr.length, 1, "a built-in formatter warns too; the warning does not depend on which function it is");
+	t.end();
+});
+
+test("format and entryFormatter are one setting, and a resolved conf carries neither spelling twice", t => {
+	const own = (entry: EntryFormatterConf) => `own ${entry.msg}`;
+
+	t.ok(thrown(() => new Log({ entryFormatter: own, format: entry => `other ${entry.msg}` })).includes("format"), "two different formatters, one per spelling, are rejected naming format");
+	t.strictEqual(thrown(() => new Log({ entryFormatter: own, format: own, stderr: () => {} })), "", "the same formatter in both spellings is no disagreement");
+
+	const parent = capture({ format: entry => `parent ${entry.msg}` });
+
+	parent.log.clone({ entryFormatter: own }).info("hi");
+	new Log({ entryFormatter: own, parentLog: parent.log }).info("hi");
+	t.deepEqual(parent.stdout, ["own hi", "own hi"], "a clone and a child take the caller's formatter over the inherited format, alike");
+
+	const spread = capture({ ...parent.log.conf, format: (entry: EntryFormatterConf) => `spread ${entry.msg}` });
+
+	spread.log.info("hi");
+	t.strictEqual(spread.stdout[0], "spread hi", "a resolved conf spread with a new format takes the new one");
+	t.deepEqual(spread.stderr, [], "and warns about nothing: the resolved formatter is not a spelling the caller wrote");
+
+	const json = capture({ ...capture().log.conf, format: "json" });
+
+	json.log.info("hi");
+	t.strictEqual(JSON.parse(json.stdout[0]).msg, "hi", "a string format applies to a spread conf too");
 	t.end();
 });
 

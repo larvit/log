@@ -35,7 +35,8 @@ export type LogConf = {
 	clock?: Clock;
 	colors?: boolean;
 	context?: Metadata;
-	// Deprecated, removed in 3.0.0: pass the function as `format`.
+
+	/** @deprecated Removed in 3.0.0: pass the function as `format`. */
 	entryFormatter?: EntryFormatter;
 	format?: "text" | "json" | EntryFormatter;
 	logLevel?: LogLevel | "none";
@@ -252,6 +253,19 @@ export function msgTextFormatter(conf: EntryFormatterConf) {
 	}
 
 	return str;
+}
+
+// The deprecated spelling folded into `format`, so nothing inherited can override what the caller passed.
+function foldEntryFormatter(conf: LogConf): void {
+	if (conf.entryFormatter === undefined) {
+		return;
+	}
+
+	if (typeof conf.format === "function" && conf.format !== conf.entryFormatter) {
+		throw new Error("entryFormatter and format are two spellings of one formatter: pass only format");
+	}
+
+	conf.format = conf.entryFormatter;
 }
 
 function resolveFormatter(format: LogConf["format"]): EntryFormatter {
@@ -1153,21 +1167,14 @@ export class Log implements LogInt {
 
 	constructor(options?: LogConf | LogLevel | "none") {
 		const conf: LogConf = typeof options === "string" ? { logLevel: options } : { ...options };
-		// A resolved conf spread back in carries the mirror below; only a formatter that disagrees is the caller's own.
-		const deprecatedFormatter = conf.entryFormatter === resolveFormatter(conf.format) ? undefined : conf.entryFormatter;
+		const deprecatedFormatter = conf.entryFormatter !== undefined;
 
-		if (deprecatedFormatter) {
-			if (typeof conf.format === "function") {
-				throw new Error("entryFormatter and a format function are the same setting: pass only format");
-			}
-
-			conf.format = deprecatedFormatter;
-		}
+		foldEntryFormatter(conf);
 
 		// Inherit conf from parent log if provided
 		if (typeof conf.parentLog === "object") {
 			const parentConf = conf.parentLog.conf;
-			const skip = new Set<keyof LogConf>(["entryFormatter", ...otlpKeysNotToInherit(conf)]);
+			const skip = new Set<keyof LogConf>(otlpKeysNotToInherit(conf));
 
 			for (const key of Object.keys(parentConf) as (keyof LogConf)[]) {
 				if (!skip.has(key) && conf[key] === undefined) {
@@ -1193,8 +1200,9 @@ export class Log implements LogInt {
 			conf.format = "text";
 		}
 
-		// entryFormatter mirrors the resolved format, so inheritance carries format alone; 3.0.0 drops it.
-		conf.entryFormatter = resolveFormatter(conf.format);
+		// Non-enumerable: this mirror of the resolved format is the library's, so a conf spread into a new
+		// instance carries the caller's spellings only. 3.0.0 drops it.
+		Object.defineProperty(conf, "entryFormatter", { configurable: true, enumerable: false, value: resolveFormatter(conf.format), writable: true });
 
 		if (conf.stderr === undefined) {
 			conf.stderr = console.error;
@@ -1269,6 +1277,8 @@ export class Log implements LogInt {
 
 		const conf: LogConf = typeof options === "string" ? { logLevel: options } : { ...options };
 
+		foldEntryFormatter(conf);
+
 		// Merge context per-key (overrides win) instead of replacing it wholesale.
 		conf.context = {
 			...this.context,
@@ -1278,7 +1288,7 @@ export class Log implements LogInt {
 		// Inherit every other setting not overridden (log level, sinks, OTLP config, printTraceInfo…),
 		// like the constructor does from a parentLog. parentLog/spanName/traceparent are excluded: a
 		// clone is its own span, not a child. (A manual allow-list here once dropped newer OTLP options.)
-		const skip = new Set<keyof LogConf>(["entryFormatter", "parentLog", "spanName", "traceparent", ...otlpKeysNotToInherit(conf)]);
+		const skip = new Set<keyof LogConf>(["parentLog", "spanName", "traceparent", ...otlpKeysNotToInherit(conf)]);
 
 		for (const key of Object.keys(this.conf) as (keyof LogConf)[]) {
 			if (!skip.has(key) && conf[key] === undefined) {

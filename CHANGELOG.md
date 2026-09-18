@@ -4,8 +4,10 @@
 
 - `format` also takes a formatter function, `(entry) => string`, and is what children and clones
   inherit. `entryFormatter` is deprecated: it still formats and still wins over a `"text"`/`"json"`
-  `format`, writes one `warn` line per `stderr` sink and 3.0.0 removes it. Beside a function
-  `format` it throws. New export: `EntryFormatter`.
+  `format`, writes one `warn` line per `stderr` sink and 3.0.0 removes it. Two different
+  formatters, one per spelling, throw. New export: `EntryFormatter`.
+- A `format` set on a spread of `log.conf` now applies; before, the resolved formatter on that
+  conf silently kept winning.
 - The level-string shorthand, `new Log("debug")` and `log.clone("debug")`, is deprecated: it still
   sets the level, writes one `warn` line per `stderr` sink whatever `logLevel` says, and 3.0.0
   removes it. Pass `{ logLevel }` instead.
