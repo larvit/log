@@ -57,6 +57,10 @@ Structured logging with a tiny API and first-class OTLP (logs + traces) over `fe
 - 2026-09-18: adding a key to `ResolvedLogConf`/`ResolvedQueueConf`'s required half ships in a
   minor. They are output types describing what the library produces; a consumer hand-building one
   is writing a test double, not running existing code. Precedent: `colors` did the same.
+- 2026-09-18: a deprecation warns once per `stderr` sink, through the instance's formatter at `warn`
+  and whatever `logLevel` says: the sink is what a log pipeline reads, so a library and its consumer
+  each hear about their own call, and a test that injects a sink stays independent of run order.
+  Valid while 2.x carries deprecations.
 
 ## Working here
 

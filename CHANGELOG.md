@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- The level-string shorthand, `new Log("debug")` and `log.clone("debug")`, is deprecated: it still
+  sets the level, writes one `warn` line per `stderr` sink whatever `logLevel` says, and 3.0.0
+  removes it. Pass `{ logLevel }` instead.
 - `clock` option on `Log` and `Queue`: `{ now, setTimeout, clearTimeout }` behind every span and
   record timestamp and behind the queue's batch, retry and send-timeout timers, so a test drives
   time instead of waiting on it. Defaults to the system clock, inherited by children and clones.

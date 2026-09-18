@@ -39,7 +39,7 @@ Node 18 or later. ESM, types included.
 ```javascript
 import { Log } from "@larvit/log";
 
-const log = new Log("silly"); // minimum level to output; default "info"
+const log = new Log({ logLevel: "silly" }); // minimum level to output; default "info"
 log.error("Apocalypse! :O"); // stderr
 log.warn("The chaos is near"); // stderr
 log.info("All is well, but important"); // stdout
@@ -218,7 +218,7 @@ metadata is built only when it will be seen:
 import { Log, type Logger } from "@larvit/log";
 
 export function createClient(options: { log?: Logger, settings: Settings }) {
-	const log = options.log ?? new Log("none");
+	const log = options.log ?? new Log({ logLevel: "none" });
 	log.debug("createClient() - connecting", { host: options.settings.host });
 	if (log.enabled("silly")) {
 		log.silly("createClient() - full settings", { settings: JSON.stringify(options.settings) });
@@ -226,8 +226,8 @@ export function createClient(options: { log?: Logger, settings: Settings }) {
 }
 ```
 
-A consumer passes `new Log("debug")`, or a child of their request log so your library's entries land
-in their trace.
+A consumer passes `new Log({ logLevel: "debug" })`, or a child of their request log so your
+library's entries land in their trace.
 
 For a span per operation, take a `LogInt` instead, make a child,
 `new Log({ parentLog: log, spanName: "submit_sm" })`, and `end()` that child. It inherits the
@@ -236,8 +236,9 @@ instance you were handed; it is single-use and the consumer owns it.
 
 ## Options
 
-`new Log(options)`, `new Log(level)` or `new Log()`. A level string is shorthand for
-`{ logLevel: level }`. Every option is optional.
+`new Log(options)` or `new Log()`. Every option is optional. A level string in place of the object,
+`new Log("debug")` or `log.clone("debug")`, is deprecated: it still sets the level, warns once per
+`stderr` sink and is removed in 3.0.0, so pass `{ logLevel }` instead.
 
 | Option | Type | Default | |
 |---|---|---|---|

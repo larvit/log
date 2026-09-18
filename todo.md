@@ -35,7 +35,7 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
 
 ### Deprecations (warn once on stderr)
 
-- [ ] Deprecate `new Log("level")` and `clone("level")` in favour of `{ logLevel }`.
+- [x] Deprecate `new Log("level")` and `clone("level")` in favour of `{ logLevel }`.
 - [ ] Deprecate `entryFormatter` in favour of `format`, and make `format` also accept
   `(entry) => string`.
 - [ ] Deprecate `parentLog` together with `traceparent`. Today `traceparent` is silently ignored.
