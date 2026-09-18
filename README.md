@@ -182,7 +182,9 @@ queue is in memory only.
 `otlpHttpBaseURI`, `otlpProtocol` and `otlpAdditionalHeaders` beside it.
 
 Credentials go either in the endpoint as `user:pass@`, which is sent as an `Authorization: Basic`
-header, or in `otlpAdditionalHeaders` as a token of your own, which wins if you set both.
+header, or in `otlpAdditionalHeaders` as a token of your own, which wins if you set both. Over
+plain `http:` either one is readable by anything on the network path, so use `https:` unless the
+collector is local or on a network you trust.
 
 | Option | Type | Default | |
 |---|---|---|---|
