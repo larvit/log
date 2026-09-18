@@ -50,7 +50,7 @@ Structured logging with a tiny API and first-class OTLP (logs + traces) over `fe
   from holding a Node or Deno process alive, and only the retry timer is unref'd; the `| number`
   arm is what lets a browser, React Native or test clock type-check against types built with
   `"types": ["node"]`. A clock that delegates to platform timers is unref'd like the system one;
-  only Deno's numeric `unrefTimer` is skipped for an injected clock, since the id is not its own.
+  only Deno's numeric `unrefTimer` is skipped for an injected clock, whose id may not be Deno's.
   Valid while a pending retry must not hold the process open.
 - 2026-09-18: `clock` is a supported option, not a test-only seam. Valid while a delegating clock
   leaves process-exit behaviour intact.

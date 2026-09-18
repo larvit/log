@@ -747,7 +747,7 @@ function unref(timer: TimerHandle, fromSystemClock: boolean): void {
 	const deno: unknown = Reflect.get(globalThis, "Deno");
 	const unrefTimer: unknown = typeof deno === "object" && deno !== null ? Reflect.get(deno, "unrefTimer") : undefined;
 
-	// An injected clock's number is not a Deno timer id, so unrefing it would hit a stranger's timer.
+	// An injected clock's number may not be a Deno timer id, and unrefing a stranger's is worse.
 	if (fromSystemClock && typeof timer === "number" && typeof unrefTimer === "function") {
 		unrefTimer(timer);
 	}
