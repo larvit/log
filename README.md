@@ -166,14 +166,14 @@ timing and is exported by `end()`.
 `end()` closes the span, queues it and flushes the [export queue](#queue-exports); a span that is
 never ended is never sent. `end({ error })` also marks the span failed: status `ERROR` with the
 error's message, and an `error.type` attribute from its `code`, else `name`; a `null` or `undefined`
-error is a plain `end()`. Userinfo in a url the message quotes becomes `REDACTED`, so a
-rejection you catch and forward carries no credential onto the span. A logged `log.error()` never fails the span; a recovered error is not a
-failed operation. `await` it when delivery must complete before the process exits (a short-lived
-script); fire-and-forget is fine in a long-running process. Against a dead collector `await end()`
-returns after one failed attempt, within about 3 s plus however long any un-awaited `log.fetch()`
-takes to complete; the retry then runs only for as long as the process lives. An instance is
-single-use: logging and `fetch()` on an ended instance throw, `end()` rejects. `log.flush()`
-delivers what is queued without ending.
+error is a plain `end()`. Userinfo in a url the message quotes becomes `REDACTED`, so a rejection
+you catch and forward carries no credential onto the span. A logged `log.error()` never fails the
+span; a recovered error is not a failed operation. `await` it when delivery must complete before the
+process exits (a short-lived script); fire-and-forget is fine in a long-running process. Against a
+dead collector `await end()` returns after one failed attempt, within about 3 s plus however long
+any un-awaited `log.fetch()` takes to complete; the retry then runs only for as long as the process
+lives. An instance is single-use: logging and `fetch()` on an ended instance throw, `end()`
+rejects. `log.flush()` delivers what is queued without ending.
 
 `log.clone(options?)` (on `Log`, not `LogInt`) makes an independent instance with the same
 settings; `context` merges per key, `spanName` is not copied, everything else is overridden as
