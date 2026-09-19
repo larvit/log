@@ -369,6 +369,10 @@ function partialRejection(body: unknown): { message?: string, rejected: number }
 	}
 }
 
+// Userinfo in a url an error message quotes: a runtime refusing a credentialed url puts the whole
+// url in its rejection, and that message becomes a span status the queue exports.
+const URL_USERINFO = /(:\/\/)[^/?#\s]*@/g;
+
 // error.type per OTel semconv; "_OTHER" is its fallback.
 function spanFailure(error: unknown): { message: string, type: string } {
 	let message = stringField(error, "message");
@@ -381,7 +385,7 @@ function spanFailure(error: unknown): { message: string, type: string } {
 		}
 	}
 
-	return { message, type: stringField(error, "code") ?? stringField(error, "name") ?? "_OTHER" };
+	return { message: message.replace(URL_USERINFO, "$1REDACTED@"), type: stringField(error, "code") ?? stringField(error, "name") ?? "_OTHER" };
 }
 
 // Resource-level OTLP attributes (service.name + telemetry.sdk.*), shared by logs and spans.
@@ -1153,8 +1157,6 @@ export class Queue implements OtlpQueue {
 // default deny-list of the official OTel HTTP instrumentations. Matched case-insensitively.
 const SENSITIVE_QUERY_KEYS = new Set(["awsaccesskeyid", "signature", "sig", "x-goog-signature"]);
 
-const CREDENTIALED_URL_STATUS = "error message withheld: the request url carries credentials";
-
 // The URL log.fetch traces: a scheme written without "//" parses to an opaque path, where
 // userinfo, or a data: payload, sits in pathname and would ride into url.full.
 function traceableUrl(input: string | URL): URL | undefined {
@@ -1488,9 +1490,7 @@ export class Log implements LogInt {
 		} catch (err) {
 			const failure = spanFailure(err);
 
-			// A runtime that refuses a credentialed url quotes the whole url into its rejection, so
-			// that message would ship the password to the tracing backend.
-			span.status = { code: 2, message: url.username || url.password ? CREDENTIALED_URL_STATUS : failure.message };
+			span.status = { code: 2, message: failure.message };
 			context["error.type"] = failure.type;
 
 			throw err;

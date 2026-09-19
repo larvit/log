@@ -90,8 +90,13 @@ and who it is for, and a design decision that cannot be derived from them belong
   right, their `url.full` (`nulluser:pass@host/x`, `https://example.comhttps://example.com/uuid`)
   was not. Valid while `url.full` is built from `origin` + `pathname`.
 
-- 2026-09-20: a `log.fetch` url carrying userinfo reaches the runtime's `fetch` untouched, and the
-  span drops the rejection message instead of quoting it. Turning the userinfo into an
+- 2026-09-20: a `log.fetch` url carrying userinfo reaches the runtime's `fetch` untouched, and
+  `spanFailure` redacts the userinfo out of any url the error message quotes. It sits there, not at
+  the `log.fetch` call site, because the same rejection reaches a second span through
+  `end({ error })` — the handler pattern the README documents — and a caller's own `fetch`
+  rejection arrives by that route too; one redaction where an error becomes a span status covers
+  every sink, where a `url.username || url.password` test at the call site covered one. Turning
+  the userinfo into an
   `Authorization: Basic` header, as `otlpHttpBaseURI` does with the same spelling, is what README →
   Goals forbids of `log.fetch`: "never a request the platform would not have made, and never a
   success the platform would have refused". The two spellings differ because the queue's endpoint
