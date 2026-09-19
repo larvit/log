@@ -68,6 +68,29 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
   `log.fetch` then traces that invented url and fetches it with `init` alone, dropping the request's
   own method, body and headers. The signature says `string | URL`, so a TypeScript consumer cannot
   reach it.
+- [ ] Weigh ratio sampling against the Goals test and either ship it or record why not. A fleet of
+  phones on cellular has no way to cap what it sends, so the 1000-item queue bound is a sampling
+  decision made by accident. An incoming `traceparent` flag still wins where there is one.
+- [ ] Weigh resource attributes beyond `service.name` the same way. `service.version` and
+  `deployment.environment` are what the telemetry reader groups on in Grafana, and the shape is a
+  map on the resource we already build.
+- [ ] Weigh span events the same way. A reader expects to find the exception on an errored span,
+  and the OTLP shape carries a dropped-count we would owe them.
+- [ ] Weigh `tracestate` the same way. It is invisible when unused, and the W3C rules it must hold
+  to — 512-char limit, list-member ordering, the `ot` vendor key — are where the cost sits.
+- [ ] Weigh OTLP metrics as a stateless pass-through: encode an already-aggregated point, batch it
+  through `Queue` and POST it to `/v1/metrics`, with the types carrying what a valid point must
+  have. Measure what the metrics messages add to the protobuf encoder against the 10 KB budget
+  before deciding.
+- [ ] Check the footprint budget in CI, so the numbers in the README's Goals fail a build instead
+  of going stale. Bundle size is the easy half; the per-operation figures need a stable enough
+  harness to not flake.
+- [ ] Size a queued payload without materializing its JSON. `log.info` with OTLP configured costs
+  6.3 µs, of which `JSON.stringify` in `withBytes` is 1.6 µs and the `utf8Length` walk over its
+  result another 1.4 µs — two passes whose only job is measuring bytes for the 64 KiB `keepalive`
+  cap. `TextEncoder` is not the answer: about 700 ns of fixed call overhead makes it slower than
+  the walk below roughly 500 chars, and it only pays at 60 KB, where it is 6.6× faster. Measured
+  on `node:24-bookworm-slim`, AMD Ryzen 9 5950X.
 - [ ] Report a 401 or 403 export as `OTLP export unauthorized, batch dropped`, not as the generic
   rejection. Working auth makes a wrong credential reachable for the first time, and it is the
   likeliest misconfiguration of `otlpHttpBaseURI` userinfo; today it reads as any other 4xx.
@@ -145,5 +168,3 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
   has had the global since React Native 0.74 (Expo SDK 51 changelog, 2024-05-07), and every
   supported React Native is newer.
 - Protobuf encoder stays; collectors that reject JSON are real, and the whole file is 4.7 KB gz.
-- Not added: sampling beyond the incoming flag, `tracestate`, span events, resource attributes
-  beyond `service.name`. Each pulls toward being an SDK, against priority 2.
