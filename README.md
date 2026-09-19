@@ -378,10 +378,11 @@ message. The response or error reaches the caller unchanged. Bodies are never ca
 `captureQuery` and the header allow-lists are read at call time from the instance; `clone()` to vary
 them per call site.
 
-Never put credentials in the url. On Node and in browsers `fetch` refuses one carrying them and
-quotes that url in full into its rejection, which becomes the span's status message; React Native,
-whose `fetch` is an `XMLHttpRequest` polyfill, may send them instead. Pass an `Authorization`
-header, and strip userinfo from a url you did not build.
+Never put credentials in the url; pass an `Authorization` header, and strip userinfo from a url you
+did not build. `log.fetch` mirrors the runtime, which on Node and in browsers refuses such a url
+and on React Native, whose `fetch` is an `XMLHttpRequest` polyfill, may send them instead. The span
+carries neither: `url.full` drops the userinfo, and a rejection quoting the url is replaced by
+`error message withheld: the request url carries credentials`.
 
 Spans are queued when the response arrives and are registered with `flush()` at call time, so
 `await log.end()` delivers a `log.fetch()` you never awaited.

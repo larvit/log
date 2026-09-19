@@ -1399,6 +1399,32 @@ test("log.fetch leaves a non-http(s) URL untraced", async t => {
 	t.end();
 });
 
+test("log.fetch keeps a url's credentials off the exported span", async t => {
+	const runtimeFetch = globalThis.fetch.bind(globalThis);
+	const { calls } = stubFetch();
+	const exportFetch = globalThis.fetch;
+
+	// Only the export is stubbed: the traced call reaches the runtime's own fetch, which refuses a
+	// url carrying credentials while building the Request, so nothing leaves the machine.
+	globalThis.fetch = ((input: string | URL, init?: RequestInit) => new URL(String(input)).port === "4318" ? exportFetch(input, init) : runtimeFetch(input, init)) as typeof fetch;
+
+	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+	let rejection = "";
+
+	await log.fetch("http://myuser:hunter2@127.0.0.1:45231/x").catch((err: Error) => { rejection = err.message; });
+	await log.end();
+
+	const span = clientSpan(calls);
+	const urlFull = span.attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue;
+
+	t.ok(rejection.includes("hunter2"), "the runtime's own rejection, credentials and all, reaches the caller");
+	t.ok(!JSON.stringify(span).includes("hunter2"), "the password is nowhere on the span");
+	t.ok(!JSON.stringify(span).includes("myuser"), "the username is nowhere on the span");
+	t.strictEqual(urlFull, "http://127.0.0.1:45231/x", "url.full keeps the url without the userinfo");
+	t.deepEqual(span.status, { code: 2, message: "error message withheld: the request url carries credentials" }, "the span is ERROR and says why it carries no message");
+	t.end();
+});
+
 test("log.fetch captures allow-listed request and response headers only", async t => {
 	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ "x-resp": "rv", "x-secret": "nope" }) }) : undefined);
 	const log = new Log({
