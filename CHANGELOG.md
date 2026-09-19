@@ -6,10 +6,12 @@
   `log.fetch("https://user:pass@host/x")` may put those credentials on the wire where Node and
   browsers refuse the url outright. `log.fetch` mirrors whatever the runtime does, so it cannot
   close this. Pass an `Authorization` header, and strip userinfo from a url you did not build.
-- `log.fetch` no longer puts a url's credentials on the exported span. On Node and in browsers
-  `fetch` refuses a url carrying them and quotes the whole url into its `TypeError`, which became
-  the span's status message; that message is now `error message withheld: the request url carries
-  credentials`. The rejection reaching the caller is unchanged, and `url.full` never held them.
+- A span's status message no longer carries url credentials: userinfo in a url the message quotes
+  is exported as `http://REDACTED@host/x`. On Node and in browsers `fetch` refuses a url carrying
+  credentials and quotes the whole url into its `TypeError`, which reached the backend both as the
+  `log.fetch` span's own status and, once you caught that rejection and forwarded it, as
+  `end({ error })` on the span around it. The rejection reaching the caller is unchanged, and
+  `url.full` never held them.
   **If you have called `log.fetch` with a `user:pass@` url on Node or in a browser, rotate those
   credentials**: they are in your tracing backend, on every span whose status message quotes the
   url.

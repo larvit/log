@@ -1124,6 +1124,10 @@ test("end({ error }) marks the span failed", async t => {
 	await new Log(conf).end({ error: undefined });
 	await new Log(conf).end({ error: null });
 	await new Log(conf).end({ error: Object.create(null) });
+	// The rejection a runtime hands back for a credentialed url, forwarded by the handler pattern
+	// the README documents.
+	await new Log(conf).end({ error: new TypeError("Request cannot be constructed from a URL that includes credentials: http://myuser:hunter2@api.test/x") });
+	await new Log(conf).end({ error: new Error("GET https://api.test/mail@example.com?to=a@b failed") });
 
 	t.deepEqual(exportedSpan(0).status, { code: 2, message: "refused" }, "status is ERROR with the error message");
 	t.strictEqual(attr(exportedSpan(0), "error.type"), "ECONNREFUSED", "error.type is the error's code when it has one");
@@ -1136,6 +1140,8 @@ test("end({ error }) marks the span failed", async t => {
 	t.notOk(attr(exportedSpan(3), "error.type"), "no error.type without an error");
 	t.deepEqual(exportedSpan(4).status, { code: 0 }, "end({ error: null }) leaves the span ok, for callback-style errors");
 	t.deepEqual(exportedSpan(5).status, { code: 2, message: "_OTHER" }, "a value that cannot be stringified still ends and exports the span");
+	t.deepEqual(exportedSpan(6).status, { code: 2, message: "Request cannot be constructed from a URL that includes credentials: http://REDACTED@api.test/x" }, "userinfo in a url the error message quotes is redacted");
+	t.deepEqual(exportedSpan(7).status, { code: 2, message: "GET https://api.test/mail@example.com?to=a@b failed" }, "an @ outside the userinfo position is left alone");
 	t.end();
 });
 
@@ -1421,7 +1427,9 @@ test("log.fetch keeps a url's credentials off the exported span", async t => {
 	t.ok(!JSON.stringify(span).includes("hunter2"), "the password is nowhere on the span");
 	t.ok(!JSON.stringify(span).includes("myuser"), "the username is nowhere on the span");
 	t.strictEqual(urlFull, "http://127.0.0.1:45231/x", "url.full keeps the url without the userinfo");
-	t.deepEqual(span.status, { code: 2, message: "error message withheld: the request url carries credentials" }, "the span is ERROR and says why it carries no message");
+	t.strictEqual(span.status.code, 2, "the span is ERROR");
+	// The wording around it differs between Node and the browser; the redaction does not.
+	t.ok(span.status.message.includes("http://REDACTED@127.0.0.1:45231/x"), "the runtime's own message survives with the userinfo redacted");
 	t.end();
 });
 
