@@ -103,10 +103,14 @@ and who it is for, and a design decision that cannot be derived from them belong
   with this" in the other. React Native's polyfill may put the credentials on the wire; mirroring
   keeps that the platform's behaviour, and `todo.md` carries the unanswered question of what it
   actually does. It ships in a minor on the precedent of the entry above, being the security fix
-  itself. Matching on `://` leaves a runtime that quotes bare `user:pass@host` unredacted, and
-  matching to the last `@` before a `/?#` loses the host of a url with an address glued to it
-  (`https://api.test,mail@example.com`), which is the safe direction. Valid while `log.fetch` is
-  a drop-in for the runtime's `fetch` and a runtime quotes the url with its scheme.
+  itself. Matching runs from `//` with the scheme optional, because a url a runtime could not
+  parse comes back without one — Node answers `fetch("//user:pass@host/x")` with "Failed to parse
+  URL from //user:pass@host/x". What it costs is over-redaction, always the safe direction: it
+  matches to the last `@` before a `/?#`, so a url with an address glued to it loses its host
+  (`https://api.test,mail@example.com`), and an `@` in a path after a doubled slash redacts as
+  though it were userinfo. A bare `user:pass@host` with no slashes at all stays unredacted. Valid
+  while `log.fetch` is a drop-in for the runtime's `fetch` and a runtime quotes the url with its
+  authority slashes.
 
 ## Working here
 

@@ -369,8 +369,9 @@ function partialRejection(body: unknown): { message?: string, rejected: number }
 	}
 }
 
-// A runtime refusing a credentialed url quotes the whole url into its rejection.
-const URL_USERINFO = /(:\/\/)[^/?#\s]*@/g;
+// A runtime refusing a credentialed url quotes the whole url into its rejection; one it could not
+// parse at all, such as a scheme-relative `//user:pass@host`, comes back without its scheme.
+const URL_USERINFO = /(:?\/\/)[^/?#\s]*@/g;
 
 // error.type per OTel semconv; "_OTHER" is its fallback.
 function spanFailure(error: unknown): { message: string, type: string } {

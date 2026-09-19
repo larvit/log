@@ -1128,6 +1128,8 @@ test("end({ error }) marks the span failed", async t => {
 	// the README documents.
 	await new Log(conf).end({ error: new TypeError("Request cannot be constructed from a URL that includes credentials: http://myuser:hunter2@api.test/x, retried against https://backup:s3cr3t@api.test/x") });
 	await new Log(conf).end({ error: new Error("GET https://api.test/mail@example.com?to=a@b failed") });
+	// Scheme-relative: Node cannot parse one without a base and quotes it back as given.
+	await new Log(conf).end({ error: new TypeError("Failed to parse URL from //myuser:hunter2@api.test/x") });
 
 	t.deepEqual(exportedSpan(0).status, { code: 2, message: "refused" }, "status is ERROR with the error message");
 	t.strictEqual(attr(exportedSpan(0), "error.type"), "ECONNREFUSED", "error.type is the error's code when it has one");
@@ -1142,6 +1144,7 @@ test("end({ error }) marks the span failed", async t => {
 	t.deepEqual(exportedSpan(5).status, { code: 2, message: "_OTHER" }, "a value that cannot be stringified still ends and exports the span");
 	t.deepEqual(exportedSpan(6).status, { code: 2, message: "Request cannot be constructed from a URL that includes credentials: http://REDACTED@api.test/x, retried against https://REDACTED@api.test/x" }, "userinfo is redacted from every url the error message quotes");
 	t.deepEqual(exportedSpan(7).status, { code: 2, message: "GET https://api.test/mail@example.com?to=a@b failed" }, "an @ outside the userinfo position is left alone");
+	t.deepEqual(exportedSpan(8).status, { code: 2, message: "Failed to parse URL from //REDACTED@api.test/x" }, "userinfo is redacted from a scheme-relative url too");
 	t.end();
 });
 
