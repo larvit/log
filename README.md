@@ -19,12 +19,71 @@ browsers and React Native. No OpenTelemetry SDK, no dependencies.
 - **Composable.** Nest instances under a parent, join an upstream trace from a `traceparent` header,
   hand the current context on to any client.
 
-[Install](#install) · [Log something](#log-something) · [Group logs into a trace](#group-logs-into-a-trace) ·
+[Goals](#goals) · [Audience](#audience) · [Install](#install) · [Log something](#log-something) ·
+[Group logs into a trace](#group-logs-into-a-trace) ·
 [Trace outgoing HTTP](#trace-outgoing-http) · [Join an incoming trace](#join-an-incoming-trace) ·
 [Queue exports](#queue-exports) · [Accept a logger in your library](#accept-a-logger-in-your-library) ·
 [Options](#options) ·
 [Output formats](#output-formats) · [`log.fetch` in depth](#logfetch-in-depth) · [Exports](#exports) ·
 [Development](#development) · [Changelog](CHANGELOG.md)
+
+## Goals
+
+Priority order decides a tie.
+
+1. **Runs everywhere.** Node, Bun, Deno, browsers and React Native, on the common JS surface.
+   *Runs* identically; behaves identically too wherever that costs no other goal, and where a
+   runtime genuinely differs the platform wins and the docs say so.
+2. **The telemetry is correct OTLP.** A span or record a backend mis-renders is a broken product.
+   Approximating part of the spec is worse than omitting it.
+3. **A credential never leaves.** Nothing you put in a url, a header or a conf reaches a span, a
+   record or `stderr`.
+4. **A very easy API.** `log.info("msg", { key })` is the whole one-line path. Nobody learns OTLP
+   to log.
+5. **Composable.** Instances nest, inherit, and attach to an upstream trace.
+6. **Low footprint.** Measured on this repo's container image: ≤10 KB gzipped, ≤50 ns for a call
+   below `logLevel`, ≤2 µs for a console call, ≤10 µs with OTLP configured, ≤1 KB per instance,
+   ≤1.5 KB per queued record, ≤1.5 MiB for a full 1000-item queue.
+
+**`log.fetch` mirrors the runtime's `fetch`.** It accepts what that `fetch` accepts, and the
+response, the rejection and the promise you see are exactly what it produced. What it adds is
+outbound trace context and a span — never a request the platform would not have made, and never a
+success the platform would have refused.
+
+**Metrics travel, they do not accumulate.** Any OTLP metric shape — gauge, delta or cumulative sum,
+histogram — may be handed over already aggregated, and this library encodes, batches and delivers
+it; the types say what a valid point must carry. Keeping a running total, a stable
+`startTimeUnixNano` and bucket boundaries that match across a series is the caller's, so
+instruments, temporality conversion and periodic collection stay out. Not implemented yet.
+
+**What earns a place here:** it fits the budget above, it can be implemented to the spec and kept
+there, and it stays off the one-line path.
+
+## Audience
+
+Public npm consumers. Three readers, in order:
+
+1. **The app developer** wiring logs and traces into a service or an app.
+2. **The library author** accepting a `Logger` from their consumer.
+3. **The person reading the telemetry** in Grafana, Tempo or Loki, who never installs the package
+   and is who span names and attribute shapes are for.
+
+A mobile app on cellular with offline periods is a primary target, equal to a server: the export
+queue survives app restarts through a `storage` adapter, and a full one holds about 1.1 MiB.
+
+**Runtimes.** Anything with global `fetch`, `TextEncoder` and `btoa`. CI proves Node 18 to 26 and
+current Chromium. React Native is supported from 0.74, where Hermes gained `TextEncoder` and
+`btoa`. Deno and Bun meet the rule and are not in CI.
+
+**Rely on** semver read strictly — a minor only adds, and your code, data and config survive it.
+Every breaking change is deprecated in a 2.x minor first and lands in the next major with a
+`MIGRATION.md` entry. The `format: "json"` output, the exported types, `log.conf`
+and `log.span` are contracts.
+
+**Do not rely on** the text output line, which is written for people to read — parse
+`format: "json"` instead. Nor on delivery: the export queue is best-effort, it keeps what `storage`
+accepted and drops the oldest past `maxItems`, because telemetry is not payload data. A major stops
+being maintained when the next one ships.
 
 ## Install
 
