@@ -18,7 +18,9 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
   `captureQuery` already takes the other stance — opt in to capture, and `SENSITIVE_QUERY_KEYS`
   still redacts the value — so the allow-lists disagree with each other. Decide whether a
   known-sensitive header name (`authorization`, `proxy-authorization`, `cookie`, `set-cookie`)
-  records `REDACTED` like a query key does, or is rejected outright.
+  records `REDACTED` like a query key does, or is rejected outright. Settle the query values in
+  the same item: with `captureQuery` on, a credentialed url nested in one survives into
+  `url.full` percent-encoded, since only the key is matched against `SENSITIVE_QUERY_KEYS`.
 - [ ] Decide what to do about Basic credentials sent over plain `http:` to a non-loopback host,
   now that they are really sent: anything on the network path can read them (CWE-319). Either warn
   once per `report` sink when the endpoint is `http:` and carries userinfo, or require `https:`

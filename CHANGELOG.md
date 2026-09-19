@@ -19,8 +19,8 @@
   browsers refuse the url outright. `log.fetch` mirrors whatever the runtime does, so it cannot
   close this. Nothing about it reaches your tracing backend — `url.full` never holds userinfo —
   so there is nothing to rotate on account of this library; the exposure is the network path to
-  the host, in the clear over `http:`. Pass an `Authorization` header, and strip userinfo from a
-  url you did not build.
+  the host, in the clear if that url is `http:`. Pass an `Authorization` header, and strip
+  userinfo from a url you did not build.
 - `log.fetch` traces only a URL that resolves to `http:` or `https:`; anything else is fetched
   untraced — no span, and no `traceparent` sent. It used to export a span whose `url.full` held
   whatever the url did: written without `//`, a url parses to an opaque path, so
