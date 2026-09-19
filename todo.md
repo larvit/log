@@ -5,12 +5,19 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
 
 ## Security
 
-- [ ] Keep a header named in `captureRequestHeaders` from exporting a credential: a consumer who
-  lists `authorization` puts the raw token on every client span, against Goals' "nothing you put
-  in a url, a header or a conf reaches a span". `captureQuery` already takes the other stance —
-  opt in to capture, and `SENSITIVE_QUERY_KEYS` still redacts the value — so the two allow-lists
-  disagree. Decide whether a known-sensitive header name (`authorization`, `proxy-authorization`,
-  `cookie`, `set-cookie`) records `REDACTED` like a query key does, or is rejected outright.
+- [ ] Verify on React Native 0.74+ whether `log.fetch` puts a url's userinfo on the wire, where
+  Node and browsers refuse the url, and replace the "may" in the README and the CHANGELOG with
+  what it does. Unverified since the span leak was fixed, and a consumer cannot tell from "may"
+  whether to rotate a credential or to change their code. Deciding not to verify is an answer
+  too: say so in the `AGENTS.md` decision entry instead of leaving "unverified" reading as
+  pending.
+- [ ] Keep a header named in `captureRequestHeaders` or `captureResponseHeaders` from exporting a
+  credential: a consumer who lists `authorization` or `set-cookie` puts the raw token on every
+  client span, against Goals' "nothing you put in a url, a header or a conf reaches a span".
+  `captureQuery` already takes the other stance — opt in to capture, and `SENSITIVE_QUERY_KEYS`
+  still redacts the value — so the allow-lists disagree with each other. Decide whether a
+  known-sensitive header name (`authorization`, `proxy-authorization`, `cookie`, `set-cookie`)
+  records `REDACTED` like a query key does, or is rejected outright.
 - [ ] Decide what to do about Basic credentials sent over plain `http:` to a non-loopback host,
   now that they are really sent: anything on the network path can read them (CWE-319). Either warn
   once per `report` sink when the endpoint is `http:` and carries userinfo, or require `https:`
@@ -86,6 +93,9 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
 - [ ] Report a 401 or 403 export as `OTLP export unauthorized, batch dropped`, not as the generic
   rejection. Working auth makes a wrong credential reachable for the first time, and it is the
   likeliest misconfiguration of `otlpHttpBaseURI` userinfo; today it reads as any other 4xx.
+- [ ] Move the decision log out of `AGENTS.md` into `docs/decisions.md`, leaving a one-line index
+  of the titles behind, per the org-wide documentation rule. It is ~100 lines of reasoning in a
+  file every session loads whole.
 - [ ] Pin every Node base image to its full patch version, so one commit builds one image on any
   day. Three places float: `ARG BASE_IMAGE=node:24-bookworm-slim` in the `Dockerfile`,
   `${NODE_IMAGE:-node:22-bookworm-slim}` in `test-docker`, and the major-only `node-version`

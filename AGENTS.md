@@ -89,22 +89,24 @@ and who it is for, and a design decision that cannot be derived from them belong
   telemetry for urls nobody traces over the network: the timing and status of those spans were
   right, their `url.full` (`nulluser:pass@host/x`, `https://example.comhttps://example.com/uuid`)
   was not. Valid while `url.full` is built from `origin` + `pathname`.
-
 - 2026-09-20: a `log.fetch` url carrying userinfo reaches the runtime's `fetch` untouched, and
-  `spanFailure` redacts the userinfo out of any url the error message quotes. It sits there, not at
-  the `log.fetch` call site, because the same rejection reaches a second span through
+  `spanFailure` redacts the userinfo out of any url the error message quotes. It sits there, not
+  at the `log.fetch` call site, because the same rejection reaches a second span through
   `end({ error })` — the handler pattern the README documents — and a caller's own `fetch`
   rejection arrives by that route too; one redaction where an error becomes a span status covers
   every sink, where a `url.username || url.password` test at the call site covered one. Turning
-  the userinfo into an
-  `Authorization: Basic` header, as `otlpHttpBaseURI` does with the same spelling, is what README →
-  Goals forbids of `log.fetch`: "never a request the platform would not have made, and never a
-  success the platform would have refused". The two spellings differ because the queue's endpoint
-  is this library's own request to make, where `log.fetch`'s is the caller's, so the same string
-  means "authenticate me" in one and "mirror what my runtime does with this" in the other.
-  React Native's polyfill may put the credentials on the wire; mirroring keeps that the platform's
-  behaviour, unverified and documented as such. Valid while `log.fetch` is a drop-in for the
-  runtime's `fetch`.
+  the userinfo into an `Authorization: Basic` header, as `otlpHttpBaseURI` does with the same
+  spelling, is what README → Goals forbids of `log.fetch`: "never a request the platform would
+  not have made, and never a success the platform would have refused". The two spellings differ
+  because the queue's endpoint is this library's own request to make, where `log.fetch`'s is the
+  caller's, so the same string means "authenticate me" in one and "mirror what my runtime does
+  with this" in the other. React Native's polyfill may put the credentials on the wire; mirroring
+  keeps that the platform's behaviour, and `todo.md` carries the unanswered question of what it
+  actually does. It ships in a minor on the precedent of the entry above, being the security fix
+  itself. Matching on `://` leaves a runtime that quotes bare `user:pass@host` unredacted, and
+  matching to the last `@` before a `/?#` loses the host of a url with an address glued to it
+  (`https://api.test,mail@example.com`), which is the safe direction. Valid while `log.fetch` is
+  a drop-in for the runtime's `fetch` and a runtime quotes the url with its scheme.
 
 ## Working here
 
