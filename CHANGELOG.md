@@ -10,8 +10,7 @@
   is exported as `http://REDACTED@host/x`. On Node and in browsers `fetch` refuses a url carrying
   credentials and quotes the whole url into its `TypeError`, which reached the backend both as the
   `log.fetch` span's own status and, once you caught that rejection and forwarded it, as
-  `end({ error })` on the span around it. The rejection reaching the caller is unchanged, and
-  `url.full` never held them.
+  `end({ error })` on the span around it. The rejection reaching the caller is unchanged.
   **If you have called `log.fetch` with a `user:pass@` url on Node or in a browser, rotate those
   credentials**: they are in your tracing backend, on every span whose status message quotes the
   url.

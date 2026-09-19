@@ -1126,7 +1126,7 @@ test("end({ error }) marks the span failed", async t => {
 	await new Log(conf).end({ error: Object.create(null) });
 	// The rejection a runtime hands back for a credentialed url, forwarded by the handler pattern
 	// the README documents.
-	await new Log(conf).end({ error: new TypeError("Request cannot be constructed from a URL that includes credentials: http://myuser:hunter2@api.test/x") });
+	await new Log(conf).end({ error: new TypeError("Request cannot be constructed from a URL that includes credentials: http://myuser:hunter2@api.test/x, retried against https://backup:s3cr3t@api.test/x") });
 	await new Log(conf).end({ error: new Error("GET https://api.test/mail@example.com?to=a@b failed") });
 
 	t.deepEqual(exportedSpan(0).status, { code: 2, message: "refused" }, "status is ERROR with the error message");
@@ -1140,7 +1140,7 @@ test("end({ error }) marks the span failed", async t => {
 	t.notOk(attr(exportedSpan(3), "error.type"), "no error.type without an error");
 	t.deepEqual(exportedSpan(4).status, { code: 0 }, "end({ error: null }) leaves the span ok, for callback-style errors");
 	t.deepEqual(exportedSpan(5).status, { code: 2, message: "_OTHER" }, "a value that cannot be stringified still ends and exports the span");
-	t.deepEqual(exportedSpan(6).status, { code: 2, message: "Request cannot be constructed from a URL that includes credentials: http://REDACTED@api.test/x" }, "userinfo in a url the error message quotes is redacted");
+	t.deepEqual(exportedSpan(6).status, { code: 2, message: "Request cannot be constructed from a URL that includes credentials: http://REDACTED@api.test/x, retried against https://REDACTED@api.test/x" }, "userinfo is redacted from every url the error message quotes");
 	t.deepEqual(exportedSpan(7).status, { code: 2, message: "GET https://api.test/mail@example.com?to=a@b failed" }, "an @ outside the userinfo position is left alone");
 	t.end();
 });
@@ -1423,9 +1423,10 @@ test("log.fetch keeps a url's credentials off the exported span", async t => {
 	const span = clientSpan(calls);
 	const urlFull = span.attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue;
 
+	// Red here means the runtime stopped quoting the credential: drop this line, keep the rest.
 	t.ok(rejection.includes("hunter2"), "the runtime's own rejection, credentials and all, reaches the caller");
-	t.ok(!JSON.stringify(span).includes("hunter2"), "the password is nowhere on the span");
-	t.ok(!JSON.stringify(span).includes("myuser"), "the username is nowhere on the span");
+	t.ok(!JSON.stringify(calls).includes("hunter2"), "the password reaches nothing the collector is sent");
+	t.ok(!JSON.stringify(calls).includes("myuser"), "the username reaches nothing the collector is sent");
 	t.strictEqual(urlFull, "http://127.0.0.1:45231/x", "url.full keeps the url without the userinfo");
 	t.strictEqual(span.status.code, 2, "the span is ERROR");
 	// The wording around it differs between Node and the browser; the redaction does not.

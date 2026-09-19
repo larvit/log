@@ -369,8 +369,7 @@ function partialRejection(body: unknown): { message?: string, rejected: number }
 	}
 }
 
-// Userinfo in a url an error message quotes: a runtime refusing a credentialed url puts the whole
-// url in its rejection, and that message becomes a span status the queue exports.
+// A runtime refusing a credentialed url quotes the whole url into its rejection.
 const URL_USERINFO = /(:\/\/)[^/?#\s]*@/g;
 
 // error.type per OTel semconv; "_OTHER" is its fallback.

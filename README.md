@@ -166,8 +166,8 @@ timing and is exported by `end()`.
 `end()` closes the span, queues it and flushes the [export queue](#queue-exports); a span that is
 never ended is never sent. `end({ error })` also marks the span failed: status `ERROR` with the
 error's message, and an `error.type` attribute from its `code`, else `name`; a `null` or `undefined`
-error is a plain `end()`. Userinfo in a url the message quotes becomes `REDACTED`, so a rejection
-you catch and forward carries no credential onto the span. A logged `log.error()` never fails the span; a recovered error is not a
+error is a plain `end()`. Userinfo in a url the message quotes becomes `REDACTED`, so a
+rejection you catch and forward carries no credential onto the span. A logged `log.error()` never fails the span; a recovered error is not a
 failed operation. `await` it when delivery must complete before the process exits (a short-lived
 script); fire-and-forget is fine in a long-running process. Against a dead collector `await end()`
 returns after one failed attempt, within about 3 s plus however long any un-awaited `log.fetch()`
@@ -381,9 +381,9 @@ them per call site.
 
 Never put credentials in the url; pass an `Authorization` header, and strip userinfo from a url you
 did not build. `log.fetch` mirrors the runtime, which on Node and in browsers refuses such a url
-and on React Native, whose `fetch` is an `XMLHttpRequest` polyfill, may send them instead. The span
-carries neither: `url.full` drops the userinfo, and the rejection quoting the url reaches the
-span's status message as `http://REDACTED@host/x`.
+and on React Native, whose `fetch` is an `XMLHttpRequest` polyfill, may send them instead. Neither
+the username nor the password reaches the span: `url.full` drops the userinfo, and the rejection
+quoting the url reaches the status message as `http://REDACTED@host/x`.
 
 Spans are queued when the response arrives and are registered with `flush()` at call time, so
 `await log.end()` delivers a `log.fetch()` you never awaited.
