@@ -2,18 +2,26 @@
 
 ## Unreleased
 
-- Not fixed: on React Native, whose `fetch` is an `XMLHttpRequest` polyfill,
-  `log.fetch("https://user:pass@host/x")` may put those credentials on the wire where Node and
-  browsers refuse the url outright. `log.fetch` mirrors whatever the runtime does, so it cannot
-  close this. Pass an `Authorization` header, and strip userinfo from a url you did not build.
+### Security
+
 - A span's status message no longer carries url credentials: userinfo in a url the message quotes
   is exported as `http://REDACTED@host/x`. On Node and in browsers `fetch` refuses a url carrying
   credentials and quotes the whole url into its `TypeError`, which reached the backend both as the
   `log.fetch` span's own status and, once you caught that rejection and forwarded it, as
-  `end({ error })` on the span around it. The rejection reaching the caller is unchanged.
-  **If you have called `log.fetch` with a `user:pass@` url on Node or in a browser, rotate those
-  credentials**: they are in your tracing backend, on every span whose status message quotes the
-  url.
+  `end({ error })` on the span around it. The rejection reaching the caller is unchanged;
+  `log.span.status.message` now shows the redacted text, and `error.type` is untouched.
+  **If any url you fetched carried `user:pass@`, on Node or in a browser, and the rejection
+  reached a span — from `log.fetch`, or from any error you passed to `end({ error })`, your own
+  `fetch` included — rotate those credentials**: search your tracing backend's span status
+  messages for `includes credentials`, the phrase Node and Chromium both use, or for `@` beside
+  your own hostname.
+- Not fixed: on React Native, whose `fetch` is an `XMLHttpRequest` polyfill,
+  `log.fetch("https://user:pass@host/x")` may put those credentials on the wire where Node and
+  browsers refuse the url outright. `log.fetch` mirrors whatever the runtime does, so it cannot
+  close this. Nothing about it reaches your tracing backend — `url.full` never holds userinfo —
+  so there is nothing to rotate on account of this library; the exposure is the network path to
+  the host, in the clear over `http:`. Pass an `Authorization` header, and strip userinfo from a
+  url you did not build.
 - `log.fetch` traces only a URL that resolves to `http:` or `https:`; anything else is fetched
   untraced — no span, and no `traceparent` sent. It used to export a span whose `url.full` held
   whatever the url did: written without `//`, a url parses to an opaque path, so
@@ -28,6 +36,9 @@
   whatever collects your `stderr`, findable by searching it for your collector's hostname. The URI
   stays on `log.conf` and `queue.conf` as you gave it, so don't log your `conf`. Percent-encode any
   `/ ? #` in a password, and a literal `%` as `%25`.
+
+### Everything else
+
 - An `otlpHttpBaseURI` that is not `http:` or `https:` is rejected in the constructor, where
   `otlp:collector.example.com` used to build a queue that could never export. Written without
   `//`, such a URI parses to an opaque path, which put any `user:pass@` in it straight back into
