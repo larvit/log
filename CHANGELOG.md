@@ -2,12 +2,17 @@
 
 ## Unreleased
 
-- Not fixed: `log.fetch("https://user:pass@host/x")` exposes those credentials. On Node and in
-  browsers `fetch` refuses a url carrying them and quotes the whole url into its `TypeError`, which
-  becomes the span's status message; React Native, whose `fetch` is an `XMLHttpRequest` polyfill,
-  may send them instead. Pass an `Authorization` header, and strip userinfo from a url you did not
-  build. **If you have done this on Node or in a browser, rotate those credentials**: they are in
-  your tracing backend, on every span whose status message quotes the url.
+- Not fixed: on React Native, whose `fetch` is an `XMLHttpRequest` polyfill,
+  `log.fetch("https://user:pass@host/x")` may put those credentials on the wire where Node and
+  browsers refuse the url outright. `log.fetch` mirrors whatever the runtime does, so it cannot
+  close this. Pass an `Authorization` header, and strip userinfo from a url you did not build.
+- `log.fetch` no longer puts a url's credentials on the exported span. On Node and in browsers
+  `fetch` refuses a url carrying them and quotes the whole url into its `TypeError`, which became
+  the span's status message; that message is now `error message withheld: the request url carries
+  credentials`. The rejection reaching the caller is unchanged, and `url.full` never held them.
+  **If you have called `log.fetch` with a `user:pass@` url on Node or in a browser, rotate those
+  credentials**: they are in your tracing backend, on every span whose status message quotes the
+  url.
 - `log.fetch` traces only a URL that resolves to `http:` or `https:`; anything else is fetched
   untraced — no span, and no `traceparent` sent. It used to export a span whose `url.full` held
   whatever the url did: written without `//`, a url parses to an opaque path, so

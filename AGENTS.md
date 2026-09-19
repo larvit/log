@@ -90,6 +90,17 @@ and who it is for, and a design decision that cannot be derived from them belong
   right, their `url.full` (`nulluser:pass@host/x`, `https://example.comhttps://example.com/uuid`)
   was not. Valid while `url.full` is built from `origin` + `pathname`.
 
+- 2026-09-20: a `log.fetch` url carrying userinfo reaches the runtime's `fetch` untouched, and the
+  span drops the rejection message instead of quoting it. Turning the userinfo into an
+  `Authorization: Basic` header, as `otlpHttpBaseURI` does with the same spelling, is what README →
+  Goals forbids of `log.fetch`: "never a request the platform would not have made, and never a
+  success the platform would have refused". The two spellings differ because the queue's endpoint
+  is this library's own request to make, where `log.fetch`'s is the caller's, so the same string
+  means "authenticate me" in one and "mirror what my runtime does with this" in the other.
+  React Native's polyfill may put the credentials on the wire; mirroring keeps that the platform's
+  behaviour, unverified and documented as such. Valid while `log.fetch` is a drop-in for the
+  runtime's `fetch`.
+
 ## Working here
 
 - Source is a single `index.ts`, compiled + uglified to `index.js` for publish.

@@ -1153,6 +1153,8 @@ export class Queue implements OtlpQueue {
 // default deny-list of the official OTel HTTP instrumentations. Matched case-insensitively.
 const SENSITIVE_QUERY_KEYS = new Set(["awsaccesskeyid", "signature", "sig", "x-goog-signature"]);
 
+const CREDENTIALED_URL_STATUS = "error message withheld: the request url carries credentials";
+
 // The URL log.fetch traces: a scheme written without "//" parses to an opaque path, where
 // userinfo, or a data: payload, sits in pathname and would ride into url.full.
 function traceableUrl(input: string | URL): URL | undefined {
@@ -1486,7 +1488,9 @@ export class Log implements LogInt {
 		} catch (err) {
 			const failure = spanFailure(err);
 
-			span.status = { code: 2, message: failure.message };
+			// A runtime that refuses a credentialed url quotes the whole url into its rejection, so
+			// that message would ship the password to the tracing backend.
+			span.status = { code: 2, message: url.username || url.password ? CREDENTIALED_URL_STATUS : failure.message };
 			context["error.type"] = failure.type;
 
 			throw err;
