@@ -10,11 +10,10 @@
   `log.fetch` span's own status and, once you caught that rejection and forwarded it, as
   `end({ error })` on the span around it. The rejection reaching the caller is unchanged;
   `log.span.status.message` now shows the redacted text, and `error.type` is untouched.
-  **If any url you fetched carried `user:pass@`, on Node or in a browser, and the rejection
-  reached a span — from `log.fetch`, or from any error you passed to `end({ error })`, your own
-  `fetch` included — rotate those credentials**: search your tracing backend's span status
-  messages for `includes credentials`, the phrase Node and Chromium both use, or for `@` beside
-  your own hostname.
+  **Rotate any credential you put in a url you fetched on Node or in a browser**, whether through
+  `log.fetch` or through an error you passed to `end({ error })`, your own `fetch` included.
+  Search your tracing backend's span status messages for `includes credentials`, the phrase Node
+  and Chromium both use, or for `@` beside your own hostname.
 - Not fixed: on React Native, whose `fetch` is an `XMLHttpRequest` polyfill,
   `log.fetch("https://user:pass@host/x")` may put those credentials on the wire where Node and
   browsers refuse the url outright. `log.fetch` mirrors whatever the runtime does, so it cannot

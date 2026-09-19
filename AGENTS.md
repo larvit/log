@@ -113,8 +113,8 @@ and who it is for, and a design decision that cannot be derived from them belong
 - Source is a single `index.ts`, compiled + uglified to `index.js` for publish.
 - A done `todo.md` item leaves the file, reworded for the consumer into `CHANGELOG.md` under
   `## Unreleased`; the `[x]` items still in the file are debt for a separate chunk.
-- A release section leads with `### Security`, holding what a consumer must act on — a rotation
-  advisory, an exposure still open — ahead of `### Everything else`. Thirty flat bullets is where
-  a rotation notice goes unread.
+- A release section with anything a consumer must act on — a rotation advisory, an exposure still
+  open — leads with `### Security` holding it, ahead of `### Everything else`; one with none omits
+  both headings. Thirty flat bullets is where a rotation notice goes unread.
 - Tests-first. The suite (`test.ts`) injects `stdout`/`stderr` and stubs the global `fetch`, so the same tests cover console + OTLP in both Node and the browser.
 - See [README](README.md) for build/test/release commands. Keep the README and this file in sync with any priority or workflow change.

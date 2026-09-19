@@ -167,7 +167,7 @@ timing and is exported by `end()`.
 never ended is never sent. `end({ error })` also marks the span failed: status `ERROR` with the
 error's message, and an `error.type` attribute from its `code`, else `name`; a `null` or `undefined`
 error is a plain `end()`. Userinfo in a url the message quotes becomes `REDACTED`; nothing else in
-the message is redacted, so keep a token out of one. A logged `log.error()` never fails the
+the message is, so keep a token out of an error message. A logged `log.error()` never fails the
 span; a recovered error is not a failed operation. `await` it when delivery must complete before the
 process exits (a short-lived script); fire-and-forget is fine in a long-running process. Against a
 dead collector `await end()` returns after one failed attempt, within about 3 s plus however long
