@@ -94,6 +94,11 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
 - [ ] Report a 401 or 403 export as `OTLP export unauthorized, batch dropped`, not as the generic
   rejection. Working auth makes a wrong credential reachable for the first time, and it is the
   likeliest misconfiguration of `otlpHttpBaseURI` userinfo; today it reads as any other 4xx.
+- [ ] Settle one marker for a CHANGELOG entry a consumer must act on, and record it in the
+  `AGENTS.md` line beside `### Security`. Two spellings exist: the `**Breaking:**` prefix `v2.0.0`
+  uses, and the `### Security` grouping. Neither covers a deprecation, so `entryFormatter` and the
+  `new Log("debug")` shorthand tell a consumer their code stops working in 3.0.0 from inside
+  `### Everything else`, unmarked.
 - [ ] Move the decision log out of `AGENTS.md` into `docs/decisions.md`, leaving a one-line index
   of the titles behind, per the org-wide documentation rule. It is ~100 lines of reasoning in a
   file every session loads whole.
