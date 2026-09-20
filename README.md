@@ -380,8 +380,9 @@ message. The response or error reaches the caller unchanged. Bodies are never ca
 them per call site.
 
 Never put credentials in the url; pass an `Authorization` header, and strip userinfo from a url you
-did not build. `log.fetch` mirrors the runtime, which on Node and in browsers refuses such a url
-and on React Native, whose `fetch` is an `XMLHttpRequest` polyfill, may send them instead.
+did not build. `log.fetch` mirrors the runtime: Node and browsers refuse such a url, while React
+Native's `XMLHttpRequest` polyfill hands it to the platform untouched, where iOS answers the
+server's auth challenge with those credentials and Android sends none, leaving you the 401.
 `url.full` never holds the userinfo, and a rejection quoting the url reaches the status message as
 `http://REDACTED@host/x` — a redaction of what the runtime wrote, not a guarantee. `REDACTED` does
 not always stand for a credential either: an address glued to a host, as in

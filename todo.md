@@ -5,13 +5,6 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
 
 ## Security
 
-- [ ] Verify on React Native 0.74+ whether `log.fetch` puts a url's userinfo on the wire, where
-  Node and browsers refuse the url, and replace the "may" in the README and the CHANGELOG with
-  what it does. Unverified since the span leak was fixed, and a consumer cannot tell from "may"
-  whether to rotate a credential or to change their code. Deciding not to verify is an answer
-  too: say so in the `AGENTS.md` decision entry instead of leaving the question open. Before the
-  release ships, edit the CHANGELOG bullet in place; after, write a new entry naming the one it
-  supersedes and leave that where it is.
 - [ ] Keep a header named in `captureRequestHeaders` or `captureResponseHeaders` from exporting a
   credential: a consumer who lists `authorization` or `set-cookie` puts the raw token on every
   client span, against Goals' "nothing you put in a url, a header or a conf reaches a span".
