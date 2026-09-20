@@ -1160,17 +1160,23 @@ export class Queue implements OtlpQueue {
 const SENSITIVE_QUERY_KEYS = new Set(["awsaccesskeyid", "signature", "sig", "x-goog-signature"]);
 
 // A url nested in a captured value is normally percent-encoded, which hides the `//` and `@`
-// URL_USERINFO looks for, so the decoded spelling is tested too. A hit drops the whole value rather
-// than splicing REDACTED in, because the encoding is the caller's and rewriting inside it would
-// report something they never sent.
+// URL_USERINFO looks for, so the decoded spelling is tested too. Run by run, never the whole
+// string: decodeURIComponent throws on the first invalid escape, so one stray `%` elsewhere in a
+// header — `&state=a%b` — would otherwise hide a credential encoded correctly beside it.
+function percentDecoded(value: string): string {
+	return value.replace(/(?:%[0-9A-Fa-f]{2})+/g, run => {
+		try {
+			return decodeURIComponent(run);
+		} catch {
+			return run; // A valid-looking run can still be a truncated or lone-surrogate sequence.
+		}
+	});
+}
+
+// A hit drops the whole value rather than splicing REDACTED in, because the encoding is the
+// caller's and rewriting inside it would report something they never sent.
 function capturedValue(value: string): string {
-	let decoded = value;
-
-	try {
-		decoded = decodeURIComponent(value);
-	} catch { /* not percent-encoded; the raw test below is the whole answer */ }
-
-	return holdsUserinfo(value) || holdsUserinfo(decoded) ? "REDACTED" : value;
+	return holdsUserinfo(value) || holdsUserinfo(percentDecoded(value)) ? "REDACTED" : value;
 }
 
 // The URL log.fetch traces: a scheme written without "//" parses to an opaque path, where
