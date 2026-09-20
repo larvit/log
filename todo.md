@@ -22,22 +22,27 @@ two of its sub-items are free only until this release publishes.
 ### Security
 
 - [ ] Keep a credential written into `spanName` off the span, or say in README → Goals that it may
-  stay. `conf.spanName` reaches `span.name` (`index.ts:1376`), the scope name every exported span
-  carries (`index.ts:440`) and, under `printTraceInfo`, the console line (`index.ts:1573`) — and
-  through the constructor's inheritance loop (`index.ts:1292`), which does not skip it, all three
+  stay. `conf.spanName` reaches `span.name` (`index.ts:1375`), the scope name every exported span
+  carries (`index.ts:440`) and, under `printTraceInfo`, the console line (`index.ts:1572`) — and
+  through the constructor's inheritance loop (`index.ts:1291`), which does not skip it, all three
   for every child as well, plus each child's public `conf`. No rule anywhere touches it.
   `new Log({ spanName: "GET " + req.url })` is the same accident `url.full` is guarded against, and
   Goal 3 binds it as written — "nothing you put in a url, a header or a **conf** may reach a
   span" — because its exemption names the message and metadata, not a conf key. Either redact it
   the way a captured value is redacted, or extend that exemption to caller-authored telemetry
   labels, which is a goal edit and so the human's: README → Options advertises `spanName` as
-  inherited, which argues it is a propagating label rather than a url. Whichever way it goes
-  decides whether the credential region can name a closed set of routes, and how wide a rotation
-  advisory would have to reach.
+  inherited, which argues it is a propagating label rather than a url. The axis settles more than
+  `spanName`: `context` is read as exempt below (it is metadata) while being just as much a conf
+  key, and an allow-listed header or query value that simply **is** a secret — `x-api-key`, a
+  signed token — is exported as sent, which README → `log.fetch` in depth calls permanent and no
+  item tracks. Say whether the exemption covers caller-authored telemetry payload or merely what is
+  not a conf key, and all of them fall out together; the `spanName` row in README → Options is then
+  worded to match. Whichever way it goes decides whether the credential region can name a closed
+  set of routes, and how wide a rotation advisory would have to reach.
 - [ ] Keep a presigned url's credentials out of `url.full`. With `captureQuery` on, a url signed
   the way every AWS presigned url has been since 2014 exports its signature, the access key id
   carried inside `X-Amz-Credential`, and a live session token inside `X-Amz-Security-Token`.
-  `SENSITIVE_QUERY_KEYS` (`index.ts:1188`) catches none of them: it mirrors OTel semconv's default
+  `SENSITIVE_QUERY_KEYS` (`index.ts:1187`) catches none of them: it mirrors OTel semconv's default
   deny-list, which is the SigV2/Azure-era one, so it covers `AWSAccessKeyId`, `Signature`, `sig`
   and `X-Goog-Signature` and stops there. Google's own V4 `X-Goog-Credential` is missed too.
   Semconv's list is a default and not a maximum, so catching more breaks no spec, and the
@@ -70,7 +75,7 @@ two of its sub-items are free only until this release publishes.
   expected*, because every call site carries its field number and a pinned real Collector checks
   the result. Comment volume is not the problem; rules with no home are. Each sub-item below is its
   own chunk, ordered so the earlier ones make the later ones readable:
-  - [ ] A file map that is true. Five banners cover 1637 lines and the first stands at
+  - [ ] A file map that is true. Five banners cover 1636 lines and the first stands at
     `index.ts:447`, so the 446 lines before it — the exported types, `LogLevels`, the formatters,
     the trace-id and `traceparent` helpers, and the OTLP payload builders — carry none. A reader
     scrolling up to learn where they are is told nothing until they reach the top of the file.
@@ -96,8 +101,8 @@ two of its sub-items are free only until this release publishes.
     already subtracted its bytes and removed it from the queue. Silent loss, no report line.
     Publishing freezes `OtlpPayload` and `OtlpQueue` as consumer contracts.
   - [ ] No comment that restates the code beneath it. Five or more readers each named
-    `index.ts:1385-1386` (whose second line is contradicted by the merge rules three lines below
-    it), `index.ts:1287`, `index.ts:1568`, and the "kept out of the class so it is trivially
+    `index.ts:1384-1385` (whose second line is contradicted by the merge rules three lines below
+    it), `index.ts:1286`, `index.ts:1567`, and the "kept out of the class so it is trivially
     testable" half of `index.ts:383` and `index.ts:417`. The `Not pure — it mutates span` half of
     that last one earns its place and stays.
   - [ ] What is *not* redacted said beside the code that does not redact it. `buildLogPayload`
@@ -106,7 +111,7 @@ two of its sub-items are free only until this release publishes.
     is half the answer to "where did this password come from?" and it lives only in a 27 KB README.
 - [ ] Survive a `logLevel` the union does not contain. `new Log({ logLevel: "trace" })` throws
   `TypeError: Cannot read properties of undefined (reading 'severityNumber')` on `log.info()` and
-  on all five other level methods, because `enabled()` (`index.ts:1548`) indexes `LogLevels` with
+  on all five other level methods, because `enabled()` (`index.ts:1547`) indexes `LogLevels` with
   it and `log()` gates on `enabled()`. TypeScript rejects the literal; the README's own examples
   are JavaScript, where nothing does, and `LOG_LEVEL=trace` (pino) or `http` (winston) is the
   obvious input. 2.4.0 is also the release adding `enabled()` as the guard README → Accept a logger
@@ -114,7 +119,7 @@ two of its sub-items are free only until this release publishes.
   logging dependency killing the process over a one-word config mistake is the thing to end;
   `msgTextFormatter` already treats the same class of input as reachable.
 - [ ] Make `traceparent` behave the way the option and the README both say it does — edge-only, not
-  inherited by clones or children. The constructor's inheritance loop (`index.ts:1292`) skips only
+  inherited by clones or children. The constructor's inheritance loop (`index.ts:1291`) skips only
   what `otlpKeysNotToInherit` returns, so it copies the parent's `traceparent` onto the child's
   conf, while `clone()`'s separate skip set excludes it correctly: the two loops disagree. The
   child's own span is right, so nothing is visibly wrong until the conf is spread — a spelling this
@@ -160,7 +165,7 @@ two of its sub-items are free only until this release publishes.
   record carries the trace's sampled flag as data, and the log pipeline exports it regardless — the
   flag tells the backend how to link the record, not whether to keep it. So dropping the *span* on
   that flag is plainly right, and dropping the *records* is a choice this library made on its own,
-  in `log()` (`index.ts:1577`), which returns before the enqueue whenever `sampled` is false.
+  in `log()` (`index.ts:1576`), which returns before the enqueue whenever `sampled` is false.
 
   *The two answers.* **Export records always, and let only spans obey the flag** — this is what
   2.3.0 did, so it is additive and safe in a minor, and you keep your error logs for unsampled

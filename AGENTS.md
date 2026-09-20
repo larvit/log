@@ -158,7 +158,7 @@ and who it is for, and a design decision that cannot be derived from them belong
 
 - Source is a single `index.ts`, compiled + uglified to `index.js` for publish.
 - A done `todo.md` item leaves the file, reworded for the consumer into `CHANGELOG.md` under
-  `## Unreleased`; the `[x]` items still in the file are debt for a separate chunk.
+  `## Unreleased`.
 - A release section with anything a consumer must act on — a rotation advisory, an exposure still
   open — leads with `### Security` holding it, ahead of `### Everything else`; one with none omits
   both headings. Thirty flat bullets is where a rotation notice goes unread.

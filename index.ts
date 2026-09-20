@@ -1153,7 +1153,6 @@ function percentDecoded(value: string): string {
 	});
 }
 
-// One decode pass, so a doubly-encoded url survives — the depth the README promises consumers.
 function capturedValue(value: string): string {
 	// URL_USERINFO cannot match without an `@`, and `%40` is the only escape that decodes to one.
 	if (!value.includes("@") && !value.includes("%40")) {
