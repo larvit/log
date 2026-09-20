@@ -378,8 +378,8 @@ A 4xx/5xx response marks the span errored; a thrown error does too, with its mes
 message. The response or error reaches the caller unchanged. Bodies are never captured.
 `captureQuery` and the header allow-lists are read at call time from the instance; `clone()` to vary
 them per call site. `authorization`, `proxy-authorization`, `cookie` and `set-cookie` record
-`REDACTED` whatever you list them for, and any other captured header value, or kept query value,
-records `REDACTED` in place of the whole value where it holds url userinfo, one layer of
+`REDACTED` whatever you list them for, and any other captured header value, or kept query key or
+value, records `REDACTED` in place of the whole of itself where it holds url userinfo, one layer of
 percent-encoding included. That covers the shapes a credential is recognisable in, not every
 credential: a header whose value simply *is* a secret — `x-api-key`, your own signed token — is
 exported as you sent it, so do not allow-list one.
