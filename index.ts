@@ -1168,7 +1168,10 @@ function percentDecoded(value: string): string {
 		try {
 			return decodeURIComponent(run);
 		} catch {
-			return run; // A valid-looking run can still be a truncated or lone-surrogate sequence.
+			// A run whose bytes are not UTF-8 — a latin-1 encoder's `%C5ke`, a truncated sequence —
+			// would otherwise stay encoded and take the `%2F%2F` glued in front of it along. Nothing
+			// but ASCII spells a url delimiter, so keep those bytes and leave the rest as written.
+			return run.replace(/%([0-9A-Fa-f]{2})/g, (escape, hex: string) => parseInt(hex, 16) < 0x80 ? String.fromCharCode(parseInt(hex, 16)) : escape);
 		}
 	});
 }
