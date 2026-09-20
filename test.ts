@@ -1376,18 +1376,17 @@ test("log.fetch captureQuery keeps the query but redacts known-sensitive keys an
 	const { calls } = stubFetch();
 	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 
-	await log.fetch("https://api.test/x?q=hi&q=there&Signature=abc&next=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&deep=https%253A%252F%252Fmyuser%253Ahunter2%2540cb.test%252Fx&stray=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx%2Cq%zz&latin1=https%3A%2F%2F%C5ke%3Ahunter2%40cb.test%2Fx");
+	await log.fetch("https://api.test/x?q=hi&Signature=abc&Signature=def&next=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&deep=https%253A%252F%252Fmyuser%253Ahunter2%2540cb.test%252Fx&https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fz");
 	await log.end();
 
 	const urlFull = clientSpan(calls).attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue;
 
-	t.ok(urlFull.includes("q=hi&q=there"), "a repeated non-sensitive query param keeps both values");
-	t.ok(urlFull.includes("Signature=REDACTED"), "sensitive query value is redacted");
-	t.ok(!urlFull.includes("abc"), "the sensitive value is not leaked");
+	t.ok(urlFull.includes("q=hi"), "non-sensitive query param is kept");
+	t.ok(urlFull.includes("Signature=REDACTED&Signature=REDACTED"), "a repeated sensitive key keeps one redaction per occurrence");
+	t.ok(!urlFull.includes("abc") && !urlFull.includes("def"), "neither sensitive value is leaked");
 	t.ok(urlFull.includes("next=REDACTED"), "a query value holding url userinfo is redacted whole");
 	t.ok(urlFull.includes("deep=REDACTED"), "one more layer of percent-encoding does not hide it");
-	t.ok(urlFull.includes("stray=REDACTED"), "an invalid escape beside the credential does not hide it");
-	t.ok(urlFull.includes("latin1=REDACTED"), "a non-UTF-8 escape glued to the scheme does not hide it");
+	t.ok(urlFull.includes("REDACTED="), "a credentialed url written as a bare query key is redacted too");
 	t.ok(!urlFull.includes("hunter2"), "the nested password is not leaked");
 	t.end();
 });
@@ -1443,10 +1442,10 @@ test("log.fetch keeps a url's credentials off the exported span", async t => {
 });
 
 test("log.fetch captures allow-listed request and response headers only, never a credential", async t => {
-	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ location: "https://idp.test/authorize?redirect_uri=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&state=a%b", "set-cookie": "sid=hunter2", "x-resp": "rv", "x-secret": "nope" }) }) : undefined);
+	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ location: "https://idp.test/authorize?redirect_uri=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&state=a%b", "set-cookie": "sid=hunter2", "x-callback": "https%3A%2F%2F%C5ke%3Ahunter2%40cb.test%2Fx", "x-resp": "rv", "x-secret": "nope" }) }) : undefined);
 	const log = new Log({
 		captureRequestHeaders: ["Authorization", "referer", "x-req"],
-		captureResponseHeaders: ["location", "set-cookie", "x-resp"],
+		captureResponseHeaders: ["location", "set-cookie", "x-callback", "x-resp"],
 		otlpHttpBaseURI: "http://127.0.0.1:4318",
 		stderr: () => {},
 	});
@@ -1464,6 +1463,7 @@ test("log.fetch captures allow-listed request and response headers only, never a
 	t.strictEqual(attr("http.response.header.x-resp"), "rv", "allow-listed response header captured");
 	t.strictEqual(attr("http.response.header.x-secret"), undefined, "non-listed response header not captured");
 	t.strictEqual(attr("http.response.header.location"), "REDACTED", "percent-encoding a credentialed url into a header does not hide it");
+	t.strictEqual(attr("http.response.header.x-callback"), "REDACTED", "a non-UTF-8 escape run glued to the scheme does not hide it either");
 	t.strictEqual(attr("http.response.header.set-cookie"), "REDACTED", "an allow-listed set-cookie records its presence, not its value");
 	t.ok(!JSON.stringify(calls.filter(call => call.path.startsWith("/v1/"))).includes("hunter2"), "no credential reaches the collector");
 	t.end();

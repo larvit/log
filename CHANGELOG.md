@@ -14,8 +14,9 @@
   recognisable in, not every credential: a header whose value simply *is* a secret, `x-api-key` or
   your own signed token, is exported as you sent it, so don't allow-list one.
   **Rotate any credential you named one of those four headers for, or put in a url you captured in
-  a header or a query string**: search your tracing backend for
-  `http.request.header.authorization`, `http.response.header.set-cookie`, or `%40` in `url.full`.
+  a header or a query string**: search your tracing backend for `http.request.header.authorization`
+  and `http.response.header.set-cookie`, and for `@` or `%40` across `url.full` and
+  `http.request.header.*` / `http.response.header.*`.
 - A span's status message no longer carries url credentials: userinfo in a url the message quotes
   is exported as `http://REDACTED@host/x`. On Node and in browsers `fetch` refuses a url carrying
   credentials and quotes the whole url into its `TypeError`, which reached the backend both as the
@@ -53,6 +54,9 @@
 
 ### Everything else
 
+- With `captureQuery` on, a query key that repeats keeps every occurrence in `url.full`. A repeated
+  known-sensitive key — `?Signature=a&Signature=b` — used to collapse to one `REDACTED`, and could
+  reorder the parameters around it.
 - An `otlpHttpBaseURI` that is not `http:` or `https:` is rejected in the constructor, where
   `otlp:collector.example.com` used to build a queue that could never export. Written without
   `//`, such a URI parses to an opaque path, which put any `user:pass@` in it straight back into

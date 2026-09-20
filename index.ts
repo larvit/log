@@ -369,8 +369,8 @@ function partialRejection(body: unknown): { message?: string, rejected: number }
 	}
 }
 
-// Userinfo in any url the text holds. Scheme-optional: a url a runtime could not parse comes back
-// from it without one, as a scheme-relative `//user:pass@host` does.
+// Userinfo in any url the text holds. The `:` is optional and captured, so a scheme-relative
+// `//user:pass@host` — what a runtime hands back for a url it could not parse — matches too.
 const URL_USERINFO = /(:?\/\/)[^/?#\s]*@/g;
 const redactUserinfo = (text: string) => text.replace(URL_USERINFO, "$1REDACTED@");
 const holdsUserinfo = (text: string) => redactUserinfo(text) !== text;
@@ -1159,26 +1159,24 @@ export class Queue implements OtlpQueue {
 // default deny-list of the official OTel HTTP instrumentations. Matched case-insensitively.
 const SENSITIVE_QUERY_KEYS = new Set(["awsaccesskeyid", "signature", "sig", "x-goog-signature"]);
 
-// A url nested in a captured value is normally percent-encoded, which hides the `//` and `@`
-// URL_USERINFO looks for, so the decoded spelling is tested too. Run by run, never the whole
-// string: decodeURIComponent throws on the first invalid escape, so one stray `%` elsewhere in a
-// header — `&state=a%b` — would otherwise hide a credential encoded correctly beside it.
+// Run by run, never the whole string: decodeURIComponent throws on the first invalid escape.
 function percentDecoded(value: string): string {
 	return value.replace(/(?:%[0-9A-Fa-f]{2})+/g, run => {
 		try {
 			return decodeURIComponent(run);
 		} catch {
-			// A run whose bytes are not UTF-8 — a latin-1 encoder's `%C5ke`, a truncated sequence —
-			// would otherwise stay encoded and take the `%2F%2F` glued in front of it along. Nothing
-			// but ASCII spells a url delimiter, so keep those bytes and leave the rest as written.
+			// Only ASCII spells a url delimiter, so keep a non-UTF-8 run's ASCII and leave the rest.
 			return run.replace(/%([0-9A-Fa-f]{2})/g, (escape, hex: string) => parseInt(hex, 16) < 0x80 ? String.fromCharCode(parseInt(hex, 16)) : escape);
 		}
 	});
 }
 
-// A hit drops the whole value rather than splicing REDACTED in, because the encoding is the
-// caller's and rewriting inside it would report something they never sent.
 function capturedValue(value: string): string {
+	// URL_USERINFO cannot match without an `@`, and `%40` is the only escape that decodes to one.
+	if (!value.includes("@") && !value.includes("%40")) {
+		return value;
+	}
+
 	return holdsUserinfo(value) || holdsUserinfo(percentDecoded(value)) ? "REDACTED" : value;
 }
 
@@ -1217,9 +1215,8 @@ function buildUrlFull(url: URL, captureQuery: boolean): string {
 // Header names carrying a credential by definition: RFC 9110 authentication, RFC 6265 cookies.
 const SENSITIVE_HEADER_NAMES = new Set(["authorization", "cookie", "proxy-authorization", "set-cookie"]);
 
-// An allow-listed header still records that it was there; what it cannot record is the credential.
 function capturedHeaderValue(name: string, value: string): string {
-	return SENSITIVE_HEADER_NAMES.has(name) ? "REDACTED" : capturedValue(value);
+	return SENSITIVE_HEADER_NAMES.has(name.toLowerCase()) ? "REDACTED" : capturedValue(value);
 }
 
 const OTLP_TRANSPORT_KEYS = ["otlpAdditionalHeaders", "otlpHttpBaseURI", "otlpProtocol"] as const;

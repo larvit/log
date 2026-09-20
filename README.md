@@ -391,7 +391,8 @@ server's auth challenge with those credentials and Android sends none, leaving y
 `url.full` never holds the userinfo, and a rejection quoting the url reaches the status message as
 `http://REDACTED@host/x` — a redaction of what the runtime wrote, not a guarantee. `REDACTED` does
 not always stand for a credential either: an address glued to a host, as in
-`https://api.test,mail@example.com`, redacts too.
+`https://api.test,mail@example.com`, redacts too, and a captured value loses all of itself rather
+than part, so a `location` of `https://cdn.test//logo@2x.png` records `REDACTED` whole.
 
 Spans are queued when the response arrives and are registered with `flush()` at call time, so
 `await log.end()` delivers a `log.fetch()` you never awaited.
