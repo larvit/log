@@ -1386,7 +1386,7 @@ test("log.fetch captureQuery keeps the query but redacts known-sensitive keys an
 	t.ok(!urlFull.includes("abc") && !urlFull.includes("def"), "neither sensitive value is leaked");
 	t.ok(urlFull.includes("next=REDACTED"), "a query value holding url userinfo is redacted whole");
 	t.ok(urlFull.includes("deep=REDACTED"), "one more layer of percent-encoding does not hide it");
-	t.ok(urlFull.includes("REDACTED="), "a credentialed url written as a bare query key is redacted too");
+	t.ok(urlFull.endsWith("&REDACTED="), "a credentialed url written as a bare query key is redacted too");
 	t.ok(!urlFull.includes("hunter2"), "the nested password is not leaked");
 	t.end();
 });

@@ -55,8 +55,7 @@
 ### Everything else
 
 - With `captureQuery` on, a query key that repeats keeps every occurrence in `url.full`. A repeated
-  known-sensitive key — `?Signature=a&Signature=b` — used to collapse to one `REDACTED`, and could
-  reorder the parameters around it.
+  known-sensitive key — `?Signature=a&Signature=b` — used to collapse to one `REDACTED`.
 - An `otlpHttpBaseURI` that is not `http:` or `https:` is rejected in the constructor, where
   `otlp:collector.example.com` used to build a queue that could never export. Written without
   `//`, such a URI parses to an opaque path, which put any `user:pass@` in it straight back into
