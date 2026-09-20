@@ -381,7 +381,7 @@ them per call site. `authorization`, `proxy-authorization`, `cookie` and `set-co
 `REDACTED` whatever you list them for, and any other captured header value, or kept query key or
 value, records `REDACTED` in place of the whole of itself where it holds url userinfo, through one layer
 of percent-encoding but not two. That covers the shapes a credential is recognisable in, not
-every credential. Two it does not reach: a header or query value that simply *is* a secret —
+every credential. It does not reach: a header or query value that simply *is* a secret —
 `x-api-key`, your own signed token — is exported as you sent it, so do not allow-list one; and a
 url nested in the request **path**, as a fetch-through proxy takes, stays in `url.full` as you
 wrote it, credentials and all, with no option involved.
