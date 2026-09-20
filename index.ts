@@ -369,8 +369,8 @@ function partialRejection(body: unknown): { message?: string, rejected: number }
 	}
 }
 
-// Userinfo in any url the text holds. The `:` is optional and captured, so a scheme-relative
-// `//user:pass@host` — what a runtime hands back for a url it could not parse — matches too.
+// The `:` is optional and captured, so a scheme-relative `//user:pass@host` — what a runtime
+// hands back for a url it could not parse — matches too.
 const URL_USERINFO = /(:?\/\/)[^/?#\s]*@/g;
 const redactUserinfo = (text: string) => text.replace(URL_USERINFO, "$1REDACTED@");
 const holdsUserinfo = (text: string) => redactUserinfo(text) !== text;
@@ -1155,8 +1155,7 @@ export class Queue implements OtlpQueue {
 
 // --- log.fetch helpers -----------------------------------------------------
 
-// Query-param keys whose values are replaced with REDACTED when captureQuery is on. Mirrors the
-// default deny-list of the official OTel HTTP instrumentations. Matched case-insensitively.
+// Mirrors the default deny-list of the official OTel HTTP instrumentations.
 const SENSITIVE_QUERY_KEYS = new Set(["awsaccesskeyid", "signature", "sig", "x-goog-signature"]);
 
 // Run by run, never the whole string: decodeURIComponent throws on the first invalid escape.
@@ -1171,6 +1170,7 @@ function percentDecoded(value: string): string {
 	});
 }
 
+// One decode pass, so a doubly-encoded url survives — the depth the README promises consumers.
 function capturedValue(value: string): string {
 	// URL_USERINFO cannot match without an `@`, and `%40` is the only escape that decodes to one.
 	if (!value.includes("@") && !value.includes("%40")) {
@@ -1194,8 +1194,7 @@ function traceableUrl(input: string | URL): URL | undefined {
 	return url.protocol === "http:" || url.protocol === "https:" ? url : undefined;
 }
 
-// Builds the `url.full` span attribute for an http(s) URL, whose origin omits userinfo; the query is
-// dropped unless captureQuery is set, in which case sensitive values are redacted.
+// `url.origin` omits userinfo, which is what keeps the outer url's credentials off the span.
 function buildUrlFull(url: URL, captureQuery: boolean): string {
 	const base = url.origin + url.pathname;
 

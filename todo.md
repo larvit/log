@@ -17,6 +17,12 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
   splicing `REDACTED@` in the way `spanFailure` does covers the literal spelling only. Decide
   which, and record it beside the 2026-09-20 entry that settled the same question for values.
   The 2.4.0 CHANGELOG already carries this as an open exposure with a rotation advisory.
+- [ ] Settle whether Goals' "A credential never leaves. Nothing you put in a url, a header or a
+  conf reaches a span, a record or `stderr`" is the target or the claim. Read as a claim it is now
+  contradicted by three things the repo documents itself: a url nested in the request path, a
+  header or query value that simply is a secret, and `otlpHttpBaseURI` sitting on `log.conf`. Read
+  as a target it is exactly right and both 2026-09-20 decisions derive from it. A goal is the
+  human's to word, so this is a question, not a rewrite.
 - [ ] Decide what to do about Basic credentials sent over plain `http:` to a non-loopback host,
   now that they are really sent: anything on the network path can read them (CWE-319). Either warn
   once per `report` sink when the endpoint is `http:` and carries userinfo, or require `https:`
@@ -108,8 +114,10 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
   `new Log("debug")` shorthand tell a consumer their code stops working in 3.0.0 from inside
   `### Everything else`, unmarked.
 - [ ] Move the decision log out of `AGENTS.md` into `docs/decisions.md`, leaving a one-line index
-  of the titles behind, per the org-wide documentation rule. It is ~100 lines of reasoning in a
-  file every session loads whole.
+  of the titles behind, per the org-wide documentation rule. It is ~130 lines of reasoning in a
+  file every session loads whole, and no entry has a title: "which entry settled header
+  redaction?" is answerable only by reading four 20-line paragraphs, so give each one a bolded
+  title line as part of the move.
 - [ ] Pin every Node base image to its full patch version, so one commit builds one image on any
   day. Three places float: `ARG BASE_IMAGE=node:24-bookworm-slim` in the `Dockerfile`,
   `${NODE_IMAGE:-node:22-bookworm-slim}` in `test-docker`, and the major-only `node-version`

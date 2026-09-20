@@ -308,9 +308,9 @@ instead. `entryFormatter` is deprecated the same way: pass the function as `form
 
 | Option | Type | Default | |
 |---|---|---|---|
-| `captureQuery` | `boolean` | `false` | `log.fetch` only: keep the query string in `url.full`. `awsaccesskeyid`, `sig`, `signature` and `x-goog-signature`, and any key or value holding url credentials, record `REDACTED`; another key whose value is a secret does not — see [`log.fetch` in depth](#logfetch-in-depth). |
-| `captureRequestHeaders` | `string[]` | none | `log.fetch` only: request header names to record as `http.request.header.*`. `authorization`, `proxy-authorization`, `cookie` and `set-cookie`, and any value holding url credentials, record `REDACTED`; another header whose value is a secret does not — see [`log.fetch` in depth](#logfetch-in-depth). |
-| `captureResponseHeaders` | `string[]` | none | `log.fetch` only: response header names to record as `http.response.header.*`. Same four names and the same redaction as `captureRequestHeaders`. |
+| `captureQuery` | `boolean` | `false` | `log.fetch` only: keep the query string in `url.full`. Not every secret in it is redacted — see [Credentials in a captured value](#credentials-in-a-captured-value). |
+| `captureRequestHeaders` | `string[]` | none | `log.fetch` only: request header names to record as `http.request.header.*`. Not every secret in one is redacted — see [Credentials in a captured value](#credentials-in-a-captured-value). |
+| `captureResponseHeaders` | `string[]` | none | `log.fetch` only: response header names to record as `http.response.header.*`. Same redaction as `captureRequestHeaders`. |
 | `clock` | `Clock` | system clock | `{ now, setTimeout, clearTimeout }` behind every span and record timestamp. Passed on to the default `Queue`; a `Queue` you build takes its own. |
 | `colors` | `boolean` | `true` | ANSI colour codes in text output. Unset in code, the env decides: `NO_COLOR` (non-empty) turns it off; otherwise `FORCE_COLOR` turns it on, except `0` or `false` which turn it off. |
 | `context` | `Metadata` | `{}` | Added to every entry. Wins over a per-call key of the same name. |
@@ -377,14 +377,21 @@ Span attributes follow the OpenTelemetry HTTP semantic conventions:
 A 4xx/5xx response marks the span errored; a thrown error does too, with its message as the status
 message. The response or error reaches the caller unchanged. Bodies are never captured.
 `captureQuery` and the header allow-lists are read at call time from the instance; `clone()` to vary
-them per call site. `authorization`, `proxy-authorization`, `cookie` and `set-cookie` record
-`REDACTED` whatever you list them for, and any other captured header value, or kept query key or
-value, records `REDACTED` in place of the whole of itself where it holds url userinfo, through one layer
-of percent-encoding but not two. That covers the shapes a credential is recognisable in, not
-every credential. It does not reach: a header or query value that simply *is* a secret —
-`x-api-key`, your own signed token — is exported as you sent it, so do not allow-list one; and a
-url nested in the request **path**, as a fetch-through proxy takes, stays in `url.full` as you
-wrote it, credentials and all, with no option involved.
+them per call site.
+
+### Credentials in a captured value
+
+Redacted, whatever you list them for: the headers `authorization`, `proxy-authorization`, `cookie`
+and `set-cookie`, and the value of a query key named `awsaccesskeyid`, `sig`, `signature` or
+`x-goog-signature`. Redacted wherever it appears: any other captured header value, or kept query
+key or value, that holds url userinfo — which records `REDACTED` in place of the whole of itself,
+through one layer of percent-encoding but not two.
+
+That covers the shapes a credential is recognisable in, not every credential. It does not reach: a
+header or query value that simply *is* a secret — `x-api-key`, your own signed token — which is
+exported as you sent it, so do not allow-list one; and a url nested in the request **path**, as a
+fetch-through proxy takes, which stays in `url.full` as you wrote it, credentials and all, with no
+option involved.
 
 Never put credentials in the url; pass an `Authorization` header, and strip userinfo from a url you
 did not build. `log.fetch` mirrors the runtime: Node and browsers refuse such a url, while React
