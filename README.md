@@ -308,9 +308,9 @@ instead. `entryFormatter` is deprecated the same way: pass the function as `form
 
 | Option | Type | Default | |
 |---|---|---|---|
-| `captureQuery` | `boolean` | `false` | `log.fetch` only: keep the query string in `url.full`. Known-sensitive keys such as `Signature`, and any value holding url credentials, record `REDACTED`. |
-| `captureRequestHeaders` | `string[]` | none | `log.fetch` only: request header names to record as `http.request.header.*`. A known credential header, and any value holding url credentials, record `REDACTED`. |
-| `captureResponseHeaders` | `string[]` | none | `log.fetch` only: response header names to record as `http.response.header.*`. A known credential header, and any value holding url credentials, record `REDACTED`. |
+| `captureQuery` | `boolean` | `false` | `log.fetch` only: keep the query string in `url.full`. `awsaccesskeyid`, `sig`, `signature` and `x-goog-signature`, and any key or value holding url credentials, record `REDACTED`; another key whose value is a secret does not — see [`log.fetch` in depth](#logfetch-in-depth). |
+| `captureRequestHeaders` | `string[]` | none | `log.fetch` only: request header names to record as `http.request.header.*`. `authorization`, `proxy-authorization`, `cookie` and `set-cookie`, and any value holding url credentials, record `REDACTED`; another header whose value is a secret does not — see [`log.fetch` in depth](#logfetch-in-depth). |
+| `captureResponseHeaders` | `string[]` | none | `log.fetch` only: response header names to record as `http.response.header.*`. Same four names and the same redaction as `captureRequestHeaders`. |
 | `clock` | `Clock` | system clock | `{ now, setTimeout, clearTimeout }` behind every span and record timestamp. Passed on to the default `Queue`; a `Queue` you build takes its own. |
 | `colors` | `boolean` | `true` | ANSI colour codes in text output. Unset in code, the env decides: `NO_COLOR` (non-empty) turns it off; otherwise `FORCE_COLOR` turns it on, except `0` or `false` which turn it off. |
 | `context` | `Metadata` | `{}` | Added to every entry. Wins over a per-call key of the same name. |
@@ -367,7 +367,7 @@ Span attributes follow the OpenTelemetry HTTP semantic conventions:
 | Attribute | Value |
 |---|---|
 | `http.request.method` | Request method, `GET` when unset |
-| `url.full` | The URL without userinfo. Query string dropped unless `captureQuery` |
+| `url.full` | The URL without the outer userinfo. Query string dropped unless `captureQuery`, where a credentialed key or value records `REDACTED` |
 | `url.scheme`, `server.address`, `server.port` | From the URL; port only when explicit |
 | `http.request.header.<name>` | Headers listed in `captureRequestHeaders` |
 | `http.response.status_code` | Response status |
@@ -379,16 +379,18 @@ message. The response or error reaches the caller unchanged. Bodies are never ca
 `captureQuery` and the header allow-lists are read at call time from the instance; `clone()` to vary
 them per call site. `authorization`, `proxy-authorization`, `cookie` and `set-cookie` record
 `REDACTED` whatever you list them for, and any other captured header value, or kept query key or
-value, records `REDACTED` in place of the whole of itself where it holds url userinfo, one layer of
-percent-encoding included. That covers the shapes a credential is recognisable in, not every
-credential: a header whose value simply *is* a secret — `x-api-key`, your own signed token — is
-exported as you sent it, so do not allow-list one.
+value, records `REDACTED` in place of the whole of itself where it holds url userinfo, through one layer
+of percent-encoding but not two. That covers the shapes a credential is recognisable in, not
+every credential. Two it does not reach: a header or query value that simply *is* a secret —
+`x-api-key`, your own signed token — is exported as you sent it, so do not allow-list one; and a
+url nested in the request **path**, as a fetch-through proxy takes, stays in `url.full` as you
+wrote it, credentials and all, with no option involved.
 
 Never put credentials in the url; pass an `Authorization` header, and strip userinfo from a url you
 did not build. `log.fetch` mirrors the runtime: Node and browsers refuse such a url, while React
 Native's `XMLHttpRequest` polyfill hands it to the platform untouched, where iOS answers the
 server's auth challenge with those credentials and Android sends none, leaving you the 401.
-`url.full` never holds the userinfo, and a rejection quoting the url reaches the status message as
+`url.full` never holds the outer url's userinfo, and a rejection quoting the url reaches the status message as
 `http://REDACTED@host/x` — a redaction of what the runtime wrote, not a guarantee. `REDACTED` does
 not always stand for a credential either: an address glued to a host, as in
 `https://api.test,mail@example.com`, redacts too, and a captured value loses all of itself rather
