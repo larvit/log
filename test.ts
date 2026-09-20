@@ -1376,7 +1376,7 @@ test("log.fetch captureQuery keeps the query but redacts known-sensitive keys an
 	const { calls } = stubFetch();
 	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 
-	await log.fetch("https://api.test/x?q=hi&q=there&Signature=abc&next=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&deep=https%253A%252F%252Fmyuser%253Ahunter2%2540cb.test%252Fx");
+	await log.fetch("https://api.test/x?q=hi&q=there&Signature=abc&next=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&deep=https%253A%252F%252Fmyuser%253Ahunter2%2540cb.test%252Fx&stray=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx%2Cq%zz");
 	await log.end();
 
 	const urlFull = clientSpan(calls).attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue;
@@ -1386,6 +1386,7 @@ test("log.fetch captureQuery keeps the query but redacts known-sensitive keys an
 	t.ok(!urlFull.includes("abc"), "the sensitive value is not leaked");
 	t.ok(urlFull.includes("next=REDACTED"), "a query value holding url userinfo is redacted whole");
 	t.ok(urlFull.includes("deep=REDACTED"), "one more layer of percent-encoding does not hide it");
+	t.ok(urlFull.includes("stray=REDACTED"), "an invalid escape beside the credential does not hide it");
 	t.ok(!urlFull.includes("hunter2"), "the nested password is not leaked");
 	t.end();
 });
@@ -1441,7 +1442,7 @@ test("log.fetch keeps a url's credentials off the exported span", async t => {
 });
 
 test("log.fetch captures allow-listed request and response headers only, never a credential", async t => {
-	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ location: "https://idp.test/authorize?redirect_uri=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx", "set-cookie": "sid=hunter2", "x-resp": "rv", "x-secret": "nope" }) }) : undefined);
+	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ location: "https://idp.test/authorize?redirect_uri=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&state=a%b", "set-cookie": "sid=hunter2", "x-resp": "rv", "x-secret": "nope" }) }) : undefined);
 	const log = new Log({
 		captureRequestHeaders: ["Authorization", "referer", "x-req"],
 		captureResponseHeaders: ["location", "set-cookie", "x-resp"],

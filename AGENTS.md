@@ -121,9 +121,12 @@ and who it is for, and a design decision that cannot be derived from them belong
   captured header values and for the query values `captureQuery` keeps, because the same
   credentialed url reaches a span by either route and two rules would disagree the way the two
   allow-lists used to: `authorization`, `proxy-authorization`, `cookie` and `set-cookie` go by
-  name, and everything else goes by whether the value holds url userinfo raw or one
-  `decodeURIComponent` deep — a nested url is normally percent-encoded, which hides the `//` and
-  `@` from `URL_USERINFO`. Redacting rather than rejecting the allow-list entry is what a minor
+  name, and everything else goes by whether the value holds url userinfo raw or once decoded — a
+  nested url is normally percent-encoded, which hides the `//` and `@` from `URL_USERINFO`. The
+  decode runs escape-run by escape-run rather than over the whole string, because
+  `decodeURIComponent` throws on the first invalid escape: a stray `%` anywhere in a header, which
+  a WHATWG url permits, would otherwise take the decoded test out for the credential encoded
+  correctly beside it. Redacting rather than rejecting the allow-list entry is what a minor
   allows — README → Audience deprecates a breaking change in a 2.x minor first, and the leak is
   open now — and it matches the stance `SENSITIVE_QUERY_KEYS` already took. `REDACTED` over
   dropping the attribute keeps the telemetry reader's "was the header there?", which is what an
