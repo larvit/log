@@ -1133,9 +1133,7 @@ export class Queue implements OtlpQueue {
 }
 
 // --- Credentials on a span -------------------------------------------------
-// Every rule deciding whether a credential reaches a span is below, and three routes carry one
-// in: `buildUrlFull` (url.full), `capturedHeaderValue` (an allow-listed header) and `spanFailure`
-// (an error message quoted into a status). A fourth route redacts here or nowhere.
+// Every rule keeping a credential off a span is here; a new one belongs here too.
 
 // The `:` is optional and captured, so a scheme-relative `//user:pass@host` — what a runtime
 // hands back for a url it could not parse — matches too.
