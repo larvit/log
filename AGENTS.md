@@ -116,6 +116,19 @@ and who it is for, and a design decision that cannot be derived from them belong
   `user:pass@host` with no slashes at all stays unredacted. Valid while `log.fetch` is a drop-in
   for the runtime's `fetch` and a runtime quotes the url with its authority slashes.
 
+- 2026-09-20: a value `log.fetch` copies onto a span carries no credential, per README → Goals'
+  "a credential never leaves". Two mechanisms, because a header name is a reliable signal where a
+  value is not: `authorization`, `proxy-authorization`, `cookie` and `set-cookie` record
+  `REDACTED` whole, and every other captured header value, plus every query value `captureQuery`
+  keeps, runs through the same userinfo redaction a span status message does. Redacting rather
+  than rejecting the allow-list entry is what a minor allows — README → Audience deprecates a
+  breaking change in a 2.x minor first, and the leak is open now — and it matches the stance
+  `SENSITIVE_QUERY_KEYS` already took, so the two allow-lists agree. `REDACTED` over dropping the
+  attribute keeps the telemetry reader's "was the header there?", which is what an allow-list is
+  for once the value is gone. The four names are the ones whose value is a credential by
+  definition (RFC 9110 authentication, RFC 6265 cookies); a header whose value merely may hold one
+  is covered by the userinfo pass. Valid while an allow-list names header names, not patterns.
+
 ## Working here
 
 - Source is a single `index.ts`, compiled + uglified to `index.js` for publish.

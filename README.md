@@ -308,9 +308,9 @@ instead. `entryFormatter` is deprecated the same way: pass the function as `form
 
 | Option | Type | Default | |
 |---|---|---|---|
-| `captureQuery` | `boolean` | `false` | `log.fetch` only: keep the query string in `url.full`. Known-sensitive keys such as `Signature` stay redacted. |
-| `captureRequestHeaders` | `string[]` | none | `log.fetch` only: request header names to record as `http.request.header.*`. |
-| `captureResponseHeaders` | `string[]` | none | `log.fetch` only: response header names to record as `http.response.header.*`. |
+| `captureQuery` | `boolean` | `false` | `log.fetch` only: keep the query string in `url.full`. Known-sensitive keys such as `Signature`, and url credentials inside any value, stay redacted. |
+| `captureRequestHeaders` | `string[]` | none | `log.fetch` only: request header names to record as `http.request.header.*`. A credential header records `REDACTED`. |
+| `captureResponseHeaders` | `string[]` | none | `log.fetch` only: response header names to record as `http.response.header.*`. A credential header records `REDACTED`. |
 | `clock` | `Clock` | system clock | `{ now, setTimeout, clearTimeout }` behind every span and record timestamp. Passed on to the default `Queue`; a `Queue` you build takes its own. |
 | `colors` | `boolean` | `true` | ANSI colour codes in text output. Unset in code, the env decides: `NO_COLOR` (non-empty) turns it off; otherwise `FORCE_COLOR` turns it on, except `0` or `false` which turn it off. |
 | `context` | `Metadata` | `{}` | Added to every entry. Wins over a per-call key of the same name. |
@@ -377,7 +377,10 @@ Span attributes follow the OpenTelemetry HTTP semantic conventions:
 A 4xx/5xx response marks the span errored; a thrown error does too, with its message as the status
 message. The response or error reaches the caller unchanged. Bodies are never captured.
 `captureQuery` and the header allow-lists are read at call time from the instance; `clone()` to vary
-them per call site.
+them per call site. A captured value never carries a credential: `authorization`,
+`proxy-authorization`, `cookie` and `set-cookie` record `REDACTED` whatever you list them for, and
+userinfo in any other captured header value, or in a url nested in a kept query value, is redacted
+as a status message's is.
 
 Never put credentials in the url; pass an `Authorization` header, and strip userinfo from a url you
 did not build. `log.fetch` mirrors the runtime: Node and browsers refuse such a url, while React

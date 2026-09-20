@@ -369,9 +369,10 @@ function partialRejection(body: unknown): { message?: string, rejected: number }
 	}
 }
 
-// A runtime refusing a credentialed url quotes the whole url into its rejection; one it could not
-// parse at all, such as a scheme-relative `//user:pass@host`, comes back without its scheme.
+// Userinfo in any url the text holds. Scheme-optional: a url a runtime could not parse comes back
+// from it without one, as a scheme-relative `//user:pass@host` does.
 const URL_USERINFO = /(:?\/\/)[^/?#\s]*@/g;
+const redactUserinfo = (text: string) => text.replace(URL_USERINFO, "$1REDACTED@");
 
 // error.type per OTel semconv; "_OTHER" is its fallback.
 function spanFailure(error: unknown): { message: string, type: string } {
@@ -385,7 +386,7 @@ function spanFailure(error: unknown): { message: string, type: string } {
 		}
 	}
 
-	return { message: message.replace(URL_USERINFO, "$1REDACTED@"), type: stringField(error, "code") ?? stringField(error, "name") ?? "_OTHER" };
+	return { message: redactUserinfo(message), type: stringField(error, "code") ?? stringField(error, "name") ?? "_OTHER" };
 }
 
 // Resource-level OTLP attributes (service.name + telemetry.sdk.*), shared by logs and spans.
@@ -1180,15 +1181,21 @@ function buildUrlFull(url: URL, captureQuery: boolean): string {
 		return base;
 	}
 
-	const params = new URLSearchParams(url.search);
+	const kept = new URLSearchParams();
 
-	for (const key of [...params.keys()]) {
-		if (SENSITIVE_QUERY_KEYS.has(key.toLowerCase())) {
-			params.set(key, "REDACTED");
-		}
+	for (const [key, value] of new URLSearchParams(url.search)) {
+		kept.append(key, SENSITIVE_QUERY_KEYS.has(key.toLowerCase()) ? "REDACTED" : redactUserinfo(value));
 	}
 
-	return `${base}?${params.toString()}`;
+	return `${base}?${kept.toString()}`;
+}
+
+// Header names carrying a credential by definition: RFC 9110 authentication, RFC 6265 cookies.
+const SENSITIVE_HEADER_NAMES = new Set(["authorization", "cookie", "proxy-authorization", "set-cookie"]);
+
+// An allow-listed header still records that it was there; what it cannot record is the credential.
+function capturedHeaderValue(name: string, value: string): string {
+	return SENSITIVE_HEADER_NAMES.has(name) ? "REDACTED" : redactUserinfo(value);
 }
 
 const OTLP_TRANSPORT_KEYS = ["otlpAdditionalHeaders", "otlpHttpBaseURI", "otlpProtocol"] as const;
@@ -1467,9 +1474,10 @@ export class Log implements LogInt {
 
 			for (const name of this.conf.captureRequestHeaders ?? []) {
 				const value = headers.get(name);
+				const key = name.toLowerCase();
 
 				if (value !== null) {
-					context[`http.request.header.${name.toLowerCase()}`] = value;
+					context[`http.request.header.${key}`] = capturedHeaderValue(key, value);
 				}
 			}
 
@@ -1480,9 +1488,10 @@ export class Log implements LogInt {
 
 			for (const name of this.conf.captureResponseHeaders ?? []) {
 				const value = res.headers.get(name);
+				const key = name.toLowerCase();
 
 				if (value !== null) {
-					context[`http.response.header.${name.toLowerCase()}`] = value;
+					context[`http.response.header.${key}`] = capturedHeaderValue(key, value);
 				}
 			}
 
