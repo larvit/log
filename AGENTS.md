@@ -100,17 +100,21 @@ and who it is for, and a design decision that cannot be derived from them belong
   not have made, and never a success the platform would have refused". The two spellings differ
   because the queue's endpoint is this library's own request to make, where `log.fetch`'s is the
   caller's, so the same string means "authenticate me" in one and "mirror what my runtime does
-  with this" in the other. React Native's polyfill may put the credentials on the wire; mirroring
-  keeps that the platform's behaviour, and `todo.md` carries the unanswered question of what it
-  actually does. It ships in a minor on the precedent of the entry above, being the security fix
-  itself. Matching runs from `//` with the scheme optional, because a url a runtime could not
-  parse comes back without one — Node answers `fetch("//user:pass@host/x")` with "Failed to parse
-  URL from //user:pass@host/x". What it costs is over-redaction, always the safe direction: it
-  matches to the last `@` before a `/?#`, so a url with an address glued to it loses its host
-  (`https://api.test,mail@example.com`), and an `@` in a path after a doubled slash redacts as
-  though it were userinfo. A bare `user:pass@host` with no slashes at all stays unredacted. Valid
-  while `log.fetch` is a drop-in for the runtime's `fetch` and a runtime quotes the url with its
-  authority slashes.
+  with this" in the other. React Native does put them on the wire, on one of its two platforms:
+  `whatwg-fetch` hands the url to `XMLHttpRequest.open` untouched and sets no header, iOS keeps
+  the userinfo through `[RCTConvert NSURL:]` and runs `NSURLSession` with no challenge delegate,
+  so the system answers `WWW-Authenticate` with the credentials, while Android passes the string
+  to `Request.Builder().url()` and OkHttp derives no `Authorization` from it — leaving the caller
+  a 401, and writing the userinfo out only in a plain-`http:` proxy's request line. Same at
+  `v0.74.0` and today's `main`. Mirroring keeps that the platform's behaviour. It ships in a
+  minor on the precedent of the entry above, being the security fix itself. Matching runs from
+  `//` with the scheme optional, because a url a runtime could not parse comes back without one
+  — Node answers `fetch("//user:pass@host/x")` with "Failed to parse URL from //user:pass@host/x".
+  What it costs is over-redaction, always the safe direction: it matches to the last `@` before a
+  `/?#`, so a url with an address glued to it loses its host (`https://api.test,mail@example.com`),
+  and an `@` in a path after a doubled slash redacts as though it were userinfo. A bare
+  `user:pass@host` with no slashes at all stays unredacted. Valid while `log.fetch` is a drop-in
+  for the runtime's `fetch` and a runtime quotes the url with its authority slashes.
 
 ## Working here
 

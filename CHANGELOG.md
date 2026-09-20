@@ -15,12 +15,15 @@
   Search your tracing backend's span status messages for `includes credentials`, the phrase Node
   and Chromium both use, or for `@` beside your own hostname.
 - Not fixed: on React Native, whose `fetch` is an `XMLHttpRequest` polyfill,
-  `log.fetch("https://user:pass@host/x")` may put those credentials on the wire where Node and
-  browsers refuse the url outright. `log.fetch` mirrors whatever the runtime does, so it cannot
-  close this. Nothing about it reaches your tracing backend — `url.full` never holds userinfo —
-  so there is nothing to rotate on account of this library; the exposure is the network path to
-  the host, in the clear if that url is `http:`. Pass an `Authorization` header, and strip
-  userinfo from a url you did not build.
+  `log.fetch("https://user:pass@host/x")` reaches the platform with the credentials still in the
+  url, where Node and browsers refuse it outright. On iOS the URL loading system answers the
+  server's `WWW-Authenticate` challenge with them, so they go on the wire; on Android OkHttp sends
+  no credentials and hands you the 401, except through a plain-`http:` proxy, whose request line
+  carries the whole url. `log.fetch` mirrors whatever the runtime does, so it cannot close this.
+  Nothing about it reaches your tracing backend — `url.full` never holds userinfo — so there is
+  nothing to rotate on account of this library; the exposure is the network path to the host, in
+  the clear if that url is `http:`. Pass an `Authorization` header, and strip userinfo from a url
+  you did not build.
 - `log.fetch` traces only a URL that resolves to `http:` or `https:`; anything else is fetched
   untraced — no span, and no `traceparent` sent. It used to export a span whose `url.full` held
   whatever the url did: written without `//`, a url parses to an opaque path, so
