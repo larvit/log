@@ -1376,7 +1376,7 @@ test("log.fetch captureQuery keeps the query but redacts known-sensitive keys an
 	const { calls } = stubFetch();
 	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 
-	await log.fetch("https://api.test/x?q=hi&q=there&Signature=abc&next=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&deep=https%253A%252F%252Fmyuser%253Ahunter2%2540cb.test%252Fx&stray=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx%2Cq%zz");
+	await log.fetch("https://api.test/x?q=hi&q=there&Signature=abc&next=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&deep=https%253A%252F%252Fmyuser%253Ahunter2%2540cb.test%252Fx&stray=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx%2Cq%zz&latin1=https%3A%2F%2F%C5ke%3Ahunter2%40cb.test%2Fx");
 	await log.end();
 
 	const urlFull = clientSpan(calls).attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue;
@@ -1387,6 +1387,7 @@ test("log.fetch captureQuery keeps the query but redacts known-sensitive keys an
 	t.ok(urlFull.includes("next=REDACTED"), "a query value holding url userinfo is redacted whole");
 	t.ok(urlFull.includes("deep=REDACTED"), "one more layer of percent-encoding does not hide it");
 	t.ok(urlFull.includes("stray=REDACTED"), "an invalid escape beside the credential does not hide it");
+	t.ok(urlFull.includes("latin1=REDACTED"), "a non-UTF-8 escape glued to the scheme does not hide it");
 	t.ok(!urlFull.includes("hunter2"), "the nested password is not leaked");
 	t.end();
 });
