@@ -4,7 +4,7 @@
 
 ### Security
 
-- Not fixed, and still exporting on every call until it is: a url nested in the request **path**
+- Not fixed, and still exporting on every such call until it is: a url nested in the request **path**
   reaches `url.full` as you wrote it. `url.full` is built from the origin and the path, and only
   the query is redacted, so
   `log.fetch("https://proxy.test/fetch/https://user:pass@cb.test/x")` — the shape a fetch-through
@@ -15,7 +15,7 @@
   cleanly, and the choice is being made on its own.
   **Rotate any credential you have passed inside a url nested in a path** — the `@`, `%40` and
   `%2540` search in the next bullet finds these too. `log.fetch` first exported `url.full` in
-  v2.3.0, so no older span carries this or anything below it.
+  v2.3.0, so no older span carries it.
 - A header you allow-list is no longer a way to export a credential: `authorization`,
   `proxy-authorization`, `cookie` and `set-cookie` named in `captureRequestHeaders` or
   `captureResponseHeaders` record `REDACTED`, so the span still shows the header was there. Any
@@ -37,11 +37,9 @@
   credentials and quotes the whole url into its `TypeError`, which reached the backend both as the
   `log.fetch` span's own status and, once you caught that rejection and forwarded it, as
   `end({ error })` on the span around it. The rejection reaching the caller is unchanged;
-  `log.span.status.message` now shows the redacted text, and `error.type` is untouched.
-  **Rotate any credential you put in a url you fetched on Node or in a browser**, whether through
-  `log.fetch` or through an error you passed to `end({ error })`, your own `fetch` included.
-  Search your tracing backend's span status messages for `includes credentials`, the phrase Node
-  and Chromium both use, or for `@` beside your own hostname.
+  `log.span.status.message` now shows the redacted text, and `error.type` is untouched. Nothing to
+  rotate: no released version exported a span status message at all — `end()` took no argument and
+  `OtlpSpan.status` had no `message` — so both routes exist only alongside their own redaction.
 - Not fixed: on React Native, whose `fetch` is an `XMLHttpRequest` polyfill,
   `log.fetch("https://user:pass@host/x")` reaches the platform with the credentials still in the
   url, where Node and browsers refuse it outright. On iOS the URL loading system answers the
