@@ -36,9 +36,12 @@ Priority order decides a tie.
    runtime genuinely differs the platform wins and the docs say so.
 2. **The telemetry is correct OTLP.** A span or record a backend mis-renders is a broken product.
    Approximating part of the spec is worse than omitting it.
-3. **A credential never leaves.** Nothing you put in a url, a header or a conf may reach a span, a
-   record or `stderr`. It binds what you configure; a secret you hand a log call, in the message or
-   in metadata, is exported as you wrote it.
+3. **A credential never leaves.** A credential hidden inside something you hand this library to
+   *use* — a url it fetches, a header or query value it captures, the OTLP endpoint — never
+   reaches a span, a record or `stderr`. Text you write yourself as telemetry is exported as you
+   wrote it: the log message, metadata, `context` and `spanName`. So is a header or query value
+   you allow-list that simply *is* a secret, because naming it is asking for it and no shape
+   tells it from any other string.
 4. **A very easy API.** `log.info("msg", { key })` is the whole one-line path. Nobody learns OTLP
    to log.
 5. **Composable.** Instances nest, inherit, and attach to an upstream trace.
