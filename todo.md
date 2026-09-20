@@ -5,83 +5,165 @@ act on leads with `### Security`, the shape AGENTS.md → Working here already s
 `CHANGELOG.md`. Per README → Audience, everything breaking is deprecated in a 2.x minor first and
 lands in 3.0.0 with a `MIGRATION.md` entry.
 
+Each item states the problem and what must hold once it is gone. Working out *how* is part of the
+item, not settled by it: where an item names a mechanism, that is evidence of the problem, never
+the prescribed repair.
+
 ## 2.4.0
 
 `CHANGELOG.md` → `## Unreleased` holds what is done: five credential leaks closed with four
 rotation advisories, the export queue, the injectable clock, `Logger`, and the `entryFormatter` and
-level-string deprecations. A 2026-09-20 architecture, product and comprehension review found the
-items below in that state; each is non-breaking, and each is either a live exposure, a crash, or a
-claim the repo makes and does not keep.
+level-string deprecations.
+
+An architecture, product and comprehension review on 2026-09-20 found everything below in that
+state. None of it is breaking. **Take "One file a reader can find their way around" first** — the
+security items below land in the very code it reorganises, and two more of them are free only until
+this release publishes.
 
 ### Security
 
-- [ ] Redact the SigV4 presigned-url query keys: `x-amz-signature`, `x-amz-credential`,
-  `x-amz-security-token` and `x-goog-credential`. `SENSITIVE_QUERY_KEYS` (`index.ts:1159`) mirrors
-  OTel semconv's default deny-list, which is the SigV2/Azure-era one — so with `captureQuery` on, a
-  presigned S3 url exports its signature in full, its access key id inside `X-Amz-Credential`, and a
-  live session token inside `X-Amz-Security-Token`. Every AWS presigned url written since 2014 takes
-  that shape. Semconv's list is a default, not a maximum, so redacting more breaks no spec and the
-  2026-09-20 decision already licenses over-redaction in a minor. Live since 2.3.0, where
-  `captureQuery` and `url.full` shipped, so it needs a rotation advisory of its own.
-- [ ] Give the path-nested-url advisory a search that finds the likeliest shape. `CHANGELOG.md`
-  tells the reader to search `url.full` for `@`, `%40` and `%2540`; a nested url is normally
-  percent-encoded and normally signed, so its credential is a query parameter of the inner url and
-  **none of those three appear anywhere in it**. A consumer runs exactly the advised search, comes
-  back clean and concludes they are safe. Add the second-`://`-or-`%3A%2F%2F`-after-the-origin
-  search and name the parameter shapes.
-- [ ] Put the `conf` credential exposure in the release's `### Security` section, and widen it to
-  `otlpAdditionalHeaders`. 2.4.0 makes it worse in two ways the section does not mention:
-  `queue.conf` becomes a second public holder of the same string, and `user:pass@` starts actually
-  working, so more consumers will set it. The README warns "don't log your `conf`" in the
-  `otlpHttpBaseURI` row only — the `otlpAdditionalHeaders` row, the spelling the docs steer people
-  to for a token, carries no warning at all. Per AGENTS.md → Working here, a release with an
-  exposure still open leads with `### Security` holding it.
+- [ ] Keep a presigned url's credentials out of `url.full`. With `captureQuery` on, a url signed
+  the way every AWS presigned url has been since 2014 exports its signature, the access key id
+  carried inside `X-Amz-Credential`, and a live session token inside `X-Amz-Security-Token`.
+  `SENSITIVE_QUERY_KEYS` (`index.ts:1159`) catches none of them: it mirrors OTel semconv's default
+  deny-list, which is the SigV2/Azure-era one, so it covers `AWSAccessKeyId`, `Signature`, `sig`
+  and `X-Goog-Signature` and stops there. Google's own V4 `X-Goog-Credential` is missed too.
+  Semconv's list is a default and not a maximum, so catching more breaks no spec, and the
+  2026-09-20 decision already licenses over-redaction in a minor. Whether the answer is more names,
+  a shape test, or something that does not need a list at all is open. Live since 2.3.0, where
+  `captureQuery` and `url.full` shipped, so whatever lands owes consumers a rotation advisory.
+- [ ] Let a consumer reading an advisory find out whether the path-nested-url leak reached them.
+  Today's advisory sends them to search `url.full` for `@`, `%40` and `%2540`. A nested url is
+  normally percent-encoded and normally signed, so its credential is a query parameter of the inner
+  url and **not one of those three appears anywhere in it** — the reader runs exactly the search
+  they were given, finds nothing, and concludes they are safe. The advisory has to match the shape
+  it warns about.
+- [ ] State the `conf` credential exposure where a consumer deciding whether to rotate will read
+  it. `log.conf` and `queue.conf` hold `otlpHttpBaseURI`'s `user:pass@` verbatim and
+  `otlpAdditionalHeaders`' bearer token verbatim, and the README documents both confs as public.
+  2.4.0 makes it reach further in two ways the `### Security` section does not mention: `queue.conf`
+  becomes a second public holder of the same string, and `user:pass@` starts actually working, so
+  more consumers will set one. The README warns "don't log your `conf`" in the `otlpHttpBaseURI`
+  row alone — the `otlpAdditionalHeaders` row, the spelling the docs steer people to for a token,
+  carries no warning at all. Per AGENTS.md → Working here, a release with an exposure still open
+  leads with `### Security` holding it. The fix itself is 2.5.0's; what 2.4.0 owes is the telling.
 
 ### Everything else
 
-- [ ] Stop an unknown `logLevel` crashing every level method. `enabled()` (`index.ts:1543`) reads
-  `LogLevels[this.conf.logLevel].severityNumber`, and `log()` gates on `enabled()`, so
-  `new Log({ logLevel: "trace" })` throws `TypeError: Cannot read properties of undefined` on
-  `log.info()` and on all five others. TypeScript rejects the literal; the README's own examples are
-  JavaScript, where nothing does, and `LOG_LEVEL=trace` (pino) or `http` (winston) is the obvious
-  input. 2.4.0 is also the release that adds `enabled()` as the guard README → Accept a logger in
-  your library tells library authors to call, so a library crashes inside its consumer's app. Fall
-  back to `"info"` and warn once through the existing sink, as `msgTextFormatter` already does for
-  the same class of input.
-- [ ] Keep `traceparent` out of a child's `conf`. The constructor's inheritance loop
-  (`index.ts:1287`) skips only what `otlpKeysNotToInherit` returns, so it copies the parent's
-  `traceparent` — against the option's own comment ("Edge-only: not inherited by clones/children")
-  and README → Options. `clone()`'s separate skip set excludes it correctly, so the two loops
-  disagree. The child's own span is right; a spread of that conf, a spelling this release
-  advertises, has no `parentLog` and adopts the stale header, parenting a span to a dead upstream
-  span. Add it to the skip set, and settle whether the instance it was given keeps it on `conf`.
-- [ ] Drop `bytes[0] = 0x01` from `generateTraceId` (`index.ts:308`). W3C Trace Context has no
-  version field inside a trace id — the version is the header's own first field, which
-  `formatTraceparent` already writes as `00`. The line makes three things false at once: its own
-  `// version 1 trace id`, `generateTraceId`'s "Random 16-byte trace id", and README → Exports'
-  "Random 32- and 16-hex-char ids". It also spends 8 bits of entropy and makes every trace id this
-  library mints start `01`. No test depends on it.
-- [ ] Correct the `LogInt` enumeration in the CHANGELOG: it omits `flush` and `sampled`, which
-  2.4.0 adds alongside `enabled`. README → Exports has it right, so the CHANGELOG is the false one.
-  Say what it costs — a hand-written `LogInt` passed as `parentLog` stops compiling on upgrade.
-- [ ] Give `index.ts` an honest section map. Three banners cover 1632 lines, lines 1–467 have none,
-  and the last one, `// --- log.fetch helpers ---` at 1156, therefore stands over `class Log`
-  (1261–1632) — 372 lines that are not fetch helpers, so a reader scrolling up from the constructor
-  is told where they are and told wrong. Both architect seats named this the worst navigational
-  defect in the repo, and it is five comment lines.
-- [ ] Scope advisories 2 and 5 to v2.3.0, the way advisory 1 already scopes itself. `log.fetch`,
-  both allow-lists and `captureQuery` all shipped there, so both exposures have the same floor and
-  a consumer upgrading from 2.2.0 can close the search in one sentence.
+- [ ] **One file a reader can find their way around.** Nine independent readers — juniors to
+  architects — scored comprehension 5.9/10, and every one of them was capped by how much unnamed
+  state and how many homeless rules they had to hold, never by navigation or by the problem's own
+  difficulty. The evidence that this is fixable rather than intrinsic: the hand-rolled protobuf
+  encoder, by far the most alien code here, was volunteered by six of the nine as *easier than
+  expected*, because every call site carries its field number and a pinned real Collector checks
+  the result. Comment volume is not the problem; rules with no home are. Each sub-item below is its
+  own chunk, ordered so the earlier ones make the later ones readable:
+  - [ ] Every rule deciding whether a credential reaches a span reachable from one place.
+    `URL_USERINFO`, `redactUserinfo`, `holdsUserinfo` and `spanFailure` (`index.ts:374-393`) sit
+    ~800 lines from `SENSITIVE_QUERY_KEYS`, `percentDecoded`, `capturedValue`,
+    `SENSITIVE_HEADER_NAMES` and `capturedHeaderValue` (`index.ts:1159-1219`), the call runs
+    upward, and no comment at either end names the other. Eight sites across four regions decide
+    it, so nobody can close the question "have I found every route?" — which is precisely what the
+    two security items above ask, and what the 3am walkthrough took fifteen minutes to answer.
+  - [ ] A file map that is true. Three banners cover 1632 lines, lines 1–467 have none, and because
+    `// --- log.fetch helpers ---` (`index.ts:1156`) is the last one it stands over `class Log`
+    (`index.ts:1261-1632`) — 372 lines that are not fetch helpers. A reader scrolling up from the
+    constructor to learn where they are is told, and told wrong. Both architect seats called this
+    the worst navigational defect in the repo.
+  - [ ] `Queue`'s rules written where they are maintained. Ten live coordination flags
+    (`index.ts:808-823`) run three interleaved state machines — buffer, scheduling, persistence —
+    and the rules that keep them consistent exist only as emergent behaviour: at most one round in
+    flight, a second caller joins the next one, `batchTimer` and `retryTimer` never both set,
+    `bytes` always the sum of `items[].bytes`. Every reader reconstructed some of these by
+    simulating callers on paper, and each is breakable without a test going red.
+  - [ ] One name per concept for the formatter, while it is still free. `conf.entryFormatter` is
+    both the deprecated caller option and the resolved formatter slot, kept apart by a
+    non-enumerable property defined 25 lines below the inheritance loop it governs and 90 lines
+    from the second loop in `clone()`. All nine readers had to leave the file for `AGENTS.md` to
+    learn this — the highest-cost lookup in the project. It is also unsound: `ResolvedLogConf`
+    declares `entryFormatter` required while the property is non-enumerable, so
+    `const c: ResolvedLogConf = { ...log.conf }` compiles and `c.entryFormatter` is `undefined`.
+    Publishing 2.4.0 freezes that as a contract until 3.0.0.
+  - [ ] A payload kind that cannot be added silently, while it is still free. The discriminator is
+    the idiom `"resourceLogs" in payload` at six sites (`index.ts:637`, `727`, `732`, `780`, `957`
+    ×2), so it has no symbol to grep for. Adding the metrics kind README → Goals already promises
+    type-errors at exactly one of them; the other five compile clean and are wrong — a metric batch
+    routes to `/v1/traces` and is then dropped by the merge, after `takeBatch` has already
+    subtracted its bytes and removed it from the queue. Silent loss, no report line. Publishing
+    freezes `OtlpPayload` and `OtlpQueue` as consumer contracts.
+  - [ ] No comment that restates the code beneath it. Five or more readers each named
+    `index.ts:1380-1381` (the file's only consecutive pair, and its second line is contradicted by
+    the merge rules three lines below it), `index.ts:1282`, `index.ts:1563`, and the "kept out of
+    the class so it is trivially testable" half of `index.ts:404` and `index.ts:437`. The
+    `Not pure — it mutates span` half of that last one earns its place and stays.
+  - [ ] What is *not* redacted said beside the code that does not redact it. `buildLogPayload`
+    (`index.ts:405`) and `buildSpanPayload` (`index.ts:439`) export the message and every
+    metadata and context key verbatim. That is correct and is now exactly what Goal 3 says, but it
+    is half the answer to "where did this password come from?" and it lives only in a 27 KB README.
+- [ ] Survive a `logLevel` the union does not contain. `new Log({ logLevel: "trace" })` throws
+  `TypeError: Cannot read properties of undefined (reading 'severityNumber')` on `log.info()` and
+  on all five other level methods, because `enabled()` (`index.ts:1543`) indexes `LogLevels` with
+  it and `log()` gates on `enabled()`. TypeScript rejects the literal; the README's own examples
+  are JavaScript, where nothing does, and `LOG_LEVEL=trace` (pino) or `http` (winston) is the
+  obvious input. 2.4.0 is also the release adding `enabled()` as the guard README → Accept a logger
+  in your library tells library authors to call, so a library crashes inside its consumer's app. A
+  logging dependency killing the process over a one-word config mistake is the thing to end;
+  `msgTextFormatter` already treats the same class of input as reachable.
+- [ ] Make `traceparent` behave the way the option and the README both say it does — edge-only, not
+  inherited by clones or children. The constructor's inheritance loop (`index.ts:1287`) skips only
+  what `otlpKeysNotToInherit` returns, so it copies the parent's `traceparent` onto the child's
+  conf, while `clone()`'s separate skip set excludes it correctly: the two loops disagree. The
+  child's own span is right, so nothing is visibly wrong until the conf is spread — a spelling this
+  release advertises — where there is no `parentLog` to take precedence, the stale header is
+  adopted, and the new span is parented to a span belonging to a finished request. Whether the
+  instance it was given should keep it on `conf` is part of the question.
+- [ ] Make `generateTraceId` produce what three places say it produces: sixteen random bytes.
+  `index.ts:308` fixes the first one to `0x01` under the comment `// version 1 trace id`, but W3C
+  Trace Context has no version field inside a trace id — the version is the header's own first
+  field, which `formatTraceparent` already writes as `00`. So the comment, `generateTraceId`'s own
+  "Random 16-byte trace id", and README → Exports' "Random 32- and 16-hex-char ids" are all false
+  together, entropy is 120 bits rather than 128, and every trace id this library mints begins `01`.
+  No test depends on it.
+- [ ] Tell a `LogInt` implementer what this release costs them. 2.4.0 adds `enabled`, `flush` and
+  `sampled` to the type, so a hand-written `LogInt` passed as `parentLog` stops compiling on
+  upgrade — and the CHANGELOG bullet that should warn them enumerates only "conf, end, fetch, span
+  and traceparent", omitting the two it added. README → Exports has it right, so the CHANGELOG is
+  the false one.
+- [ ] Let a consumer upgrading from 2.2.0 close the allow-listed-header and opaque-url searches in
+  one sentence, the way the path-leak advisory already lets them. `log.fetch`, both allow-lists and
+  `captureQuery` all shipped in v2.3.0, so those two exposures have the same floor and neither
+  advisory says so. The opaque-url advisory has a second gap: it sends the reader to search for a
+  `url.full` starting with `null`, but the repo's own 2026-09-19 decision records a second broken
+  spelling, `https://example.comhttps://example.com/uuid`, which that search never finds.
 
 ### Ask before cutting
 
-- [ ] Settle whether an unsampled incoming `traceparent` is meant to stop **log records** or only
-  spans. Today `log()` returns before `enqueue` when `sampled` is false, so a consumer behind a
-  sampling gateway loses every exported record for unsampled requests — error records included —
-  with console output unchanged and no opt-out. OTel has no log-record sampler: a record carries the
-  trace flags and the log pipeline exports it regardless, so gating spans is correct and gating
-  records is this library's own choice. The answer decides whether 2.4.0 ships a code change or a
-  reworded bullet, and it wants a decision entry either way.
+- [ ] **When a caller says "don't trace this request", should we throw the log lines away too?**
+
+  *What happens today.* A gateway decides a request is not worth tracing and sends
+  `traceparent: 00-<trace>-<span>-00`. That last `00` means "not sampled". The handler passes the
+  header on — `new Log({ traceparent: req.headers.traceparent })` — and from then on:
+  - the span is not exported. Everyone agrees that part is right;
+  - **every log record is also not exported**, `log.error("payment failed")` included;
+  - the console still prints all of it, so nothing looks broken;
+  - there is no way to turn it off.
+
+  *What that looks like.* Your gateway samples 1 request in 100. A customer reports a bug. You open
+  Loki to find their error and it is not there, and never was, because their request was one of the
+  99. Meanwhile a request nobody cares about, that happened to be sampled, has its logs in full.
+
+  *Why it is a question and not simply a bug.* OpenTelemetry has no such thing as a log sampler. A
+  record carries the trace's sampled flag as data, and the log pipeline exports it regardless — the
+  flag tells the backend how to link the record, not whether to keep it. So dropping the *span* on
+  that flag is plainly right, and dropping the *records* is a choice this library made on its own,
+  in `log()` (`index.ts:1572`), which returns before the enqueue whenever `sampled` is false.
+
+  *The two answers.* **Export records always, and let only spans obey the flag** — this is what
+  2.3.0 did, so it is additive and safe in a minor, and you keep your error logs for unsampled
+  requests; it costs volume from exactly the fleet that sampling was meant to quieten. Or **keep
+  today's behaviour**, in which case the CHANGELOG bullet has to open with the consequence in the
+  consumer's words, because it currently reads as a feature about spans and buries the effect on
+  their logs. Either answer wants a decision entry naming the goal it serves.
 
 ## 2.5.0 — close the credential story
 
