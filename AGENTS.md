@@ -147,11 +147,11 @@ and who it is for, and a design decision that cannot be derived from them belong
 - 2026-09-20: every rule deciding whether a credential reaches a span sits in one region,
   `// --- Credentials on a span ---`, grouped by that question and not by the caller asking it, so
   `traceableUrl` and `buildUrlFull` are there and not beside `log.fetch`. README → Goals #3 is
-  checkable only against the whole set, and the rules used to sit in four regions ~800 lines apart
+  checkable only against the whole set, and the rules used to sit in two places ~800 lines apart
   with the call running upward and no comment at either end naming the other. Neither the banner
   nor this entry lists the routes in: the set is not closed while `spanName` is unsettled, and
-  prose has nothing keeping a count true. Scoped to spans because Goal 3's other two sinks are the
-  queue's, and 2.5.0's conf-redaction and Basic-over-`http:` items rewrite that code. Valid while
+  prose has nothing keeping a count true. Scoped to spans because the remaining credential rules are
+  the queue's, and 2.5.0's conf-redaction and Basic-over-`http:` items rewrite that code. Valid while
   the source is a single `index.ts`.
 
 ## Working here

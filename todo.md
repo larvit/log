@@ -23,14 +23,17 @@ two of its sub-items are free only until this release publishes.
 
 - [ ] Keep a credential written into `spanName` off the span, or say in README → Goals that it may
   stay. `conf.spanName` reaches `span.name` (`index.ts:1376`), the scope name every exported span
-  carries (`index.ts:440`) and, under `printTraceInfo`, the console line (`index.ts:1573`), and no
-  rule anywhere touches it. `new Log({ spanName: "GET " + req.url })` is the same accident
-  `url.full` is guarded against, and Goal 3 binds it as written — "nothing you put in a url, a
-  header or a **conf** may reach a span" — because its exemption names the message and metadata,
-  not a conf key. Either redact it the way a captured value is redacted, or extend the exemption to
-  caller-authored telemetry labels, which is a goal edit and so the human's; whichever way it goes
-  decides whether the credential region can name a closed set of routes, and whether this owes a
-  rotation advisory.
+  carries (`index.ts:440`) and, under `printTraceInfo`, the console line (`index.ts:1573`) — and
+  through the constructor's inheritance loop (`index.ts:1292`), which does not skip it, all three
+  for every child as well, plus each child's public `conf`. No rule anywhere touches it.
+  `new Log({ spanName: "GET " + req.url })` is the same accident `url.full` is guarded against, and
+  Goal 3 binds it as written — "nothing you put in a url, a header or a **conf** may reach a
+  span" — because its exemption names the message and metadata, not a conf key. Either redact it
+  the way a captured value is redacted, or extend that exemption to caller-authored telemetry
+  labels, which is a goal edit and so the human's: README → Options advertises `spanName` as
+  inherited, which argues it is a propagating label rather than a url. Whichever way it goes
+  decides whether the credential region can name a closed set of routes, and how wide a rotation
+  advisory would have to reach.
 - [ ] Keep a presigned url's credentials out of `url.full`. With `captureQuery` on, a url signed
   the way every AWS presigned url has been since 2014 exports its signature, the access key id
   carried inside `X-Amz-Credential`, and a live session token inside `X-Amz-Security-Token`.
@@ -95,8 +98,8 @@ two of its sub-items are free only until this release publishes.
   - [ ] No comment that restates the code beneath it. Five or more readers each named
     `index.ts:1385-1386` (whose second line is contradicted by the merge rules three lines below
     it), `index.ts:1287`, `index.ts:1568`, and the "kept out of the class so it is trivially
-    testable" half of `index.ts:383` and `index.ts:417`. The
-    `Not pure — it mutates span` half of that last one earns its place and stays.
+    testable" half of `index.ts:383` and `index.ts:417`. The `Not pure — it mutates span` half of
+    that last one earns its place and stays.
   - [ ] What is *not* redacted said beside the code that does not redact it. `buildLogPayload`
     (`index.ts:384`) and `buildSpanPayload` (`index.ts:418`) export the message and every
     metadata and context key verbatim. That is correct and is now exactly what Goal 3 says, but it
