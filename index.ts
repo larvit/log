@@ -1133,7 +1133,7 @@ export class Queue implements OtlpQueue {
 }
 
 // --- Credentials on a span -------------------------------------------------
-// Every rule keeping a credential off a span is here; a new one belongs here too.
+// A new rule keeping a credential off a span belongs here.
 
 // The `:` is optional and captured, so a scheme-relative `//user:pass@host` — what a runtime
 // hands back for a url it could not parse — matches too.
