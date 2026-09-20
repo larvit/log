@@ -1372,18 +1372,20 @@ test("log.fetch traces a successful call and drops the query by default", async 
 	t.end();
 });
 
-test("log.fetch captureQuery keeps the query but redacts known-sensitive keys", async t => {
+test("log.fetch captureQuery keeps the query but redacts known-sensitive keys and url credentials", async t => {
 	const { calls } = stubFetch();
 	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 
-	await log.fetch("https://api.test/x?q=hi&Signature=abc");
+	await log.fetch("https://api.test/x?q=hi&q=there&Signature=abc&next=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx");
 	await log.end();
 
 	const urlFull = clientSpan(calls).attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue;
 
-	t.ok(urlFull.includes("q=hi"), "non-sensitive query param is kept");
+	t.ok(urlFull.includes("q=hi&q=there"), "a repeated non-sensitive query param keeps both values");
 	t.ok(urlFull.includes("Signature=REDACTED"), "sensitive query value is redacted");
 	t.ok(!urlFull.includes("abc"), "the sensitive value is not leaked");
+	t.ok(urlFull.includes("next=https%3A%2F%2FREDACTED%40cb.test%2Fx"), "userinfo in a url nested in a query value is redacted");
+	t.ok(!urlFull.includes("hunter2"), "the nested password is not leaked");
 	t.end();
 });
 
@@ -1437,16 +1439,16 @@ test("log.fetch keeps a url's credentials off the exported span", async t => {
 	t.end();
 });
 
-test("log.fetch captures allow-listed request and response headers only", async t => {
-	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ "x-resp": "rv", "x-secret": "nope" }) }) : undefined);
+test("log.fetch captures allow-listed request and response headers only, never a credential", async t => {
+	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ "set-cookie": "sid=hunter2", "x-resp": "rv", "x-secret": "nope" }) }) : undefined);
 	const log = new Log({
-		captureRequestHeaders: ["x-req"],
-		captureResponseHeaders: ["x-resp"],
+		captureRequestHeaders: ["Authorization", "referer", "x-req"],
+		captureResponseHeaders: ["set-cookie", "x-resp"],
 		otlpHttpBaseURI: "http://127.0.0.1:4318",
 		stderr: () => {},
 	});
 
-	await log.fetch("https://api.test/h", { headers: { "x-other": "ignored", "x-req": "qv" } });
+	await log.fetch("https://api.test/h", { headers: { authorization: "Bearer hunter2", referer: "https://myuser:hunter2@cb.test/x", "x-other": "ignored", "x-req": "qv" } });
 	await log.end();
 
 	const span = clientSpan(calls);
@@ -1454,8 +1456,12 @@ test("log.fetch captures allow-listed request and response headers only", async 
 
 	t.strictEqual(attr("http.request.header.x-req"), "qv", "allow-listed request header captured");
 	t.strictEqual(attr("http.request.header.x-other"), undefined, "non-listed request header not captured");
+	t.strictEqual(attr("http.request.header.authorization"), "REDACTED", "an allow-listed credential header records its presence, not its value");
+	t.strictEqual(attr("http.request.header.referer"), "https://REDACTED@cb.test/x", "userinfo in a captured header value is redacted");
 	t.strictEqual(attr("http.response.header.x-resp"), "rv", "allow-listed response header captured");
 	t.strictEqual(attr("http.response.header.x-secret"), undefined, "non-listed response header not captured");
+	t.strictEqual(attr("http.response.header.set-cookie"), "REDACTED", "an allow-listed set-cookie records its presence, not its value");
+	t.ok(!JSON.stringify(calls.filter(call => call.path.startsWith("/v1/"))).includes("hunter2"), "no credential reaches the collector");
 	t.end();
 });
 
