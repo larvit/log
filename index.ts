@@ -369,27 +369,6 @@ function partialRejection(body: unknown): { message?: string, rejected: number }
 	}
 }
 
-// The `:` is optional and captured, so a scheme-relative `//user:pass@host` — what a runtime
-// hands back for a url it could not parse — matches too.
-const URL_USERINFO = /(:?\/\/)[^/?#\s]*@/g;
-const redactUserinfo = (text: string) => text.replace(URL_USERINFO, "$1REDACTED@");
-const holdsUserinfo = (text: string) => redactUserinfo(text) !== text;
-
-// error.type per OTel semconv; "_OTHER" is its fallback.
-function spanFailure(error: unknown): { message: string, type: string } {
-	let message = stringField(error, "message");
-
-	if (message === undefined) {
-		try {
-			message = String(error);
-		} catch {
-			message = "_OTHER";
-		}
-	}
-
-	return { message: redactUserinfo(message), type: stringField(error, "code") ?? stringField(error, "name") ?? "_OTHER" };
-}
-
 // Resource-level OTLP attributes (service.name + telemetry.sdk.*), shared by logs and spans.
 // Grafana/Loki reads service.name from here, not from the records.
 function buildResourceAttributes(context: DefinedMetadata): OtlpAttribute[] {
@@ -1153,10 +1132,16 @@ export class Queue implements OtlpQueue {
 	}
 }
 
-// --- log.fetch helpers -----------------------------------------------------
+// --- Credentials on a span -------------------------------------------------
+// Every rule deciding whether a credential reaches a span is below, and three routes carry one
+// in: `buildUrlFull` (url.full), `capturedHeaderValue` (an allow-listed header) and `spanFailure`
+// (an error message quoted into a status). A fourth route redacts here or nowhere.
 
-// Mirrors the default deny-list of the official OTel HTTP instrumentations.
-const SENSITIVE_QUERY_KEYS = new Set(["awsaccesskeyid", "signature", "sig", "x-goog-signature"]);
+// The `:` is optional and captured, so a scheme-relative `//user:pass@host` — what a runtime
+// hands back for a url it could not parse — matches too.
+const URL_USERINFO = /(:?\/\/)[^/?#\s]*@/g;
+const redactUserinfo = (text: string) => text.replace(URL_USERINFO, "$1REDACTED@");
+const holdsUserinfo = (text: string) => redactUserinfo(text) !== text;
 
 // Run by run, never the whole string: decodeURIComponent throws on the first invalid escape.
 function percentDecoded(value: string): string {
@@ -1180,6 +1165,13 @@ function capturedValue(value: string): string {
 	return holdsUserinfo(value) || holdsUserinfo(percentDecoded(value)) ? "REDACTED" : value;
 }
 
+// Header names carrying a credential by definition: RFC 9110 authentication, RFC 6265 cookies.
+const SENSITIVE_HEADER_NAMES = new Set(["authorization", "cookie", "proxy-authorization", "set-cookie"]);
+
+function capturedHeaderValue(name: string, value: string): string {
+	return SENSITIVE_HEADER_NAMES.has(name.toLowerCase()) ? "REDACTED" : capturedValue(value);
+}
+
 // The URL log.fetch traces: a scheme written without "//" parses to an opaque path, where
 // userinfo, or a data: payload, sits in pathname and would ride into url.full.
 function traceableUrl(input: string | URL): URL | undefined {
@@ -1193,6 +1185,9 @@ function traceableUrl(input: string | URL): URL | undefined {
 
 	return url.protocol === "http:" || url.protocol === "https:" ? url : undefined;
 }
+
+// Mirrors the default deny-list of the official OTel HTTP instrumentations.
+const SENSITIVE_QUERY_KEYS = new Set(["awsaccesskeyid", "signature", "sig", "x-goog-signature"]);
 
 // `url.origin` omits userinfo, which is what keeps the outer url's credentials off the span.
 function buildUrlFull(url: URL, captureQuery: boolean): string {
@@ -1211,12 +1206,22 @@ function buildUrlFull(url: URL, captureQuery: boolean): string {
 	return `${base}?${kept.toString()}`;
 }
 
-// Header names carrying a credential by definition: RFC 9110 authentication, RFC 6265 cookies.
-const SENSITIVE_HEADER_NAMES = new Set(["authorization", "cookie", "proxy-authorization", "set-cookie"]);
+// error.type per OTel semconv; "_OTHER" is its fallback.
+function spanFailure(error: unknown): { message: string, type: string } {
+	let message = stringField(error, "message");
 
-function capturedHeaderValue(name: string, value: string): string {
-	return SENSITIVE_HEADER_NAMES.has(name.toLowerCase()) ? "REDACTED" : capturedValue(value);
+	if (message === undefined) {
+		try {
+			message = String(error);
+		} catch {
+			message = "_OTHER";
+		}
+	}
+
+	return { message: redactUserinfo(message), type: stringField(error, "code") ?? stringField(error, "name") ?? "_OTHER" };
 }
+
+// --- Conf inheritance and deprecation --------------------------------------
 
 const OTLP_TRANSPORT_KEYS = ["otlpAdditionalHeaders", "otlpHttpBaseURI", "otlpProtocol"] as const;
 
@@ -1257,6 +1262,8 @@ function warnDeprecated(conf: ResolvedLogConf, metadata: DefinedMetadata, msg: s
 	warned.add(msg);
 	conf.stderr(conf.entryFormatter({ colors: conf.colors, logLevel: "warn", metadata, msTimestamp: conf.clock.now(), msg }));
 }
+
+// --- Log -------------------------------------------------------------------
 
 export class Log implements LogInt {
 	context: DefinedMetadata;
