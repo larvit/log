@@ -5,6 +5,18 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
 
 ## Security
 
+- [ ] Keep a url nested in the request path out of `url.full`. `buildUrlFull` is `url.origin +
+  url.pathname` and redacts only the query, so
+  `log.fetch("https://proxy.test/fetch/https://user:pass@cb.test/x")` exports that password with no
+  capture option involved — the one credential shape that reaches a span on the default path,
+  against Goals' "nothing you put in a url reaches a span". A fetch-through proxy, a CORS or image
+  proxy, a webhook replay endpoint and a signed-url wrapper all take that shape, and
+  percent-encoding it changes nothing. `capturedValue` already holds the rule; what it does not
+  settle is the cost, because a path is not a value: replacing the whole of it on a hit loses the
+  endpoint the telemetry reader needs, where `/a//b@2x.png` would take the path with it, and
+  splicing `REDACTED@` in the way `spanFailure` does covers the literal spelling only. Decide
+  which, and record it beside the 2026-09-20 entry that settled the same question for values.
+  The 2.4.0 CHANGELOG already carries this as an open exposure with a rotation advisory.
 - [ ] Decide what to do about Basic credentials sent over plain `http:` to a non-loopback host,
   now that they are really sent: anything on the network path can read them (CWE-319). Either warn
   once per `report` sink when the endpoint is `http:` and carries userinfo, or require `https:`
@@ -49,6 +61,16 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
 - [x] Inject one clock (`now`, `setTimeout`, `clearTimeout`) behind span and record timestamps and
   the `Queue` timers, so tests assert exact times instead of "within an hour" and the retry
   schedule, its 30 s cap included, without waiting.
+- [ ] Spell a redacted `url.full` the way OTel semconv asks — `https://REDACTED:REDACTED@host/x` —
+  instead of dropping the userinfo silently. Today a span can carry `url.full` showing a
+  credential-free url beside a `status.message` quoting `http://REDACTED@host/x`, so the reader is
+  told both that credentials were written and that they were not. Only React Native reaches it;
+  Node and browsers refuse the url first. It belongs beside the 2026-09-20 decision that settled
+  how `REDACTED` is spelled everywhere else.
+- [ ] Keep the auth scheme when an allow-listed `authorization` records `REDACTED`: `Bearer
+  REDACTED` and `Basic REDACTED` tell a reader chasing a 401 whether the caller sent the wrong kind
+  of credential, and RFC 9110's `auth-scheme` is a fixed token, never the secret. Split on the
+  first space and keep the prefix only where it matches the token grammar.
 - [ ] Leave a `Request` untraced in `log.fetch`. A JS consumer passing one gets `String(request)` =
   `"[object Request]"`, which in a browser resolves against `location.href` to an http(s) url:
   `log.fetch` then traces that invented url and fetches it with `init` alone, dropping the request's
@@ -118,6 +140,10 @@ first and lands in 3.0.0 with a `MIGRATION.md` entry. Additive work ships in 2.x
 
 ## 3.0.0, breaking
 
+- [ ] Give the redaction sentinel its own name — `REDACTED by @larvit/log` or similar. Today one
+  token means three things to the telemetry reader: a header redacted by name, a value that matched
+  a credential shape, and a value the consumer's own app had already redacted upstream. `REDACTED`
+  shipped in 2.3.0 and `log.span` is a stated contract, so renaming it waits for the major.
 - [ ] Remove the level-string shorthand from `Log` and `clone`.
 - [ ] Remove `entryFormatter`; `format` is `"text" | "json" | ((entry) => string)`.
 - [ ] Rename `EntryFormatterConf` to `LogEntry`: it is an entry, and the option it was named after

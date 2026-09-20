@@ -9,14 +9,23 @@
   `captureResponseHeaders` record `REDACTED`, so the span still shows the header was there. Any
   other captured header value records `REDACTED` too where it holds url userinfo — a `referer` or a
   `location` carrying an OAuth `redirect_uri` — and with `captureQuery` on so does a query value,
-  where matching only the key left `?next=https://user:pass@host/x` exporting the password.
-  One layer of percent-encoding does not hide either. It covers the shapes a credential is
-  recognisable in, not every credential: a header whose value simply *is* a secret, `x-api-key` or
-  your own signed token, is exported as you sent it, so don't allow-list one.
+  where matching only the key left `?next=https://user:pass@host/x` exporting the password, as does
+  a query key, so a credentialed url written as a bare key records as a parameter named `REDACTED`.
+  One layer of percent-encoding does not hide any of it; two still does. A value merely shaped like
+  a credential goes the same way: a `location` of `https://cdn.test//logo@2x.png` records
+  `REDACTED` whole. What it does not reach is a header or query value that simply *is* a secret —
+  `x-api-key`, your own signed token — which is exported as you sent it, so don't allow-list one.
   **Rotate any credential you named one of those four headers for, or put in a url you captured in
-  a header or a query string**: search your tracing backend for `http.request.header.authorization`
-  and `http.response.header.set-cookie`, and for `@` or `%40` across `url.full` and
-  `http.request.header.*` / `http.response.header.*`.
+  a header or a query string**: search each header you allow-listed, under
+  `http.request.header.*` and `http.response.header.*`, for those four names, and search those same
+  attributes and `url.full` for `@`, `%40` or `%2540`.
+- Not fixed: a url nested in the request **path** still reaches `url.full` as you wrote it. `url.full`
+  is built from the origin and the path, and only the query is redacted, so
+  `log.fetch("https://proxy.test/fetch/https://user:pass@cb.test/x")` — the shape a fetch-through
+  proxy, a CORS or image proxy or a webhook replay endpoint takes — exports that password to your
+  tracing backend with no capture option involved. Percent-encoding it changes nothing.
+  **Rotate any credential you have passed inside a url nested in a path**, and search `url.full`
+  for a second `://` or `%3A%2F%2F` after the host.
 - A span's status message no longer carries url credentials: userinfo in a url the message quotes
   is exported as `http://REDACTED@host/x`. On Node and in browsers `fetch` refuses a url carrying
   credentials and quotes the whole url into its `TypeError`, which reached the backend both as the
