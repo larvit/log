@@ -149,8 +149,9 @@ and who it is for, and a design decision that cannot be derived from them belong
   `traceableUrl` and `buildUrlFull` are there and not beside `log.fetch`. README → Goals #3 is
   checkable only against the whole set, and the rules used to sit in two places ~800 lines apart
   with the call running upward and no comment at either end naming the other. Neither the banner
-  nor this entry lists the routes in: the set is not closed while `spanName` is unsettled, and
-  prose has nothing keeping a count true. Scoped to spans because the remaining credential rules are
+  nor this entry lists the routes in: prose has nothing keeping a count true, and the
+  userinfo-free-by-construction choices at the `log.fetch` call site are not rules this region
+  holds. Scoped to spans because the remaining credential rules are
   the queue's, and 2.5.0's conf-redaction and Basic-over-`http:` items rewrite that code. Valid while
   the source is a single `index.ts`.
 

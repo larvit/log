@@ -21,24 +21,6 @@ two of its sub-items are free only until this release publishes.
 
 ### Security
 
-- [ ] Keep a credential written into `spanName` off the span, or say in README → Goals that it may
-  stay. `conf.spanName` reaches `span.name` (`index.ts:1375`), the scope name every exported span
-  carries (`index.ts:440`) and, under `printTraceInfo`, the console line (`index.ts:1572`) — and
-  through the constructor's inheritance loop (`index.ts:1291`), which does not skip it, all three
-  for every child as well, plus each child's public `conf`. No rule anywhere touches it.
-  `new Log({ spanName: "GET " + req.url })` is the same accident `url.full` is guarded against, and
-  Goal 3 binds it as written — "nothing you put in a url, a header or a **conf** may reach a
-  span" — because its exemption names the message and metadata, not a conf key. Either redact it
-  the way a captured value is redacted, or extend that exemption to caller-authored telemetry
-  labels, which is a goal edit and so the human's: README → Options advertises `spanName` as
-  inherited, which argues it is a propagating label rather than a url. The axis settles more than
-  `spanName`: `context` is read as exempt below (it is metadata) while being just as much a conf
-  key, and an allow-listed header or query value that simply **is** a secret — `x-api-key`, a
-  signed token — is exported as sent, which README → `log.fetch` in depth calls permanent and no
-  item tracks. Say whether the exemption covers caller-authored telemetry payload or merely what is
-  not a conf key, and all of them fall out together; the `spanName` row in README → Options is then
-  worded to match. Whichever way it goes decides whether the credential region can name a closed
-  set of routes, and how wide a rotation advisory would have to reach.
 - [ ] Keep a presigned url's credentials out of `url.full`. With `captureQuery` on, a url signed
   the way every AWS presigned url has been since 2014 exports its signature, the access key id
   carried inside `X-Amz-Credential`, and a live session token inside `X-Amz-Security-Token`.
@@ -182,7 +164,7 @@ two of its sub-items are free only until this release publishes.
   url.pathname` and redacts only the query, so
   `log.fetch("https://proxy.test/fetch/https://user:pass@cb.test/x")` exports that password with no
   capture option involved — the one credential shape that reaches a span on the default path,
-  against Goals' "nothing you put in a url reaches a span". A fetch-through proxy, a CORS or image
+  against Goals' "a url it fetches … never reaches a span". A fetch-through proxy, a CORS or image
   proxy, a webhook replay endpoint and a signed-url wrapper all take that shape, and
   percent-encoding it changes nothing. `capturedValue` already holds the rule; what it does not
   settle is the cost, because a path is not a value: replacing the whole of it on a hit loses the

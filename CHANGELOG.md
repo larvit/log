@@ -4,6 +4,13 @@
 
 ### Security
 
+- Goals now say plainly which text this library will never clean for you: the log message,
+  metadata, `context`, `spanName`, and a header or query value you allow-list that simply *is* a
+  secret. Nothing exported has changed — `spanName` has always gone out as you wrote it — but if
+  you build one from a request url (`spanName: "GET " + req.url`), its credentials reach your
+  tracing backend, in the span name, the scope name and, under `printTraceInfo`, your console; a
+  child log inherits the name, so one such `spanName` labels the whole trace. Name the route, not
+  the url.
 - Not fixed, and still exporting on every such call until it is: a url nested in the request **path**
   reaches `url.full` as you wrote it. `url.full` is built from the origin and the path, and only
   the query is redacted, so
