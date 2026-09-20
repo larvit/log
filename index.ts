@@ -373,6 +373,7 @@ function partialRejection(body: unknown): { message?: string, rejected: number }
 // from it without one, as a scheme-relative `//user:pass@host` does.
 const URL_USERINFO = /(:?\/\/)[^/?#\s]*@/g;
 const redactUserinfo = (text: string) => text.replace(URL_USERINFO, "$1REDACTED@");
+const holdsUserinfo = (text: string) => redactUserinfo(text) !== text;
 
 // error.type per OTel semconv; "_OTHER" is its fallback.
 function spanFailure(error: unknown): { message: string, type: string } {
@@ -1158,6 +1159,20 @@ export class Queue implements OtlpQueue {
 // default deny-list of the official OTel HTTP instrumentations. Matched case-insensitively.
 const SENSITIVE_QUERY_KEYS = new Set(["awsaccesskeyid", "signature", "sig", "x-goog-signature"]);
 
+// A url nested in a captured value is normally percent-encoded, which hides the `//` and `@`
+// URL_USERINFO looks for, so the decoded spelling is tested too. A hit drops the whole value rather
+// than splicing REDACTED in, because the encoding is the caller's and rewriting inside it would
+// report something they never sent.
+function capturedValue(value: string): string {
+	let decoded = value;
+
+	try {
+		decoded = decodeURIComponent(value);
+	} catch { /* not percent-encoded; the raw test below is the whole answer */ }
+
+	return holdsUserinfo(value) || holdsUserinfo(decoded) ? "REDACTED" : value;
+}
+
 // The URL log.fetch traces: a scheme written without "//" parses to an opaque path, where
 // userinfo, or a data: payload, sits in pathname and would ride into url.full.
 function traceableUrl(input: string | URL): URL | undefined {
@@ -1184,7 +1199,7 @@ function buildUrlFull(url: URL, captureQuery: boolean): string {
 	const kept = new URLSearchParams();
 
 	for (const [key, value] of new URLSearchParams(url.search)) {
-		kept.append(key, SENSITIVE_QUERY_KEYS.has(key.toLowerCase()) ? "REDACTED" : redactUserinfo(value));
+		kept.append(capturedValue(key), SENSITIVE_QUERY_KEYS.has(key.toLowerCase()) ? "REDACTED" : capturedValue(value));
 	}
 
 	return `${base}?${kept.toString()}`;
@@ -1195,7 +1210,7 @@ const SENSITIVE_HEADER_NAMES = new Set(["authorization", "cookie", "proxy-author
 
 // An allow-listed header still records that it was there; what it cannot record is the credential.
 function capturedHeaderValue(name: string, value: string): string {
-	return SENSITIVE_HEADER_NAMES.has(name) ? "REDACTED" : redactUserinfo(value);
+	return SENSITIVE_HEADER_NAMES.has(name) ? "REDACTED" : capturedValue(value);
 }
 
 const OTLP_TRANSPORT_KEYS = ["otlpAdditionalHeaders", "otlpHttpBaseURI", "otlpProtocol"] as const;
