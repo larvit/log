@@ -6,14 +6,16 @@
 
 - A header you allow-list is no longer a way to export a credential: `authorization`,
   `proxy-authorization`, `cookie` and `set-cookie` named in `captureRequestHeaders` or
-  `captureResponseHeaders` record `REDACTED`, so the span still shows the header was there.
-  Userinfo in any other captured header value — a `referer` or `location` holding a credentialed
-  url — is redacted as a span status message's is, and with `captureQuery` on the same redaction
-  now reaches a url nested in a query value, where matching only the key left
-  `?next=https://user:pass@host/x` exporting the password percent-encoded.
-  **Rotate any credential you named one of those four headers for, or put in a url inside a query
-  string you captured**: search your tracing backend for `http.request.header.authorization`,
-  `http.response.header.set-cookie`, or `%40` in `url.full`.
+  `captureResponseHeaders` record `REDACTED`, so the span still shows the header was there. Any
+  other captured header value records `REDACTED` too where it holds url userinfo — a `referer` or a
+  `location` carrying an OAuth `redirect_uri` — and with `captureQuery` on so does a query value,
+  where matching only the key left `?next=https://user:pass@host/x` exporting the password.
+  One layer of percent-encoding does not hide either. It covers the shapes a credential is
+  recognisable in, not every credential: a header whose value simply *is* a secret, `x-api-key` or
+  your own signed token, is exported as you sent it, so don't allow-list one.
+  **Rotate any credential you named one of those four headers for, or put in a url you captured in
+  a header or a query string**: search your tracing backend for
+  `http.request.header.authorization`, `http.response.header.set-cookie`, or `%40` in `url.full`.
 - A span's status message no longer carries url credentials: userinfo in a url the message quotes
   is exported as `http://REDACTED@host/x`. On Node and in browsers `fetch` refuses a url carrying
   credentials and quotes the whole url into its `TypeError`, which reached the backend both as the

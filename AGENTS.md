@@ -116,18 +116,24 @@ and who it is for, and a design decision that cannot be derived from them belong
   `user:pass@host` with no slashes at all stays unredacted. Valid while `log.fetch` is a drop-in
   for the runtime's `fetch` and a runtime quotes the url with its authority slashes.
 
-- 2026-09-20: a value `log.fetch` copies onto a span carries no credential, per README → Goals'
-  "a credential never leaves". Two mechanisms, because a header name is a reliable signal where a
-  value is not: `authorization`, `proxy-authorization`, `cookie` and `set-cookie` record
-  `REDACTED` whole, and every other captured header value, plus every query value `captureQuery`
-  keeps, runs through the same userinfo redaction a span status message does. Redacting rather
-  than rejecting the allow-list entry is what a minor allows — README → Audience deprecates a
-  breaking change in a 2.x minor first, and the leak is open now — and it matches the stance
-  `SENSITIVE_QUERY_KEYS` already took, so the two allow-lists agree. `REDACTED` over dropping the
-  attribute keeps the telemetry reader's "was the header there?", which is what an allow-list is
-  for once the value is gone. The four names are the ones whose value is a credential by
-  definition (RFC 9110 authentication, RFC 6265 cookies); a header whose value merely may hold one
-  is covered by the userinfo pass. Valid while an allow-list names header names, not patterns.
+- 2026-09-20: a value `log.fetch` copies onto a span records `REDACTED` in place of the whole value
+  where it holds a credential, per README → Goals' "a credential never leaves". One rule for
+  captured header values and for the query values `captureQuery` keeps, because the same
+  credentialed url reaches a span by either route and two rules would disagree the way the two
+  allow-lists used to: `authorization`, `proxy-authorization`, `cookie` and `set-cookie` go by
+  name, and everything else goes by whether the value holds url userinfo raw or one
+  `decodeURIComponent` deep — a nested url is normally percent-encoded, which hides the `//` and
+  `@` from `URL_USERINFO`. Redacting rather than rejecting the allow-list entry is what a minor
+  allows — README → Audience deprecates a breaking change in a 2.x minor first, and the leak is
+  open now — and it matches the stance `SENSITIVE_QUERY_KEYS` already took. `REDACTED` over
+  dropping the attribute keeps the telemetry reader's "was the header there?", which is what an
+  allow-list is for once the value is gone. `spanFailure` keeps splicing `REDACTED@` into the url
+  instead, because there the surrounding text is a message a human reads and the encoding is the
+  runtime's own; a captured value's encoding is the caller's, so rewriting inside it would report
+  something they never sent. The four names are the ones whose value is a credential by definition
+  (RFC 9110 authentication, RFC 6265 cookies). What this does not reach, and the README says so, is
+  a header whose value simply is a secret — `x-api-key`, a signed token — which no shape
+  distinguishes from any other string. Valid while an allow-list names header names, not patterns.
 
 ## Working here
 
