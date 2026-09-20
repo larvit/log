@@ -118,9 +118,10 @@ and who it is for, and a design decision that cannot be derived from them belong
 
 - 2026-09-20: a value `log.fetch` copies onto a span records `REDACTED` in place of the whole value
   where it holds a credential, per README → Goals' "a credential never leaves". One rule for
-  captured header values and for the query values `captureQuery` keeps, because the same
-  credentialed url reaches a span by either route and two rules would disagree the way the two
-  allow-lists used to: `authorization`, `proxy-authorization`, `cookie` and `set-cookie` go by
+  captured header values and for the query values `captureQuery` keeps — and for a query key, since
+  a url written as a bare key reaches `url.full` the same way its value would — because the same
+  credentialed url arrives by every one of those routes and separate rules would disagree the way
+  the two allow-lists used to: `authorization`, `proxy-authorization`, `cookie` and `set-cookie` go by
   name, and everything else goes by whether the value holds url userinfo raw or once decoded — a
   nested url is normally percent-encoded, which hides the `//` and `@` from `URL_USERINFO`. The
   decode runs escape-run by escape-run rather than over the whole string, because
@@ -136,7 +137,12 @@ and who it is for, and a design decision that cannot be derived from them belong
   something they never sent. The four names are the ones whose value is a credential by definition
   (RFC 9110 authentication, RFC 6265 cookies). What this does not reach, and the README says so, is
   a header whose value simply is a secret — `x-api-key`, a signed token — which no shape
-  distinguishes from any other string. Valid while an allow-list names header names, not patterns.
+  distinguishes from any other string. Over-redaction stays the safe direction, as the entry above
+  has it, but the cost is higher here than in a status message: the reader loses the whole
+  attribute, so a `location` of `https://cdn.test//logo@2x.png` records `REDACTED`. Weighed against
+  README → Audience #3 and taken, because Goals ranks the credential above the reader, and the
+  README says it so that reader is not left guessing. Valid while an allow-list names header names,
+  not patterns.
 
 ## Working here
 
