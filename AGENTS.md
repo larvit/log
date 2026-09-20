@@ -144,6 +144,15 @@ and who it is for, and a design decision that cannot be derived from them belong
   README says it so that reader is not left guessing. Valid while an allow-list names header names,
   not patterns.
 
+- 2026-09-20: every rule deciding whether a credential reaches a span sits in one region,
+  `// --- Credentials on a span ---`, grouped by that question and not by the caller asking it, so
+  `traceableUrl` and `buildUrlFull` are there and not beside `log.fetch`. README → Goals #3 is
+  checkable only by enumerating the routes in, and the region's banner names all three —
+  `buildUrlFull`, `capturedHeaderValue`, `spanFailure` — with everything else private to it; the
+  rules used to sit in four regions ~800 lines apart with the call running upward and no comment at
+  either end naming the other. Valid while Goal 3 binds what a consumer configures and not what
+  they hand a log call, which is exported as written.
+
 ## Working here
 
 - Source is a single `index.ts`, compiled + uglified to `index.js` for publish.
