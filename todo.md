@@ -5,20 +5,83 @@ act on leads with `### Security`, the shape AGENTS.md → Working here already s
 `CHANGELOG.md`. Per README → Audience, everything breaking is deprecated in a 2.x minor first and
 lands in 3.0.0 with a `MIGRATION.md` entry.
 
-## Open question, ahead of every release below
-
-Settle whether README → Goals' "A credential never leaves. Nothing you put in a url, a header or a
-conf reaches a span, a record or `stderr`" is the target or the claim. Read as a claim it is now
-contradicted by three things the repo documents itself: a url nested in the request path, a header
-or query value that simply is a secret, and `otlpHttpBaseURI` sitting on `log.conf`. Read as a
-target it is exactly right and both 2026-09-20 decisions derive from it. A goal is the human's to
-word, and the answer re-sorts 2.5.0 below, so it comes first.
-
 ## 2.4.0
 
-Nothing left. `CHANGELOG.md` → `## Unreleased` holds it: five credential leaks closed with four
+`CHANGELOG.md` → `## Unreleased` holds what is done: five credential leaks closed with four
 rotation advisories, the export queue, the injectable clock, `Logger`, and the `entryFormatter` and
-level-string deprecations. Ready to cut.
+level-string deprecations. A 2026-09-20 architecture, product and comprehension review found the
+items below in that state; each is non-breaking, and each is either a live exposure, a crash, or a
+claim the repo makes and does not keep.
+
+### Security
+
+- [ ] Redact the SigV4 presigned-url query keys: `x-amz-signature`, `x-amz-credential`,
+  `x-amz-security-token` and `x-goog-credential`. `SENSITIVE_QUERY_KEYS` (`index.ts:1159`) mirrors
+  OTel semconv's default deny-list, which is the SigV2/Azure-era one — so with `captureQuery` on, a
+  presigned S3 url exports its signature in full, its access key id inside `X-Amz-Credential`, and a
+  live session token inside `X-Amz-Security-Token`. Every AWS presigned url written since 2014 takes
+  that shape. Semconv's list is a default, not a maximum, so redacting more breaks no spec and the
+  2026-09-20 decision already licenses over-redaction in a minor. Live since 2.3.0, where
+  `captureQuery` and `url.full` shipped, so it needs a rotation advisory of its own.
+- [ ] Give the path-nested-url advisory a search that finds the likeliest shape. `CHANGELOG.md`
+  tells the reader to search `url.full` for `@`, `%40` and `%2540`; a nested url is normally
+  percent-encoded and normally signed, so its credential is a query parameter of the inner url and
+  **none of those three appear anywhere in it**. A consumer runs exactly the advised search, comes
+  back clean and concludes they are safe. Add the second-`://`-or-`%3A%2F%2F`-after-the-origin
+  search and name the parameter shapes.
+- [ ] Put the `conf` credential exposure in the release's `### Security` section, and widen it to
+  `otlpAdditionalHeaders`. 2.4.0 makes it worse in two ways the section does not mention:
+  `queue.conf` becomes a second public holder of the same string, and `user:pass@` starts actually
+  working, so more consumers will set it. The README warns "don't log your `conf`" in the
+  `otlpHttpBaseURI` row only — the `otlpAdditionalHeaders` row, the spelling the docs steer people
+  to for a token, carries no warning at all. Per AGENTS.md → Working here, a release with an
+  exposure still open leads with `### Security` holding it.
+
+### Everything else
+
+- [ ] Stop an unknown `logLevel` crashing every level method. `enabled()` (`index.ts:1543`) reads
+  `LogLevels[this.conf.logLevel].severityNumber`, and `log()` gates on `enabled()`, so
+  `new Log({ logLevel: "trace" })` throws `TypeError: Cannot read properties of undefined` on
+  `log.info()` and on all five others. TypeScript rejects the literal; the README's own examples are
+  JavaScript, where nothing does, and `LOG_LEVEL=trace` (pino) or `http` (winston) is the obvious
+  input. 2.4.0 is also the release that adds `enabled()` as the guard README → Accept a logger in
+  your library tells library authors to call, so a library crashes inside its consumer's app. Fall
+  back to `"info"` and warn once through the existing sink, as `msgTextFormatter` already does for
+  the same class of input.
+- [ ] Keep `traceparent` out of a child's `conf`. The constructor's inheritance loop
+  (`index.ts:1287`) skips only what `otlpKeysNotToInherit` returns, so it copies the parent's
+  `traceparent` — against the option's own comment ("Edge-only: not inherited by clones/children")
+  and README → Options. `clone()`'s separate skip set excludes it correctly, so the two loops
+  disagree. The child's own span is right; a spread of that conf, a spelling this release
+  advertises, has no `parentLog` and adopts the stale header, parenting a span to a dead upstream
+  span. Add it to the skip set, and settle whether the instance it was given keeps it on `conf`.
+- [ ] Drop `bytes[0] = 0x01` from `generateTraceId` (`index.ts:308`). W3C Trace Context has no
+  version field inside a trace id — the version is the header's own first field, which
+  `formatTraceparent` already writes as `00`. The line makes three things false at once: its own
+  `// version 1 trace id`, `generateTraceId`'s "Random 16-byte trace id", and README → Exports'
+  "Random 32- and 16-hex-char ids". It also spends 8 bits of entropy and makes every trace id this
+  library mints start `01`. No test depends on it.
+- [ ] Correct the `LogInt` enumeration in the CHANGELOG: it omits `flush` and `sampled`, which
+  2.4.0 adds alongside `enabled`. README → Exports has it right, so the CHANGELOG is the false one.
+  Say what it costs — a hand-written `LogInt` passed as `parentLog` stops compiling on upgrade.
+- [ ] Give `index.ts` an honest section map. Three banners cover 1632 lines, lines 1–467 have none,
+  and the last one, `// --- log.fetch helpers ---` at 1156, therefore stands over `class Log`
+  (1261–1632) — 372 lines that are not fetch helpers, so a reader scrolling up from the constructor
+  is told where they are and told wrong. Both architect seats named this the worst navigational
+  defect in the repo, and it is five comment lines.
+- [ ] Scope advisories 2 and 5 to v2.3.0, the way advisory 1 already scopes itself. `log.fetch`,
+  both allow-lists and `captureQuery` all shipped there, so both exposures have the same floor and
+  a consumer upgrading from 2.2.0 can close the search in one sentence.
+
+### Ask before cutting
+
+- [ ] Settle whether an unsampled incoming `traceparent` is meant to stop **log records** or only
+  spans. Today `log()` returns before `enqueue` when `sampled` is false, so a consumer behind a
+  sampling gateway loses every exported record for unsampled requests — error records included —
+  with console output unchanged and no opt-out. OTel has no log-record sampler: a record carries the
+  trace flags and the log pipeline exports it regardless, so gating spans is correct and gating
+  records is this library's own choice. The answer decides whether 2.4.0 ships a code change or a
+  reworded bullet, and it wants a decision entry either way.
 
 ## 2.5.0 — close the credential story
 
@@ -36,13 +99,14 @@ level-string deprecations. Ready to cut.
   splicing `REDACTED@` in the way `spanFailure` does covers the literal spelling only. Decide
   which, and record it beside the 2026-09-20 entry that settled the same question for values.
   The 2.4.0 CHANGELOG carries this as an open exposure with a rotation advisory.
-- [ ] Keep `otlpHttpBaseURI` credentials off `log.conf` and `queue.conf`, which the README
-  documents as public: the URI sits there verbatim, so a consumer who logs their own conf — as
-  the README's own library example spells `JSON.stringify(options.settings)` — puts the password
-  in their log store. No library path emits it. Dropping the key is breaking and waits for the
-  3.0.0 item that makes `otlpQueue` the only OTLP representation; redacting the userinfo in place
-  is not, and `isQueueFor`'s exact-string compare survives it as long as both sides are redacted
-  the same way. Weigh the two before writing either.
+- [ ] Keep credentials off `log.conf` and `queue.conf`, which the README documents as public. Two
+  spellings carry one: `otlpHttpBaseURI` holds `user:pass@` verbatim, and `otlpAdditionalHeaders`
+  holds a bearer token verbatim — the second being the spelling the docs steer people to, so it is
+  the likelier leak. A consumer who logs their own conf, as the README's own library example spells
+  `JSON.stringify(options.settings)`, puts either in their log store. No library path emits them.
+  Dropping the keys is breaking and waits for the 3.0.0 item that makes `otlpQueue` the only OTLP
+  representation; redacting in place is not, and `isQueueFor`'s exact-string compare survives it as
+  long as both sides are redacted the same way. Weigh the two before writing either.
 - [ ] Decide what to do about Basic credentials sent over plain `http:` to a non-loopback host,
   now that they are really sent: anything on the network path can read them (CWE-319). Either warn
   once per `report` sink when the endpoint is `http:` and carries userinfo, or require `https:`
@@ -78,6 +142,32 @@ level-string deprecations. Ready to cut.
   two different formatters already throw. That combination has never produced a working request,
   so rejecting it is safe in a minor. Either take that, or deprecate the userinfo spelling here
   and reject it in 3.0.0.
+- [ ] Split the `Log` constructor into named steps — normalize options, inherit from parent, apply
+  defaults, resolve the OTLP queue, open the span — ahead of the 3.0.0 item that changes three of
+  them. It is ~90 lines doing five jobs with three ordering constraints held nowhere but the line
+  sequence, every one of nine comprehension-panel readers named it, and four named it the unit they
+  would least want to touch because it is the only one whose failure mode is silent. The split
+  changes no contract, so it needs no major, and 2.5.0, 2.6.0 and 2.7.0 all edit those 90 lines
+  otherwise: the `traceparent` skip-set fix, the conf redaction above and the `spanName` warning all
+  land in them. Refactor first and 3.0.0's diff gets smaller.
+- [ ] Stop a restored batch being the first thing dropped. `add(batch, true)` unshifts a failed
+  batch to the front, and the `maxItems` trim then splices the excess off that same front. An
+  offline phone at `maxItems` reports "OTLP export failed, will retry" for items it has already
+  discarded, and the retry finds them gone — so the round trip and the promise are both spent on
+  the flagship offline path. Protect a restored batch, or stop promising a retry for what was
+  dropped.
+- [ ] Keep a transient `storage` read failure from wiping the persisted queue. `load()` treats an
+  unreadable `getItem` and corrupt content identically and then calls `removeItem`, so one flaky
+  AsyncStorage read at startup loses everything a phone held offline. The full fix is larger than
+  skipping the remove: after a failed load the first `save` overwrites the key anyway, so a load
+  failure has to suppress saving too.
+- [ ] Inject `fetch`. The queue and `log.fetch` both reach for the global, the one un-injected seam
+  in a library that injects `stdout`, `stderr`, `clock`, `storage`, `report` and `otlpQueue` — and
+  the suite pays for it by swapping `globalThis.fetch`, process-global state nothing can run beside.
+  A React Native app that pins TLS or uses `expo/fetch` cannot route the exporter, the one request
+  that crosses a hostile network, through it. Scope as `QueueConf.fetch`; whether `log.fetch` takes
+  one is a separate question, since Goals says it mirrors the runtime and an injected fetch becomes
+  the runtime.
 - [ ] Pin every Node base image to its full patch version, so one commit builds one image on any
   day. Three places float: `ARG BASE_IMAGE=node:24-bookworm-slim` in the `Dockerfile`,
   `${NODE_IMAGE:-node:22-bookworm-slim}` in `test-docker`, and the major-only `node-version`
@@ -109,6 +199,10 @@ README → Audience promises a 2.x warning before each break below, so 3.0.0 wai
   uses, and the `### Security` grouping. Neither covers a deprecation, so `entryFormatter` and the
   `new Log("debug")` shorthand tell a consumer their code stops working in 3.0.0 from inside
   `### Everything else`, unmarked.
+- [ ] Publish the artifact the gate tested. `push.yaml` builds and tests `index.js` inside the
+  container; `publish.yaml` builds a second one on the runner and publishes that, so the thing
+  consumers install is never the thing CI proved. Build once, upload, publish that. Pinning the
+  base images above is the other half of the same problem.
 - [ ] Check the footprint budget in CI, so the numbers in the README's Goals fail a build instead
   of going stale. Bundle size is the easy half; the per-operation figures need a stable enough
   harness to not flake.
@@ -172,9 +266,8 @@ Each one is a weigh against README → Goals first: ship it, or delete the item 
   Add `ended` to `LogInt`.
 - [ ] Keep `otlpQueue` as the only OTLP representation in `conf`: build the default `Queue` from
   the three `otlp*` shorthands and clear them, so inheritance needs one rule and `isQueueFor` goes.
-  Today `log.conf.otlpHttpBaseURI` stays readable, which is why this waits for a major. Split the
-  constructor into named steps in the same change; it is ~90 lines doing five jobs and this touches
-  three of them.
+  Today `log.conf.otlpHttpBaseURI` stays readable, which is why this waits for a major. It lands on
+  the constructor 2.5.0 already split.
 - [ ] Require `spanName` whenever `otlpQueue` is set or inherited: a child or clone of an
   OTLP-configured instance must name its span, and the constructor rejects one that does not, so
   no backend shows `unnamed-span`.
