@@ -11,8 +11,7 @@
   proxy, a CORS or image proxy or a webhook replay endpoint takes — exports that password to your
   tracing backend with no capture option involved, which means you cannot rule yourself out by
   reading your capture config. Percent-encoding it changes nothing. It is deferred rather than
-  unfixable: a path is not a value, so neither redaction rule in the next bullet transfers
-  cleanly, and the choice is being made on its own.
+  unfixable: a path is not a value, so neither redaction rule in the next bullet transfers cleanly.
   **Rotate any credential you have passed inside a url nested in a path** — the `@`, `%40` and
   `%2540` search in the next bullet finds these too. `log.fetch` first exported `url.full` in
   v2.3.0, so no older span carries it.
