@@ -4,6 +4,18 @@
 
 ### Security
 
+- Not fixed, and still exporting on every call until it is: a url nested in the request **path**
+  reaches `url.full` as you wrote it. `url.full` is built from the origin and the path, and only
+  the query is redacted, so
+  `log.fetch("https://proxy.test/fetch/https://user:pass@cb.test/x")` — the shape a fetch-through
+  proxy, a CORS or image proxy or a webhook replay endpoint takes — exports that password to your
+  tracing backend with no capture option involved, which means you cannot rule yourself out by
+  reading your capture config. Percent-encoding it changes nothing. It is deferred rather than
+  unfixable: a path is not a value, so neither redaction rule in the next bullet transfers
+  cleanly, and the choice is being made on its own.
+  **Rotate any credential you have passed inside a url nested in a path** — the `@`, `%40` and
+  `%2540` search in the next bullet finds these too. `log.fetch` first exported `url.full` in
+  v2.3.0, so no older span carries this or anything below it.
 - A header you allow-list is no longer a way to export a credential: `authorization`,
   `proxy-authorization`, `cookie` and `set-cookie` named in `captureRequestHeaders` or
   `captureResponseHeaders` record `REDACTED`, so the span still shows the header was there. Any
@@ -11,21 +23,15 @@
   `location` carrying an OAuth `redirect_uri` — and with `captureQuery` on so does a query value,
   where matching only the key left `?next=https://user:pass@host/x` exporting the password, as does
   a query key, so a credentialed url written as a bare key records as a parameter named `REDACTED`.
-  One layer of percent-encoding does not hide any of it; two still does. A value merely shaped like
-  a credential goes the same way: a `location` of `https://cdn.test//logo@2x.png` records
-  `REDACTED` whole. What it does not reach is a header or query value that simply *is* a secret —
-  `x-api-key`, your own signed token — which is exported as you sent it, so don't allow-list one.
+  It sees through one layer of percent-encoding but not two; a second layer still gets past it. A
+  value merely shaped like a credential goes the same way: a `location` of
+  `https://cdn.test//logo@2x.png` records `REDACTED` whole. What it does not reach is a header or
+  query value that simply *is* a secret — `x-api-key`, your own signed token — which is exported as
+  you sent it, so don't allow-list one.
   **Rotate any credential you named one of those four headers for, or put in a url you captured in
   a header or a query string**: search each header you allow-listed, under
   `http.request.header.*` and `http.response.header.*`, for those four names, and search those same
   attributes and `url.full` for `@`, `%40` or `%2540`.
-- Not fixed: a url nested in the request **path** still reaches `url.full` as you wrote it. `url.full`
-  is built from the origin and the path, and only the query is redacted, so
-  `log.fetch("https://proxy.test/fetch/https://user:pass@cb.test/x")` — the shape a fetch-through
-  proxy, a CORS or image proxy or a webhook replay endpoint takes — exports that password to your
-  tracing backend with no capture option involved. Percent-encoding it changes nothing.
-  **Rotate any credential you have passed inside a url nested in a path**, and search `url.full`
-  for a second `://` or `%3A%2F%2F` after the host.
 - A span's status message no longer carries url credentials: userinfo in a url the message quotes
   is exported as `http://REDACTED@host/x`. On Node and in browsers `fetch` refuses a url carrying
   credentials and quotes the whole url into its `TypeError`, which reached the backend both as the
@@ -42,8 +48,8 @@
   server's `WWW-Authenticate` challenge with them, so they go on the wire; on Android OkHttp sends
   no credentials and hands you the 401, except through a plain-`http:` proxy, whose request line
   carries the whole url. `log.fetch` mirrors whatever the runtime does, so it cannot close this.
-  Nothing about it reaches your tracing backend — `url.full` never holds userinfo — so there is
-  nothing to rotate on account of this library; the exposure is the network path to the host, in
+  Nothing about it reaches your tracing backend — `url.full` never holds the outer url's userinfo —
+  so there is nothing to rotate on account of this platform difference; the exposure is the network path to the host, in
   the clear if that url is `http:`. Pass an `Authorization` header, and strip userinfo from a url
   you did not build.
 - `log.fetch` traces only a URL that resolves to `http:` or `https:`; anything else is fetched
