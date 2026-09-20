@@ -1,3 +1,5 @@
+// --- Types and the default clock -------------------------------------------
+
 // The library's one source of time; now() returns integer epoch milliseconds.
 export type Clock = {
 	clearTimeout: (timer?: TimerHandle) => void;
@@ -157,6 +159,8 @@ export type OtlpSpanPayload = {
 	}[],
 };
 
+// --- Levels, metadata and entry formatting ---------------------------------
+
 export const LogLevels = {
 	/* eslint-disable sort-keys */
 	error: {
@@ -276,6 +280,8 @@ function resolveFormatter(format: LogConf["format"]): EntryFormatter {
 	return format === "json" ? msgJsonFormatter : msgTextFormatter;
 }
 
+// --- Trace ids and traceparent ---------------------------------------------
+
 function bytesToHex(bytes: Uint8Array): string {
 	return Array.from(bytes).map(byte => byte.toString(16).padStart(2, "0")).join("");
 }
@@ -334,14 +340,7 @@ export function parseTraceparent(header: string): { flags: string, sampled: bool
 	return { flags, sampled: (parseInt(flags, 16) & 1) === 1, spanId, traceId };
 }
 
-function getNsTimestamp(msTimestamp: number): string {
-	const seconds = Math.floor(msTimestamp / 1000);
-	const nanos = (msTimestamp % 1000) * 1000000;
-
-	const totalNanos = (BigInt(seconds) * BigInt(1000000000)) + BigInt(nanos);
-
-	return totalNanos.toString();
-}
+// --- Reading a value of unknown shape --------------------------------------
 
 // Total: a throwing getter yields undefined, so the flush path never rejects on its input.
 function stringField(value: unknown, key: string): string | undefined {
@@ -367,6 +366,17 @@ function partialRejection(body: unknown): { message?: string, rejected: number }
 	} catch {
 		return undefined;
 	}
+}
+
+// --- OTLP payload builders -------------------------------------------------
+
+function getNsTimestamp(msTimestamp: number): string {
+	const seconds = Math.floor(msTimestamp / 1000);
+	const nanos = (msTimestamp % 1000) * 1000000;
+
+	const totalNanos = (BigInt(seconds) * BigInt(1000000000)) + BigInt(nanos);
+
+	return totalNanos.toString();
 }
 
 // Resource-level OTLP attributes (service.name + telemetry.sdk.*), shared by logs and spans.
