@@ -259,19 +259,6 @@ export function msgTextFormatter(conf: EntryFormatterConf) {
 	return str;
 }
 
-// The deprecated spelling folded into `format`, so nothing inherited can override what the caller passed.
-function foldEntryFormatter(conf: LogConf): void {
-	if (conf.entryFormatter === undefined) {
-		return;
-	}
-
-	if (typeof conf.format === "function" && conf.format !== conf.entryFormatter) {
-		throw new Error("entryFormatter and format are two spellings of one formatter: pass only format");
-	}
-
-	conf.format = conf.entryFormatter;
-}
-
 function resolveFormatter(format: LogConf["format"]): EntryFormatter {
 	if (typeof format === "function") {
 		return format;
@@ -1262,9 +1249,21 @@ function isQueueFor(queue: OtlpQueue, conf: LogConf): boolean {
 		&& queue.conf.otlpAdditionalHeaders === conf.otlpAdditionalHeaders;
 }
 
+// The deprecated spelling folded into `format`, so nothing inherited can override what the caller passed.
+function foldEntryFormatter(conf: LogConf): void {
+	if (conf.entryFormatter === undefined) {
+		return;
+	}
+
+	if (typeof conf.format === "function" && conf.format !== conf.entryFormatter) {
+		throw new Error("entryFormatter and format are two spellings of one formatter: pass only format");
+	}
+
+	conf.format = conf.entryFormatter;
+}
+
 const warnedDeprecations = new WeakMap<(msg: string) => void, Set<string>>();
 
-// Ungated by logLevel: `"none"` silences logs, not a deprecation the app developer must act on.
 function warnDeprecated(conf: ResolvedLogConf, metadata: Metadata | undefined, msg: string): void {
 	let warned = warnedDeprecations.get(conf.stderr);
 
@@ -1287,7 +1286,7 @@ const CONF_FORMATTER_DEPRECATED = "@larvit/log: conf.entryFormatter is deprecate
 // One descriptor for every instance: a closure pair per `Log` breaks Goals #6's 1 KB budget.
 const ENTRY_FORMATTER_ALIAS: PropertyDescriptor = {
 	configurable: true,
-	// Non-enumerable, so a child or a spread carries `format` alone and folds nothing a second time.
+	// So a child or a spread carries `format` alone, and never folds the alias a second time.
 	enumerable: false,
 	get(this: ResolvedLogConf): EntryFormatter {
 		warnDeprecated(this, this.context, CONF_FORMATTER_DEPRECATED);
