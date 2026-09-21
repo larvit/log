@@ -172,11 +172,11 @@ never ended is never sent. `end({ error })` also marks the span failed: status `
 error's message, and an `error.type` attribute from its `code`, else `name`; a `null` or `undefined`
 error is a plain `end()`. Userinfo in a url the message quotes becomes `REDACTED`; nothing else in
 the message is, so keep a token out of an error message. A logged `log.error()` never fails the
-span; a recovered error is not a failed operation. `await` it when delivery must complete before the
+span; a recovered error is not a failed operation. `await` it to make one delivery attempt before the
 process exits (a short-lived script); fire-and-forget is fine in a long-running process. Against a
-dead collector `await end()` returns after one failed attempt, within about 3 s plus however long
-any un-awaited `log.fetch()` takes to complete; the retry then runs only for as long as the process
-lives. An instance is single-use: logging and `fetch()` on an ended instance throw, `end()`
+dead collector `await end()` returns after that attempt, within about 3 s plus however long any
+un-awaited `log.fetch()` takes to complete, and returns at once while a retry backoff is pending;
+the retry then runs only for as long as the process lives. An instance is single-use: logging and `fetch()` on an ended instance throw, `end()`
 rejects. `log.flush()` delivers what is queued without ending.
 
 `log.clone(options?)` (on `Log`, not `LogInt`) makes an independent instance with the same

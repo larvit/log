@@ -804,7 +804,7 @@ export class Queue implements OtlpQueue {
 	private items: QueuedItem[] = [];
 
 	// Scheduling: one round runs at a time, callers arriving mid-round join one next round, and
-	// setTimer owns the one timer that starts it — a batch wait, or a backoff flush() must not jump.
+	// setTimer installs the one timer that starts it — a batch wait, or a backoff flush() must not jump.
 	private failures = 0;
 	private pending?: Promise<void>;
 	private running?: Promise<void>;
@@ -1436,8 +1436,7 @@ export class Log implements LogInt {
 		return new Log(conf);
 	}
 
-	// Ends the span and flushes OTLP. Awaitable: `await log.end()` guarantees delivery before exit.
-	// Fire-and-forget (`log.end()`) still works for callers that do not care.
+	// Ends the span, then flushes: one delivery attempt, not a guarantee.
 	public async end(options?: { error?: unknown }): Promise<void> {
 		if (this.ended) {
 			throw new Error("Logging instance is already ended");
