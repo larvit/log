@@ -38,7 +38,7 @@ export type LogConf = {
 	colors?: boolean;
 	context?: Metadata;
 
-	/** @deprecated Removed in 3.0.0: pass the function as `format`. */
+	/** @deprecated Removed in 3.0.0: use `format`. On `log.conf` this is an alias of `format`; reading or writing it warns. */
 	entryFormatter?: EntryFormatter;
 	format?: "text" | "json" | EntryFormatter;
 	logLevel?: LogLevel | "none";
