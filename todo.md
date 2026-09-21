@@ -87,6 +87,10 @@ two of its sub-items are free only until this release publishes.
     (`index.ts:394`) and `buildSpanPayload` (`index.ts:428`) export the message and every
     metadata and context key verbatim. That is correct and is now exactly what Goal 3 says, but it
     is half the answer to "where did this password come from?" and it lives only in a 27 KB README.
+- [ ] Point a `todo.md` item at the symbol it means, keeping an `index.ts:NNN` only where
+  nothing else identifies the spot — the bare comments and the flag block. Eleven of nineteen
+  references were renumbered by one banner commit, and every one would have been silently
+  false had it been missed; most sit beside the name they point at, which grep already finds.
 - [ ] Survive a `logLevel` the union does not contain. `new Log({ logLevel: "trace" })` throws
   `TypeError: Cannot read properties of undefined (reading 'severityNumber')` on `log.info()` and
   on all five other level methods, because `enabled()` (`index.ts:1557`) indexes `LogLevels` with
