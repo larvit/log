@@ -1,4 +1,4 @@
-import { type DefinedMetadata, type EntryFormatterConf, formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, type Logger, type LogLevel, LogLevels, msgJsonFormatter, msgTextFormatter, type OtlpPayload, type OtlpQueue, parseTraceparent, Queue, type QueueStorage, type TimerHandle } from "./index.js";
+import { type DefinedMetadata, type EntryFormatterConf, formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, type Logger, type LogLevel, LogLevels, msgJsonFormatter, msgTextFormatter, type OtlpPayload, type OtlpQueue, parseTraceparent, Queue, type QueueStorage, type ResolvedLogConf, type TimerHandle } from "./index.js";
 import test from "./tap.js";
 
 // --- helpers ---------------------------------------------------------------
@@ -658,6 +658,29 @@ test("format and entryFormatter are one setting, and a resolved conf carries nei
 
 	json.log.info("hi");
 	t.strictEqual(JSON.parse(json.stdout[0]).msg, "hi", "a string format applies to a spread conf too");
+
+	const deprecated = capture({ entryFormatter: own });
+	const resolved: ResolvedLogConf = { ...deprecated.log.conf };
+
+	t.strictEqual(deprecated.log.conf.format, own, "a resolved conf holds the formatter under format, whichever spelling set it");
+	t.notOk("entryFormatter" in deprecated.log.conf, "and carries no entryFormatter: the deprecated spelling is an input, not a slot");
+	t.strictEqual(resolved.entryFormatter, undefined, "so a ResolvedLogConf promises none either, where it used to promise one a spread could not carry");
+
+	const given: LogConf = { entryFormatter: own, stderr: () => {} };
+
+	new Log(given);
+	t.strictEqual(given.entryFormatter, own, "the caller's own options object keeps the spelling they wrote");
+
+	// Only a hand-written LogInt hands a child a conf that still carries the deprecated spelling.
+	const handBuilt = capture({ format: (entry: EntryFormatterConf) => `parent ${entry.msg}` });
+	const handBuiltConf: LogConf = handBuilt.log.conf;
+
+	handBuiltConf.entryFormatter = own;
+	const inherited = new Log({ parentLog: handBuilt.log });
+
+	inherited.info("hi");
+	t.deepEqual(handBuilt.stdout, ["parent hi"], "an inherited entryFormatter is not folded, so it never becomes the child's formatter");
+	t.notOk("entryFormatter" in inherited.conf, "and does not reach the child's conf either");
 	t.end();
 });
 

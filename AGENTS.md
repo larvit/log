@@ -45,15 +45,6 @@ and who it is for, and a design decision that cannot be derived from them belong
 - 2026-09-18: adding a key to `ResolvedLogConf`/`ResolvedQueueConf`'s required half ships in a
   minor. They are output types describing what the library produces; a consumer hand-building one
   is writing a test double, not running existing code. Precedent: `colors` did the same.
-- 2026-09-18: `format` and `entryFormatter` are one setting. `entryFormatter` folds into `format`,
-  winning over a `"text"`/`"json"` one as 2.x documented, and two *different* formatters throw:
-  nothing can hold that combination yet, while rejecting the documented one would break a minor.
-  `conf.entryFormatter` mirrors the resolved `format` as a non-enumerable property, so a child or a
-  spread of a `conf` carries the caller's spellings alone and an explicit `format` there now applies,
-  where 2.x silently kept the parent's formatter. An `entryFormatter` reaching an instance through
-  inheritance is never folded, which only a hand-built parent conf can do — a test double, per the
-  required-half rule above, which also carries `ResolvedLogConf["format"]` widening to include a
-  function. Valid until 3.0.0 removes `entryFormatter`.
 - 2026-09-18: a deprecation warns once per `stderr` sink for each distinct warning text, through the
   instance's formatter at `warn` and whatever `logLevel` says. Instances sharing the default
   `console.error` share that one warning; a sink the caller injects gets its own, which keeps a test
@@ -154,6 +145,21 @@ and who it is for, and a design decision that cannot be derived from them belong
   holds. Scoped to spans because the remaining credential rules are
   the queue's, and 2.5.0's conf-redaction and Basic-over-`http:` items rewrite that code. Valid while
   the source is a single `index.ts`.
+
+- 2026-09-21: `format` is the formatter's one name and `entryFormatter` an input spelling only. It
+  folds into `format`, winning over a `"text"`/`"json"` one as 2.x documented, and two *different*
+  formatters throw: nothing can hold that combination yet, while rejecting the documented one would
+  break a minor. The fold consumes it, so no resolved `conf` carries `entryFormatter` — one that did
+  would fold again on a spread, over the `format` written beside it — and `ResolvedLogConf` says so
+  with `entryFormatter?: never`, where declaring it required while the property was non-enumerable
+  let `const c: ResolvedLogConf = { ...log.conf }` compile with `c.entryFormatter` undefined. What
+  `format` resolves to is the instance's private `formatter`, the one function every line written
+  here goes through. Serves README → Goals #4: all nine comprehension-panel readers left the file to
+  learn which of the two names meant what, the highest-cost lookup they reported. An
+  `entryFormatter` reaching an instance through inheritance is never folded, which only a hand-built
+  parent conf can do — a test double, per the required-half rule above, which also carries
+  `ResolvedLogConf["format"]` widening to include a function. Valid until 3.0.0 removes
+  `entryFormatter`.
 
 ## Working here
 

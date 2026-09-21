@@ -57,8 +57,8 @@ export type LogConf = {
 	traceparent?: string;
 };
 
-// conf after the constructor fills its defaults: the always-set fields are no longer optional.
-export type ResolvedLogConf = LogConf & Required<Pick<LogConf, "clock" | "colors" | "entryFormatter" | "format" | "logLevel" | "stderr" | "stdout">>;
+// conf after the constructor fills its defaults: the always-set fields are no longer optional, and `entryFormatter` has folded into `format`.
+export type ResolvedLogConf = LogConf & Required<Pick<LogConf, "clock" | "colors" | "format" | "logLevel" | "stderr" | "stdout">> & { entryFormatter?: never };
 
 export type Logger = {
 	enabled: (logLevel: LogLevel) => boolean;
@@ -1239,7 +1239,7 @@ function spanFailure(error: unknown): { message: string, type: string } {
 	return { message: redactUserinfo(message), type: stringField(error, "code") ?? stringField(error, "name") ?? "_OTHER" };
 }
 
-// --- Conf inheritance and deprecation --------------------------------------
+// --- Conf inheritance ------------------------------------------------------
 
 const OTLP_TRANSPORT_KEYS = ["otlpAdditionalHeaders", "otlpHttpBaseURI", "otlpProtocol"] as const;
 
@@ -1262,32 +1262,18 @@ function isQueueFor(queue: OtlpQueue, conf: LogConf): boolean {
 		&& queue.conf.otlpAdditionalHeaders === conf.otlpAdditionalHeaders;
 }
 
-const warnedDeprecations = new WeakMap<(msg: string) => void, Set<string>>();
-
-function warnDeprecated(conf: ResolvedLogConf, metadata: DefinedMetadata, msg: string): void {
-	let warned = warnedDeprecations.get(conf.stderr);
-
-	if (!warned) {
-		warned = new Set();
-		warnedDeprecations.set(conf.stderr, warned);
-	}
-
-	if (warned.has(msg)) {
-		return;
-	}
-
-	// Added before the sink runs, so a sink that itself uses the deprecated spelling cannot recurse.
-	warned.add(msg);
-	conf.stderr(conf.entryFormatter({ colors: conf.colors, logLevel: "warn", metadata, msTimestamp: conf.clock.now(), msg }));
-}
-
 // --- Log -------------------------------------------------------------------
 
 export class Log implements LogInt {
+	private static warnedDeprecations = new WeakMap<(msg: string) => void, Set<string>>();
+
 	context: DefinedMetadata;
 	ended: boolean = false;
 
 	readonly conf: ResolvedLogConf;
+
+	// What `conf.format` resolves to, and the one function every line written here goes through.
+	private readonly formatter: EntryFormatter;
 
 	// Un-awaited log.fetch calls, awaited by flush() so their spans are queued before the queue flushes.
 	private inFlight = new Set<Promise<unknown>>();
@@ -1333,8 +1319,8 @@ export class Log implements LogInt {
 			conf.format = "text";
 		}
 
-		// Non-enumerable, so a conf spread into a new instance carries the caller's spellings only; 3.0.0 drops it.
-		Object.defineProperty(conf, "entryFormatter", { configurable: true, enumerable: false, value: resolveFormatter(conf.format), writable: true });
+		// Folded into `format` above; left on, a spread of this conf would fold it again over the `format` written beside it.
+		delete conf.entryFormatter;
 
 		if (conf.stderr === undefined) {
 			conf.stderr = console.error;
@@ -1346,17 +1332,18 @@ export class Log implements LogInt {
 
 		// Every optional field the resolved type requires has been defaulted above.
 		this.conf = conf as ResolvedLogConf;
+		this.formatter = resolveFormatter(this.conf.format);
 		// Own copy, so a clone/child never mutates a context object shared with another instance.
 		this.context = withoutUndefined(this.conf.context);
 
 		if (typeof options === "string") {
-			warnDeprecated(this.conf, this.context, "@larvit/log: new Log(\"level\") is deprecated and removed in 3.0.0, use new Log({ logLevel })");
+			this.warnDeprecated("@larvit/log: new Log(\"level\") is deprecated and removed in 3.0.0, use new Log({ logLevel })");
 		}
 
 		if (overriddenFormat) {
-			warnDeprecated(this.conf, this.context, "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format — entryFormatter wins and the format beside it is ignored");
+			this.warnDeprecated("@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format — entryFormatter wins and the format beside it is ignored");
 		} else if (deprecatedFormatter) {
-			warnDeprecated(this.conf, this.context, "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format");
+			this.warnDeprecated("@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format");
 		}
 
 		if (this.conf.otlpQueue) {
@@ -1369,7 +1356,7 @@ export class Log implements LogInt {
 				otlpAdditionalHeaders: this.conf.otlpAdditionalHeaders,
 				otlpHttpBaseURI: this.conf.otlpHttpBaseURI,
 				otlpProtocol: this.conf.otlpProtocol,
-				report: (msg, metadata) => this.conf.stderr(this.conf.entryFormatter({ colors: this.conf.colors, logLevel: "error", metadata, msTimestamp: this.conf.clock.now(), msg })),
+				report: (msg, metadata) => this.outputToConsole("error", msg, metadata, this.conf.clock.now()),
 			});
 		}
 
@@ -1406,7 +1393,7 @@ export class Log implements LogInt {
 	// All options sent in will override the current instance settings
 	public clone(options?: LogConf | LogLevel | "none") {
 		if (typeof options === "string") {
-			warnDeprecated(this.conf, this.context, "@larvit/log: log.clone(\"level\") is deprecated and removed in 3.0.0, use log.clone({ logLevel })");
+			this.warnDeprecated("@larvit/log: log.clone(\"level\") is deprecated and removed in 3.0.0, use log.clone({ logLevel })");
 		}
 
 		const conf: LogConf = typeof options === "string" ? { logLevel: options } : { ...options };
@@ -1609,8 +1596,26 @@ export class Log implements LogInt {
 		void promise.catch(() => {}).finally(() => this.inFlight.delete(promise));
 	}
 
+	// Ungated by logLevel: `"none"` silences logs, not a deprecation the app developer must act on.
+	private warnDeprecated(msg: string): void {
+		let warned = Log.warnedDeprecations.get(this.conf.stderr);
+
+		if (!warned) {
+			warned = new Set();
+			Log.warnedDeprecations.set(this.conf.stderr, warned);
+		}
+
+		if (warned.has(msg)) {
+			return;
+		}
+
+		// Added before the sink runs, so a sink that itself uses the deprecated spelling cannot recurse.
+		warned.add(msg);
+		this.outputToConsole("warn", msg, this.context, this.conf.clock.now());
+	}
+
 	private outputToConsole(logLevel: LogLevel, msg: string, metadata: DefinedMetadata, msTimestamp: number) {
-		const output = this.conf.entryFormatter({
+		const output = this.formatter({
 			colors: this.conf.colors,
 			logLevel,
 			metadata,
