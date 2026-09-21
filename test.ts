@@ -114,7 +114,7 @@ function response({ headers, json = { partialSuccess: {} }, status = 200 }: { he
 
 // Replace global fetch with a recording stub (Node + browser), so the OTLP transport is asserted
 // without a real server. The harness restores globalThis.fetch after each test.
-function stubFetch(responder?: (path: string, body: unknown) => ReturnType<typeof response> | undefined) {
+function stubFetch(responder?: (path: string, body: unknown) => ReturnType<typeof response> | Promise<ReturnType<typeof response>> | undefined) {
 	const calls: { body: any, contentType: string | null, headers: any, keepalive: unknown, path: string, rawBody: any, url: string }[] = [];
 
 	globalThis.fetch = (async (url: string, init: { body?: any, headers?: HeadersInit, keepalive?: boolean } = {}) => {
@@ -125,7 +125,7 @@ function stubFetch(responder?: (path: string, body: unknown) => ReturnType<typeo
 
 		calls.push({ body, contentType, headers: init.headers, keepalive: init.keepalive, path, rawBody: init.body, url: String(url) });
 
-		return responder?.(path, body) ?? response();
+		return await responder?.(path, body) ?? response();
 	}) as unknown as typeof fetch;
 
 	return { calls };
@@ -897,6 +897,126 @@ test("Queue is bounded: drops the oldest when full and reports the count once", 
 
 	t.deepEqual(exportedRecords(calls), ["3", "4"], "the two newest records are kept");
 	t.deepEqual(reports.lines, [{ dropped: 2, msg: "OTLP queue full, oldest items dropped" }], "one line with the count, and a throwing sink did not break the round");
+	t.end();
+});
+
+test("Queue's byte count follows its items, so a delivered or dropped record stops filling the next batch", async t => {
+	const clock = fakeClock();
+	const big = "a".repeat(1200);
+	let attempts = 0;
+	const { calls } = stubFetch(() => {
+		attempts++;
+
+		return attempts === 1 ? response({ status: 503 }) : undefined;
+	});
+	const log = new Log({ clock, otlpQueue: new Queue({ batchDelayMs: 600000, clock, maxBatchBytes: 2000, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, retryDelayMs: 1000 }), stderr: () => {}, stdout: () => {} });
+
+	log.info(big);
+	log.info(big);
+	await clock.settle();
+	t.strictEqual(calls.length, 1, "the second record takes the queue over maxBatchBytes and sends what fits");
+	await clock.advance(1000);
+	t.strictEqual(calls.length, 3, "the retry delivers the failed batch, then the record that waited behind it");
+
+	log.info("small");
+	await clock.settle();
+	t.strictEqual(calls.length, 3, "a delivered record no longer counts toward maxBatchBytes");
+	await clock.advance(600000);
+	t.deepEqual(calls.map(call => call.body.resourceLogs[0].scopeLogs[0].logRecords.length), [1, 1, 1, 1], "one record per POST throughout");
+
+	const bounded = new Log({ clock, otlpQueue: new Queue({ batchDelayMs: 600000, clock, maxBatchBytes: 2000, maxItems: 1, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {} }), stderr: () => {}, stdout: () => {} });
+
+	calls.length = 0;
+	bounded.info(big);
+	bounded.info(big);
+	await clock.settle();
+	t.strictEqual(calls.length, 0, "a dropped record stops counting too: the one kept is still under maxBatchBytes");
+	t.end();
+});
+
+test("Queue runs one round at a time, and a flush() arriving mid-round waits for a round of its own", async t => {
+	const clock = fakeClock();
+	let released = false;
+	const { calls } = stubFetch(async () => {
+		await waitFor(() => released);
+
+		return response();
+	});
+	const log = new Log({ clock, otlpQueue: new Queue({ clock, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {} }), stderr: () => {} });
+
+	log.info("first");
+	const first = log.flush();
+
+	await waitFor(() => calls.length === 1);
+	log.info("second");
+	let joined = false;
+	const second = log.flush().then(() => { joined = true; });
+
+	await clock.settle();
+	t.strictEqual(calls.length, 1, "no second POST opens beside the round already in flight");
+	t.strictEqual(joined, false, "and the caller that arrived mid-round does not resolve on it");
+
+	released = true;
+	await first;
+	await second;
+	t.deepEqual(exportedRecords(calls), ["first", "second"], "both records are delivered, the mid-round one after");
+	t.strictEqual(clock.pending.size, 0, "no timer is left behind");
+	t.end();
+});
+
+test("Queue keeps one timer: a record arriving during a retry backoff never jumps it", async t => {
+	const clock = fakeClock();
+	let attempts = 0;
+	const { calls } = stubFetch(() => {
+		attempts++;
+
+		return attempts === 1 ? response({ status: 503 }) : undefined;
+	});
+	const log = new Log({ clock, otlpQueue: new Queue({ batchDelayMs: 100, clock, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, retryDelayMs: 5000 }), stderr: () => {} });
+
+	log.info("first");
+	t.strictEqual(clock.pending.size, 1, "one timer waits for the batch to fill");
+	await clock.advance(100);
+	t.strictEqual(attempts, 1, "which sends it once batchDelayMs is up");
+	t.strictEqual(clock.pending.size, 1, "and the failed attempt leaves the retry backoff as the only timer");
+
+	log.info("second");
+	t.strictEqual(clock.pending.size, 1, "a record arriving during the backoff schedules nothing beside it");
+	await clock.advance(4999);
+	t.strictEqual(attempts, 1, "so nothing is attempted before the backoff is up");
+	await clock.advance(1);
+	t.strictEqual(attempts, 2, "the retry is the next attempt");
+	t.deepEqual(exportedRecords(calls), ["first", "first", "second"], "carrying the kept record and the one that waited with it");
+	t.strictEqual(clock.pending.size, 0, "nothing is left scheduled");
+	t.end();
+});
+
+test("Queue with storage writes through one writer, so changes made during a write coalesce into the next", async t => {
+	const clock = fakeClock();
+	const storage = fakeStorage(true);
+	const setItem = storage.setItem;
+	let inFlight = 0;
+	let concurrent = 0;
+	let writes = 0;
+
+	storage.setItem = async (key, value) => {
+		writes++;
+		inFlight++;
+		concurrent = Math.max(concurrent, inFlight);
+		await new Promise(resolve => setTimeout(resolve, 20));
+		await setItem(key, value);
+		inFlight--;
+	};
+	stubFetch();
+	const log = new Log({ clock, otlpQueue: new Queue({ batchDelayMs: 600000, clock, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, storage }), stderr: () => {} });
+
+	log.info("1");
+	await waitFor(() => writes === 1);
+	log.info("2");
+	log.info("3");
+	await waitFor(() => JSON.parse(storage.data.get("@larvit/log:otlp-queue") ?? "[]").length === 3);
+	t.strictEqual(concurrent, 1, "no second writer starts beside the one already writing");
+	t.strictEqual(writes, 2, "both records that arrived during that write go out in the one write after it");
 	t.end();
 });
 
