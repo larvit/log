@@ -24,7 +24,7 @@ two of its sub-items are free only until this release publishes.
 - [ ] Keep a presigned url's credentials out of `url.full`. With `captureQuery` on, a url signed
   the way every AWS presigned url has been since 2014 exports its signature, the access key id
   carried inside `X-Amz-Credential`, and a live session token inside `X-Amz-Security-Token`.
-  `SENSITIVE_QUERY_KEYS` (`index.ts:1197`) catches none of them: it mirrors OTel semconv's default
+  `SENSITIVE_QUERY_KEYS` (`index.ts:1204`) catches none of them: it mirrors OTel semconv's default
   deny-list, which is the SigV2/Azure-era one, so it covers `AWSAccessKeyId`, `Signature`, `sig`
   and `X-Goog-Signature` and stops there. Google's own V4 `X-Goog-Credential` is missed too.
   Semconv's list is a default and not a maximum, so catching more breaks no spec, and the
@@ -57,12 +57,6 @@ two of its sub-items are free only until this release publishes.
   expected*, because every call site carries its field number and a pinned real Collector checks
   the result. Comment volume is not the problem; rules with no home are. Each sub-item below is its
   own chunk, ordered so the earlier ones make the later ones readable:
-  - [ ] `Queue`'s rules written where they are maintained. Ten live coordination flags
-    (`index.ts:797-812`) run three interleaved state machines — buffer, scheduling, persistence —
-    and the rules that keep them consistent exist only as emergent behaviour: at most one round in
-    flight, a second caller joins the next one, `batchTimer` and `retryTimer` never both set,
-    `bytes` always the sum of `items[].bytes`. Every reader reconstructed some of these by
-    simulating callers on paper, and each is breakable without a test going red.
   - [ ] One name per concept for the formatter, while it is still free. `conf.entryFormatter` is
     both the deprecated caller option and the resolved formatter slot, kept apart by a
     non-enumerable property defined 25 lines below the inheritance loop it governs and 90 lines
@@ -72,15 +66,15 @@ two of its sub-items are free only until this release publishes.
     `const c: ResolvedLogConf = { ...log.conf }` compiles and `c.entryFormatter` is `undefined`.
     Publishing 2.4.0 freezes that as a contract until 3.0.0.
   - [ ] A payload kind that cannot be added silently, while it is still free. The discriminator is
-    the idiom `"resourceLogs" in payload` at six sites (`index.ts:627`, `722`, `770`, `771`, `947`
-    and `952`), so it has no symbol to grep for. Adding the metrics kind (which README → Goals
+    the idiom `"resourceLogs" in payload` at six sites (`index.ts:627`, `722`, `770`, `771`, `954`
+    and `959`), so it has no symbol to grep for. Adding the metrics kind (which README → Goals
     already promises) type-errors at exactly one of them; the other five compile clean and are
     wrong — a metric batch routes to `/v1/traces` and is then dropped by the merge, after
     `takeBatch` has already subtracted its bytes and removed it from the queue. Silent loss, no
     report line. Publishing freezes `OtlpPayload` and `OtlpQueue` as consumer contracts.
   - [ ] No comment that restates the code beneath it. Five or more readers each named
-    `index.ts:1394-1395` (whose second line is contradicted by the merge rules three lines below
-    it), `index.ts:1296`, `index.ts:1577`, and the "kept out of the class so it is trivially
+    `index.ts:1401-1402` (whose second line is contradicted by the merge rules three lines below
+    it), `index.ts:1303`, `index.ts:1584`, and the "kept out of the class so it is trivially
     testable" half of `index.ts:393` and `index.ts:427`. The `Not pure — it mutates span` half of
     that last one earns its place and stays.
   - [ ] What is *not* redacted said beside the code that does not redact it. `buildLogPayload`
@@ -93,7 +87,7 @@ two of its sub-items are free only until this release publishes.
   false had it been missed; most sit beside the name they point at, which grep already finds.
 - [ ] Survive a `logLevel` the union does not contain. `new Log({ logLevel: "trace" })` throws
   `TypeError: Cannot read properties of undefined (reading 'severityNumber')` on `log.info()` and
-  on all five other level methods, because `enabled()` (`index.ts:1557`) indexes `LogLevels` with
+  on all five other level methods, because `enabled()` (`index.ts:1564`) indexes `LogLevels` with
   it and `log()` gates on `enabled()`. TypeScript rejects the literal; the README's own examples
   are JavaScript, where nothing does, and `LOG_LEVEL=trace` (pino) or `http` (winston) is the
   obvious input. 2.4.0 is also the release adding `enabled()` as the guard README → Accept a logger
@@ -101,7 +95,7 @@ two of its sub-items are free only until this release publishes.
   logging dependency killing the process over a one-word config mistake is the thing to end;
   `msgTextFormatter` already treats the same class of input as reachable.
 - [ ] Make `traceparent` behave the way the option and the README both say it does — edge-only, not
-  inherited by clones or children. The constructor's inheritance loop (`index.ts:1301`) skips only
+  inherited by clones or children. The constructor's inheritance loop (`index.ts:1308`) skips only
   what `otlpKeysNotToInherit` returns, so it copies the parent's `traceparent` onto the child's
   conf, while `clone()`'s separate skip set excludes it correctly: the two loops disagree. The
   child's own span is right, so nothing is visibly wrong until the conf is spread — a spelling this
@@ -147,7 +141,7 @@ two of its sub-items are free only until this release publishes.
   record carries the trace's sampled flag as data, and the log pipeline exports it regardless — the
   flag tells the backend how to link the record, not whether to keep it. So dropping the *span* on
   that flag is plainly right, and dropping the *records* is a choice this library made on its own,
-  in `log()` (`index.ts:1586`), which returns before the enqueue whenever `sampled` is false.
+  in `log()` (`index.ts:1593`), which returns before the enqueue whenever `sampled` is false.
 
   *The two answers.* **Export records always, and let only spans obey the flag** — this is what
   2.3.0 did, so it is additive and safe in a minor, and you keep your error logs for unsampled

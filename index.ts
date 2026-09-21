@@ -794,21 +794,25 @@ function unref(timer: TimerHandle, fromSystemClock: boolean): void {
 export class Queue implements OtlpQueue {
 	readonly conf: ResolvedQueueConf;
 
-	private items: QueuedItem[] = [];
-	private bytes = 0;
 	private readonly headers: Headers;
 	private readonly protobuf: boolean;
 	private readonly url: string;
+
+	// Buffer: bytes is the running sum of items[].bytes, so add() and takeBatch() move both together.
+	private bytes = 0;
 	private dropped = 0;
+	private items: QueuedItem[] = [];
+
+	// Scheduling: one round runs at a time, one caller waits for the next, and one timer says when
+	// that next round starts — a batch wait, or a retry backoff flush() must not jump.
 	private failures = 0;
-	private batchTimer?: TimerHandle;
-	private retryTimer?: TimerHandle;
-	private running?: Promise<void>;
 	private pending?: Promise<void>;
+	private running?: Promise<void>;
+	private timer?: { handle: TimerHandle, retry: boolean };
 
 	// Storage only: leftovers load before the first round, and saves coalesce into one writer.
-	private readonly ready: Promise<void>;
 	private dirty = false;
+	private readonly ready: Promise<void>;
 	private saving?: Promise<void>;
 
 	constructor(conf: QueueConf) {
@@ -872,7 +876,7 @@ export class Queue implements OtlpQueue {
 
 	// While a retry is pending, flush() attempts nothing new: the timer decides.
 	flush(): Promise<void> {
-		if (this.retryTimer !== undefined) {
+		if (this.timer?.retry) {
 			return this.running ?? Promise.resolve();
 		}
 
@@ -892,20 +896,22 @@ export class Queue implements OtlpQueue {
 	}
 
 	private schedule(): void {
-		if (this.batchTimer !== undefined || this.retryTimer !== undefined) {
+		if (this.timer) {
 			return;
 		}
 
-		this.batchTimer = this.conf.clock.setTimeout(() => {
-			this.batchTimer = undefined;
+		const handle = this.conf.clock.setTimeout(() => {
+			this.timer = undefined;
 			void this.flush();
 		}, this.conf.batchDelayMs);
+
+		this.timer = { handle, retry: false };
 	}
 
 	private async round(): Promise<void> {
 		await this.ready;
-		this.conf.clock.clearTimeout(this.batchTimer);
-		this.batchTimer = undefined;
+		this.conf.clock.clearTimeout(this.timer?.handle);
+		this.timer = undefined;
 
 		while (this.items.length) {
 			const batch = this.takeBatch();
@@ -933,12 +939,13 @@ export class Queue implements OtlpQueue {
 		this.failures++;
 
 		const retryInMs = Math.min(this.conf.retryDelayMs * (2 ** (this.failures - 1)), RETRY_DELAY_MAX_MS);
-
-		this.retryTimer = this.conf.clock.setTimeout(() => {
-			this.retryTimer = undefined;
+		const handle = this.conf.clock.setTimeout(() => {
+			this.timer = undefined;
 			void this.flush();
 		}, retryInMs);
-		unref(this.retryTimer, this.conf.clock === systemClock);
+
+		this.timer = { handle, retry: true };
+		unref(handle, this.conf.clock === systemClock);
 		this.report("OTLP export failed, will retry", { ...this.describe(batch, failure), retryInMs });
 	}
 
