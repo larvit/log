@@ -91,11 +91,14 @@
   inherit. `entryFormatter` is deprecated: it still formats and still wins over a `"text"`/`"json"`
   `format`, writes one `warn` line per `stderr` sink for each distinct warning text, whatever
   `logLevel` says, and 3.0.0 removes it. Two different formatters, one per spelling, throw. New
-  export: `EntryFormatter`; `ResolvedLogConf["format"]` widens to include a function, and a
-  resolved `log.conf` carries the formatter under `format` alone — `entryFormatter` is an input
-  spelling, absent from the conf whichever way you set it, where v2.3.0 left the resolved formatter
-  under that name. A `format` function drops out of `JSON.stringify(log.conf)`, as any
-  function does, where the string always showed.
+  export: `EntryFormatter`; `ResolvedLogConf["format"]` widens to include a function.
+  `log.conf.entryFormatter` is deprecated as well as the option: it still reads back the formatter
+  and still swaps it when written, now through `format` so the two names cannot disagree, but
+  touching it warns and 3.0.0 removes it — read `log.conf.format`. It is also non-enumerable now,
+  so it no longer shows up in a spread or `Object.keys` of the conf, where a spread used to carry
+  the parent's resolved formatter into the child. `JSON.stringify(log.conf)` always carries
+  `format` — `"text"` by default, where v2.3.0 left the key absent unless you passed one — and
+  shows nothing for it when it is a function, as any function does.
 - A `format` set on a child (`parentLog`) or on a spread of `log.conf` now applies; before, the
   parent's resolved formatter silently kept winning.
 - Every deprecation line names the package: `@larvit/log: …`.
