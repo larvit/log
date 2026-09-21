@@ -664,7 +664,7 @@ test("format and entryFormatter are one setting, and a resolved conf carries nei
 
 	t.strictEqual(deprecated.log.conf.format, own, "a resolved conf holds the formatter under format, whichever spelling set it");
 	t.deepEqual(Object.keys(deprecated.log.conf).filter(key => key === "entryFormatter"), [], "the deprecated name is not a key of its own, so nothing inherits or spreads it");
-	t.strictEqual(resolved.entryFormatter, undefined, "which is what ResolvedLogConf now says: optional, where it promised one a spread could not carry");
+	t.strictEqual(resolved.entryFormatter, undefined, "and a spread of a resolved conf carries format alone, so nothing folds a second time");
 
 	const given: LogConf = { entryFormatter: own, stderr: () => {} };
 
@@ -676,20 +676,23 @@ test("format and entryFormatter are one setting, and a resolved conf carries nei
 test("conf.entryFormatter still reads and writes the formatter, deprecated, until 3.0.0", t => {
 	const readback = capture({ format: "json" });
 
-	t.strictEqual(readback.log.conf.entryFormatter, msgJsonFormatter, "reading it resolves format, as it did in v2.3.0 whichever spelling set the formatter");
+	const annotated: ResolvedLogConf = readback.log.conf;
+
+	t.strictEqual(annotated.entryFormatter, msgJsonFormatter, "reading it resolves format, as it did in v2.3.0 whichever spelling set the formatter, and off the published type too");
 	t.strictEqual(JSON.parse(readback.stderr[0] ?? "{}").msg, "@larvit/log: conf.entryFormatter is deprecated and removed in 3.0.0, use conf.format", "and warns once through the instance's formatter, naming the name to read instead");
 
 	const swap = capture({ colors: false });
+	const swapped = (entry: EntryFormatterConf) => `swapped ${entry.msg}`;
 
-	swap.log.conf.entryFormatter = entry => `swapped ${entry.msg}`;
+	swap.log.conf.entryFormatter = swapped;
 	swap.log.info("hi");
 	t.strictEqual(swap.stdout[0], "swapped hi", "writing it swaps the formatter on a live instance, as it did in v2.3.0");
-	t.strictEqual(typeof swap.log.conf.format, "function", "through format, so the two names cannot disagree");
+	t.strictEqual(swap.log.conf.format, swapped, "through format, so the two names cannot disagree");
 	t.strictEqual(swap.stderr[0], "swapped @larvit/log: conf.entryFormatter is deprecated and removed in 3.0.0, use conf.format", "the write lands before the warning it raises, which the formatter just set then renders");
 
 	const afterWrite = swap.log.conf.entryFormatter;
 
-	t.strictEqual(typeof afterWrite, "function", "a read after a write resolves what was written");
+	t.strictEqual(afterWrite, swapped, "a read after a write resolves what was written");
 	t.strictEqual(swap.stderr.length, 1, "and shares the write's warning: one text, one sink");
 	swap.log.conf.format = "json";
 	swap.log.info("live");
@@ -701,6 +704,7 @@ test("conf.entryFormatter still reads and writes the formatter, deprecated, unti
 	Object.defineProperty(handBuilt.log.conf, "entryFormatter", { configurable: true, enumerable: true, value: () => "inherited" });
 	new Log({ parentLog: handBuilt.log }).info("hi");
 	t.deepEqual(handBuilt.stdout, ["parent hi"], "an inherited entryFormatter is not folded, so it never becomes the child's formatter");
+	t.deepEqual(handBuilt.stderr, [], "and warns about nothing: the app developer never wrote that spelling");
 	t.end();
 });
 

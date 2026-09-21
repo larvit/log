@@ -65,8 +65,8 @@ one of its sub-items is free only until this release publishes.
     `takeBatch` has already subtracted its bytes and removed it from the queue. Silent loss, no
     report line. Publishing freezes `OtlpPayload` and `OtlpQueue` as consumer contracts.
   - [ ] No comment that restates the code beneath it. Five or more readers each named
-    `index.ts:1425-1426` (whose second line is contradicted by the merge rules three lines below
-    it), `index.ts:1328`, `index.ts:1607`, and the "kept out of the class so it is trivially
+    `index.ts:1423-1424` (whose second line is contradicted by the merge rules three lines below
+    it), `index.ts:1326`, `index.ts:1605`, and the "kept out of the class so it is trivially
     testable" half of `index.ts:393` and `index.ts:427`. The `Not pure — it mutates span` half of
     that last one earns its place and stays. Two more, from the 2026-09-21 prose pass: the
     placement instruction under the `// --- Credentials on a span ---` banner, which AGENTS.md →
@@ -82,7 +82,7 @@ one of its sub-items is free only until this release publishes.
   false had it been missed; most sit beside the name they point at, which grep already finds.
 - [ ] Survive a `logLevel` the union does not contain. `new Log({ logLevel: "trace" })` throws
   `TypeError: Cannot read properties of undefined (reading 'severityNumber')` on `log.info()` and
-  on all five other level methods, because `enabled()` (`index.ts:1587`) indexes `LogLevels` with
+  on all five other level methods, because `enabled()` (`index.ts:1585`) indexes `LogLevels` with
   it and `log()` gates on `enabled()`. TypeScript rejects the literal; the README's own examples
   are JavaScript, where nothing does, and `LOG_LEVEL=trace` (pino) or `http` (winston) is the
   obvious input. 2.4.0 is also the release adding `enabled()` as the guard README → Accept a logger
@@ -90,7 +90,7 @@ one of its sub-items is free only until this release publishes.
   logging dependency killing the process over a one-word config mistake is the thing to end;
   `msgTextFormatter` already treats the same class of input as reachable.
 - [ ] Make `traceparent` behave the way the option and the README both say it does — edge-only, not
-  inherited by clones or children. The constructor's inheritance loop (`index.ts:1333`) skips only
+  inherited by clones or children. The constructor's inheritance loop (`index.ts:1331`) skips only
   what `otlpKeysNotToInherit` returns, so it copies the parent's `traceparent` onto the child's
   conf, while `clone()`'s separate skip set excludes it correctly: the two loops disagree. The
   child's own span is right, so nothing is visibly wrong until the conf is spread — a spelling this
@@ -165,7 +165,7 @@ one of its sub-items is free only until this release publishes.
   record carries the trace's sampled flag as data, and the log pipeline exports it regardless — the
   flag tells the backend how to link the record, not whether to keep it. So dropping the *span* on
   that flag is plainly right, and dropping the *records* is a choice this library made on its own,
-  in `log()` (`index.ts:1616`), which returns before the enqueue whenever `sampled` is false.
+  in `log()` (`index.ts:1614`), which returns before the enqueue whenever `sampled` is false.
 
   *The two answers.* **Export records always, and let only spans obey the flag** — this is what
   2.3.0 did, so it is additive and safe in a minor, and you keep your error logs for unsampled
@@ -338,7 +338,10 @@ Each one is a weigh against README → Goals first: ship it, or delete the item 
   shipped in 2.3.0 and `log.span` is a stated contract, so renaming it waits for the major.
 - [ ] Remove the level-string shorthand from `Log` and `clone`.
 - [ ] Remove `entryFormatter`, the option and the `conf` alias of `format` beside it; `format` is
-  `"text" | "json" | ((entry) => string)`.
+  `"text" | "json" | ((entry) => string)`. This is what closes the one unsoundness 2.4.0 could not:
+  the alias is non-enumerable, which no type can say, so `ResolvedLogConf` declares a member a
+  spread of a conf does not carry — and it keeps declaring it, because v2.3.0 shipped it required
+  and a minor may not narrow an exported type.
 - [ ] Rename `EntryFormatterConf` to `LogEntry`: it is an entry, and the option it was named after
   is gone.
 - [ ] Reject a `format` string other than `"text"` or `"json"` in the constructor.
