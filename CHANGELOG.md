@@ -88,21 +88,20 @@
   rejects drops that batch, reported as `OTLP export headers invalid, batch dropped` naming the
   header, never its value.
 - `format` also takes a formatter function, `(entry) => string`, and is what children and clones
-  inherit. `entryFormatter` is deprecated: it still formats and still wins over a `"text"`/`"json"`
-  `format`, writes one `warn` line per `stderr` sink for each distinct warning text, whatever
-  `logLevel` says, and 3.0.0 removes it. Two different formatters, one per spelling, throw. New
-  export: `EntryFormatter`; `ResolvedLogConf["format"]` widens to include a function.
-  `log.conf.entryFormatter` is deprecated as well as the option: it still reads back the formatter
-  and still swaps it when written, now through `format` so the two names cannot disagree, but
-  touching it warns once per `stderr` sink, reads and writes sharing the line, and 3.0.0 removes
-  it — read `log.conf.format`. It is also non-enumerable now, so `{ ...log.conf }` and
-  `Object.keys(log.conf)` no longer carry it, which is what lets a `format` on a spread or a child
-  apply. `ResolvedLogConf` still declares it, so `const c: ResolvedLogConf = { ...log.conf }` still
-  compiles while calling `c.entryFormatter(entry)` throws, the spread carrying no such property;
-  read the formatter off `log.conf` itself, or switch on `c.format`. 3.0.0 removes the member with
-  the property. `JSON.stringify(log.conf)` always carries
-  `format` — `"text"` by default, where v2.3.0 left the key absent unless you passed one — and
-  shows nothing for it when it is a function, as any function does.
+  inherit. New export: `EntryFormatter`; `ResolvedLogConf["format"]` widens to include a function.
+  The `entryFormatter` option is deprecated: it still formats and still wins over a
+  `"text"`/`"json"` `format`, writes one `warn` line per `stderr` sink for each distinct warning
+  text whatever `logLevel` says, and 3.0.0 removes it. Two different formatters, one per spelling,
+  throw.
+- `log.conf.entryFormatter` is deprecated too. Reading it still returns the formatter and writing
+  it still swaps it — through `format` now, so the two names cannot disagree — and either warns
+  once per `stderr` sink. Read `log.conf.format` instead. It is non-enumerable now, so
+  `{ ...log.conf }` and `Object.keys(log.conf)` no longer carry it, which is what lets a `format`
+  on a spread or a child apply; `ResolvedLogConf` still declares it, so
+  `const c: ResolvedLogConf = { ...log.conf }` compiles and `c.entryFormatter(entry)` throws at
+  runtime. 3.0.0 removes the member with the property.
+- `JSON.stringify(log.conf)` carries `format`, `"text"` by default, where v2.3.0 left the key
+  absent unless you passed one — and omits it when you passed a function, as it omits any function.
 - A `format` set on a child (`parentLog`) or on a spread of `log.conf` now applies; before, the
   parent's resolved formatter silently kept winning. `log.conf.format` is read where a line is
   written, so writing it swaps the formatter on a live instance, like `logLevel` and the sinks.

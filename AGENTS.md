@@ -43,8 +43,10 @@ and who it is for, and a design decision that cannot be derived from them belong
 - 2026-09-18: `clock` is a supported option, not a test-only seam. Valid while a delegating clock
   leaves process-exit behaviour intact.
 - 2026-09-18: adding a key to `ResolvedLogConf`/`ResolvedQueueConf`'s required half ships in a
-  minor. They are output types describing what the library produces; a consumer hand-building one
-  is writing a test double, not running existing code. Precedent: `colors` did the same.
+  minor; removing one, or making it optional, waits for a major, because a consumer reading that
+  key stops compiling. They are output types describing what the library produces; a consumer
+  hand-building one is writing a test double, not running existing code. Precedent: `colors` did
+  the same.
 - 2026-09-18: a deprecation warns once per `stderr` sink for each distinct warning text, through the
   instance's formatter at `warn` and whatever `logLevel` says. Instances sharing the default
   `console.error` share that one warning; a sink the caller injects gets its own, which keeps a test
@@ -146,33 +148,28 @@ and who it is for, and a design decision that cannot be derived from them belong
   the queue's, and 2.5.0's conf-redaction and Basic-over-`http:` items rewrite that code. Valid while
   the source is a single `index.ts`.
 
-- 2026-09-21: `format` is the formatter's one name in use, and `conf.entryFormatter` a deprecated
-  alias of it until 3.0.0 drops both. `entryFormatter` folds into `format`, winning over a
+- 2026-09-21: `format` is the formatter's one name, and `conf.entryFormatter` a deprecated alias of
+  it, read and write, until 3.0.0 drops both. `entryFormatter` folds into `format`, winning over a
   `"text"`/`"json"` one as 2.x documented, and two *different* formatters throw: nothing can hold
-  that combination yet, while rejecting the documented one would break a minor. Nothing reads the
-  second name to obtain a formatter any more, and `outputToConsole` resolves `conf.format` where it
-  writes a line, so the formatter is as live as `logLevel` and the sinks are rather than a snapshot
-  no writer can reach. The alias stays because v2.3.0 filled `conf.entryFormatter` on every
-  instance, whichever spelling set the formatter, and README → Audience promises a minor leaves
-  working code alone: a read resolves `format` and a write sets it, so the two names cannot
-  disagree, and the write lands before the warning it raises, so a formatter or sink that throws
-  cannot swallow it. Either warns once per sink, which is the deprecation Audience requires before
-  3.0.0 drops the property beside the option, in its `MIGRATION.md` entry. It is one module-level
-  descriptor for every instance: a closure pair per `Log` put one at 1347 bytes, against Goals #6's
-  1 KB. Non-enumerable, so a child or a spread carries `format` alone and folds nothing a second
-  time — which the type cannot say, so `ResolvedLogConf` keeps `entryFormatter` in its required
-  half, where v2.3.0 declared it and a minor may not narrow it, and a spread's type promises a
-  formatter the spread does not carry until 3.0.0 removes the member with the property.
-  `todo.md`'s 3.0.0 item carries that. Serves README → Goals #4 for the one name, README → Audience
-  for the alias. An `entryFormatter` reaching an instance through inheritance is never folded,
-  which only a hand-built parent conf can do — a test double, per the required-half rule above,
-  which also carries `ResolvedLogConf["format"]` widening to include a function. Valid until 3.0.0
-  removes `entryFormatter`.
+  that combination yet, while rejecting the documented one would break a minor. An `entryFormatter`
+  reaching an instance through inheritance is never folded, which only a hand-built parent conf can
+  do. The alias stays because v2.3.0 filled `conf.entryFormatter` on every instance, whichever
+  spelling set the formatter; it is one module-level descriptor, because a closure pair per `Log`
+  measured 1347 bytes against Goals #6's 1 KB, on `node:22-bookworm-slim` over 50 000 retained
+  instances. The formatter is resolved from `conf.format` where a line is written, so writing it
+  takes effect on a live instance, like `logLevel` and the sinks. Serves README → Goals #4 for the
+  one name, README → Audience for the alias. Valid until 3.0.0 removes `entryFormatter`.
+- 2026-09-21: `ResolvedLogConf` keeps `entryFormatter` in its required half while the property is
+  non-enumerable, so a spread's type promises a formatter the spread does not carry. Accepted
+  rather than fixed: v2.3.0 shipped the member required and a minor may not narrow it, per the
+  required-half entry above, and no type can say "non-enumerable". `todo.md`'s 3.0.0 item closes
+  it. Valid until 3.0.0 removes `entryFormatter`.
 
 ## Working here
 
 - Source is a single `index.ts`, sectioned by `// --- name ---` banners. New code joins a
-  section whose banner stays true of it, or gets its own.
+  section whose banner stays true of it, or gets its own. A rule set answering one question — what
+  a reader has to check as a whole — lives in one section, never split across two.
 - A done `todo.md` item leaves the file: a change a consumer can observe is reworded for them
   under `CHANGELOG.md` → `## Unreleased`; anything else is deleted outright.
 - A release section with anything a consumer must act on — a rotation advisory, an exposure still
