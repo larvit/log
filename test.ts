@@ -1,4 +1,4 @@
-import { type DefinedMetadata, type EntryFormatterConf, formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, type Logger, type LogLevel, LogLevels, msgJsonFormatter, msgTextFormatter, type OtlpPayload, type OtlpQueue, parseTraceparent, Queue, type QueueStorage, type ResolvedLogConf, type TimerHandle } from "./index.js";
+import { type DefinedMetadata, type EntryFormatter, type EntryFormatterConf, formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, type Logger, type LogLevel, LogLevels, msgJsonFormatter, msgTextFormatter, type OtlpPayload, type OtlpQueue, parseTraceparent, Queue, type QueueStorage, type ResolvedLogConf, type TimerHandle } from "./index.js";
 import test from "./tap.js";
 
 // --- helpers ---------------------------------------------------------------
@@ -677,8 +677,10 @@ test("conf.entryFormatter still reads and writes the formatter, deprecated, unti
 	const readback = capture({ format: "json" });
 
 	const annotated: ResolvedLogConf = readback.log.conf;
+	// Typed, not inferred: dropping the member from ResolvedLogConf again fails the build here.
+	const fromPublishedType: EntryFormatter = annotated.entryFormatter;
 
-	t.strictEqual(annotated.entryFormatter, msgJsonFormatter, "reading it resolves format, as it did in v2.3.0 whichever spelling set the formatter, and off the published type too");
+	t.strictEqual(fromPublishedType, msgJsonFormatter, "reading it resolves format, as it did in v2.3.0 whichever spelling set the formatter, and off the published type too");
 	t.strictEqual(JSON.parse(readback.stderr[0] ?? "{}").msg, "@larvit/log: conf.entryFormatter is deprecated and removed in 3.0.0, use conf.format", "and warns once through the instance's formatter, naming the name to read instead");
 
 	const swap = capture({ colors: false });
@@ -697,6 +699,11 @@ test("conf.entryFormatter still reads and writes the formatter, deprecated, unti
 	swap.log.conf.format = "json";
 	swap.log.info("live");
 	t.strictEqual(JSON.parse(swap.stdout[1]).msg, "live", "format is read where a line is written, like logLevel and the sinks");
+
+	const silent = capture({ logLevel: "none" });
+
+	t.strictEqual(silent.log.conf.entryFormatter, msgTextFormatter, "a silenced instance still resolves it");
+	t.strictEqual(silent.stderr.length, 1, "and still warns: no logLevel silences a deprecation");
 
 	// Only a hand-written LogInt's conf carries the deprecated name as a key of its own.
 	const handBuilt = capture({ format: (entry: EntryFormatterConf) => `parent ${entry.msg}` });
