@@ -91,9 +91,10 @@
   inherit. `entryFormatter` is deprecated: it still formats and still wins over a `"text"`/`"json"`
   `format`, writes one `warn` line per `stderr` sink for each distinct warning text, whatever
   `logLevel` says, and 3.0.0 removes it. Two different formatters, one per spelling, throw. New
-  export: `EntryFormatter`; `ResolvedLogConf["format"]` widens to include a function, and
-  `log.conf.entryFormatter` is now non-enumerable, so it no longer shows up in a spread or
-  `Object.keys` of the conf. A `format` function drops out of `JSON.stringify(log.conf)`, as any
+  export: `EntryFormatter`; `ResolvedLogConf["format"]` widens to include a function, and a
+  resolved `log.conf` carries the formatter under `format` alone — `entryFormatter` is an input
+  spelling, absent from the conf whichever way you set it, where v2.3.0 left the resolved formatter
+  under that name. A `format` function drops out of `JSON.stringify(log.conf)`, as any
   function does, where the string always showed.
 - A `format` set on a child (`parentLog`) or on a spread of `log.conf` now applies; before, the
   parent's resolved formatter silently kept winning.
