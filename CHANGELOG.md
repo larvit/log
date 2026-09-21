@@ -73,6 +73,10 @@
 
 ### Everything else
 
+- A failed export no longer holds a Node or Deno process open. A record logged while the failing
+  round was in flight scheduled a batch send of its own, which the retry backoff did not take over
+  and which is not unref'd, so the process stayed alive for up to `batchDelayMs` after
+  `await log.flush()` or `await log.end()` had already returned.
 - With `captureQuery` on, a query key that repeats keeps every occurrence in `url.full`. A repeated
   known-sensitive key — `?Signature=a&Signature=b` — used to collapse to one `REDACTED`.
 - An `otlpHttpBaseURI` that is not `http:` or `https:` is rejected in the constructor, where
