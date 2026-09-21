@@ -3,9 +3,18 @@ import test from "./tap.js";
 
 // --- helpers ---------------------------------------------------------------
 
-// Polls until `done` holds; a hung condition fails through the harness timeout.
+// Polls until `done` holds. Bounded below the harness timeout because an abandoned poll keeps
+// Node's event loop alive, which hangs the whole run in place of failing one test.
+const WAIT_FOR_TIMEOUT_MS = 5000;
+
 async function waitFor(done: () => boolean): Promise<void> {
+	const deadline = Date.now() + WAIT_FOR_TIMEOUT_MS;
+
 	while (!done()) {
+		if (Date.now() >= deadline) {
+			throw new Error("waitFor: the condition never held");
+		}
+
 		await new Promise(resolve => setTimeout(resolve, 5));
 	}
 }
