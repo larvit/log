@@ -150,20 +150,24 @@ and who it is for, and a design decision that cannot be derived from them belong
   alias of it until 3.0.0 drops both. `entryFormatter` folds into `format`, winning over a
   `"text"`/`"json"` one as 2.x documented, and two *different* formatters throw: nothing can hold
   that combination yet, while rejecting the documented one would break a minor. Nothing in the
-  library reads the second name any more — `outputToConsole` resolves `conf.format` where it writes
-  a line, so the formatter is as live as `logLevel` and the sinks are, and one call site carries
-  every line this library writes, a deprecation warning and a queue's `report` included. The alias
-  stays because v2.3.0 filled `conf.entryFormatter` on every instance, whichever spelling set the
-  formatter, and README → Audience promises a minor leaves working code alone: it is an accessor
-  over `format`, so a read resolves and a write sets, the two names cannot disagree, and either
-  warns once per sink. Non-enumerable, so a child or a spread carries `format` alone and folds
-  nothing a second time; dropping the property is 3.0.0's, beside the option and its `MIGRATION.md`
-  entry. `ResolvedLogConf` loses `entryFormatter` from its required half, which is what let
-  `const c: ResolvedLogConf = { ...log.conf }` compile with `c.entryFormatter` undefined. Serves
-  README → Goals #4 for the one name, README → Audience for the alias. An `entryFormatter` reaching
-  an instance through inheritance is never folded, which only a hand-built parent conf can do — a
-  test double, per the required-half rule above, which also carries `ResolvedLogConf["format"]`
-  widening to include a function. Valid until 3.0.0 removes `entryFormatter`.
+  library reads the second name any more, and `outputToConsole` resolves `conf.format` where it
+  writes a line, so the formatter is as live as `logLevel` and the sinks are rather than a snapshot
+  no writer can reach. The alias stays because v2.3.0 filled `conf.entryFormatter` on every
+  instance, whichever spelling set the formatter, and README → Audience promises a minor leaves
+  working code alone — including code that type-checked, so `log.conf` is typed with the alias
+  where `ResolvedLogConf`, which describes a spread, is not. It is one module-level descriptor for
+  every instance: a closure pair per `Log` measured 1347 bytes against Goals #6's 1 KB. A read
+  resolves `format` and a write sets it, so the two names cannot disagree; the write lands before
+  the warning it raises, so a formatter or sink that throws cannot swallow it. Either warns once
+  per sink, which is the deprecation README → Audience requires before 3.0.0 drops the property
+  beside the option, in its `MIGRATION.md` entry. Non-enumerable, so a child or a spread carries
+  `format` alone and folds nothing a second time. `ResolvedLogConf` loses `entryFormatter` from its
+  required half, which is what let `const c: ResolvedLogConf = { ...log.conf }` compile with
+  `c.entryFormatter` undefined. Serves README → Goals #4 for the one name, README → Audience for
+  the alias. An `entryFormatter` reaching an instance through inheritance is never folded, which
+  only a hand-built parent conf can do — a test double, per the required-half rule above, which
+  also carries `ResolvedLogConf["format"]` widening to include a function. Valid until 3.0.0
+  removes `entryFormatter`.
 
 ## Working here
 

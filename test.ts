@@ -685,9 +685,17 @@ test("conf.entryFormatter still reads and writes the formatter, deprecated, unti
 	swap.log.info("hi");
 	t.strictEqual(swap.stdout[0], "swapped hi", "writing it swaps the formatter on a live instance, as it did in v2.3.0");
 	t.strictEqual(typeof swap.log.conf.format, "function", "through format, so the two names cannot disagree");
-	t.strictEqual(swap.stderr.length, 1, "the write and the read after it share one warning");
+	t.strictEqual(swap.stderr[0], "swapped @larvit/log: conf.entryFormatter is deprecated and removed in 3.0.0, use conf.format", "the write lands before the warning it raises, which the formatter just set then renders");
 
-	// A key of its own, as only a hand-written LogInt's conf carries it: writing through the mirror sets format.
+	const afterWrite = swap.log.conf.entryFormatter;
+
+	t.strictEqual(typeof afterWrite, "function", "a read after a write resolves what was written");
+	t.strictEqual(swap.stderr.length, 1, "and shares the write's warning: one text, one sink");
+	swap.log.conf.format = "json";
+	swap.log.info("live");
+	t.strictEqual(JSON.parse(swap.stdout[1]).msg, "live", "format is read where a line is written, like logLevel and the sinks");
+
+	// Only a hand-written LogInt's conf carries the deprecated name as a key of its own.
 	const handBuilt = capture({ format: (entry: EntryFormatterConf) => `parent ${entry.msg}` });
 
 	Object.defineProperty(handBuilt.log.conf, "entryFormatter", { configurable: true, enumerable: true, value: () => "inherited" });
