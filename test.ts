@@ -904,14 +904,14 @@ test("Queue is bounded: drops the oldest when full and reports the count once", 
 
 test("Queue's byte count follows its items, so a delivered or dropped record stops filling the next batch", async t => {
 	const clock = fakeClock();
-	const big = "a".repeat(1200);
+	const big = "a".repeat(5000);
 	let attempts = 0;
 	const { calls } = stubFetch(() => {
 		attempts++;
 
 		return attempts === 1 ? response({ status: 503 }) : undefined;
 	});
-	const log = new Log({ clock, otlpQueue: new Queue({ batchDelayMs: 600000, clock, maxBatchBytes: 2000, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, retryDelayMs: 1000 }), stderr: () => {}, stdout: () => {} });
+	const log = new Log({ clock, otlpQueue: new Queue({ batchDelayMs: 600000, clock, maxBatchBytes: 8000, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, retryDelayMs: 1000 }), stderr: () => {}, stdout: () => {} });
 
 	log.info(big);
 	log.info(big);
@@ -926,7 +926,7 @@ test("Queue's byte count follows its items, so a delivered or dropped record sto
 	await clock.advance(600000);
 	t.deepEqual(calls.map(call => call.body.resourceLogs[0].scopeLogs[0].logRecords.length), [1, 1, 1, 1], "one record per POST throughout");
 
-	const bounded = new Log({ clock, otlpQueue: new Queue({ batchDelayMs: 600000, clock, maxBatchBytes: 2000, maxItems: 1, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {} }), stderr: () => {}, stdout: () => {} });
+	const bounded = new Log({ clock, otlpQueue: new Queue({ batchDelayMs: 600000, clock, maxBatchBytes: 8000, maxItems: 1, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {} }), stderr: () => {}, stdout: () => {} });
 
 	calls.length = 0;
 	bounded.info(big);
@@ -962,7 +962,7 @@ test("Queue runs one round at a time, and a flush() arriving mid-round waits for
 	await first;
 	await second;
 	t.deepEqual(exportedRecords(calls), ["first", "second"], "both records are delivered, the mid-round one after");
-	t.strictEqual(clock.pending.size, 0, "no timer is left behind");
+	t.strictEqual(clock.pending.size, 0, "and the rounds cleared every timer they scheduled");
 	t.end();
 });
 
@@ -1035,11 +1035,13 @@ test("Queue with storage writes through one writer, so changes made during a wri
 	let concurrent = 0;
 	let writes = 0;
 
+	let released = false;
+
 	storage.setItem = async (key, value) => {
 		writes++;
 		inFlight++;
 		concurrent = Math.max(concurrent, inFlight);
-		await new Promise(resolve => setTimeout(resolve, 20));
+		await waitFor(() => released);
 		await setItem(key, value);
 		inFlight--;
 	};
@@ -1050,9 +1052,12 @@ test("Queue with storage writes through one writer, so changes made during a wri
 	await waitFor(() => writes === 1);
 	log.info("2");
 	log.info("3");
-	await waitFor(() => JSON.parse(storage.data.get("@larvit/log:otlp-queue") ?? "[]").length === 3);
+	released = true;
+	// Quiescence, not the wanted outcome: a second writer must fail this test, never hang it.
+	await waitFor(() => inFlight === 0 && writes >= 2);
 	t.strictEqual(concurrent, 1, "no second writer starts beside the one already writing");
 	t.strictEqual(writes, 2, "both records that arrived during that write go out in the one write after it");
+	t.strictEqual(JSON.parse(storage.data.get("@larvit/log:otlp-queue") ?? "[]").length, 3, "and that write holds all three");
 	t.end();
 });
 

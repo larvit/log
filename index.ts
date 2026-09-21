@@ -803,8 +803,8 @@ export class Queue implements OtlpQueue {
 	private dropped = 0;
 	private items: QueuedItem[] = [];
 
-	// Scheduling: one round runs at a time, one caller waits for the next, and one timer says when
-	// that next round starts — a batch wait, or a retry backoff flush() must not jump.
+	// Scheduling: one round runs at a time, callers arriving mid-round join one next round, and
+	// setTimer owns the one timer that starts it — a batch wait, or a backoff flush() must not jump.
 	private failures = 0;
 	private pending?: Promise<void>;
 	private running?: Promise<void>;
@@ -895,17 +895,24 @@ export class Queue implements OtlpQueue {
 		return this.pending;
 	}
 
-	private schedule(): void {
-		if (this.timer) {
-			return;
-		}
+	// The one writer of the timer slot: whatever it replaces is cleared, so no stray callback fires.
+	private setTimer(retry: boolean, delayMs: number): TimerHandle {
+		this.conf.clock.clearTimeout(this.timer?.handle);
 
 		const handle = this.conf.clock.setTimeout(() => {
 			this.timer = undefined;
 			void this.flush();
-		}, this.conf.batchDelayMs);
+		}, delayMs);
 
-		this.timer = { handle, retry: false };
+		this.timer = { handle, retry };
+
+		return handle;
+	}
+
+	private schedule(): void {
+		if (!this.timer) {
+			this.setTimer(false, this.conf.batchDelayMs);
+		}
 	}
 
 	private async round(): Promise<void> {
@@ -941,15 +948,7 @@ export class Queue implements OtlpQueue {
 		const retryInMs = Math.min(this.conf.retryDelayMs * (2 ** (this.failures - 1)), RETRY_DELAY_MAX_MS);
 
 		// A record enqueued mid-round leaves a batch timer behind; the backoff takes it over.
-		this.conf.clock.clearTimeout(this.timer?.handle);
-
-		const handle = this.conf.clock.setTimeout(() => {
-			this.timer = undefined;
-			void this.flush();
-		}, retryInMs);
-
-		this.timer = { handle, retry: true };
-		unref(handle, this.conf.clock === systemClock);
+		unref(this.setTimer(true, retryInMs), this.conf.clock === systemClock);
 		this.report("OTLP export failed, will retry", { ...this.describe(batch, failure), retryInMs });
 	}
 
@@ -1017,7 +1016,7 @@ export class Queue implements OtlpQueue {
 
 		// AbortController + cleared timer works in browsers and Node, and never leaves a dangling timer.
 		const controller = new AbortController();
-		const timer = this.conf.clock.setTimeout(() => controller.abort(), OTLP_EXPORT_TIMEOUT_MS);
+		const abortTimer = this.conf.clock.setTimeout(() => controller.abort(), OTLP_EXPORT_TIMEOUT_MS);
 
 		try {
 			const res = await fetch(this.url + otlpPath(batch[0].payload), {
@@ -1045,7 +1044,7 @@ export class Queue implements OtlpQueue {
 		} catch (err) {
 			return { message: stringField(err, "message") ?? "Unknown error sending to OTLP", retry: true };
 		} finally {
-			this.conf.clock.clearTimeout(timer);
+			this.conf.clock.clearTimeout(abortTimer);
 		}
 	}
 

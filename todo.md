@@ -217,6 +217,13 @@ two of its sub-items are free only until this release publishes.
   changes no contract, so it needs no major, and 2.5.0, 2.6.0 and 2.7.0 all edit those 90 lines
   otherwise: the `traceparent` skip-set fix, the conf redaction above and the `spanName` warning all
   land in them. Refactor first and 3.0.0's diff gets smaller.
+- [ ] Let a drained round clear the batch timer a record enqueued into it scheduled. `round()`
+  clears the timer once, at its start, so a record logged while an export is in flight installs a
+  batch timer that the same round's loop then drains — leaving a timer with nothing left to send.
+  Only the retry timer is unref'd (AGENTS.md, 2026-09-18), so this one holds a Node or Deno process:
+  measured on `node:22`, `await log.flush()` returned with both records delivered and the process
+  stayed alive a further 4.7 s of a 5 s `batchDelayMs`. Logging while an export is in flight is the
+  normal case on a busy service, not an edge. The failed-round half of this shipped in 2.4.0.
 - [ ] Stop a restored batch being the first thing dropped. `add(batch, true)` unshifts a failed
   batch to the front, and the `maxItems` trim then splices the excess off that same front. An
   offline phone at `maxItems` reports "OTLP export failed, will retry" for items it has already
