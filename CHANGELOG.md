@@ -94,13 +94,18 @@
   export: `EntryFormatter`; `ResolvedLogConf["format"]` widens to include a function.
   `log.conf.entryFormatter` is deprecated as well as the option: it still reads back the formatter
   and still swaps it when written, now through `format` so the two names cannot disagree, but
-  touching it warns and 3.0.0 removes it — read `log.conf.format`. It is also non-enumerable now,
-  so it no longer shows up in a spread or `Object.keys` of the conf, where a spread used to carry
-  the parent's resolved formatter into the child. `JSON.stringify(log.conf)` always carries
+  touching it warns once per `stderr` sink, reads and writes sharing the line, and 3.0.0 removes
+  it — read `log.conf.format`. It is also non-enumerable now, so `{ ...log.conf }` and
+  `Object.keys(log.conf)` no longer carry it, which is what lets a `format` on a spread or a child
+  apply. `ResolvedLogConf` still declares it, so `const c: ResolvedLogConf = { ...log.conf }` still
+  compiles while calling `c.entryFormatter(entry)` throws, the spread carrying no such property;
+  read the formatter off `log.conf` itself, or switch on `c.format`. 3.0.0 removes the member with
+  the property. `JSON.stringify(log.conf)` always carries
   `format` — `"text"` by default, where v2.3.0 left the key absent unless you passed one — and
   shows nothing for it when it is a function, as any function does.
 - A `format` set on a child (`parentLog`) or on a spread of `log.conf` now applies; before, the
-  parent's resolved formatter silently kept winning.
+  parent's resolved formatter silently kept winning. `log.conf.format` is read where a line is
+  written, so writing it swaps the formatter on a live instance, like `logLevel` and the sinks.
 - Every deprecation line names the package: `@larvit/log: …`.
 - The level-string shorthand, `new Log("debug")` and `log.clone("debug")`, is deprecated: it still
   sets the level, writes one `warn` line per `stderr` sink for each distinct warning text,
