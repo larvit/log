@@ -58,7 +58,7 @@ export type LogConf = {
 };
 
 // conf after the constructor fills its defaults: the always-set fields are no longer optional.
-export type ResolvedLogConf = LogConf & Required<Pick<LogConf, "clock" | "colors" | "format" | "logLevel" | "stderr" | "stdout">>;
+export type ResolvedLogConf = LogConf & Required<Pick<LogConf, "clock" | "colors" | "entryFormatter" | "format" | "logLevel" | "stderr" | "stdout">>;
 
 export type Logger = {
 	enabled: (logLevel: LogLevel) => boolean;
@@ -1265,7 +1265,7 @@ function isQueueFor(queue: OtlpQueue, conf: LogConf): boolean {
 const warnedDeprecations = new WeakMap<(msg: string) => void, Set<string>>();
 
 // Ungated by logLevel: `"none"` silences logs, not a deprecation the app developer must act on.
-function warnDeprecated(conf: ResolvedLogConf, metadata: DefinedMetadata, msg: string): void {
+function warnDeprecated(conf: ResolvedLogConf, metadata: Metadata | undefined, msg: string): void {
 	let warned = warnedDeprecations.get(conf.stderr);
 
 	if (!warned) {
@@ -1279,25 +1279,24 @@ function warnDeprecated(conf: ResolvedLogConf, metadata: DefinedMetadata, msg: s
 
 	// Added before the sink runs, so a sink that itself uses the deprecated spelling cannot recurse.
 	warned.add(msg);
-	conf.stderr(resolveFormatter(conf.format)({ colors: conf.colors, logLevel: "warn", metadata, msTimestamp: conf.clock.now(), msg }));
+	conf.stderr(resolveFormatter(conf.format)({ colors: conf.colors, logLevel: "warn", metadata: withoutUndefined(metadata), msTimestamp: conf.clock.now(), msg }));
 }
 
 const CONF_FORMATTER_DEPRECATED = "@larvit/log: conf.entryFormatter is deprecated and removed in 3.0.0, use conf.format";
 
-// 2.x's second name for `format`, read and written through it so the two cannot disagree. One
-// descriptor for every instance: a closure pair per `Log` cost 560 of Goals #6's 1 KB budget.
+// One descriptor for every instance: a closure pair per `Log` put one at 1347 bytes, against Goals #6's 1 KB.
 const ENTRY_FORMATTER_ALIAS: PropertyDescriptor = {
 	configurable: true,
 	// Non-enumerable, so a child or a spread carries `format` alone and folds nothing a second time.
 	enumerable: false,
 	get(this: ResolvedLogConf): EntryFormatter {
-		warnDeprecated(this, withoutUndefined(this.context), CONF_FORMATTER_DEPRECATED);
+		warnDeprecated(this, this.context, CONF_FORMATTER_DEPRECATED);
 
 		return resolveFormatter(this.format);
 	},
 	set(this: ResolvedLogConf, formatter: EntryFormatter) {
 		this.format = formatter;
-		warnDeprecated(this, withoutUndefined(this.context), CONF_FORMATTER_DEPRECATED);
+		warnDeprecated(this, this.context, CONF_FORMATTER_DEPRECATED);
 	},
 };
 
@@ -1307,8 +1306,7 @@ export class Log implements LogInt {
 	context: DefinedMetadata;
 	ended: boolean = false;
 
-	// The alias the constructor defines is on this object but not on a spread of it, so it is typed here.
-	readonly conf: ResolvedLogConf & { entryFormatter: EntryFormatter };
+	readonly conf: ResolvedLogConf;
 
 	// Un-awaited log.fetch calls, awaited by flush() so their spans are queued before the queue flushes.
 	private inFlight = new Set<Promise<unknown>>();
@@ -1354,8 +1352,6 @@ export class Log implements LogInt {
 			conf.format = "text";
 		}
 
-		Object.defineProperty(conf, "entryFormatter", ENTRY_FORMATTER_ALIAS);
-
 		if (conf.stderr === undefined) {
 			conf.stderr = console.error;
 		}
@@ -1364,8 +1360,10 @@ export class Log implements LogInt {
 			conf.stdout = console.log;
 		}
 
-		// Every optional field the resolved type requires is defaulted above, and the alias defined with them.
-		this.conf = conf as ResolvedLogConf & { entryFormatter: EntryFormatter };
+		Object.defineProperty(conf, "entryFormatter", ENTRY_FORMATTER_ALIAS);
+
+		// Every optional field the resolved type requires has been defaulted above.
+		this.conf = conf as ResolvedLogConf;
 		// Own copy, so a clone/child never mutates a context object shared with another instance.
 		this.context = withoutUndefined(this.conf.context);
 
