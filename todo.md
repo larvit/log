@@ -73,11 +73,11 @@ two of its sub-items are free only until this release publishes.
     Publishing 2.4.0 freezes that as a contract until 3.0.0.
   - [ ] A payload kind that cannot be added silently, while it is still free. The discriminator is
     the idiom `"resourceLogs" in payload` at six sites (`index.ts:627`, `722`, `770`, `771`, `947`
-    and `952`), so it has no symbol to grep for. Adding the metrics kind README → Goals already
-    promises type-errors at exactly one of them; the other five compile clean and are wrong — a
-    metric batch routes to `/v1/traces` and is then dropped by the merge, after `takeBatch` has
-    already subtracted its bytes and removed it from the queue. Silent loss, no report line.
-    Publishing freezes `OtlpPayload` and `OtlpQueue` as consumer contracts.
+    and `952`), so it has no symbol to grep for. Adding the metrics kind (which README → Goals
+    already promises) type-errors at exactly one of them; the other five compile clean and are
+    wrong — a metric batch routes to `/v1/traces` and is then dropped by the merge, after
+    `takeBatch` has already subtracted its bytes and removed it from the queue. Silent loss, no
+    report line. Publishing freezes `OtlpPayload` and `OtlpQueue` as consumer contracts.
   - [ ] No comment that restates the code beneath it. Five or more readers each named
     `index.ts:1394-1395` (whose second line is contradicted by the merge rules three lines below
     it), `index.ts:1296`, `index.ts:1577`, and the "kept out of the class so it is trivially
