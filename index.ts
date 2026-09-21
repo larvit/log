@@ -1239,7 +1239,7 @@ function spanFailure(error: unknown): { message: string, type: string } {
 	return { message: redactUserinfo(message), type: stringField(error, "code") ?? stringField(error, "name") ?? "_OTHER" };
 }
 
-// --- Conf inheritance ------------------------------------------------------
+// --- Conf inheritance and deprecation --------------------------------------
 
 const OTLP_TRANSPORT_KEYS = ["otlpAdditionalHeaders", "otlpHttpBaseURI", "otlpProtocol"] as const;
 
@@ -1262,15 +1262,53 @@ function isQueueFor(queue: OtlpQueue, conf: LogConf): boolean {
 		&& queue.conf.otlpAdditionalHeaders === conf.otlpAdditionalHeaders;
 }
 
+const warnedDeprecations = new WeakMap<(msg: string) => void, Set<string>>();
+
+// Ungated by logLevel: `"none"` silences logs, not a deprecation the app developer must act on.
+function warnDeprecated(conf: ResolvedLogConf, metadata: DefinedMetadata, msg: string): void {
+	let warned = warnedDeprecations.get(conf.stderr);
+
+	if (!warned) {
+		warned = new Set();
+		warnedDeprecations.set(conf.stderr, warned);
+	}
+
+	if (warned.has(msg)) {
+		return;
+	}
+
+	// Added before the sink runs, so a sink that itself uses the deprecated spelling cannot recurse.
+	warned.add(msg);
+	conf.stderr(resolveFormatter(conf.format)({ colors: conf.colors, logLevel: "warn", metadata, msTimestamp: conf.clock.now(), msg }));
+}
+
+const CONF_FORMATTER_DEPRECATED = "@larvit/log: conf.entryFormatter is deprecated and removed in 3.0.0, use conf.format";
+
+// 2.x's second name for `format`, read and written through it so the two cannot disagree. One
+// descriptor for every instance: a closure pair per `Log` cost 560 of Goals #6's 1 KB budget.
+const ENTRY_FORMATTER_ALIAS: PropertyDescriptor = {
+	configurable: true,
+	// Non-enumerable, so a child or a spread carries `format` alone and folds nothing a second time.
+	enumerable: false,
+	get(this: ResolvedLogConf): EntryFormatter {
+		warnDeprecated(this, withoutUndefined(this.context), CONF_FORMATTER_DEPRECATED);
+
+		return resolveFormatter(this.format);
+	},
+	set(this: ResolvedLogConf, formatter: EntryFormatter) {
+		this.format = formatter;
+		warnDeprecated(this, withoutUndefined(this.context), CONF_FORMATTER_DEPRECATED);
+	},
+};
+
 // --- Log -------------------------------------------------------------------
 
 export class Log implements LogInt {
-	private static warnedDeprecations = new WeakMap<(msg: string) => void, Set<string>>();
-
 	context: DefinedMetadata;
 	ended: boolean = false;
 
-	readonly conf: ResolvedLogConf;
+	// The alias the constructor defines is on this object but not on a spread of it, so it is typed here.
+	readonly conf: ResolvedLogConf & { entryFormatter: EntryFormatter };
 
 	// Un-awaited log.fetch calls, awaited by flush() so their spans are queued before the queue flushes.
 	private inFlight = new Set<Promise<unknown>>();
@@ -1316,23 +1354,7 @@ export class Log implements LogInt {
 			conf.format = "text";
 		}
 
-		// The deprecated spelling is 2.x's second name for `format`, kept readable and writable until 3.0.0 drops
-		// both. Non-enumerable, so a child or a spread carries `format` alone and folds nothing a second time.
-		const confDeprecation = "@larvit/log: conf.entryFormatter is deprecated and removed in 3.0.0, use conf.format";
-
-		Object.defineProperty(conf, "entryFormatter", {
-			configurable: true,
-			enumerable: false,
-			get: () => {
-				this.warnDeprecated(confDeprecation);
-
-				return resolveFormatter(conf.format);
-			},
-			set: (formatter: EntryFormatter) => {
-				this.warnDeprecated(confDeprecation);
-				conf.format = formatter;
-			},
-		});
+		Object.defineProperty(conf, "entryFormatter", ENTRY_FORMATTER_ALIAS);
 
 		if (conf.stderr === undefined) {
 			conf.stderr = console.error;
@@ -1342,19 +1364,19 @@ export class Log implements LogInt {
 			conf.stdout = console.log;
 		}
 
-		// Every optional field the resolved type requires has been defaulted above.
-		this.conf = conf as ResolvedLogConf;
+		// Every optional field the resolved type requires is defaulted above, and the alias defined with them.
+		this.conf = conf as ResolvedLogConf & { entryFormatter: EntryFormatter };
 		// Own copy, so a clone/child never mutates a context object shared with another instance.
 		this.context = withoutUndefined(this.conf.context);
 
 		if (typeof options === "string") {
-			this.warnDeprecated("@larvit/log: new Log(\"level\") is deprecated and removed in 3.0.0, use new Log({ logLevel })");
+			warnDeprecated(this.conf, this.context, "@larvit/log: new Log(\"level\") is deprecated and removed in 3.0.0, use new Log({ logLevel })");
 		}
 
 		if (overriddenFormat) {
-			this.warnDeprecated("@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format — entryFormatter wins and the format beside it is ignored");
+			warnDeprecated(this.conf, this.context, "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format — entryFormatter wins and the format beside it is ignored");
 		} else if (deprecatedFormatter) {
-			this.warnDeprecated("@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format");
+			warnDeprecated(this.conf, this.context, "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format");
 		}
 
 		if (this.conf.otlpQueue) {
@@ -1404,7 +1426,7 @@ export class Log implements LogInt {
 	// All options sent in will override the current instance settings
 	public clone(options?: LogConf | LogLevel | "none") {
 		if (typeof options === "string") {
-			this.warnDeprecated("@larvit/log: log.clone(\"level\") is deprecated and removed in 3.0.0, use log.clone({ logLevel })");
+			warnDeprecated(this.conf, this.context, "@larvit/log: log.clone(\"level\") is deprecated and removed in 3.0.0, use log.clone({ logLevel })");
 		}
 
 		const conf: LogConf = typeof options === "string" ? { logLevel: options } : { ...options };
@@ -1605,24 +1627,6 @@ export class Log implements LogInt {
 		this.inFlight.add(promise);
 		// The tracked promise only resolves, but stay defensive so a stray rejection can't become unhandled.
 		void promise.catch(() => {}).finally(() => this.inFlight.delete(promise));
-	}
-
-	// Ungated by logLevel: `"none"` silences logs, not a deprecation the app developer must act on.
-	private warnDeprecated(msg: string): void {
-		let warned = Log.warnedDeprecations.get(this.conf.stderr);
-
-		if (!warned) {
-			warned = new Set();
-			Log.warnedDeprecations.set(this.conf.stderr, warned);
-		}
-
-		if (warned.has(msg)) {
-			return;
-		}
-
-		// Added before the sink runs, so a sink that itself uses the deprecated spelling cannot recurse.
-		warned.add(msg);
-		this.outputToConsole("warn", msg, this.context, this.conf.clock.now());
 	}
 
 	private outputToConsole(logLevel: LogLevel, msg: string, metadata: DefinedMetadata, msTimestamp: number) {
