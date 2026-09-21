@@ -74,9 +74,12 @@ two of its sub-items are free only until this release publishes.
     report line. Publishing freezes `OtlpPayload` and `OtlpQueue` as consumer contracts.
   - [ ] No comment that restates the code beneath it. Five or more readers each named
     `index.ts:1405-1406` (whose second line is contradicted by the merge rules three lines below
-    it), `index.ts:1307`, `index.ts:1588`, and the "kept out of the class so it is trivially
+    it), `index.ts:1307`, `index.ts:1587`, and the "kept out of the class so it is trivially
     testable" half of `index.ts:393` and `index.ts:427`. The `Not pure — it mutates span` half of
-    that last one earns its place and stays.
+    that last one earns its place and stays. Two more, from the 2026-09-21 prose pass: the
+    placement instruction under the `// --- Credentials on a span ---` banner, which AGENTS.md →
+    Working here already states for every banner, and the comment above `log.fetch`'s span
+    registration, a near-verbatim copy of README → `log.fetch` in depth.
   - [ ] What is *not* redacted said beside the code that does not redact it. `buildLogPayload`
     (`index.ts:394`) and `buildSpanPayload` (`index.ts:428`) export the message and every
     metadata and context key verbatim. That is correct and is now exactly what Goal 3 says, but it
@@ -87,7 +90,7 @@ two of its sub-items are free only until this release publishes.
   false had it been missed; most sit beside the name they point at, which grep already finds.
 - [ ] Survive a `logLevel` the union does not contain. `new Log({ logLevel: "trace" })` throws
   `TypeError: Cannot read properties of undefined (reading 'severityNumber')` on `log.info()` and
-  on all five other level methods, because `enabled()` (`index.ts:1568`) indexes `LogLevels` with
+  on all five other level methods, because `enabled()` (`index.ts:1567`) indexes `LogLevels` with
   it and `log()` gates on `enabled()`. TypeScript rejects the literal; the README's own examples
   are JavaScript, where nothing does, and `LOG_LEVEL=trace` (pino) or `http` (winston) is the
   obvious input. 2.4.0 is also the release adding `enabled()` as the guard README → Accept a logger
@@ -123,6 +126,20 @@ two of its sub-items are free only until this release publishes.
 
 ### Ask before cutting
 
+- [ ] **Does Goal 3 promise what the code does?** It says a credential handed to this library
+  "never reaches a span", and names two carve-outs, neither of which covers a url nested in a
+  request path — which `buildUrlFull` exports verbatim, as this release's `### Security` section
+  says out loud. So the README contradicts itself, and a reader scoping the promise from Goals
+  alone gets it wrong. Either Goal 3 is a target that 2.5.0's path-redaction item closes, and says
+  so, or it needs a third carve-out — which would decide that item by declaration, so it is not a
+  wording fix. Found by the 2026-09-21 prose pass.
+- [ ] **Which goal is "a pending retry must not hold the process open"?** AGENTS.md's 2026-09-18
+  `Clock` entry rests on it, and 2.4.0's process-hold fix and 2.5.0's drained-round item both hang
+  off that entry rather than off a goal, which "every decision links to a goal" forbids. One
+  candidate is Goal 6, as "nothing this library schedules keeps a Node or Deno process alive past
+  the work the app asked for". Settling it also answers what the entry leaves open and what the
+  prose pass would not invent a reason for: why the batch timer is left ref'd when the retry timer
+  is not.
 - [ ] **When a caller says "don't trace this request", should we throw the log lines away too?**
 
   *What happens today.* A gateway decides a request is not worth tracing and sends
@@ -141,7 +158,7 @@ two of its sub-items are free only until this release publishes.
   record carries the trace's sampled flag as data, and the log pipeline exports it regardless — the
   flag tells the backend how to link the record, not whether to keep it. So dropping the *span* on
   that flag is plainly right, and dropping the *records* is a choice this library made on its own,
-  in `log()` (`index.ts:1597`), which returns before the enqueue whenever `sampled` is false.
+  in `log()` (`index.ts:1596`), which returns before the enqueue whenever `sampled` is false.
 
   *The two answers.* **Export records always, and let only spans obey the flag** — this is what
   2.3.0 did, so it is additive and safe in a minor, and you keep your error logs for unsampled
@@ -223,7 +240,7 @@ two of its sub-items are free only until this release publishes.
   Only the retry timer is unref'd (AGENTS.md, 2026-09-18), so this one holds a Node or Deno process:
   measured on `node:22`, `await log.flush()` returned with both records delivered and the process
   stayed alive a further 4.7 s of a 5 s `batchDelayMs`. Logging while an export is in flight is the
-  normal case on a busy service, not an edge. The failed-round half of this shipped in 2.4.0.
+  normal case on a busy service, not an edge. 2.4.0 closes the failed-round half.
 - [ ] Stop a restored batch being the first thing dropped. `add(batch, true)` unshifts a failed
   batch to the front, and the `maxItems` trim then splices the excess off that same front. An
   offline phone at `maxItems` reports "OTLP export failed, will retry" for items it has already

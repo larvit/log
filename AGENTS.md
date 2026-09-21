@@ -159,8 +159,8 @@ and who it is for, and a design decision that cannot be derived from them belong
 
 - Source is a single `index.ts`, sectioned by `// --- name ---` banners. New code joins a
   section whose banner stays true of it, or gets its own.
-- A done `todo.md` item leaves the file: into `CHANGELOG.md` under `## Unreleased`, reworded for
-  the consumer, where one can observe the change; deleted outright where none can.
+- A done `todo.md` item leaves the file: a change a consumer can observe is reworded for them
+  under `CHANGELOG.md` → `## Unreleased`; anything else is deleted outright.
 - A release section with anything a consumer must act on — a rotation advisory, an exposure still
   open — leads with `### Security` holding it, ahead of `### Everything else`; one with none omits
   both headings. Thirty flat bullets is where a rotation notice goes unread.
