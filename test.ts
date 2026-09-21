@@ -3,8 +3,7 @@ import test from "./tap.js";
 
 // --- helpers ---------------------------------------------------------------
 
-// Polls until `done` holds. Bounded below the harness timeout because an abandoned poll keeps
-// Node's event loop alive, which hangs the whole run in place of failing one test.
+// Bounded below tap's 10 s timeout: an abandoned poll keeps Node's loop alive and hangs the whole run.
 const WAIT_FOR_TIMEOUT_MS = 5000;
 
 async function waitFor(done: () => boolean): Promise<void> {
@@ -1062,7 +1061,7 @@ test("Queue with storage writes through one writer, so changes made during a wri
 	log.info("2");
 	log.info("3");
 	released = true;
-	// Quiescence, not the wanted outcome: a second writer must fail this test, never hang it.
+	// Quiescence, not the wanted outcome: a second writer must fail the assertion below, not block this wait.
 	await waitFor(() => inFlight === 0 && writes >= 2);
 	t.strictEqual(concurrent, 1, "no second writer starts beside the one already writing");
 	t.strictEqual(writes, 2, "both records that arrived during that write go out in the one write after it");
