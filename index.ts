@@ -1284,7 +1284,7 @@ function warnDeprecated(conf: ResolvedLogConf, metadata: Metadata | undefined, m
 
 const CONF_FORMATTER_DEPRECATED = "@larvit/log: conf.entryFormatter is deprecated and removed in 3.0.0, use conf.format";
 
-// One descriptor for every instance: a closure pair per `Log` put one at 1347 bytes, against Goals #6's 1 KB.
+// One descriptor for every instance: a closure pair per `Log` breaks Goals #6's 1 KB budget.
 const ENTRY_FORMATTER_ALIAS: PropertyDescriptor = {
 	configurable: true,
 	// Non-enumerable, so a child or a spread carries `format` alone and folds nothing a second time.
