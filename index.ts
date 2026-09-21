@@ -57,8 +57,8 @@ export type LogConf = {
 	traceparent?: string;
 };
 
-// conf after the constructor fills its defaults: the always-set fields are no longer optional, and `entryFormatter` has folded into `format`.
-export type ResolvedLogConf = LogConf & Required<Pick<LogConf, "clock" | "colors" | "format" | "logLevel" | "stderr" | "stdout">> & { entryFormatter?: never };
+// conf after the constructor fills its defaults: the always-set fields are no longer optional.
+export type ResolvedLogConf = LogConf & Required<Pick<LogConf, "clock" | "colors" | "format" | "logLevel" | "stderr" | "stdout">>;
 
 export type Logger = {
 	enabled: (logLevel: LogLevel) => boolean;
@@ -1272,9 +1272,6 @@ export class Log implements LogInt {
 
 	readonly conf: ResolvedLogConf;
 
-	// What `conf.format` resolves to, and the one function every line written here goes through.
-	private readonly formatter: EntryFormatter;
-
 	// Un-awaited log.fetch calls, awaited by flush() so their spans are queued before the queue flushes.
 	private inFlight = new Set<Promise<unknown>>();
 
@@ -1319,8 +1316,23 @@ export class Log implements LogInt {
 			conf.format = "text";
 		}
 
-		// Folded into `format` above; left on, a spread of this conf would fold it again over the `format` written beside it.
-		delete conf.entryFormatter;
+		// The deprecated spelling is 2.x's second name for `format`, kept readable and writable until 3.0.0 drops
+		// both. Non-enumerable, so a child or a spread carries `format` alone and folds nothing a second time.
+		const confDeprecation = "@larvit/log: conf.entryFormatter is deprecated and removed in 3.0.0, use conf.format";
+
+		Object.defineProperty(conf, "entryFormatter", {
+			configurable: true,
+			enumerable: false,
+			get: () => {
+				this.warnDeprecated(confDeprecation);
+
+				return resolveFormatter(conf.format);
+			},
+			set: (formatter: EntryFormatter) => {
+				this.warnDeprecated(confDeprecation);
+				conf.format = formatter;
+			},
+		});
 
 		if (conf.stderr === undefined) {
 			conf.stderr = console.error;
@@ -1332,7 +1344,6 @@ export class Log implements LogInt {
 
 		// Every optional field the resolved type requires has been defaulted above.
 		this.conf = conf as ResolvedLogConf;
-		this.formatter = resolveFormatter(this.conf.format);
 		// Own copy, so a clone/child never mutates a context object shared with another instance.
 		this.context = withoutUndefined(this.conf.context);
 
@@ -1615,7 +1626,7 @@ export class Log implements LogInt {
 	}
 
 	private outputToConsole(logLevel: LogLevel, msg: string, metadata: DefinedMetadata, msTimestamp: number) {
-		const output = this.formatter({
+		const output = resolveFormatter(this.conf.format)({
 			colors: this.conf.colors,
 			logLevel,
 			metadata,

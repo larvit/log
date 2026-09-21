@@ -663,24 +663,36 @@ test("format and entryFormatter are one setting, and a resolved conf carries nei
 	const resolved: ResolvedLogConf = { ...deprecated.log.conf };
 
 	t.strictEqual(deprecated.log.conf.format, own, "a resolved conf holds the formatter under format, whichever spelling set it");
-	t.notOk("entryFormatter" in deprecated.log.conf, "and carries no entryFormatter: the deprecated spelling is an input, not a slot");
-	t.strictEqual(resolved.entryFormatter, undefined, "so a ResolvedLogConf promises none either, where it used to promise one a spread could not carry");
+	t.deepEqual(Object.keys(deprecated.log.conf).filter(key => key === "entryFormatter"), [], "the deprecated name is not a key of its own, so nothing inherits or spreads it");
+	t.strictEqual(resolved.entryFormatter, undefined, "which is what ResolvedLogConf now says: optional, where it promised one a spread could not carry");
 
 	const given: LogConf = { entryFormatter: own, stderr: () => {} };
 
 	new Log(given);
 	t.strictEqual(given.entryFormatter, own, "the caller's own options object keeps the spelling they wrote");
+	t.end();
+});
 
-	// Only a hand-written LogInt hands a child a conf that still carries the deprecated spelling.
+test("conf.entryFormatter still reads and writes the formatter, deprecated, until 3.0.0", t => {
+	const readback = capture({ format: "json" });
+
+	t.strictEqual(readback.log.conf.entryFormatter, msgJsonFormatter, "reading it resolves format, as it did in v2.3.0 whichever spelling set the formatter");
+	t.strictEqual(JSON.parse(readback.stderr[0] ?? "{}").msg, "@larvit/log: conf.entryFormatter is deprecated and removed in 3.0.0, use conf.format", "and warns once through the instance's formatter, naming the name to read instead");
+
+	const swap = capture({ colors: false });
+
+	swap.log.conf.entryFormatter = entry => `swapped ${entry.msg}`;
+	swap.log.info("hi");
+	t.strictEqual(swap.stdout[0], "swapped hi", "writing it swaps the formatter on a live instance, as it did in v2.3.0");
+	t.strictEqual(typeof swap.log.conf.format, "function", "through format, so the two names cannot disagree");
+	t.strictEqual(swap.stderr.length, 1, "the write and the read after it share one warning");
+
+	// A key of its own, as only a hand-written LogInt's conf carries it: writing through the mirror sets format.
 	const handBuilt = capture({ format: (entry: EntryFormatterConf) => `parent ${entry.msg}` });
-	const handBuiltConf: LogConf = handBuilt.log.conf;
 
-	handBuiltConf.entryFormatter = own;
-	const inherited = new Log({ parentLog: handBuilt.log });
-
-	inherited.info("hi");
+	Object.defineProperty(handBuilt.log.conf, "entryFormatter", { configurable: true, enumerable: true, value: () => "inherited" });
+	new Log({ parentLog: handBuilt.log }).info("hi");
 	t.deepEqual(handBuilt.stdout, ["parent hi"], "an inherited entryFormatter is not folded, so it never becomes the child's formatter");
-	t.notOk("entryFormatter" in inherited.conf, "and does not reach the child's conf either");
 	t.end();
 });
 
