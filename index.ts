@@ -368,7 +368,7 @@ function partialRejection(body: unknown): { message?: string, rejected: number }
 	}
 }
 
-// --- OTLP payload builders -------------------------------------------------
+// --- OTLP payloads ---------------------------------------------------------
 
 function getNsTimestamp(msTimestamp: number): string {
 	const seconds = Math.floor(msTimestamp / 1000);
