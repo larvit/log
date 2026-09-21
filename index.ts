@@ -939,6 +939,10 @@ export class Queue implements OtlpQueue {
 		this.failures++;
 
 		const retryInMs = Math.min(this.conf.retryDelayMs * (2 ** (this.failures - 1)), RETRY_DELAY_MAX_MS);
+
+		// A record enqueued mid-round leaves a batch timer behind; the backoff takes it over.
+		this.conf.clock.clearTimeout(this.timer?.handle);
+
 		const handle = this.conf.clock.setTimeout(() => {
 			this.timer = undefined;
 			void this.flush();

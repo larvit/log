@@ -112,9 +112,11 @@ function response({ headers, json = { partialSuccess: {} }, status = 200 }: { he
 	return { headers: headers ?? new Headers(), json: () => Promise.resolve(json), ok: status < 400, status };
 }
 
+type StubResponse = ReturnType<typeof response>;
+
 // Replace global fetch with a recording stub (Node + browser), so the OTLP transport is asserted
 // without a real server. The harness restores globalThis.fetch after each test.
-function stubFetch(responder?: (path: string, body: unknown) => ReturnType<typeof response> | Promise<ReturnType<typeof response>> | undefined) {
+function stubFetch(responder?: (path: string, body: unknown) => StubResponse | Promise<StubResponse | undefined> | undefined) {
 	const calls: { body: any, contentType: string | null, headers: any, keepalive: unknown, path: string, rawBody: any, url: string }[] = [];
 
 	globalThis.fetch = (async (url: string, init: { body?: any, headers?: HeadersInit, keepalive?: boolean } = {}) => {
@@ -987,6 +989,40 @@ test("Queue keeps one timer: a record arriving during a retry backoff never jump
 	await clock.advance(1);
 	t.strictEqual(attempts, 2, "the retry is the next attempt");
 	t.deepEqual(exportedRecords(calls), ["first", "first", "second"], "carrying the kept record and the one that waited with it");
+	t.strictEqual(clock.pending.size, 0, "nothing is left scheduled");
+	t.end();
+});
+
+test("Queue keeps one timer: a retry takes over the batch timer a mid-round record scheduled", async t => {
+	const clock = fakeClock();
+	let released = false;
+	let attempts = 0;
+	const { calls } = stubFetch(async () => {
+		attempts++;
+
+		if (attempts > 1) {
+			return undefined;
+		}
+
+		await waitFor(() => released);
+
+		return response({ status: 503 });
+	});
+	const log = new Log({ clock, otlpQueue: new Queue({ batchDelayMs: 100, clock, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, retryDelayMs: 5000 }), stderr: () => {} });
+
+	log.info("first");
+	const flushed = log.flush();
+
+	await waitFor(() => attempts === 1);
+	log.info("second");
+	released = true;
+	await flushed;
+	t.strictEqual(clock.pending.size, 1, "the backoff replaces the batch timer the mid-round record scheduled");
+	await clock.advance(100);
+	t.strictEqual(attempts, 1, "so none survives to send inside the backoff");
+	await clock.advance(4900);
+	t.strictEqual(attempts, 2, "the retry is still the next attempt");
+	t.deepEqual(exportedRecords(calls), ["first", "first", "second"], "carrying the record it kept and the one enqueued mid-round");
 	t.strictEqual(clock.pending.size, 0, "nothing is left scheduled");
 	t.end();
 });
