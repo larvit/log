@@ -895,9 +895,10 @@ export class Queue implements OtlpQueue {
 		return this.pending;
 	}
 
-	// The one writer of the timer slot: whatever it replaces is cleared, so no stray callback fires.
+	// The only place a timer is installed: whatever it replaces is cleared, so no stray callback fires.
 	private setTimer(retry: boolean, delayMs: number): TimerHandle {
 		this.conf.clock.clearTimeout(this.timer?.handle);
+		this.timer = undefined;
 
 		const handle = this.conf.clock.setTimeout(() => {
 			this.timer = undefined;
