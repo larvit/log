@@ -1147,12 +1147,18 @@ test("Queue with storage survives a restart: leftovers go first and storage empt
 
 	corrupt.data.set("custom-key", "not json");
 	const { calls } = stubFetch();
-	const log = new Log({ otlpQueue: new Queue({ key: "custom-key", otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report, storage: corrupt }), stderr: () => {} });
+	const queue = new Queue({ key: "custom-key", otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report, storage: corrupt });
+	const log = new Log({ otlpQueue: queue, stderr: () => {} });
 
 	log.info("still works");
 	await log.flush();
 	t.deepEqual(exportedRecords(calls), ["still works"], "corrupt stored data does not block new records");
 	t.deepEqual(reports.lines.map(line => line.msg), ["OTLP queue storage unreadable, discarded"], "corrupt data is reported once");
+
+	Reflect.apply(queue.enqueue, queue, [{ resourceMetrics: [] }]);
+	await queue.flush();
+	t.strictEqual(calls.length, 1, "an enqueued payload of unknown kind is never sent");
+	t.deepEqual(reports.lines.slice(1), [{ msg: "OTLP payload of unknown kind, dropped" }], "and is reported by the same rule stored data meets");
 	await waitFor(() => corrupt.data.size === 0);
 	t.strictEqual(corrupt.data.size, 0, "the custom key is cleared");
 
