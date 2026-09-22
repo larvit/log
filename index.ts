@@ -367,11 +367,11 @@ const PAYLOAD_KEYS: { [K in OtlpKind]: keyof PayloadByKind[K] } = { logs: "resou
 
 // The one branch on a payload's kind, so a new kind fails to compile at every caller.
 function byKind<R>(payload: OtlpPayload, handlers: { [K in OtlpKind]: (payload: PayloadByKind[K]) => R }): R {
-	if ("resourceLogs" in payload) {
+	if (PAYLOAD_KEYS.logs in payload) {
 		return handlers.logs(payload);
 	}
 
-	if ("resourceSpans" in payload) {
+	if (PAYLOAD_KEYS.traces in payload) {
 		return handlers.traces(payload);
 	}
 
@@ -778,8 +778,10 @@ function mergeSpanPayloads(payloads: OtlpSpanPayload[]): OtlpSpanPayload {
 // A batch holds one kind, so the first payload decides.
 function mergePayloads(payloads: OtlpPayload[]): OtlpPayload {
 	return byKind<OtlpPayload>(payloads[0], {
-		logs: () => mergeLogPayloads(payloads.flatMap(payload => byKind<OtlpLogPayload[]>(payload, { logs: log => [log], traces: () => [] }))),
-		traces: () => mergeSpanPayloads(payloads.flatMap(payload => byKind<OtlpSpanPayload[]>(payload, { logs: () => [], traces: span => [span] }))),
+		logs: () => mergeLogPayloads(payloads.flatMap(payload =>
+			byKind<OtlpLogPayload[]>(payload, { logs: log => [log], traces: () => [] }))),
+		traces: () => mergeSpanPayloads(payloads.flatMap(payload =>
+			byKind<OtlpSpanPayload[]>(payload, { logs: () => [], traces: span => [span] }))),
 	});
 }
 
@@ -873,6 +875,12 @@ export class Queue implements OtlpQueue {
 	}
 
 	enqueue(payload: OtlpPayload): void {
+		if (!isOtlpPayload(payload)) {
+			this.report("OTLP payload of unknown kind, dropped", {});
+
+			return;
+		}
+
 		this.add([withBytes(payload)]);
 		this.changed();
 
