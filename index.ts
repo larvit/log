@@ -357,6 +357,31 @@ function partialRejection(body: unknown): { message?: string, rejected: number }
 
 // --- OTLP payloads ---------------------------------------------------------
 
+type PayloadByKind = { logs: OtlpLogPayload, traces: OtlpSpanPayload };
+
+type OtlpKind = keyof PayloadByKind;
+
+export type OtlpPayload = PayloadByKind[OtlpKind];
+
+const PAYLOAD_KEYS: { [K in OtlpKind]: keyof PayloadByKind[K] } = { logs: "resourceLogs", traces: "resourceSpans" };
+
+// The one branch on a payload's kind, so a new kind fails to compile at every caller.
+function byKind<R>(payload: OtlpPayload, handlers: { [K in OtlpKind]: (payload: PayloadByKind[K]) => R }): R {
+	if ("resourceLogs" in payload) {
+		return handlers.logs(payload);
+	}
+
+	if ("resourceSpans" in payload) {
+		return handlers.traces(payload);
+	}
+
+	return payload satisfies never;
+}
+
+function payloadKind(payload: OtlpPayload): OtlpKind {
+	return byKind<OtlpKind>(payload, { logs: () => "logs", traces: () => "traces" });
+}
+
 function getNsTimestamp(msTimestamp: number): string {
 	const seconds = Math.floor(msTimestamp / 1000);
 	const nanos = (msTimestamp % 1000) * 1000000;
@@ -610,13 +635,11 @@ function encodeOtlpSpanPayload(payload: OtlpSpanPayload): Uint8Array<ArrayBuffer
 	return root.finish();
 }
 
-function encodeOtlpProtobuf(payload: OtlpLogPayload | OtlpSpanPayload): Uint8Array<ArrayBuffer> {
-	return "resourceLogs" in payload ? encodeOtlpLogPayload(payload) : encodeOtlpSpanPayload(payload);
+function encodeOtlpProtobuf(payload: OtlpPayload): Uint8Array<ArrayBuffer> {
+	return byKind(payload, { logs: encodeOtlpLogPayload, traces: encodeOtlpSpanPayload });
 }
 
 // --- OTLP export queue -----------------------------------------------------
-
-export type OtlpPayload = OtlpLogPayload | OtlpSpanPayload;
 
 // What Log exports through. Queue is the shipped implementation; any { enqueue, flush } will do.
 export type OtlpQueue = {
@@ -702,11 +725,11 @@ function withBytes(payload: OtlpPayload): QueuedItem {
 
 function isOtlpPayload(value: unknown): value is OtlpPayload {
 	return typeof value === "object" && value !== null
-		&& (Array.isArray(Reflect.get(value, "resourceLogs")) || Array.isArray(Reflect.get(value, "resourceSpans")));
+		&& Object.values(PAYLOAD_KEYS).some(key => Array.isArray(Reflect.get(value, key)));
 }
 
 function otlpPath(payload: OtlpPayload): string {
-	return "resourceLogs" in payload ? "/v1/logs" : "/v1/traces";
+	return byKind(payload, { logs: () => "/v1/logs", traces: () => "/v1/traces" });
 }
 
 // Records under one resource share a resourceLogs entry and its single scopeLogs entry.
@@ -754,11 +777,10 @@ function mergeSpanPayloads(payloads: OtlpSpanPayload[]): OtlpSpanPayload {
 
 // A batch holds one kind, so the first payload decides.
 function mergePayloads(payloads: OtlpPayload[]): OtlpPayload {
-	if ("resourceLogs" in payloads[0]) {
-		return mergeLogPayloads(payloads.filter((payload): payload is OtlpLogPayload => "resourceLogs" in payload));
-	}
-
-	return mergeSpanPayloads(payloads.filter((payload): payload is OtlpSpanPayload => "resourceSpans" in payload));
+	return byKind<OtlpPayload>(payloads[0], {
+		logs: () => mergeLogPayloads(payloads.flatMap(payload => byKind<OtlpLogPayload[]>(payload, { logs: log => [log], traces: () => [] }))),
+		traces: () => mergeSpanPayloads(payloads.flatMap(payload => byKind<OtlpSpanPayload[]>(payload, { logs: () => [], traces: span => [span] }))),
+	});
 }
 
 // A pending retry must not keep a finished Node or Deno process alive.
@@ -942,12 +964,12 @@ export class Queue implements OtlpQueue {
 
 	// The oldest item's kind, plus every later item of the same, up to maxBatchBytes.
 	private takeBatch(): QueuedItem[] {
-		const logs = "resourceLogs" in this.items[0].payload;
+		const kind = payloadKind(this.items[0].payload);
 		const batch: QueuedItem[] = [];
 		let bytes = 0;
 
 		for (const item of this.items) {
-			if (("resourceLogs" in item.payload) !== logs) {
+			if (payloadKind(item.payload) !== kind) {
 				continue;
 			}
 
