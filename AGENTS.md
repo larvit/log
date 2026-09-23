@@ -175,7 +175,9 @@ and who it is for, and a design decision that cannot be derived from them belong
   `X-Amz-Date` and `X-Amz-Expires` are what README → Audience #3 reads to explain a 403. Serves
   README → Goals #3; over-redaction in a minor stands on the 2026-09-20 captured-value entry. A
   vendor not named here, or a bearer token carried as a query parameter, is an addition to the
-  set and not a change of rule. Valid while the deny-list names query keys, not shapes.
+  set and not a change of rule. The advisory scopes rotation to unexpired urls: the signature and
+  key id reveal no secret, so the url itself is the leaked capability, dead once it expires. Valid
+  while the deny-list names query keys, not shapes.
 
 ## Working here
 

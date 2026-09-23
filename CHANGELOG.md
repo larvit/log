@@ -22,19 +22,6 @@
   **Rotate any credential you have passed inside a url nested in a path** — the `@`, `%40` and
   `%2540` search in the next bullet finds these too. `log.fetch` first exported `url.full` in
   v2.3.0, so no older span carries it.
-- With `captureQuery` on, a presigned S3 or GCS url no longer exports its credentials in `url.full`.
-  The redacted query keys were OTel semconv's default four — `AWSAccessKeyId`, `Signature`, `sig`,
-  `X-Goog-Signature` — which stop at SigV2 and Azure SAS, so a SigV4 url, the kind every AWS SDK has
-  produced since 2014, exported its `X-Amz-Signature`, the access key id inside `X-Amz-Credential`
-  and the session token inside `X-Amz-Security-Token`, and a Google V4 url its `X-Goog-Credential`.
-  Those keys and `GoogleAccessId` now record `REDACTED`, matched whatever their casing; every other
-  parameter of the presigned url is kept. **Rotate the credentials behind any presigned url you
-  fetched with `captureQuery` on**: the access key in `X-Amz-Credential` and the service account in
-  `X-Goog-Credential` or `GoogleAccessId`, and revoke the session behind an `X-Amz-Security-Token`
-  that has not expired. Search `url.full` for `X-Amz-Credential=`, `X-Goog-Credential=` or
-  `GoogleAccessId=` and ignore the hits reading `REDACTED`; each other hit names the key or account,
-  and one also carrying `X-Amz-Security-Token=` a session. `captureQuery` and `url.full` shipped in
-  v2.3.0, so no older span carries a query string at all.
 - A header you allow-list is no longer a way to export a credential: `authorization`,
   `proxy-authorization`, `cookie` and `set-cookie` named in `captureRequestHeaders` or
   `captureResponseHeaders` record `REDACTED`, so the span still shows the header was there. Any
@@ -51,6 +38,18 @@
   a header or a query string**: search each header you allow-listed, under
   `http.request.header.*` and `http.response.header.*`, for those four names, and search those same
   attributes and `url.full` for `@`, `%40` or `%2540`.
+- With `captureQuery` on, a presigned S3-compatible or GCS url exported its credentials in
+  `url.full`: `X-Amz-Signature`, the access key id in `X-Amz-Credential`, the session token in
+  `X-Amz-Security-Token`, `X-Goog-Credential` and `GoogleAccessId`. They now record `REDACTED`, in
+  any casing; every other parameter of the url is kept. **On v2.3.0 or later with `captureQuery`
+  on, act on every leaked presigned url that has not expired**: one is replayable until its
+  `X-Amz-Date` plus `X-Amz-Expires` (`X-Goog-Date` plus `X-Goog-Expires`; the `Expires` epoch on a
+  V2 url) has passed, all still in `url.full`, and the signature and key id alone reveal no secret,
+  so an expired one needs nothing. For a live one, an `X-Amz-Credential` starting `AKIA` names a
+  long-term key: rotate it. One starting `ASIA` names a role session: revoke the role's active
+  sessions. A Google hit names the service account: rotate its key. Search `url.full` for
+  `aws4_request` and `goog4_request`, which every leaked credential scope ends in and a redacted
+  one never holds; a `GoogleAccessId=` hit is among what the `%40` search above returns.
 - A span's status message no longer carries url credentials: userinfo in a url the message quotes
   is exported as `http://REDACTED@host/x`. On Node and in browsers `fetch` refuses a url carrying
   credentials and quotes the whole url into its `TypeError`, which reached the backend both as the
