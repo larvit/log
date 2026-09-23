@@ -166,7 +166,7 @@ and who it is for, and a design decision that cannot be derived from them belong
   it. Valid until 3.0.0 removes `entryFormatter`.
 
 - 2026-09-23: `SENSITIVE_QUERY_KEYS` names the access key, session token and signature parameter of
-  every query-signing generation AWS and Google Cloud have shipped, on top of OTel semconv's default
+  every query-signing generation S3 and GCS have shipped, on top of OTel semconv's default
   four, which name no SigV4 key: `X-Amz-Signature` was the one replayable leak. Names, because a
   presigned url's credentials have no shape that tells them from any other opaque value, and the
   semconv list is a default and not a maximum, so more names break no spec. An access key id and a

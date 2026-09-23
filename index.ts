@@ -1221,7 +1221,7 @@ function traceableUrl(input: string | URL): URL | undefined {
 	return url.protocol === "http:" || url.protocol === "https:" ? url : undefined;
 }
 
-// OTel semconv's default deny-list plus every AWS and Google Cloud query-signing generation's credential keys.
+// OTel semconv's default deny-list plus every S3 and GCS query-signing generation's credential keys.
 const SENSITIVE_QUERY_KEYS = new Set(["awsaccesskeyid", "googleaccessid", "sig", "signature", "x-amz-credential", "x-amz-security-token", "x-amz-signature", "x-goog-credential", "x-goog-signature"]);
 
 // `url.origin` omits userinfo, which is what keeps the outer url's credentials off the span.

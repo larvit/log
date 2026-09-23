@@ -48,7 +48,7 @@
   key id and session token alone reveal no secret, so an expired one needs nothing. Search
   `url.full` for `aws4_request`, which every leaked `X-Amz-Credential` ends in and a redacted one
   never holds; on S3 itself no presigned url outlives seven days, so only the last week's spans can
-  hold a live one. For a live hit, a credential starting `ASIA` is a role session, and the url died
+  hold a live one. For a live hit, a credential starting `ASIA` is temporary, and the url died
   with that session whatever `X-Amz-Expires` says: revoke the role's active sessions only if it may
   still be open. Any other is a long-term key: rotate it.
 - A span's status message no longer carries url credentials: userinfo in a url the message quotes
