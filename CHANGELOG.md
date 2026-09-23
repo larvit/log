@@ -42,15 +42,16 @@
   `X-Amz-Signature`, the access key id in `X-Amz-Credential` and the session token in
   `X-Amz-Security-Token` in `url.full`; a GCS url exported the service account's email in
   `X-Goog-Credential` or `GoogleAccessId`, its signature already redacted. All five now record
-  `REDACTED`, in any casing; every other parameter is kept. **On v2.3.0 or later with
-  `captureQuery` on, act on every leaked SigV4 url that has not expired**: it is replayable until
-  its `X-Amz-Date` plus `X-Amz-Expires`, both still in `url.full`, has passed, and the signature,
-  key id and session token alone reveal no secret, so an expired one needs nothing. Search
-  `url.full` for `aws4_request`, which every leaked `X-Amz-Credential` ends in and a redacted one
-  never holds; on S3 itself no presigned url outlives seven days, so only the last week's spans can
-  hold a live one. For a live hit, a credential starting `ASIA` is temporary, and the url died
-  with that session whatever `X-Amz-Expires` says: revoke the role's active sessions only if it may
-  still be open. Any other is a long-term key: rotate it.
+  `REDACTED`; every other parameter is kept. A GCS url needs nothing: an email leaked and no
+  signature did. **On v2.3.0 or later with `captureQuery` on, act on every leaked SigV4 url that has
+  not expired**: it is replayable until its `X-Amz-Date` plus `X-Amz-Expires`, both still in
+  `url.full`, has passed, and the signature, key id and session token alone reveal no secret, so an
+  expired one needs nothing. Search `url.full` for `aws4_request`, which every leaked
+  `X-Amz-Credential` ends in and a redacted one never holds; on S3 itself no presigned url outlives
+  seven days, so only the last week's spans can hold a live one. For a live hit, a credential
+  starting `ASIA` is temporary, and the url died with that session whatever `X-Amz-Expires` says:
+  revoke the role's active sessions only if it may still be open. Any other is a long-term key:
+  rotate it.
 - A span's status message no longer carries url credentials: userinfo in a url the message quotes
   is exported as `http://REDACTED@host/x`. On Node and in browsers `fetch` refuses a url carrying
   credentials and quotes the whole url into its `TypeError`, which reached the backend both as the
