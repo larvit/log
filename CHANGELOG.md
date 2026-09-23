@@ -38,18 +38,17 @@
   a header or a query string**: search each header you allow-listed, under
   `http.request.header.*` and `http.response.header.*`, for those four names, and search those same
   attributes and `url.full` for `@`, `%40` or `%2540`.
-- With `captureQuery` on, a presigned S3-compatible or GCS url exported its credentials in
-  `url.full`: `X-Amz-Signature`, the access key id in `X-Amz-Credential`, the session token in
-  `X-Amz-Security-Token`, `X-Goog-Credential` and `GoogleAccessId`. They now record `REDACTED`, in
-  any casing; every other parameter of the url is kept. **On v2.3.0 or later with `captureQuery`
-  on, act on every leaked presigned url that has not expired**: one is replayable until its
-  `X-Amz-Date` plus `X-Amz-Expires` (`X-Goog-Date` plus `X-Goog-Expires`; the `Expires` epoch on a
-  V2 url) has passed, all still in `url.full`, and the signature and key id alone reveal no secret,
-  so an expired one needs nothing. For a live one, an `X-Amz-Credential` starting `AKIA` names a
-  long-term key: rotate it. One starting `ASIA` names a role session: revoke the role's active
-  sessions. A Google hit names the service account: rotate its key. Search `url.full` for
-  `aws4_request` and `goog4_request`, which every leaked credential scope ends in and a redacted
-  one never holds; a `GoogleAccessId=` hit is among what the `%40` search above returns.
+- With `captureQuery` on, a presigned SigV4 url — S3 or any S3-compatible store — exported its
+  `X-Amz-Signature`, the access key id in `X-Amz-Credential` and the session token in
+  `X-Amz-Security-Token` in `url.full`; a GCS url exported the service account's email in
+  `X-Goog-Credential` or `GoogleAccessId`, its signature already redacted. All five now record
+  `REDACTED`, in any casing; every other parameter is kept. **On v2.3.0 or later with
+  `captureQuery` on, act on every leaked SigV4 url that has not expired**: it is replayable until
+  its `X-Amz-Date` plus `X-Amz-Expires`, both still in `url.full`, has passed, and the signature,
+  key id and session token alone reveal no secret, so an expired one needs nothing. Search
+  `url.full` for `aws4_request`, which every leaked `X-Amz-Credential` ends in and a redacted one
+  never holds. For a live hit, a credential starting `ASIA` is a role session: revoke the role's
+  active sessions; any other is a long-term key: rotate it.
 - A span's status message no longer carries url credentials: userinfo in a url the message quotes
   is exported as `http://REDACTED@host/x`. On Node and in browsers `fetch` refuses a url carrying
   credentials and quotes the whole url into its `TypeError`, which reached the backend both as the
