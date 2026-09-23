@@ -11,7 +11,7 @@ the prescribed repair.
 
 ## 2.4.0
 
-`CHANGELOG.md` → `## Unreleased` holds what is done: five credential leaks closed with four
+`CHANGELOG.md` → `## Unreleased` holds what is done: six credential leaks closed with five
 rotation advisories, the export queue, the injectable clock, `Logger`, and the `entryFormatter` and
 level-string deprecations.
 
@@ -21,16 +21,6 @@ free only until this release publishes.
 
 ### Security
 
-- [ ] Keep a presigned url's credentials out of `url.full`. With `captureQuery` on, a url signed
-  the way every AWS presigned url has been since 2014 exports its signature, the access key id
-  carried inside `X-Amz-Credential`, and a live session token inside `X-Amz-Security-Token`.
-  `SENSITIVE_QUERY_KEYS` (`index.ts:1217`) catches none of them: it mirrors OTel semconv's default
-  deny-list, which is the SigV2/Azure-era one, so it covers `AWSAccessKeyId`, `Signature`, `sig`
-  and `X-Goog-Signature` and stops there. Google's own V4 `X-Goog-Credential` is missed too.
-  Semconv's list is a default and not a maximum, so catching more breaks no spec, and the
-  2026-09-20 decision already licenses over-redaction in a minor. Whether the answer is more names,
-  a shape test, or something that does not need a list at all is open. Live since 2.3.0, where
-  `captureQuery` and `url.full` shipped, so whatever lands owes consumers a rotation advisory.
 - [ ] Let a consumer reading an advisory find out whether the path-nested-url leak reached them.
   Today's advisory sends them to search `url.full` for `@`, `%40` and `%2540`. A nested url is
   normally percent-encoded and normally signed, so its credential is a query parameter of the inner
@@ -183,6 +173,14 @@ free only until this release publishes.
   splicing `REDACTED@` in the way `spanFailure` does covers the literal spelling only. Decide
   which, and record it beside the 2026-09-20 entry that settled the same question for values.
   The 2.4.0 CHANGELOG carries this as an open exposure with a rotation advisory.
+- [ ] Keep a bearer token carried as a query parameter out of `url.full`. RFC 6750 §2.3 defines
+  `access_token` as a way to send one, and OAuth providers still accept it, so with `captureQuery`
+  on `log.fetch("https://graph.test/me?access_token=…")` exports a live token that no rule catches:
+  `SENSITIVE_QUERY_KEYS` names signing-scheme parameters only, and a token has no shape. Whether
+  the answer is the one RFC-defined name, the names the wild uses beside it (`api_key`, `apikey`,
+  `key`, `token`), or a statement that `captureQuery` is an allow-list the caller owns and Goal 3's
+  "naming it is asking for it" already covers it, is open; the 2026-09-23 decision leaves a name
+  as an addition to the set. Live since 2.3.0, so a name that lands owes a rotation advisory.
 - [ ] Keep credentials off `log.conf` and `queue.conf`, which the README documents as public. Two
   spellings carry one: `otlpHttpBaseURI` holds `user:pass@` verbatim, and `otlpAdditionalHeaders`
   holds a bearer token verbatim — the second being the spelling the docs steer people to, so it is
