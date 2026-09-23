@@ -395,21 +395,18 @@ generation made it, and an Azure SAS url. Redacted wherever it appears: any othe
 value, or kept query key or value, that holds url userinfo — which records `REDACTED` in place of
 the whole of itself, through one layer of percent-encoding but not two.
 
-That covers the shapes a credential is recognisable in, not every credential. It does not reach: a
-header or query value that simply *is* a secret — `x-api-key`, your own signed token — which is
-exported as you sent it, so do not allow-list one; and a url nested in the request **path**, as a
-fetch-through proxy takes, which stays in `url.full` as you wrote it, credentials and all, with no
-option involved.
+That covers the shapes a credential is recognisable in, not every credential: a value that simply
+*is* a secret is exported as you sent it ([Goals](#goals) #3), and a url nested in the request
+**path**, as a fetch-through proxy takes, stays in `url.full` as you wrote it, credentials and all,
+with no option involved.
 
 Never put credentials in the url; pass an `Authorization` header, and strip userinfo from a url you
 did not build. `log.fetch` mirrors the runtime: Node and browsers refuse such a url, while React
-Native's `XMLHttpRequest` polyfill hands it to the platform untouched, where iOS answers the
-server's auth challenge with those credentials and Android sends none, leaving you the 401.
-`url.full` never holds the outer url's userinfo, and a rejection quoting the url reaches the status message as
-`http://REDACTED@host/x` — a redaction of what the runtime wrote, not a guarantee. `REDACTED` does
-not always stand for a credential either: an address glued to a host, as in
-`https://api.test,mail@example.com`, redacts too, and a captured value loses all of itself rather
-than part, so a `location` of `https://cdn.test//logo@2x.png` records `REDACTED` whole.
+Native hands it to the platform, where iOS sends the credentials and Android sends none, leaving
+you the 401. A rejection quoting the url reaches the status message as `http://REDACTED@host/x` —
+a redaction of what the runtime wrote, not a guarantee. `REDACTED` does not always stand for a
+credential either: an address glued to a host, as in `https://api.test,mail@example.com`, redacts
+too, and a `location` of `https://cdn.test//logo@2x.png` records `REDACTED` whole.
 
 Spans are queued when the response arrives and are registered with `flush()` at call time, so
 `await log.end()` delivers a `log.fetch()` you never awaited.

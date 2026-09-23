@@ -165,20 +165,15 @@ and who it is for, and a design decision that cannot be derived from them belong
   required-half entry above, and no type can say "non-enumerable". `todo.md`'s 3.0.0 item closes
   it. Valid until 3.0.0 removes `entryFormatter`.
 
-- 2026-09-23: `SENSITIVE_QUERY_KEYS` names the access key, session token and signature parameter of
-  every query-signing generation S3 and GCS have shipped, on top of OTel semconv's default
-  four, which name no SigV4 key: `X-Amz-Signature` was the one replayable leak. Names, because a
-  presigned url's credentials have no shape that tells them from any other opaque value, and the
-  semconv list is a default and not a maximum, so more names break no spec. An access key id and a
-  `GoogleAccessId` are identifiers, not secrets, and are redacted anyway: semconv already redacts
-  `AWSAccessKeyId`, and a reader who needs the key knows which bucket they fetched from. The rest of
-  a presigned url is kept, because `X-Amz-Date` and `X-Amz-Expires` are what README → Audience #3
-  reads to explain a 403. Serves README → Goals #3; over-redaction in a minor stands on the
-  2026-09-20 captured-value entry. A vendor not named here, or a bearer token carried as a query
-  parameter, is an addition to the set and not a change of rule. The advisory scopes rotation to
-  unexpired urls: the signature, key id and session token reveal no secret alone, so the url itself
-  is the leaked capability, dead once it expires. Valid while the deny-list names query keys, not
-  shapes.
+- 2026-09-23: `SENSITIVE_QUERY_KEYS` grows by name, and OTel semconv's default four name no SigV4
+  key: `X-Amz-Signature` was the one replayable leak. Names, because a presigned url's credentials
+  have no shape that tells them from any other opaque value, and the semconv list is a default and
+  not a maximum, so more names break no spec. An access key id and a `GoogleAccessId` are
+  identifiers, not secrets, and are redacted anyway: semconv already redacts `AWSAccessKeyId`, and
+  a reader who needs the key knows which bucket they fetched from. The rest of a presigned url is
+  kept, because `X-Amz-Date` and `X-Amz-Expires` are what README → Audience #3 reads to explain a
+  403. Serves README → Goals #3; over-redaction in a minor stands on the 2026-09-20 captured-value
+  entry. Valid while the deny-list names query keys, not shapes.
 
 ## Working here
 
