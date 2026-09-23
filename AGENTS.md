@@ -121,7 +121,7 @@ and who it is for, and a design decision that cannot be derived from them belong
   `decodeURIComponent` throws on the first invalid escape: a stray `%` anywhere in a header, which
   a WHATWG url permits, would otherwise take the decoded test out for the credential encoded
   correctly beside it. Redacting rather than rejecting the allow-list entry is what a minor
-  allows — README → Audience deprecates a breaking change in a 2.x minor first, and the leak is
+  allows — README → Goals #4 deprecates a breaking change in a 2.x minor first, and the leak is
   open now — and it matches the stance `SENSITIVE_QUERY_KEYS` already took. `REDACTED` over
   dropping the attribute keeps the telemetry reader's "was the header there?", which is what an
   allow-list is for once the value is gone. `spanFailure` keeps splicing `REDACTED@` into the url
@@ -155,10 +155,10 @@ and who it is for, and a design decision that cannot be derived from them belong
   reaching an instance through inheritance is never folded, which only a hand-built parent conf can
   do. The alias stays because v2.3.0 filled `conf.entryFormatter` on every instance, whichever
   spelling set the formatter; it is one module-level descriptor, because a closure pair per `Log`
-  measured 1347 bytes against Goals #6's 1 KB, on `node:22-bookworm-slim` over 50 000 retained
+  measured 1347 bytes against Goals #7's 1 KB, on `node:22-bookworm-slim` over 50 000 retained
   instances. The formatter is resolved from `conf.format` where a line is written, so writing it
-  takes effect on a live instance, like `logLevel` and the sinks. Serves README → Goals #4 for the
-  one name, README → Audience for the alias. Valid until 3.0.0 removes `entryFormatter`.
+  takes effect on a live instance, like `logLevel` and the sinks. Serves README → Goals #5 for the
+  one name, README → Goals #4 for the alias. Valid until 3.0.0 removes `entryFormatter`.
 - 2026-09-21: `ResolvedLogConf` keeps `entryFormatter` in its required half while the property is
   non-enumerable, so a spread's type promises a formatter the spread does not carry. Accepted
   rather than fixed: v2.3.0 shipped the member required and a minor may not narrow it, per the
