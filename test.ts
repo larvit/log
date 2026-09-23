@@ -1603,7 +1603,7 @@ test("log.fetch captureQuery keeps the query but redacts known-sensitive keys an
 	await log.end();
 
 	const urlFull = clientSpan(calls).attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue;
-	const presigned = ["X-Amz-Credential", "X-Amz-Security-Token", "X-Amz-Signature", "X-Goog-Credential", "GoogleAccessId"];
+	const presigned = ["GoogleAccessId", "X-Amz-Credential", "X-Amz-Security-Token", "X-Amz-Signature", "X-Goog-Credential"];
 
 	t.ok(urlFull.includes("q=hi"), "non-sensitive query param is kept");
 	t.ok(urlFull.includes("Signature=REDACTED&Signature=REDACTED"), "a repeated sensitive key keeps one redaction per occurrence");
@@ -1613,7 +1613,7 @@ test("log.fetch captureQuery keeps the query but redacts known-sensitive keys an
 	t.ok(urlFull.endsWith("&REDACTED="), "a credentialed url written as a bare query key is redacted too");
 	t.ok(!urlFull.includes("hunter2"), "the nested password is not leaked");
 	t.ok(urlFull.includes("X-Amz-Algorithm=AWS4-HMAC-SHA256"), "a presigned url's non-credential params are kept");
-	t.ok(presigned.every(key => urlFull.includes(`${key}=REDACTED`)), "every SigV4 and Google V2/V4 credential key records REDACTED");
+	for (const key of presigned) t.ok(urlFull.includes(`${key}=REDACTED`), `${key} records REDACTED`);
 	t.ok(!/AKIAEXAMPLE|FwoGZXIvYXdz|8b1c9f|gserviceaccount/.test(urlFull), "no presigned credential value is leaked");
 	t.end();
 });
