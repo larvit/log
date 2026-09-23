@@ -2,7 +2,7 @@
 
 Every item sits under the release that ships it, and a release that holds anything a consumer must
 act on leads with `### Security`, the shape AGENTS.md → Working here already sets for
-`CHANGELOG.md`. Per README → Audience, everything breaking is deprecated in a 2.x minor first and
+`CHANGELOG.md`. Per README → Goals #4, everything breaking is deprecated in a 2.x minor first and
 lands in 3.0.0 with a `MIGRATION.md` entry.
 
 Each item states the problem and what must hold once it is gone. Working out *how* is part of the
@@ -16,7 +16,7 @@ rotation advisories, the export queue, the injectable clock, `Logger`, and the `
 level-string deprecations.
 
 An architecture, product and comprehension review on 2026-09-20 found everything below in that
-state. None of it is breaking. **Settle "May `OtlpPayload` gain a kind in a minor?" first** — it is
+state. None of it is breaking. **Settle "What does `log.conf` promise, key by key?" first** — it is
 free only until this release publishes.
 
 ### Security
@@ -111,12 +111,6 @@ free only until this release publishes.
 
 ### Ask before cutting
 
-- [ ] **May `OtlpPayload` gain a kind in a minor?** Both it and `OtlpQueue` are new in 2.4.0, and
-  README → Audience makes the exported types contracts. The metrics kind Goals promises widens
-  `enqueue`'s parameter, so a hand-written `OtlpQueue` that branches on `resourceLogs` compiles
-  against 2.7.0 and mishandles a metric batch — the loss `byKind` now stops inside this library.
-  Either Audience says a queue implementer must pass through a kind it does not know, or metrics
-  wait for 3.0.0. Saying it after 2.4.0 publishes is itself the break.
 - [ ] **Does Goal 3 promise what the code does?** It says a credential handed to this library
   "never reaches a span", and names two carve-outs, neither of which covers a url nested in a
   request path — which `buildUrlFull` exports verbatim, as this release's `### Security` section
@@ -127,11 +121,11 @@ free only until this release publishes.
 - [ ] **Which goal is "a pending retry must not hold the process open"?** AGENTS.md's 2026-09-18
   `Clock` entry rests on it, and 2.4.0's process-hold fix and 2.5.0's drained-round item both hang
   off that entry rather than off a goal, which "every decision links to a goal" forbids. One
-  candidate is Goal 6, as "nothing this library schedules keeps a Node or Deno process alive past
+  candidate is Goal 7, as "nothing this library schedules keeps a Node or Deno process alive past
   the work the app asked for". Settling it also answers what the entry leaves open and what the
   prose pass would not invent a reason for: why the batch timer is left ref'd when the retry timer
   is not.
-- [ ] **What does `log.conf` promise, key by key?** README → Audience names the whole object a
+- [ ] **What does `log.conf` promise, key by key?** README → Goals #4 names the whole object a
   contract, which promises every property a version happened to expose — including one a later
   release wants to drop, as 2.4.0's deprecated `conf.entryFormatter` alias will in 3.0.0 and the
   3.0.0 `otlpQueue` item will for `conf.otlpHttpBaseURI`. The sentence is new in this release and
@@ -141,7 +135,7 @@ free only until this release publishes.
   product-owner review.
 - [ ] **Which goal is "a file a reader can find their way around"?** The comprehension item above
   and each of its sub-items rest on a 5.9/10 panel score, and no goal speaks to how readable the
-  source is — Goals #4 is about the API a consumer calls, not the file a maintainer opens. So the
+  source is — Goals #5 is about the API a consumer calls, not the file a maintainer opens. So the
   decision entries those chunks write cite #4 for the half that is API surface and nothing for the
   rest, which "every decision links to a goal" forbids. Either the panel is measuring something
   README → Goals should say out loud, or these items are worth doing for a reason the goals do not
@@ -282,7 +276,7 @@ free only until this release publishes.
 
 ## 2.6.0 — every 3.0.0 break deprecated
 
-README → Audience promises a 2.x warning before each break below, so 3.0.0 waits on this release.
+README → Goals #4 promises a 2.x warning before each break below, so 3.0.0 waits on this release.
 
 - [ ] Deprecate `parentLog` together with `traceparent`. Today `traceparent` is silently ignored.
 - [ ] Warn once when `colors` is unset, `process.stdout.isTTY` is false and neither `NO_COLOR` nor
@@ -299,6 +293,8 @@ README → Audience promises a 2.x warning before each break below, so 3.0.0 wai
   `log.fetch` then traces that invented url and fetches it with `init` alone, dropping the request's
   own method, body and headers. The signature says `string | URL`, so a TypeScript consumer cannot
   reach it.
+- [ ] Announce in the README that 3.0.0 adds a metrics kind to `OtlpPayload`, so an `OtlpQueue`
+  implementer handles one before it arrives.
 - [ ] Settle one marker for a CHANGELOG entry a consumer must act on, and record it in the
   `AGENTS.md` line beside `### Security`. Two spellings exist: the `**Breaking:**` prefix `v2.0.0`
   uses, and the `### Security` grouping. Neither covers a deprecation, so `entryFormatter` and the
@@ -332,12 +328,13 @@ Each one is a weigh against README → Goals first: ship it, or delete the item 
   cap. `TextEncoder` is not the answer: about 700 ns of fixed call overhead makes it slower than
   the walk below roughly 500 chars, and it only pays at 60 KB, where it is 6.6× faster. Measured
   on `node:24-bookworm-slim`, AMD Ryzen 9 5950X.
-- [ ] OTLP metrics as a stateless pass-through: encode an already-aggregated point, batch it
-  through `Queue` and POST it to `/v1/metrics`, with the types carrying what a valid point must
-  have. Measure what the metrics messages add to the protobuf encoder against the 10 KB budget
-  before deciding.
 
 ## 3.0.0 — breaking
+
+- [ ] OTLP metrics as a stateless pass-through: a metrics kind in `OtlpPayload`, batched through
+  `Queue` and POSTed to `/v1/metrics`, with the types carrying what a valid point must have. It
+  waits for the major because an `OtlpQueue` implementer receives the wider union. Measure what
+  the metrics messages add to the protobuf encoder against the 10 KB budget before deciding.
 
 - [ ] Give the redaction sentinel its own name — `REDACTED by @larvit/log` or similar. Today one
   token means three things to the telemetry reader: a header redacted by name, a value that matched

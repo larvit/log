@@ -42,10 +42,15 @@ Priority order decides a tie.
    wrote it: the log message, metadata, `context` and `spanName`. So is a header or query value
    you allow-list that simply *is* a secret, because naming it is asking for it and no shape
    tells it from any other string.
-4. **A very easy API.** `log.info("msg", { key })` is the whole one-line path. Nobody learns OTLP
+4. **Semver, read strictly.** A minor only adds; a major is the only release that changes what
+   exists: an exported type in either direction, including one you implement; the
+   `format: "json"` output, `log.conf` and `log.span`; a default; a supported runtime. Every break
+   is deprecated in a minor first and lands in the next major with a `MIGRATION.md` entry. A
+   feature whose right shape breaks waits for that major; it never ships early in a worse one.
+5. **A very easy API.** `log.info("msg", { key })` is the whole one-line path. Nobody learns OTLP
    to log.
-5. **Composable.** Instances nest, inherit, and attach to an upstream trace.
-6. **Low footprint.** Measured on this repo's container image: ≤10 KB gzipped, ≤50 ns for a call
+6. **Composable.** Instances nest, inherit, and attach to an upstream trace.
+7. **Low footprint.** Measured on this repo's container image: ≤10 KB gzipped, ≤50 ns for a call
    below `logLevel`, ≤2 µs for a console call, ≤10 µs with OTLP configured, ≤1 KB per instance,
    ≤1.5 KB per queued record, ≤1.5 MiB for a full 1000-item queue.
 
@@ -79,10 +84,7 @@ queue survives app restarts through a `storage` adapter, and a full one holds ab
 current Chromium. React Native is supported from 0.74, where Hermes gained `TextEncoder` and
 `btoa`. Deno and Bun meet the rule and are not in CI.
 
-**Rely on** semver read strictly — a minor only adds, and your code, data and config survive it.
-Every breaking change is deprecated in a 2.x minor first and lands in the next major with a
-`MIGRATION.md` entry. The `format: "json"` output, the exported types, `log.conf`
-and `log.span` are contracts.
+**Rely on** what Goals #4 says a release may change.
 
 **Do not rely on** the text output line, which is written for people to read — parse
 `format: "json"` instead. Nor on delivery: the export queue is best-effort, it keeps what `storage`
