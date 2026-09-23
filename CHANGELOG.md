@@ -30,10 +30,11 @@
   Those keys and `GoogleAccessId` now record `REDACTED`, matched whatever their casing; every other
   parameter of the presigned url is kept. **Rotate the credentials behind any presigned url you
   fetched with `captureQuery` on**: the access key in `X-Amz-Credential` and the service account in
-  `X-Goog-Credential` or `GoogleAccessId`, and the session behind an `X-Amz-Security-Token` that has
-  not expired. Search `url.full` for `X-Amz-Credential=`, `X-Goog-Credential=` or `GoogleAccessId=`
-  followed by anything but `REDACTED`; each hit names the key or account. `captureQuery` and
-  `url.full` shipped in v2.3.0, so no older span carries a query string at all.
+  `X-Goog-Credential` or `GoogleAccessId`, and revoke the session behind an `X-Amz-Security-Token`
+  that has not expired. Search `url.full` for `X-Amz-Credential=`, `X-Goog-Credential=` or
+  `GoogleAccessId=` and ignore the hits reading `REDACTED`; each other hit names the key or account,
+  and one also carrying `X-Amz-Security-Token=` a session. `captureQuery` and `url.full` shipped in
+  v2.3.0, so no older span carries a query string at all.
 - A header you allow-list is no longer a way to export a credential: `authorization`,
   `proxy-authorization`, `cookie` and `set-cookie` named in `captureRequestHeaders` or
   `captureResponseHeaders` record `REDACTED`, so the span still shows the header was there. Any
