@@ -47,8 +47,10 @@
   its `X-Amz-Date` plus `X-Amz-Expires`, both still in `url.full`, has passed, and the signature,
   key id and session token alone reveal no secret, so an expired one needs nothing. Search
   `url.full` for `aws4_request`, which every leaked `X-Amz-Credential` ends in and a redacted one
-  never holds. For a live hit, a credential starting `ASIA` is a role session: revoke the role's
-  active sessions; any other is a long-term key: rotate it.
+  never holds; on S3 itself no presigned url outlives seven days, so only the last week's spans can
+  hold a live one. For a live hit, a credential starting `ASIA` is a role session, and the url died
+  with that session whatever `X-Amz-Expires` says: revoke the role's active sessions only if it may
+  still be open. Any other is a long-term key: rotate it.
 - A span's status message no longer carries url credentials: userinfo in a url the message quotes
   is exported as `http://REDACTED@host/x`. On Node and in browsers `fetch` refuses a url carrying
   credentials and quotes the whole url into its `TypeError`, which reached the backend both as the
