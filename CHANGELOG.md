@@ -116,6 +116,7 @@
   runtime. 3.0.0 removes the member with the property.
 - `JSON.stringify(log.conf)` carries `format`, `"text"` by default, where v2.3.0 left the key
   absent unless you passed one — and omits it when you passed a function, as it omits any function.
+  Not promised; see below.
 - A `format` set on a child (`parentLog`) now applies; before, the parent's resolved formatter
   silently kept winning. `log.conf.format` is read where a line is written, so writing it swaps
   the formatter on a live instance.

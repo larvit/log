@@ -188,7 +188,8 @@ rejects. `log.flush()` delivers what is queued without ending.
 `log.clone(options?)` (on `Log`, not `LogInt`) makes an independent instance with the same
 settings; `context` merges per key, `spanName` is not copied, everything else is overridden as
 given. A clone is its own span in a new trace, not a child. Copy settings with `clone()` or
-`parentLog`, never a spread of `log.conf`, whose shape a minor may change.
+`parentLog`, never a spread of `log.conf`, whose shape a minor may change. From a `LogInt` only
+`parentLog` is available; a new trace needs the consumer's `Log`.
 
 ## Trace outgoing HTTP
 
