@@ -120,7 +120,7 @@
 - A `format` set on a child (`parentLog`) now applies; before, the parent's resolved formatter
   silently kept winning. `log.conf.format` is read where a line is written, so writing it swaps
   the formatter on a live instance.
-- Copy an instance's settings with `clone()` or `parentLog`. What a spread or `JSON.stringify` of
+- Copy an instance's settings with `clone()`. What a spread or `JSON.stringify` of
   `log.conf` carries is not part of the semver promise and may change in a minor.
 - Every deprecation line names the package: `@larvit/log: …`.
 - The level-string shorthand, `new Log("debug")` and `log.clone("debug")`, is deprecated: it still

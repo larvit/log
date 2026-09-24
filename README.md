@@ -185,11 +185,11 @@ un-awaited `log.fetch()` takes to complete, and returns at once while a retry ba
 the retry then runs only for as long as the process lives. An instance is single-use: logging and `fetch()` on an ended instance throw, `end()`
 rejects. `log.flush()` delivers what is queued without ending.
 
-`log.clone(options?)` (on `Log`, not `LogInt`) makes an independent instance with the same
-settings; `context` merges per key, `spanName` is not copied, everything else is overridden as
-given. A clone is its own span in a new trace, not a child. Copy settings with `clone()` or
-`parentLog`, never a spread of `log.conf`, whose shape a minor may change. From a `LogInt` only
-`parentLog` is available; a new trace needs the consumer's `Log`.
+`log.clone(options?)` makes an independent instance with the same settings. `context` merges per
+key; `parentLog`, `spanName` and `traceparent` are not copied, so a clone starts a new trace unless
+you pass one of them; any other option you pass wins. Copy settings with `clone()`, never a spread
+of `log.conf`, which carries `parentLog` and `traceparent` and whose shape a minor may change
+([Goals #4](#goals)).
 
 ## Trace outgoing HTTP
 
