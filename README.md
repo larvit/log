@@ -42,9 +42,12 @@ Priority order decides a tie.
    wrote it: the log message, metadata, `context` and `spanName`. So is a header or query value
    you allow-list that simply *is* a secret, because naming it is asking for it and no shape
    tells it from any other string.
-4. **Semver, read strictly.** A minor only adds; a major is the only release that changes what
-   exists: an exported type in either direction, including one you implement; the
-   `format: "json"` output, `log.conf` and `log.span`; a default; a supported runtime. Every break
+4. **Semver, read strictly, over what this README documents.** A minor only adds; a major is the
+   only release that changes what exists: an exported type in either direction, including one you
+   implement; the `format: "json"` output; each documented option, read back from `log.conf` under
+   its own name; each documented field of `log.span`; a default; a supported runtime. What the
+   README does not document — an undocumented key, enumerability, what a spread or
+   `JSON.stringify` of `log.conf` carries — may change in a minor. Every break
    is deprecated in a minor first and lands in the next major with a `MIGRATION.md` entry. A
    feature whose right shape breaks waits for that major; it never ships early in a worse one.
 5. **A very easy API.** `log.info("msg", { key })` is the whole one-line path. Nobody learns OTLP
