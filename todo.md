@@ -16,8 +16,7 @@ rotation advisories, the export queue, the injectable clock, `Logger`, and the `
 level-string deprecations.
 
 An architecture, product and comprehension review on 2026-09-20 found everything below in that
-state. None of it is breaking. **Settle "What does `log.conf` promise, key by key?" first** — it is
-free only until this release publishes.
+state. None of it is breaking.
 
 ### Security
 
@@ -115,14 +114,6 @@ free only until this release publishes.
   the work the app asked for". Settling it also answers what the entry leaves open and what the
   prose pass would not invent a reason for: why the batch timer is left ref'd when the retry timer
   is not.
-- [ ] **What does `log.conf` promise, key by key?** README → Goals #4 names the whole object a
-  contract, which promises every property a version happened to expose — including one a later
-  release wants to drop, as 2.4.0's deprecated `conf.entryFormatter` alias will in 3.0.0 and the
-  3.0.0 `otlpQueue` item will for `conf.otlpHttpBaseURI`. The sentence is new in this release and
-  has never shipped, so narrowing it is free until 2.4.0 publishes: scoping it to each documented
-  option read back under its own name, and saying `conf` is for reading where `clone()` is for
-  changing, settles that whole class instead of one key at a time. Found by the 2026-09-21
-  product-owner review.
 - [ ] **Which goal is "a file a reader can find their way around"?** The comprehension item above
   and each of its sub-items rest on a 5.9/10 panel score, and no goal speaks to how readable the
   source is — Goals #5 is about the API a consumer calls, not the file a maintainer opens. So the
@@ -187,7 +178,8 @@ free only until this release publishes.
   the likelier leak. A consumer who logs their own conf, as the README's own library example spells
   `JSON.stringify(options.settings)`, puts either in their log store. No library path emits them.
   Dropping the keys is breaking and waits for the 3.0.0 item that makes `otlpQueue` the only OTLP
-  representation; redacting in place is not, and `isQueueFor`'s exact-string compare survives it as
+  representation. Redacting in place changes a documented option's read-back value, which Goals #4
+  calls breaking, but Goals #3 outranks it; `isQueueFor`'s exact-string compare survives it as
   long as both sides are redacted the same way. Weigh the two before writing either.
 - [ ] Decide what to do about Basic credentials sent over plain `http:` to a non-loopback host,
   now that they are really sent: anything on the network path can read them (CWE-319). Either warn
