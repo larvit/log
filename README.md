@@ -44,10 +44,11 @@ Priority order decides a tie.
    tells it from any other string.
 4. **Semver, read strictly, over what this README documents.** A minor only adds; a major is the
    only release that changes what exists: an exported type in either direction, including one you
-   implement; the `format: "json"` output; each documented option, read back from `log.conf` under
-   its own name; each documented field of `log.span`; a default; a supported runtime. What the
-   README does not document — an undocumented key, enumerability, what a spread or
-   `JSON.stringify` of `log.conf` carries — may change in a minor. Every break
+   implement; the `format: "json"` output; each documented option, read back from `log.conf` or
+   `queue.conf` under its own name; each documented instance field; each span attribute and value
+   this README documents, on `log.span` and on the wire; a default; a supported runtime. What the
+   README does not document — an undocumented key of a `conf`, enumerability, what a spread or
+   `JSON.stringify` of one carries — may change in a minor. Every break
    is deprecated in a minor first and lands in the next major with a `MIGRATION.md` entry. A
    feature whose right shape breaks waits for that major; it never ships early in a worse one.
 5. **A very easy API.** `log.info("msg", { key })` is the whole one-line path. Nobody learns OTLP
@@ -87,7 +88,7 @@ queue survives app restarts through a `storage` adapter, and a full one holds ab
 current Chromium. React Native is supported from 0.74, where Hermes gained `TextEncoder` and
 `btoa`. Deno and Bun meet the rule and are not in CI.
 
-**Rely on** what Goals #4 says a release may change.
+**Rely on** what Goals #4 says only a major may change.
 
 **Do not rely on** the text output line, which is written for people to read — parse
 `format: "json"` instead. Nor on delivery: the export queue is best-effort, it keeps what `storage`
@@ -186,7 +187,8 @@ rejects. `log.flush()` delivers what is queued without ending.
 
 `log.clone(options?)` (on `Log`, not `LogInt`) makes an independent instance with the same
 settings; `context` merges per key, `spanName` is not copied, everything else is overridden as
-given. A clone is its own span in a new trace, not a child.
+given. A clone is its own span in a new trace, not a child. Copy settings with `clone()` or
+`parentLog`, never a spread of `log.conf`, whose shape a minor may change.
 
 ## Trace outgoing HTTP
 
