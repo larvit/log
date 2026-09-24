@@ -145,7 +145,7 @@ and who it is for, and a design decision that cannot be derived from them belong
   nor this entry lists the routes in: prose has nothing keeping a count true, and the
   userinfo-free-by-construction choices at the `log.fetch` call site are not rules this region
   holds. Scoped to spans because the remaining credential rules are
-  the queue's, and 2.5.0's conf-redaction and Basic-over-`http:` items rewrite that code. Valid while
+  the queue's, and the conf-redaction and Basic-over-`http:` items rewrite that code. Valid while
   the source is a single `index.ts`.
 
 - 2026-09-21: `format` is the formatter's one name, and `conf.entryFormatter` a deprecated alias of

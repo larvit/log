@@ -34,7 +34,7 @@ state. None of it is breaking.
   more consumers will set one. The README warns "don't log your `conf`" in the `otlpHttpBaseURI`
   row alone — the `otlpAdditionalHeaders` row, the spelling the docs steer people to for a token,
   carries no warning at all. Per AGENTS.md → Working here, a release with an exposure still open
-  leads with `### Security` holding it. The fix itself is 2.5.0's; what 2.4.0 owes is the telling.
+  leads with `### Security` holding it. The fix itself is 3.0.0's; what 2.4.0 owes is the telling.
 
 ### Everything else
 
@@ -171,17 +171,6 @@ state. None of it is breaking.
   `key`, `token`), or a statement that `captureQuery` is an allow-list the caller owns and Goal 3's
   "naming it is asking for it" already covers it, is open; the 2026-09-23 decision leaves a name
   as an addition to the set. Live since 2.3.0, so a name that lands owes a rotation advisory.
-- [ ] Keep credentials off `log.conf` and `queue.conf`, which the README documents as public. Two
-  spellings carry one: `otlpHttpBaseURI` holds `user:pass@` verbatim, and `otlpAdditionalHeaders`
-  holds a bearer token verbatim — the second being the spelling the docs steer people to, so it is
-  the likelier leak. A consumer who logs their own conf, as the README's own library example spells
-  `JSON.stringify(options.settings)`, puts either in their log store. No library path emits them.
-  Dropping the keys is breaking and waits for the 3.0.0 item that makes `otlpQueue` the only OTLP
-  representation. Redacting in place changes a documented option's read-back value, which Goals #4
-  calls breaking; it ships in a minor only if Goals #3 grows to cover a value this library hands
-  back, since today it stops at a span, a record and `stderr`. `isQueueFor`'s exact-string compare
-  survives redaction as long as both sides are redacted the same way. Weigh the two before writing
-  either.
 - [ ] Decide what to do about Basic credentials sent over plain `http:` to a non-loopback host,
   now that they are really sent: anything on the network path can read them (CWE-319). Either warn
   once per `report` sink when the endpoint is `http:` and carries userinfo, or require `https:`
@@ -231,8 +220,7 @@ state. None of it is breaking.
   sequence, every one of nine comprehension-panel readers named it, and four named it the unit they
   would least want to touch because it is the only one whose failure mode is silent. The split
   changes no contract, so it needs no major, and 2.5.0, 2.6.0 and 2.7.0 all edit those 90 lines
-  otherwise: the `traceparent` skip-set fix, the conf redaction above and the `spanName` warning all
-  land in them. Refactor first and 3.0.0's diff gets smaller.
+  otherwise: the `traceparent` skip-set fix and the `spanName` warning both land in them. Refactor first and 3.0.0's diff gets smaller.
 - [ ] Let a drained round clear the batch timer a record enqueued into it scheduled. `round()`
   clears the timer once, at its start, so a record logged while an export is in flight installs a
   batch timer that the same round's loop then drains — leaving a timer with nothing left to send.
@@ -286,6 +274,8 @@ README → Goals #4 promises a 2.x warning before each break below, so 3.0.0 wai
   reach it.
 - [ ] Announce in the README that 3.0.0 adds a metrics kind to `OtlpPayload`, so an `OtlpQueue`
   implementer handles one before it arrives.
+- [ ] Announce in the README and CHANGELOG that 3.0.0 stops `log.conf` and `queue.conf` handing
+  back a credential, so a consumer reading one out of them moves to their own copy first.
 - [ ] Settle one marker for a CHANGELOG entry a consumer must act on, and record it in the
   `AGENTS.md` line beside `### Security`. Two spellings exist: the `**Breaking:**` prefix `v2.0.0`
   uses, and the `### Security` grouping. Neither covers a deprecation, so `entryFormatter` and the
@@ -365,6 +355,11 @@ Each one is a weigh against README → Goals first: ship it, or delete the item 
   the three `otlp*` shorthands and clear them, so inheritance needs one rule and `isQueueFor` goes.
   Today `log.conf.otlpHttpBaseURI` stays readable, which is why this waits for a major. It lands on
   the constructor 2.5.0 already split.
+- [ ] Keep credentials off `log.conf` and `queue.conf`. `otlpHttpBaseURI`'s `user:pass@` and an
+  `otlpAdditionalHeaders` bearer token sit there verbatim, so a consumer who logs their own conf, as
+  the README's library example does with `JSON.stringify(options.settings)`, puts them in their log
+  store. Goals #3 stops at what this library emits, so this is a Goals #4 break. The `otlpQueue`
+  item above clears `log.conf`; `queue.conf` still needs redacting, or its credentials held off it.
 - [ ] Require `spanName` whenever `otlpQueue` is set or inherited: a child or clone of an
   OTLP-configured instance must name its span, and the constructor rejects one that does not, so
   no backend shows `unnamed-span`.
