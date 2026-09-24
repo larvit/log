@@ -75,8 +75,8 @@ state. None of it is breaking.
   inherited by clones or children. The constructor's inheritance loop (`index.ts:1352`) skips only
   what `otlpKeysNotToInherit` returns, so it copies the parent's `traceparent` onto the child's
   conf, while `clone()`'s separate skip set excludes it correctly: the two loops disagree. The
-  child's own span is right, so nothing is visibly wrong until the conf is spread — a spelling this
-  release advertises — where there is no `parentLog` to take precedence, the stale header is
+  child's own span is right, so nothing is visibly wrong until the conf is spread into a new `Log`,
+  where there is no `parentLog` to take precedence, the stale header is
   adopted, and the new span is parented to a span belonging to a finished request. Whether the
   instance it was given should keep it on `conf` is part of the question.
 - [ ] Make `generateTraceId` produce what three places say it produces: sixteen random bytes.
@@ -179,8 +179,9 @@ state. None of it is breaking.
   `JSON.stringify(options.settings)`, puts either in their log store. No library path emits them.
   Dropping the keys is breaking and waits for the 3.0.0 item that makes `otlpQueue` the only OTLP
   representation. Redacting in place changes a documented option's read-back value, which Goals #4
-  calls breaking, but Goals #3 outranks it; `isQueueFor`'s exact-string compare survives it as
-  long as both sides are redacted the same way. Weigh the two before writing either.
+  calls breaking; it ships in a minor only if Goals #3 grows to cover a value this library hands
+  back, since today it stops at a span, a record and `stderr`. `isQueueFor`'s exact-string compare
+  survives redaction as long as both sides are redacted the same way. Weigh the two before writing either.
 - [ ] Decide what to do about Basic credentials sent over plain `http:` to a non-loopback host,
   now that they are really sent: anything on the network path can read them (CWE-319). Either warn
   once per `report` sink when the endpoint is `http:` and carries userinfo, or require `https:`
@@ -329,7 +330,8 @@ Each one is a weigh against README → Goals first: ship it, or delete the item 
 - [ ] Give the redaction sentinel its own name — `REDACTED by @larvit/log` or similar. Today one
   token means three things to the telemetry reader: a header redacted by name, a value that matched
   a credential shape, and a value the consumer's own app had already redacted upstream. `REDACTED`
-  shipped in 2.3.0 and `log.span` is a stated contract, so renaming it waits for the major.
+  shipped in 2.3.0 and Goals #4 promises each documented span value, so renaming it waits for the
+  major.
 - [ ] Remove the level-string shorthand from `Log` and `clone`.
 - [ ] Remove `entryFormatter`, the option and the `conf` alias of `format` beside it; `format` is
   `"text" | "json" | ((entry) => string)`. This closes the one unsoundness 2.4.0 could not: the
