@@ -74,11 +74,10 @@ state. None of it is breaking.
 - [ ] Make `traceparent` behave the way the option and the README both say it does — edge-only, not
   inherited by clones or children. The constructor's inheritance loop (`index.ts:1352`) skips only
   what `otlpKeysNotToInherit` returns, so it copies the parent's `traceparent` onto the child's
-  conf, while `clone()`'s separate skip set excludes it correctly: the two loops disagree. The
-  child's own span is right, so nothing is visibly wrong until the conf is spread into a new `Log`,
-  where there is no `parentLog` to take precedence, the stale header is
-  adopted, and the new span is parented to a span belonging to a finished request. Whether the
-  instance it was given should keep it on `conf` is part of the question.
+  conf, while `clone()`'s separate skip set excludes it correctly: the two loops disagree. So a
+  child's `log.conf.traceparent` reads back the parent's header, which README → Join an incoming
+  trace says it never inherits. Whether the instance it was given should keep it on `conf` is part
+  of the question.
 - [ ] Make `generateTraceId` produce what three places say it produces: sixteen random bytes.
   `index.ts:301` fixes the first one to `0x01` under the comment `// version 1 trace id`, but W3C
   Trace Context has no version field inside a trace id — the version is the header's own first
@@ -181,7 +180,8 @@ state. None of it is breaking.
   representation. Redacting in place changes a documented option's read-back value, which Goals #4
   calls breaking; it ships in a minor only if Goals #3 grows to cover a value this library hands
   back, since today it stops at a span, a record and `stderr`. `isQueueFor`'s exact-string compare
-  survives redaction as long as both sides are redacted the same way. Weigh the two before writing either.
+  survives redaction as long as both sides are redacted the same way. Weigh the two before writing
+  either.
 - [ ] Decide what to do about Basic credentials sent over plain `http:` to a non-loopback host,
   now that they are really sent: anything on the network path can read them (CWE-319). Either warn
   once per `report` sink when the endpoint is `http:` and carries userinfo, or require `https:`
