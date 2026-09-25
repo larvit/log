@@ -190,6 +190,9 @@ export const LogLevels = {
 	/* eslint-enable sort-keys */
 };
 
+// A Map, so a JavaScript caller's `"constructor"` finds no level and `["debug"]` is never coerced into one.
+const SEVERITY_NUMBERS = new Map<unknown, number>(Object.entries(LogLevels).map(([logLevel, { severityNumber }]) => [logLevel, severityNumber]));
+
 function withoutUndefined(metadata: Metadata = {}): DefinedMetadata {
 	const defined: DefinedMetadata = {};
 
@@ -1291,23 +1294,52 @@ function foldEntryFormatter(conf: LogConf): void {
 	conf.format = conf.entryFormatter;
 }
 
-const warnedDeprecations = new WeakMap<(msg: string) => void, Set<string>>();
+const warned = new WeakMap<(msg: string) => void, Set<unknown>>();
 
-function warnDeprecated(conf: ResolvedLogConf, metadata: Metadata | undefined, msg: string): void {
-	let warned = warnedDeprecations.get(conf.stderr);
+// Marked before the sink runs, so a sink that itself uses the deprecated spelling cannot recurse.
+function firstWarning(conf: ResolvedLogConf, key: unknown): boolean {
+	let keys = warned.get(conf.stderr);
 
-	if (!warned) {
-		warned = new Set();
-		warnedDeprecations.set(conf.stderr, warned);
+	if (!keys) {
+		keys = new Set();
+		warned.set(conf.stderr, keys);
 	}
 
-	if (warned.has(msg)) {
-		return;
+	if (keys.has(key)) {
+		return false;
 	}
 
-	// Added before the sink runs, so a sink that itself uses the deprecated spelling cannot recurse.
-	warned.add(msg);
+	keys.add(key);
+
+	return true;
+}
+
+function describeLogLevel(value: unknown): string {
+	// A proxy trap, getter or toJSON on the value is caller code, and may throw.
+	try {
+		if (typeof value === "string" || (Array.isArray(value) && value.every(item => typeof item === "string"))) {
+			return JSON.stringify(value);
+		}
+
+		if (value !== null && (typeof value === "object" || typeof value === "function")) {
+			// Object.prototype.toString, so a value's own toString is never called.
+			return Object.prototype.toString.call(value);
+		}
+
+		return String(value);
+	} catch {
+		return "(a value that cannot be printed)";
+	}
+}
+
+function writeWarning(conf: ResolvedLogConf, metadata: Metadata | undefined, msg: string): void {
 	conf.stderr(resolveFormatter(conf.format)({ colors: conf.colors, logLevel: "warn", metadata: withoutUndefined(metadata), msTimestamp: conf.clock.now(), msg }));
+}
+
+function warnOnce(conf: ResolvedLogConf, metadata: Metadata | undefined, msg: string): void {
+	if (firstWarning(conf, msg)) {
+		writeWarning(conf, metadata, msg);
+	}
 }
 
 const CONF_FORMATTER_DEPRECATED = "@larvit/log: conf.entryFormatter is deprecated and removed in 3.0.0, use conf.format";
@@ -1318,13 +1350,13 @@ const ENTRY_FORMATTER_ALIAS: PropertyDescriptor = {
 	// So a child or a spread carries `format` alone, and never folds the alias a second time.
 	enumerable: false,
 	get(this: ResolvedLogConf): EntryFormatter {
-		warnDeprecated(this, this.context, CONF_FORMATTER_DEPRECATED);
+		warnOnce(this, this.context, CONF_FORMATTER_DEPRECATED);
 
 		return resolveFormatter(this.format);
 	},
 	set(this: ResolvedLogConf, formatter: EntryFormatter) {
 		this.format = formatter;
-		warnDeprecated(this, this.context, CONF_FORMATTER_DEPRECATED);
+		warnOnce(this, this.context, CONF_FORMATTER_DEPRECATED);
 	},
 };
 
@@ -1395,13 +1427,13 @@ export class Log implements LogInt {
 		this.context = withoutUndefined(this.conf.context);
 
 		if (typeof options === "string") {
-			warnDeprecated(this.conf, this.context, "@larvit/log: new Log(\"level\") is deprecated and removed in 3.0.0, use new Log({ logLevel })");
+			warnOnce(this.conf, this.context, "@larvit/log: new Log(\"level\") is deprecated and removed in 3.0.0, use new Log({ logLevel })");
 		}
 
 		if (overriddenFormat) {
-			warnDeprecated(this.conf, this.context, "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format — entryFormatter wins and the format beside it is ignored");
+			warnOnce(this.conf, this.context, "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format — entryFormatter wins and the format beside it is ignored");
 		} else if (deprecatedFormatter) {
-			warnDeprecated(this.conf, this.context, "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format");
+			warnOnce(this.conf, this.context, "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format");
 		}
 
 		if (this.conf.otlpQueue) {
@@ -1449,7 +1481,7 @@ export class Log implements LogInt {
 
 	public clone(options?: LogConf | LogLevel | "none") {
 		if (typeof options === "string") {
-			warnDeprecated(this.conf, this.context, "@larvit/log: log.clone(\"level\") is deprecated and removed in 3.0.0, use log.clone({ logLevel })");
+			warnOnce(this.conf, this.context, "@larvit/log: log.clone(\"level\") is deprecated and removed in 3.0.0, use log.clone({ logLevel })");
 		}
 
 		const conf: LogConf = typeof options === "string" ? { logLevel: options } : { ...options };
@@ -1602,8 +1634,18 @@ export class Log implements LogInt {
 			return false;
 		}
 
-		// LogLevels.severityNumber is the single source of truth for ordering.
-		return LogLevels[logLevel].severityNumber >= LogLevels[this.conf.logLevel].severityNumber;
+		let threshold = SEVERITY_NUMBERS.get(this.conf.logLevel);
+
+		if (threshold === undefined) {
+			// Keyed on the raw value, so only the first call builds the message.
+			if (firstWarning(this.conf, this.conf.logLevel)) {
+				writeWarning(this.conf, undefined, `@larvit/log: logLevel ${describeLogLevel(this.conf.logLevel)} is not a level, logging at "info"; use error, warn, info, verbose, debug, silly or none`);
+			}
+
+			threshold = LogLevels.info.severityNumber;
+		}
+
+		return (SEVERITY_NUMBERS.get(logLevel) ?? -Infinity) >= threshold;
 	}
 
 	public error(msg: string, metadata?: Metadata) { this.log("error", msg, metadata); }

@@ -370,6 +370,58 @@ test("respects the configured log-level threshold", t => {
 	none.log.error("x");
 	t.strictEqual(none.stderr.length, 0, "nothing is written at level none, not even error");
 	t.strictEqual(none.log.enabled("error"), false, "enabled() is false for every level at none");
+
+	// What a JavaScript consumer passes from LOG_LEVEL=trace (pino) or http (winston).
+	const unknownLevel: any = "trace";
+	const unknown = capture({ colors: false, logLevel: unknownLevel });
+
+	t.doesNotThrow(() => {
+		unknown.log.info("x");
+		unknown.log.verbose("x");
+		unknown.log.error("x");
+	}, "an unknown logLevel never throws from a level method");
+	t.strictEqual(unknown.stdout.length, 1, "an unknown logLevel logs at the default, info");
+	t.strictEqual(unknown.stderr.length, 2, "one warning beside the error line");
+	t.ok(unknown.stderr[0].includes("[war] @larvit/log: logLevel \"trace\" is not a level"), "the warning names the package and the value");
+	t.ok(unknown.stderr[0].includes("error, warn, info, verbose, debug, silly or none"), "and the values to use instead");
+	t.strictEqual(unknown.log.enabled(unknownLevel), false, "enabled() is false for an unknown level, never a throw");
+	unknown.log.conf.logLevel = unknownLevel;
+	unknown.log.info("x");
+	t.strictEqual(unknown.stderr.length, 2, "the warning is written once per sink and value");
+
+	const live = capture({ colors: false, context: { requestId: "01a0d9b5-8ddc-743e-8555-76c9875b7d9d" } });
+	const prototypeKey: any = "constructor";
+	const numericLevel: any = 30;
+
+	live.log.conf.logLevel = prototypeKey;
+	live.log.info("x");
+	t.strictEqual(live.stdout.length, 1, "a live write is checked where a line is written, and a prototype key is no level");
+	t.ok(live.stderr[0].includes("logLevel \"constructor\" is not a level"), "and warns");
+	t.notOk(live.stderr[0].includes("01a0d9b5-8ddc-743e-8555-76c9875b7d9d"), "a config warning carries no instance context");
+	live.log.conf.logLevel = numericLevel;
+	live.log.info("x");
+	t.ok(live.stderr[1].includes("logLevel 30 is not a level"), "a number is quoted as a number");
+
+	const arrayLevel: any = ["debug"];
+	const hostileLevel: any = { toString() { throw new Error("toString called"); } };
+	const nullLevel: any = null;
+
+	live.log.conf.logLevel = arrayLevel;
+	live.log.debug("x");
+	t.strictEqual(live.stdout.length, 2, "an array holding a level is no level");
+	t.ok(live.stderr[2].includes("logLevel [\"debug\"] is not a level"), "and warns, naming the strings it holds");
+	live.log.conf.logLevel = hostileLevel;
+	t.doesNotThrow(() => live.log.info("x"), "a value's own toString is never called");
+	t.ok(live.stderr[3].includes("logLevel [object Object] is not a level"), "and warns");
+	live.log.conf.logLevel = nullLevel;
+	live.log.info("x");
+	t.ok(live.stderr[4].includes("logLevel null is not a level"), "null is printed as null");
+
+	const trapLevel: any = new Proxy([], { get() { throw new Error("trap called"); } });
+
+	live.log.conf.logLevel = trapLevel;
+	t.doesNotThrow(() => live.log.info("x"), "a value that throws while it is described never throws from a level method");
+	t.ok(live.stderr[5].includes("logLevel (a value that cannot be printed) is not a level"), "and still warns");
 	t.end();
 });
 
