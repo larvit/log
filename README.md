@@ -42,7 +42,7 @@ Priority order decides a tie.
    wrote it: the log message, metadata, `context` and `spanName`. So is a header or query value
    you allow-list that simply *is* a secret, because naming it is asking for it and no shape
    tells it from any other string. Until 2.5.0 a url nested in a request path still reaches
-   `url.full` as written, so keep credentials out of one.
+   `url.full` as written; the [changelog](CHANGELOG.md) says what to rotate.
 4. **Semver, read strictly, over what this README documents.** A minor only adds; a major is the
    only release that changes what exists: an exported type in either direction, including one you
    implement; the `format: "json"` output; each documented option, read back from `log.conf` or
@@ -58,9 +58,10 @@ Priority order decides a tie.
 7. **Low footprint.** Measured on this repo's container image: ≤10 KB gzipped, ≤50 ns for a call
    below `logLevel`, ≤2 µs for a console call, ≤10 µs with OTLP configured, ≤1 KB per instance,
    ≤1.5 KB per queued record, ≤1.5 MiB for a full 1000-item queue. Nothing this library schedules
-   keeps a Node or Deno process alive past the work the app asked for.
-8. **A maintainer can hold it.** The source scores at least 7.0 on a comprehension-panel run, and
-   no change lowers the score.
+   keeps a Node or Deno process alive past the work the app asked for; until 2.5.0 a batch timer can
+   hold it for up to `batchDelayMs` after the last record is delivered.
+8. **A maintainer can hold it.** Simulated readers, junior to architect, rate how well they
+   understand the source; the target is 7.0/10 (5.9 today), and no change lowers the score.
 
 **`log.fetch` mirrors the runtime's `fetch`.** It accepts what that `fetch` accepts, and the
 response, the rejection and the promise you see are exactly what it produced. What it adds is

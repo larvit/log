@@ -177,9 +177,10 @@ and who it is for, and a design decision that cannot be derived from them belong
   entry. Valid while the deny-list names query keys, not shapes.
 
 - 2026-09-25, the maintainer: an incoming `traceparent` with the sampled flag off drops the span,
-  never the log records. OTel has no log sampler; a record carries the flag as data for the backend
-  to link by, so an unsampled request's `log.error` still reaches the log store. Serves README →
-  Goals #2. Valid while OTel logs define no sampling.
+  never the log records. OTel's stable logs spec defines no sampling; a record carries the flag as
+  data for the backend to link by, so an unsampled request's `log.error` still reaches the log
+  store. Serves README → Goals #2. Valid while trace-based log filtering is not stable in OTel and
+  on by default.
 
 ## Working here
 
