@@ -169,6 +169,8 @@
 - `MetadataValue` accepts `undefined`; such keys are dropped from console, custom-formatter and OTLP
   output, so `{ port: options.port }` with an optional field type-checks. Formatters and `log.context`
   are typed with the new `DefinedMetadata`, so existing narrowing on their values still compiles.
+- A `logLevel` outside the six levels and `"none"`, such as `LOG_LEVEL=trace` from a JavaScript
+  app, logs at `"info"` and warns once on `stderr`. Every level method used to throw on it.
 - `log.enabled(level)`: `true` when a call at that level would output, so a caller can skip building
   expensive metadata.
 - Exported `Logger` type: the six level methods plus `enabled`. `LogInt` is `Logger` plus `conf`,

@@ -370,6 +370,26 @@ test("respects the configured log-level threshold", t => {
 	none.log.error("x");
 	t.strictEqual(none.stderr.length, 0, "nothing is written at level none, not even error");
 	t.strictEqual(none.log.enabled("error"), false, "enabled() is false for every level at none");
+
+	// What a JavaScript caller hands over from LOG_LEVEL=trace: nothing type-checks it.
+	const unknown = capture(JSON.parse("{ \"colors\": false, \"logLevel\": \"trace\" }"));
+
+	unknown.log.error("x");
+	unknown.log.warn("x");
+	unknown.log.info("x");
+	unknown.log.verbose("x");
+	unknown.log.debug("x");
+	unknown.log.silly("x");
+	t.strictEqual(unknown.stdout.length, 1, "an unknown level logs at the default info instead of throwing");
+	t.strictEqual(unknown.stderr.filter(line => line.includes("[war] x")).length, 1, "warn still passes at the fallback");
+	const warnings = unknown.stderr.filter(line => line.includes("@larvit/log: "));
+
+	t.strictEqual(warnings.length, 1, "and warns once");
+	t.ok(warnings[0]?.endsWith("[war] @larvit/log: unknown logLevel \"trace\", using \"info\"; use one of error, warn, info, verbose, debug, silly or none"), "naming the value it ignored and the ones it takes");
+
+	unknown.log.conf.logLevel = JSON.parse("\"toString\"");
+	t.strictEqual(unknown.log.enabled("info"), true, "a level written onto a live conf falls back too, an inherited key included");
+	t.ok(unknown.stderr.at(-1)?.includes("unknown logLevel \"toString\""), "and warns for its own value");
 	t.end();
 });
 

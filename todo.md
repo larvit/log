@@ -18,15 +18,6 @@ level-string deprecations.
 An architecture, product and comprehension review on 2026-09-20 found everything below in that
 state. None of it is breaking.
 
-- [ ] Survive a `logLevel` the union does not contain. `new Log({ logLevel: "trace" })` throws
-  `TypeError: Cannot read properties of undefined (reading 'severityNumber')` on `log.info()` and
-  on all five other level methods, because `enabled()` indexes `LogLevels` with
-  it and `log()` gates on `enabled()`. TypeScript rejects the literal; the README's own examples
-  are JavaScript, where nothing does, and `LOG_LEVEL=trace` (pino) or `http` (winston) is the
-  obvious input. 2.4.0 is also the release adding `enabled()` as the guard README → Accept a logger
-  in your library tells library authors to call, so a library crashes inside its consumer's app. A
-  logging dependency killing the process over a one-word config mistake is the thing to end;
-  `msgTextFormatter` already treats the same class of input as reachable.
 - [ ] Make `traceparent` behave the way the option and the README both say it does — edge-only, not
   inherited by clones or children. The constructor's inheritance loop skips only
   what `otlpKeysNotToInherit` returns, so it copies the parent's `traceparent` onto the child's

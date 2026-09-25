@@ -123,7 +123,8 @@ log.silly("Open the flood gates!"); // stdout
 ```
 
 Levels, most to least severe: `error`, `warn`, `info`, `verbose`, `debug`, `silly`. `"none"` outputs
-nothing, except a deprecation warning, which no `logLevel` silences.
+nothing, except this library's own warnings, which no `logLevel` silences. Any other value logs at
+`"info"` and warns once.
 
 Keep the message a static string and put every value in the metadata object, so entries with the
 same message aggregate in your log backend:

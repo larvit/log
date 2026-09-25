@@ -47,14 +47,16 @@ and who it is for, and a design decision that cannot be derived from them belong
   key stops compiling. They are output types describing what the library produces; a consumer
   hand-building one is writing a test double, not running existing code. Precedent: `colors` did
   the same.
-- 2026-09-18: a deprecation warns once per `stderr` sink for each distinct warning text, through the
-  instance's formatter at `warn` and whatever `logLevel` says. Instances sharing the default
+- 2026-09-18: a deprecation, or an unknown `logLevel`, warns once per `stderr` sink for each distinct
+  warning text, through the instance's formatter at `warn` and whatever `logLevel` says. Instances sharing the default
   `console.error` share that one warning; a sink the caller injects gets its own, which keeps a test
   independent of run order. The key is the sink plus the message text, so keep the messages literal.
   Every deprecation line opens with `@larvit/log: `, part of that literal, so an app developer can
   tell which dependency emitted one about code they may not own. A `Queue`'s `report` lines carry no
-  prefix: they report that developer's own setup, not this library's own API. Valid
-  while 2.x carries deprecations.
+  prefix: they report that developer's own setup, not this library's own API. The unknown-level
+  line names the value it ignored, so it is keyed per value; it keeps the prefix, since the value
+  may come from a library the app developer does not own. Valid while this library warns through
+  the instance's `stderr`.
 - 2026-09-19: `otlpHttpBaseURI` userinfo is sent as an `Authorization: Basic` header, never in the
   request url. WHATWG `fetch` refuses a url carrying credentials and quotes that url into the
   `TypeError`, so keeping them there made basic auth unusable on Node and in browsers and leaked
