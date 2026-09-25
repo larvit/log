@@ -18,13 +18,9 @@ level-string deprecations.
 An architecture, product and comprehension review on 2026-09-20 found everything below in that
 state. None of it is breaking.
 
-- [ ] Point a `todo.md` item at the symbol it means, keeping an `index.ts:NNN` only where
-  nothing else identifies the spot — the bare comments and the flag block. Eleven of nineteen
-  references were renumbered by one banner commit, and every one would have been silently
-  false had it been missed; most sit beside the name they point at, which grep already finds.
 - [ ] Survive a `logLevel` the union does not contain. `new Log({ logLevel: "trace" })` throws
   `TypeError: Cannot read properties of undefined (reading 'severityNumber')` on `log.info()` and
-  on all five other level methods, because `enabled()` (`index.ts:1598`) indexes `LogLevels` with
+  on all five other level methods, because `enabled()` indexes `LogLevels` with
   it and `log()` gates on `enabled()`. TypeScript rejects the literal; the README's own examples
   are JavaScript, where nothing does, and `LOG_LEVEL=trace` (pino) or `http` (winston) is the
   obvious input. 2.4.0 is also the release adding `enabled()` as the guard README → Accept a logger
@@ -32,14 +28,14 @@ state. None of it is breaking.
   logging dependency killing the process over a one-word config mistake is the thing to end;
   `msgTextFormatter` already treats the same class of input as reachable.
 - [ ] Make `traceparent` behave the way the option and the README both say it does — edge-only, not
-  inherited by clones or children. The constructor's inheritance loop (`index.ts:1356`) skips only
+  inherited by clones or children. The constructor's inheritance loop skips only
   what `otlpKeysNotToInherit` returns, so it copies the parent's `traceparent` onto the child's
   conf, while `clone()`'s separate skip set excludes it correctly: the two loops disagree. So a
   child's `log.conf.traceparent` reads back the parent's header, which README → Join an incoming
   trace says it never inherits. Whether the instance it was given should keep it on `conf` is part
   of the question.
 - [ ] Make `generateTraceId` produce what three places say it produces: sixteen random bytes.
-  `index.ts:301` fixes the first one to `0x01` under the comment `// version 1 trace id`, but W3C
+  It fixes the first one to `0x01` under the comment `// version 1 trace id`, but W3C
   Trace Context has no version field inside a trace id — the version is the header's own first
   field, which `formatTraceparent` already writes as `00`. So the comment, `generateTraceId`'s own
   "Random 16-byte trace id", and README → Exports' "Random 32- and 16-hex-char ids" are all false
