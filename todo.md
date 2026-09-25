@@ -18,20 +18,6 @@ level-string deprecations.
 An architecture, product and comprehension review on 2026-09-20 found everything below in that
 state. None of it is breaking.
 
-### Security
-
-- [ ] State the `conf` credential exposure where a consumer deciding whether to rotate will read
-  it. `log.conf` and `queue.conf` hold `otlpHttpBaseURI`'s `user:pass@` verbatim and
-  `otlpAdditionalHeaders`' bearer token verbatim, and the README documents both confs as public.
-  2.4.0 makes it reach further in two ways the `### Security` section does not mention: `queue.conf`
-  becomes a second public holder of the same string, and `user:pass@` starts actually working, so
-  more consumers will set one. The README warns "don't log your `conf`" in the `otlpHttpBaseURI`
-  row alone — the `otlpAdditionalHeaders` row, the spelling the docs steer people to for a token,
-  carries no warning at all. Per AGENTS.md → Working here, a release with an exposure still open
-  leads with `### Security` holding it. The fix itself is 3.0.0's; what 2.4.0 owes is the telling.
-
-### Everything else
-
 - [ ] **One file a reader can find their way around.** Nine independent readers — juniors to
   architects — scored comprehension 5.9/10, and every one of them was capped by how much unnamed
   state and how many homeless rules they had to hold, never by navigation or by the problem's own
@@ -350,9 +336,8 @@ Each one is a weigh against README → Goals first: ship it, or delete the item 
   Today `log.conf.otlpHttpBaseURI` stays readable, which is why this waits for a major. It lands on
   the constructor 2.5.0 already split.
 - [ ] Keep credentials off `log.conf` and `queue.conf`. `otlpHttpBaseURI`'s `user:pass@` and an
-  `otlpAdditionalHeaders` bearer token sit there verbatim, so a consumer who logs their own conf, as
-  the README's library example does with `JSON.stringify(options.settings)`, puts them in their log
-  store. Goals #3 stops at what this library emits, so this is a Goals #4 break. The `otlpQueue`
+  `otlpAdditionalHeaders` bearer token sit there verbatim, so a consumer who logs their own conf puts
+  them in their log store. Goals #3 stops at what this library emits, so this is a Goals #4 break. The `otlpQueue`
   item above clears `log.conf`; `queue.conf` still needs redacting, or its credentials held off it.
 - [ ] Require `spanName` whenever `otlpQueue` is set or inherited: a child or clone of an
   OTLP-configured instance must name its span, and the constructor rejects one that does not, so
