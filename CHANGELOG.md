@@ -19,9 +19,13 @@
   tracing backend with no capture option involved, which means you cannot rule yourself out by
   reading your capture config. Percent-encoding it changes nothing. It is deferred rather than
   unfixable: a path is not a value, so neither redaction rule in the next bullet transfers cleanly.
-  **Rotate any credential you have passed inside a url nested in a path** — the `@`, `%40` and
-  `%2540` search in the next bullet finds these too. `log.fetch` first exported `url.full` in
-  v2.3.0, so no older span carries it.
+  **Rotate any credential you have passed inside a url nested in a path.** The `@`, `%40` and
+  `%2540` search in the next bullet finds userinfo only, and a nested url is usually
+  percent-encoded and signed: its credential is its own query parameter — `X-Amz-Signature`,
+  `sig`, `access_token` — which stays in `url.full` as part of the path. Find every nested url with
+  the RE2 regex `(?i)https?://[^/]*/.*https?(:|%3A|%253A).*` on `url.full`, which matches one raw
+  or percent-encoded once or twice, and check each hit for userinfo and for a signature or token
+  parameter. `log.fetch` first exported `url.full` in v2.3.0, so no older span carries it.
 - A header you allow-list is no longer a way to export a credential: `authorization`,
   `proxy-authorization`, `cookie` and `set-cookie` named in `captureRequestHeaders` or
   `captureResponseHeaders` record `REDACTED`, so the span still shows the header was there. Any
