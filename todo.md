@@ -77,8 +77,9 @@ state. None of it is breaking.
   `url.full` starting with `null`, but the repo's own 2026-09-19 decision records a second broken
   spelling, `https://example.comhttps://example.com/uuid`, which that search never finds.
 - [ ] Export log records whatever the incoming `sampled` flag says, per AGENTS.md's 2026-09-25
-  entry; only the span obeys it. `log()` returns before the enqueue whenever `sampled` is false,
-  and the CHANGELOG bullet on the sampled flag says the records go too.
+  entry; only the span obeys it. `log()` returns before the enqueue whenever `sampled` is false.
+  Afterwards the CHANGELOG bullet on the sampled flag, README → Join an incoming trace, the
+  `traceparent` option row and the `sampled` field comment all say records still export.
 - [ ] Keep `JSON.stringify(log.conf)` from throwing. With OTLP configured `log.conf.otlpQueue` is
   the `Queue` itself, and once a batch timer is pending on Node its `Timeout` makes the structure
   circular, so a debug line that worked on v2.3.0 now crashes some calls and leaks credentials on
@@ -159,15 +160,12 @@ state. None of it is breaking.
   would least want to touch because it is the only one whose failure mode is silent. The split
   changes no contract, so it needs no major, and 2.5.0, 2.6.0 and 2.7.0 all edit those 90 lines
   otherwise: the `traceparent` skip-set fix and the `spanName` warning both land in them. Refactor first and 3.0.0's diff gets smaller.
-- [ ] Let a drained round clear the batch timer a record enqueued into it scheduled. `round()`
-  clears the timer once, at its start, so a record logged while an export is in flight installs a
-  batch timer that the same round's loop then drains — leaving a timer with nothing left to send.
-  Only the retry timer is unref'd (AGENTS.md, 2026-09-18), so this one holds a Node or Deno process:
-  measured on `node:22`, `await log.flush()` returned with both records delivered and the process
-  stayed alive a further 4.7 s of a 5 s `batchDelayMs`. Logging while an export is in flight is the
-  normal case on a busy service, not an edge. 2.4.0 closes the failed-round half.
-- [ ] Unref the batch timer, or record why it stays ref'd. README → Goals #7 says nothing this
-  library schedules holds the process open, and only the retry timer is unref'd today.
+- [ ] Unref the batch timer, so a pending batch never holds a Node or Deno process, per README →
+  Goals #7, and drop that goal's "until 2.5.0" clause. Today only the retry timer is unref'd, and
+  `round()` clears the batch timer once, at its start, so a record logged while an export is in
+  flight leaves one behind with nothing to send: measured on `node:22`, `await log.flush()`
+  returned with both records delivered and the process stayed alive a further 4.7 s of a 5 s
+  `batchDelayMs`. 2.4.0 closes the failed-round half.
 - [ ] Stop a restored batch being the first thing dropped. `add(batch, true)` unshifts a failed
   batch to the front, and the `maxItems` trim then splices the excess off that same front. An
   offline phone at `maxItems` reports "OTLP export failed, will retry" for items it has already
