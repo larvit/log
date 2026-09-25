@@ -1569,6 +1569,8 @@ test("traceparent adoption: incoming joins; malformed, parentLog and clone do no
 
 	// A clone is its own trace, never re-adopting the base's traceparent.
 	t.notStrictEqual(adopted.clone().span.traceId, adopted.span.traceId, "clone starts its own trace");
+	t.strictEqual(adopted.conf.traceparent, formatTraceparent(traceId, spanId), "the instance given it reads it back");
+	t.strictEqual(new Log({ parentLog: adopted }).conf.traceparent, undefined, "a child does not inherit it");
 	t.end();
 });
 

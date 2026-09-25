@@ -1262,6 +1262,9 @@ function spanFailure(error: unknown): { message: string, type: string } {
 
 const OTLP_TRANSPORT_KEYS = ["otlpAdditionalHeaders", "otlpHttpBaseURI", "otlpProtocol"] as const;
 
+// Where this instance sits in a trace: never inherited, by a child or a clone.
+const EDGE_KEYS = ["parentLog", "traceparent"] as const;
+
 // The keys of the OTLP spelling `conf` does not use, so inheriting never puts a queue beside an
 // endpoint it was not built from.
 function otlpKeysNotToInherit(conf: LogConf): (keyof LogConf)[] {
@@ -1385,7 +1388,7 @@ export class Log implements LogInt {
 
 		if (typeof conf.parentLog === "object") {
 			const parentConf = conf.parentLog.conf;
-			const skip = new Set<keyof LogConf>(otlpKeysNotToInherit(conf));
+			const skip = new Set<keyof LogConf>([...EDGE_KEYS, ...otlpKeysNotToInherit(conf)]);
 
 			for (const key of Object.keys(parentConf) as (keyof LogConf)[]) {
 				if (!skip.has(key) && conf[key] === undefined) {
@@ -1495,7 +1498,7 @@ export class Log implements LogInt {
 		// Inherit every other setting not overridden (log level, sinks, OTLP config, printTraceInfo…),
 		// like the constructor does from a parentLog. parentLog/spanName/traceparent are excluded: a
 		// clone is its own span, not a child. (A manual allow-list here once dropped newer OTLP options.)
-		const skip = new Set<keyof LogConf>(["parentLog", "spanName", "traceparent", ...otlpKeysNotToInherit(conf)]);
+		const skip = new Set<keyof LogConf>([...EDGE_KEYS, "spanName", ...otlpKeysNotToInherit(conf)]);
 
 		// The caller's entryFormatter is their format; leave the pair for the constructor to fold and warn about.
 		if (conf.entryFormatter !== undefined) {
