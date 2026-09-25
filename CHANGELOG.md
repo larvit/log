@@ -87,13 +87,12 @@
   **If you have ever set `user:pass@` in `otlpHttpBaseURI`, rotate those credentials**: they are in
   whatever collects your `stderr`, findable by searching it for your collector's hostname.
   Percent-encode any `/ ? #` in a password, and a literal `%` as `%25`.
-- Not fixed until 3.0.0: `log.conf` and the new `queue.conf` hold `otlpHttpBaseURI`, `user:pass@`
-  included, and `otlpAdditionalHeaders`, a bearer token included, exactly as you gave them. Logging,
-  serialising or sending either one — `JSON.stringify(log.conf)` in a debug line — puts the
-  credentials wherever it lands, and this release makes that likelier: `queue.conf` is a second
-  holder, and `user:pass@` now works, so more of you will set one. Don't log a `conf`.
-  **If you ever have, with either option set, rotate those credentials**: search where it landed
-  for your collector's hostname, which every serialised `conf` holding them carries.
+- Not fixed until 3.0.0: `queue.conf` holds `otlpHttpBaseURI`, `user:pass@` included, and
+  `otlpAdditionalHeaders`, a bearer token included, exactly as you gave them, and `log.conf` holds
+  them too, whether you set them on `Log` or on the `Queue` you passed as `otlpQueue`. Logging,
+  serialising or sending either `conf` puts the credentials wherever it lands. Don't log a `conf`.
+  **If you ever have, rotate those credentials**: search where it landed for `otlpHttpBaseURI` and
+  `otlpAdditionalHeaders`, which every serialised `conf` holding them carries.
 
 ### Everything else
 
