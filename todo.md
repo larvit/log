@@ -18,18 +18,6 @@ level-string deprecations.
 An architecture, product and comprehension review on 2026-09-20 found everything below in that
 state. None of it is breaking.
 
-- [ ] **One file a reader can find their way around.** Nine independent readers — juniors to
-  architects — scored comprehension 5.9/10, and every one of them was capped by how much unnamed
-  state and how many homeless rules they had to hold, never by navigation or by the problem's own
-  difficulty. The evidence that this is fixable rather than intrinsic: the hand-rolled protobuf
-  encoder, by far the most alien code here, was volunteered by six of the nine as *easier than
-  expected*, because every call site carries its field number and a pinned real Collector checks
-  the result. Comment volume is not the problem; rules with no home are. Each sub-item below is its
-  own chunk, ordered so the earlier ones make the later ones readable:
-  - [ ] What is *not* redacted said beside the code that does not redact it. `buildLogPayload`
-    (`index.ts:405`) and `buildSpanPayload` (`index.ts:438`) export the message and every
-    metadata and context key verbatim. That is correct and is now exactly what Goal 3 says, but it
-    is half the answer to "where did this password come from?" and it lives only in a 27 KB README.
 - [ ] Point a `todo.md` item at the symbol it means, keeping an `index.ts:NNN` only where
   nothing else identifies the spot — the bare comments and the flag block. Eleven of nineteen
   references were renumbered by one banner commit, and every one would have been silently
