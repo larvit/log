@@ -402,6 +402,7 @@ function buildResourceAttributes(context: DefinedMetadata): OtlpAttribute[] {
 	];
 }
 
+// Unredacted, per README → Goals #3: the message, metadata and context are the caller's own text.
 function buildLogPayload(opts: {
 	attributes: DefinedMetadata,
 	logLevel: LogLevel,
@@ -435,6 +436,7 @@ function buildLogPayload(opts: {
 }
 
 // Not pure: writes the resolved attributes onto `span` before returning its payload.
+// Unredacted, per README → Goals #3: context and the span name are the caller's own text.
 function buildSpanPayload(opts: {
 	context: DefinedMetadata,
 	span: OtlpSpan,
