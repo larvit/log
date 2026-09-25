@@ -76,61 +76,14 @@ state. None of it is breaking.
   advisory says so. The opaque-url advisory has a second gap: it sends the reader to search for a
   `url.full` starting with `null`, but the repo's own 2026-09-19 decision records a second broken
   spelling, `https://example.comhttps://example.com/uuid`, which that search never finds.
+- [ ] Export log records whatever the incoming `sampled` flag says, per AGENTS.md's 2026-09-25
+  entry; only the span obeys it. `log()` returns before the enqueue whenever `sampled` is false,
+  and the CHANGELOG bullet on the sampled flag says the records go too.
 - [ ] Keep `JSON.stringify(log.conf)` from throwing. With OTLP configured `log.conf.otlpQueue` is
   the `Queue` itself, and once a batch timer is pending on Node its `Timeout` makes the structure
   circular, so a debug line that worked on v2.3.0 now crashes some calls and leaks credentials on
   the rest. What a stringify carries is outside Goals #4, but a logging library crashing the app is
   not.
-
-### Ask before cutting
-
-- [ ] **Does Goal 3 promise what the code does?** It says a credential handed to this library
-  "never reaches a span", and names two carve-outs, neither of which covers a url nested in a
-  request path — which `buildUrlFull` exports verbatim, as this release's `### Security` section
-  says out loud. So the README contradicts itself, and a reader scoping the promise from Goals
-  alone gets it wrong. Either Goal 3 is a target that 2.5.0's path-redaction item closes, and says
-  so, or it needs a third carve-out — which would decide that item by declaration, so it is not a
-  wording fix. Found by the 2026-09-21 prose pass.
-- [ ] **Which goal is "a pending retry must not hold the process open"?** AGENTS.md's 2026-09-18
-  `Clock` entry rests on it, and 2.4.0's process-hold fix and 2.5.0's drained-round item both hang
-  off that entry rather than off a goal, which "every decision links to a goal" forbids. One
-  candidate is Goal 7, as "nothing this library schedules keeps a Node or Deno process alive past
-  the work the app asked for". Settling it also answers what the entry leaves open and what the
-  prose pass would not invent a reason for: why the batch timer is left ref'd when the retry timer
-  is not.
-- [ ] **Which goal is "a file a reader can find their way around"?** The comprehension item above
-  and each of its sub-items rest on a 5.9/10 panel score, and no goal speaks to how readable the
-  source is — Goals #5 is about the API a consumer calls, not the file a maintainer opens. So the
-  decision entries those chunks write cite #4 for the half that is API surface and nothing for the
-  rest, which "every decision links to a goal" forbids. Either the panel is measuring something
-  README → Goals should say out loud, or these items are worth doing for a reason the goals do not
-  hold. Found by the 2026-09-21 stability review.
-- [ ] **When a caller says "don't trace this request", should we throw the log lines away too?**
-
-  *What happens today.* A gateway decides a request is not worth tracing and sends
-  `traceparent: 00-<trace>-<span>-00`. That last `00` means "not sampled". The handler passes the
-  header on — `new Log({ traceparent: req.headers.traceparent })` — and from then on:
-  - the span is not exported. Everyone agrees that part is right;
-  - **every log record is also not exported**, `log.error("payment failed")` included;
-  - the console still prints all of it, so nothing looks broken;
-  - there is no way to turn it off.
-
-  *What that looks like.* Your gateway samples 1 request in 100. A customer reports a bug. You open
-  Loki to find their error and it is not there, and never was, because their request was one of the
-  99. Meanwhile a request nobody cares about, that happened to be sampled, has its logs in full.
-
-  *Why it is a question and not simply a bug.* OpenTelemetry has no such thing as a log sampler. A
-  record carries the trace's sampled flag as data, and the log pipeline exports it regardless — the
-  flag tells the backend how to link the record, not whether to keep it. So dropping the *span* on
-  that flag is plainly right, and dropping the *records* is a choice this library made on its own,
-  in `log()` (`index.ts:1635`), which returns before the enqueue whenever `sampled` is false.
-
-  *The two answers.* **Export records always, and let only spans obey the flag** — this is what
-  2.3.0 did, so it is additive and safe in a minor, and you keep your error logs for unsampled
-  requests; it costs volume from exactly the fleet that sampling was meant to quieten. Or **keep
-  today's behaviour**, in which case the CHANGELOG bullet has to open with the consequence in the
-  consumer's words, because it currently reads as a feature about spans and buries the effect on
-  their logs. Either answer wants a decision entry naming the goal it serves.
 
 ## 2.5.0 — close the credential story
 
@@ -213,6 +166,8 @@ state. None of it is breaking.
   measured on `node:22`, `await log.flush()` returned with both records delivered and the process
   stayed alive a further 4.7 s of a 5 s `batchDelayMs`. Logging while an export is in flight is the
   normal case on a busy service, not an edge. 2.4.0 closes the failed-round half.
+- [ ] Unref the batch timer, or record why it stays ref'd. README → Goals #7 says nothing this
+  library schedules holds the process open, and only the retry timer is unref'd today.
 - [ ] Stop a restored batch being the first thing dropped. `add(batch, true)` unshifts a failed
   batch to the front, and the `maxItems` trim then splices the excess off that same front. An
   offline phone at `maxItems` reports "OTLP export failed, will retry" for items it has already

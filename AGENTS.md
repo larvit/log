@@ -39,7 +39,7 @@ and who it is for, and a design decision that cannot be derived from them belong
   arm is what lets a browser, React Native or test clock type-check against types built with
   `"types": ["node"]`. A clock that delegates to platform timers is unref'd like the system one;
   only Deno's numeric `unrefTimer` is skipped for an injected clock, whose id may not be Deno's.
-  Valid while a pending retry must not hold the process open.
+  Serves README → Goals #7. Valid while a pending retry must not hold the process open.
 - 2026-09-18: `clock` is a supported option, not a test-only seam. Valid while a delegating clock
   leaves process-exit behaviour intact.
 - 2026-09-18: adding a key to `ResolvedLogConf`/`ResolvedQueueConf`'s required half ships in a
@@ -175,6 +175,11 @@ and who it is for, and a design decision that cannot be derived from them belong
   kept, because `X-Amz-Date` and `X-Amz-Expires` are what README → Audience #3 reads to explain a
   403. Serves README → Goals #3; over-redaction in a minor stands on the 2026-09-20 captured-value
   entry. Valid while the deny-list names query keys, not shapes.
+
+- 2026-09-25, the maintainer: an incoming `traceparent` with the sampled flag off drops the span,
+  never the log records. OTel has no log sampler; a record carries the flag as data for the backend
+  to link by, so an unsampled request's `log.error` still reaches the log store. Serves README →
+  Goals #2. Valid while OTel logs define no sampling.
 
 ## Working here
 
