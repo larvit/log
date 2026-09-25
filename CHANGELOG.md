@@ -23,8 +23,8 @@
   `%2540` search in the next bullet finds its userinfo. Its query — where a signed url keeps
   `X-Amz-Signature`, `sig` or `access_token` — reaches the path only percent-encoded, so also search
   `url.full` for `%3F` and `%253F`, upper or lower case, and for `aHR0c`, which begins a
-  base64-encoded url. Rotate any token a hit holds; a SigV4 one also holds `aws4_request` and
-  follows the presigned-url bullet below, `captureQuery` or not. `log.fetch` first exported
+  base64-encoded url. Rotate any token a hit holds; a SigV4 one not base64-encoded also holds
+  `aws4_request` and follows the presigned-url bullet below, `captureQuery` or not. `log.fetch` first exported
   `url.full` in v2.3.0, so no older span carries it.
 - A header you allow-list is no longer a way to export a credential: `authorization`,
   `proxy-authorization`, `cookie` and `set-cookie` named in `captureRequestHeaders` or
