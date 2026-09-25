@@ -182,6 +182,11 @@ and who it is for, and a design decision that cannot be derived from them belong
   data for the backend to link by, so an unsampled request's `log.error` still reaches the log
   store. Serves README → Goals #2. Valid until OTel's trace-based log filtering is stable and on by
   default.
+- 2026-09-25, the maintainer: an empty `logLevel` (`""`, as compose's `${LOG_LEVEL}` substitutes
+  for an unset variable) is a value the caller wrote: it logs at `"info"` and
+  warns once, like any other unknown level, so the operator sees the empty substitution. Only
+  `undefined` means unset. Serves README → Goals #5. Valid while an unknown `logLevel` logs at the
+  default and warns.
 
 ## Working here
 
