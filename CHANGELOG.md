@@ -96,6 +96,9 @@
 
 ### Everything else
 
+- A `logLevel` that is not a level — `LOG_LEVEL=trace` from pino, `http` from winston — no longer
+  throws from every level method. It logs at `"info"` and writes one `warn` line per `stderr` sink
+  naming the value.
 - A failed export no longer holds a Node or Deno process open. A record logged while the failing
   round was in flight scheduled a batch send of its own that the retry backoff did not take over,
   so the process stayed alive for up to `batchDelayMs` after `await log.flush()` or
@@ -170,7 +173,7 @@
   output, so `{ port: options.port }` with an optional field type-checks. Formatters and `log.context`
   are typed with the new `DefinedMetadata`, so existing narrowing on their values still compiles.
 - `log.enabled(level)`: `true` when a call at that level would output, so a caller can skip building
-  expensive metadata.
+  expensive metadata; `false` for a level it does not know.
 - Exported `Logger` type: the six level methods plus `enabled`. `LogInt` is `Logger` plus `conf`,
   `end`, `fetch`, `span` and `traceparent`. Libraries accept `Logger`; `parentLog` takes `LogInt`.
 
