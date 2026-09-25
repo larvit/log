@@ -1495,9 +1495,7 @@ export class Log implements LogInt {
 			...withoutUndefined(conf.context),
 		};
 
-		// Inherit every other setting not overridden (log level, sinks, OTLP config, printTraceInfo…),
-		// like the constructor does from a parentLog. parentLog/spanName/traceparent are excluded: a
-		// clone is its own span, not a child. (A manual allow-list here once dropped newer OTLP options.)
+		// A clone is its own span, so it takes no spanName either.
 		const skip = new Set<keyof LogConf>([...EDGE_KEYS, "spanName", ...otlpKeysNotToInherit(conf)]);
 
 		// The caller's entryFormatter is their format; leave the pair for the constructor to fold and warn about.
