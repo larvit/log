@@ -58,10 +58,10 @@ Priority order decides a tie.
 7. **Low footprint.** Measured on this repo's container image: ≤10 KB gzipped, ≤50 ns for a call
    below `logLevel`, ≤2 µs for a console call, ≤10 µs with OTLP configured, ≤1 KB per instance,
    ≤1.5 KB per queued record, ≤1.5 MiB for a full 1000-item queue. Nothing this library schedules
-   keeps a Node or Deno process alive past the work the app asked for; until 2.5.0 a batch timer can
-   hold it for up to `batchDelayMs` after the last record is delivered.
+   keeps a Node or Deno process alive past the work the app asked for; until 2.5.0 a pending batch
+   timer holds it for up to `batchDelayMs`.
 8. **A maintainer can hold it.** Simulated readers, junior to architect, rate how well they
-   understand the source; the target is 7.0/10 (5.9 today), and no change lowers the score.
+   understand the source; the target is 7.0/10, and no change lowers the score.
 
 **`log.fetch` mirrors the runtime's `fetch`.** It accepts what that `fetch` accepts, and the
 response, the rejection and the promise you see are exactly what it produced. What it adds is

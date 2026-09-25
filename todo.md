@@ -161,11 +161,14 @@ state. None of it is breaking.
   changes no contract, so it needs no major, and 2.5.0, 2.6.0 and 2.7.0 all edit those 90 lines
   otherwise: the `traceparent` skip-set fix and the `spanName` warning both land in them. Refactor first and 3.0.0's diff gets smaller.
 - [ ] Unref the batch timer, so a pending batch never holds a Node or Deno process, per README →
-  Goals #7, and drop that goal's "until 2.5.0" clause. Today only the retry timer is unref'd, and
-  `round()` clears the batch timer once, at its start, so a record logged while an export is in
-  flight leaves one behind with nothing to send: measured on `node:22`, `await log.flush()`
-  returned with both records delivered and the process stayed alive a further 4.7 s of a 5 s
-  `batchDelayMs`. 2.4.0 closes the failed-round half.
+  Goals #7, and drop that goal's "until 2.5.0" clause. Today only the retry timer is unref'd, so
+  any pending batch holds the process for up to `batchDelayMs`, and `round()` clears the batch
+  timer once, at its start, so a record logged while an export is in flight leaves one behind with
+  nothing to send: measured on `node:22`, `await log.flush()` returned with both records delivered
+  and the process stayed alive a further 4.7 s of a 5 s `batchDelayMs`. 2.4.0 closes the
+  failed-round half. A script that awaits neither `end()` nor `flush()` then exits without
+  exporting what it queued, so the CHANGELOG says so, and README → Queue exports' "A retry timer
+  never keeps…" covers every timer.
 - [ ] Stop a restored batch being the first thing dropped. `add(batch, true)` unshifts a failed
   batch to the front, and the `maxItems` trim then splices the excess off that same front. An
   offline phone at `maxItems` reports "OTLP export failed, will retry" for items it has already
