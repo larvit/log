@@ -26,16 +26,8 @@ state. None of it is breaking.
   expected*, because every call site carries its field number and a pinned real Collector checks
   the result. Comment volume is not the problem; rules with no home are. Each sub-item below is its
   own chunk, ordered so the earlier ones make the later ones readable:
-  - [ ] No comment that restates the code beneath it. Five or more readers each named
-    `index.ts:1444-1445` (whose second line is contradicted by the merge rules three lines below
-    it), `index.ts:1347`, `index.ts:1626`, and the "kept out of the class so it is trivially
-    testable" half of `index.ts:405` and `index.ts:439`. The `Not pure — it mutates span` half of
-    that last one earns its place and stays. Two more, from the 2026-09-21 prose pass: the
-    placement instruction under the `// --- Credentials on a span ---` banner, which AGENTS.md →
-    Working here already states for every banner, and the comment above `log.fetch`'s span
-    registration, a near-verbatim copy of README → `log.fetch` in depth.
   - [ ] What is *not* redacted said beside the code that does not redact it. `buildLogPayload`
-    (`index.ts:406`) and `buildSpanPayload` (`index.ts:440`) export the message and every
+    (`index.ts:405`) and `buildSpanPayload` (`index.ts:438`) export the message and every
     metadata and context key verbatim. That is correct and is now exactly what Goal 3 says, but it
     is half the answer to "where did this password come from?" and it lives only in a 27 KB README.
 - [ ] Point a `todo.md` item at the symbol it means, keeping an `index.ts:NNN` only where
@@ -44,7 +36,7 @@ state. None of it is breaking.
   false had it been missed; most sit beside the name they point at, which grep already finds.
 - [ ] Survive a `logLevel` the union does not contain. `new Log({ logLevel: "trace" })` throws
   `TypeError: Cannot read properties of undefined (reading 'severityNumber')` on `log.info()` and
-  on all five other level methods, because `enabled()` (`index.ts:1606`) indexes `LogLevels` with
+  on all five other level methods, because `enabled()` (`index.ts:1598`) indexes `LogLevels` with
   it and `log()` gates on `enabled()`. TypeScript rejects the literal; the README's own examples
   are JavaScript, where nothing does, and `LOG_LEVEL=trace` (pino) or `http` (winston) is the
   obvious input. 2.4.0 is also the release adding `enabled()` as the guard README → Accept a logger
@@ -52,7 +44,7 @@ state. None of it is breaking.
   logging dependency killing the process over a one-word config mistake is the thing to end;
   `msgTextFormatter` already treats the same class of input as reachable.
 - [ ] Make `traceparent` behave the way the option and the README both say it does — edge-only, not
-  inherited by clones or children. The constructor's inheritance loop (`index.ts:1352`) skips only
+  inherited by clones or children. The constructor's inheritance loop (`index.ts:1356`) skips only
   what `otlpKeysNotToInherit` returns, so it copies the parent's `traceparent` onto the child's
   conf, while `clone()`'s separate skip set excludes it correctly: the two loops disagree. So a
   child's `log.conf.traceparent` reads back the parent's header, which README → Join an incoming

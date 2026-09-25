@@ -402,7 +402,6 @@ function buildResourceAttributes(context: DefinedMetadata): OtlpAttribute[] {
 	];
 }
 
-// Pure builder: state in, OTLP log payload out. Kept out of the class so it is trivially testable.
 function buildLogPayload(opts: {
 	attributes: DefinedMetadata,
 	logLevel: LogLevel,
@@ -435,8 +434,7 @@ function buildLogPayload(opts: {
 	};
 }
 
-// Span finalizer: writes the resolved attributes onto the span, then returns the OTLP payload.
-// Not pure — it mutates `span` — but kept out of the class so it stays trivially testable.
+// Not pure: writes the resolved attributes onto `span` before returning its payload.
 function buildSpanPayload(opts: {
 	context: DefinedMetadata,
 	span: OtlpSpan,
@@ -1171,7 +1169,6 @@ export class Queue implements OtlpQueue {
 }
 
 // --- Credentials on a span -------------------------------------------------
-// A new rule keeping a credential off a span belongs here.
 
 // The `:` is optional and captured, so a scheme-relative `//user:pass@host` — what a runtime
 // hands back for a url it could not parse — matches too.
@@ -1352,7 +1349,6 @@ export class Log implements LogInt {
 
 		foldEntryFormatter(conf);
 
-		// Inherit conf from parent log if provided
 		if (typeof conf.parentLog === "object") {
 			const parentConf = conf.parentLog.conf;
 			const skip = new Set<keyof LogConf>(otlpKeysNotToInherit(conf));
@@ -1449,8 +1445,6 @@ export class Log implements LogInt {
 		};
 	}
 
-	// Create a new instance based on the current instance
-	// All options sent in will override the current instance settings
 	public clone(options?: LogConf | LogLevel | "none") {
 		if (typeof options === "string") {
 			warnDeprecated(this.conf, this.context, "@larvit/log: log.clone(\"level\") is deprecated and removed in 3.0.0, use log.clone({ logLevel })");
@@ -1515,10 +1509,6 @@ export class Log implements LogInt {
 		return formatTraceparent(this.span.traceId, this.span.spanId, this.sampled);
 	}
 
-	// Drop-in `fetch`: auto-creates a CLIENT span (nested under this log's span), injects a
-	// `traceparent`, records the OTel http.* attributes, and is the only output (no log line). The
-	// span is queued when the response arrives and is registered with flush() at call time, so
-	// `await log.end()` delivers it even when the fetch wasn't awaited.
 	public fetch(input: string | URL, init?: RequestInit): Promise<Response> {
 		if (this.ended) {
 			throw new Error("Logging instance is already ended");
@@ -1631,7 +1621,6 @@ export class Log implements LogInt {
 		const msTimestamp = this.conf.clock.now();
 		const attributes = Object.assign(withoutUndefined(metadata), this.context);
 
-		// Console output, optionally enriched with span/trace info.
 		const consoleMetadata: DefinedMetadata = { ...attributes };
 		if (this.conf.printTraceInfo) {
 			consoleMetadata.spanId = this.span.spanId;
