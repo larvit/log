@@ -20,12 +20,6 @@ state. None of it is breaking.
 
 ### Security
 
-- [ ] Let a consumer reading an advisory find out whether the path-nested-url leak reached them.
-  Today's advisory sends them to search `url.full` for `@`, `%40` and `%2540`. A nested url is
-  normally percent-encoded and normally signed, so its credential is a query parameter of the inner
-  url and **not one of those three appears anywhere in it** — the reader runs exactly the search
-  they were given, finds nothing, and concludes they are safe. The advisory has to match the shape
-  it warns about.
 - [ ] State the `conf` credential exposure where a consumer deciding whether to rotate will read
   it. `log.conf` and `queue.conf` hold `otlpHttpBaseURI`'s `user:pass@` verbatim and
   `otlpAdditionalHeaders`' bearer token verbatim, and the README documents both confs as public.
