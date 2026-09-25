@@ -76,7 +76,6 @@ state. None of it is breaking.
   advisory says so. The opaque-url advisory has a second gap: it sends the reader to search for a
   `url.full` starting with `null`, but the repo's own 2026-09-19 decision records a second broken
   spelling, `https://example.comhttps://example.com/uuid`, which that search never finds.
-
 - [ ] Keep `JSON.stringify(log.conf)` from throwing. With OTLP configured `log.conf.otlpQueue` is
   the `Queue` itself, and once a batch timer is pending on Node its `Timeout` makes the structure
   circular, so a debug line that worked on v2.3.0 now crashes some calls and leaks credentials on
