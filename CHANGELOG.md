@@ -96,6 +96,8 @@
 
 ### Everything else
 
+- A child no longer inherits its parent's `traceparent`: `child.conf.traceparent` is `undefined`
+  unless you pass one, as a clone's already was. The child's span was never affected.
 - A `logLevel` that is not a level — `LOG_LEVEL=trace` from pino, `http` from winston — no longer
   throws from every level method. It logs at `"info"` and writes one `warn` line per `stderr` sink
   naming the value.

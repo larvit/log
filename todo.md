@@ -18,13 +18,6 @@ level-string deprecations.
 An architecture, product and comprehension review on 2026-09-20 found everything below in that
 state. None of it is breaking.
 
-- [ ] Make `traceparent` behave the way the option and the README both say it does — edge-only, not
-  inherited by clones or children. The constructor's inheritance loop skips only
-  what `otlpKeysNotToInherit` returns, so it copies the parent's `traceparent` onto the child's
-  conf, while `clone()`'s separate skip set excludes it correctly: the two loops disagree. So a
-  child's `log.conf.traceparent` reads back the parent's header, which README → Join an incoming
-  trace says it never inherits. Whether the instance it was given should keep it on `conf` is part
-  of the question.
 - [ ] Make `generateTraceId` produce what three places say it produces: sixteen random bytes.
   It fixes the first one to `0x01` under the comment `// version 1 trace id`, but W3C
   Trace Context has no version field inside a trace id — the version is the header's own first
