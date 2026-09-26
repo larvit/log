@@ -48,13 +48,13 @@ Priority order decides a tie.
    before. A major is the only release that changes what exists: widening what a key of a type you
    read can hold (`log.conf`, `queue.conf`, `LogInt.conf`, anything handed back), even where the
    option behind it accepts more; narrowing what a type you pass accepts; removing or widening what
-   a type you implement is handed, or adding to what it must provide; the `format: "json"` output; each documented option, read back under its
-   own name; each documented instance field; each span attribute and value
-   this README documents, on `log.span` and on the wire; a default; a supported runtime. What the
-   README does not document — an undocumented key of a `conf`, enumerability, what a spread or
-   `JSON.stringify` of one carries — may change in a minor. Every break
-   is deprecated in a minor first and lands in the next major with a `MIGRATION.md` entry. A
-   feature whose right shape breaks waits for that major; it never ships early in a worse one.
+   a type you implement is handed, or adding to what it must provide; the `format: "json"` output;
+   each documented option, read back under its own name; each documented instance field; each span
+   attribute and value this README documents, on `log.span` and on the wire; a default; a supported
+   runtime. What the README does not document — an undocumented key of a `conf`, enumerability, what
+   a spread or `JSON.stringify` of one carries — may change in a minor. Every break is deprecated in
+   a minor first and lands in the next major with a `MIGRATION.md` entry. A feature whose right
+   shape breaks waits for that major; it never ships early in a worse one.
 5. **A very easy API.** `log.info("msg", { key })` is the whole one-line path. Nobody learns OTLP
    to log.
 6. **Composable.** Instances nest, inherit, and attach to an upstream trace.
