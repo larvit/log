@@ -311,7 +311,8 @@ A consumer passes `new Log({ logLevel: "debug" })`, or a child of their request 
 library's entries land in their trace.
 
 For a span per operation, take a `LogInt` instead, make a child,
-`new Log({ parentLog: log, spanName: "submit_sm" })`, and `end()` that child. It inherits the
+`new Log({ parentLog: log, spanName: "submit_sm" })`, log on it and `end()` it: the child is a
+`Logger`, where the `LogInt` you were handed is not until 3.0.0. It inherits the
 consumer's level, sinks and OTLP settings, so a `"none"` consumer stays silent. Never `end()` the
 instance you were handed; it is single-use and the consumer owns it.
 
@@ -437,7 +438,7 @@ Spans are queued when the response arrives and are registered with `flush()` at 
 | `LogConf`, `ResolvedLogConf` | The options object; `ResolvedLogConf` is `log.conf` with defaults applied. |
 | `LogLevel`, `LogShorthand` | Level name union; the signature of one `LogInt` level method. |
 | `Metadata`, `MetadataValue` | `Record<string, string \| number \| boolean>` and its value type: what a formatter and `log.context` see. |
-| `MetadataInput` | `Metadata` whose values may be `undefined`: what a level method and `context` accept. |
+| `MetadataInput` | `Metadata` whose values may be `undefined`: what `Logger`'s level methods and `context` accept. |
 | `EntryFormatter`, `EntryFormatterConf` | A formatter, `(entry) => string`, and the entry it takes: `{ colors? (unset = on), logLevel, metadata?, msg, msTimestamp? }`. |
 | `OtlpSpan`, `OtlpAttribute`, `OtlpLogPayload`, `OtlpSpanPayload` | The OTLP wire shapes; `log.span` is an `OtlpSpan`. |
 | `OtlpQueue`, `OtlpPayload` | What `otlpQueue` takes, `{ enqueue, flush }`, and what `enqueue` receives, a log or span payload. |
