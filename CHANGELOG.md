@@ -178,8 +178,9 @@
   are typed with the new `DefinedMetadata`, so existing narrowing on their values still compiles.
 - `log.enabled(level)`: `true` when a call at that level would output, so a caller can skip building
   expensive metadata; `false` for a level it does not know.
-- Exported `Logger` type: the six level methods plus `enabled`. `LogInt` is `Logger` plus `conf`,
-  `end`, `fetch`, `span` and `traceparent`. Libraries accept `Logger`; `parentLog` takes `LogInt`.
+- Exported `Logger` type: the six level methods plus `enabled`. Libraries accept `Logger`;
+  `parentLog` takes `LogInt`, which gains `enabled`, `flush` and `sampled` as optional members, so
+  a `LogInt` you wrote against v2.3.0 still compiles. 3.0.0 makes them required.
 - A trace id `generateTraceId` or a new span mints is sixteen random bytes; every one used to
   begin `01`. Match this library's spans on the `telemetry.sdk.name` resource attribute,
   `@larvit/log`.

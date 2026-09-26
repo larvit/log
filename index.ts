@@ -72,12 +72,14 @@ export type Logger = {
 	/* eslint-enable perfectionist/sort-object-types */
 };
 
-export type LogInt = Logger & {
+// Members added after v2.3.0 stay optional until 3.0.0, so a LogInt written against it still compiles.
+export type LogInt = Omit<Logger, "enabled"> & {
 	conf: LogConf;
+	enabled?: Logger["enabled"];
 	end: (options?: { error?: unknown }) => Promise<void>;
 	fetch: (input: string | URL, init?: RequestInit) => Promise<Response>;
-	flush: () => Promise<void>;
-	sampled: boolean;
+	flush?: () => Promise<void>;
+	sampled?: boolean;
 	span: OtlpSpan;
 	traceparent: () => string;
 };

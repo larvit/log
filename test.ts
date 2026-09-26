@@ -1,4 +1,4 @@
-import { type DefinedMetadata, type EntryFormatter, type EntryFormatterConf, formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, type Logger, type LogLevel, LogLevels, msgJsonFormatter, msgTextFormatter, type OtlpPayload, type OtlpQueue, parseTraceparent, Queue, type QueueStorage, type ResolvedLogConf, type TimerHandle } from "./index.js";
+import { type DefinedMetadata, type EntryFormatter, type EntryFormatterConf, formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, type Logger, type LogInt, type LogLevel, LogLevels, msgJsonFormatter, msgTextFormatter, type OtlpPayload, type OtlpQueue, parseTraceparent, Queue, type QueueStorage, type ResolvedLogConf, type TimerHandle } from "./index.js";
 import test from "./tap.js";
 
 // --- helpers ---------------------------------------------------------------
@@ -1567,6 +1567,13 @@ test("traceparent adoption: incoming joins; malformed, parentLog and clone do no
 
 	t.strictEqual(child.span.traceId, parent.span.traceId, "parentLog trace wins over the header");
 	t.strictEqual(child.span.parentSpanId, parent.span.spanId, "parentLog span is the parent");
+
+	const noop = () => {};
+	const v230Parent: LogInt = { conf: {}, debug: noop, end: async () => {}, error: noop, fetch: async () => new Response(), info: noop, silly: noop, span: parent.span, traceparent: () => "", verbose: noop, warn: noop };
+	const v230Child = new Log({ parentLog: v230Parent });
+
+	t.strictEqual(v230Child.span.parentSpanId, parent.span.spanId, "a LogInt written against v2.3.0 still type-checks as a parentLog");
+	t.strictEqual(v230Child.sampled, true, "and its missing sampled reads as sampled");
 
 	// A clone is its own trace, never re-adopting the base's traceparent.
 	t.notStrictEqual(adopted.clone().span.traceId, adopted.span.traceId, "clone starts its own trace");
