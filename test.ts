@@ -486,7 +486,7 @@ test("json format emits context, metadata, logLevel and msg", t => {
 });
 
 test("msgJsonFormatter keeps native types, does not mutate input, is undefined-safe", t => {
-	const meta = { count: 5, user: "abc" };
+	const meta: Metadata = { count: 5, user: "abc" };
 	const parsed = JSON.parse(msgJsonFormatter({ logLevel: "info", metadata: meta, msg: "hi" }));
 
 	t.strictEqual(parsed.count, 5, "number metadata stays a number in JSON output");
@@ -1577,7 +1577,6 @@ test("traceparent adoption: incoming joins; malformed, parentLog and clone do no
 	t.strictEqual(v230Child.span.parentSpanId, parent.span.spanId, "a parentLog written against v2.3.0 is nested under");
 	t.strictEqual(v230Child.sampled, true, "and its missing sampled reads as sampled");
 	v230Parent.info("forwarded", forwarded);
-	t.strictEqual(JSON.parse(msgJsonFormatter({ logLevel: "info", metadata: forwarded, msg: "forwarded" })).key, "value", "and Metadata still forwards to a LogInt and a built-in formatter");
 
 	// A clone is its own trace, never re-adopting the base's traceparent.
 	t.notStrictEqual(adopted.clone().span.traceId, adopted.span.traceId, "clone starts its own trace");
