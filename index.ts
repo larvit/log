@@ -64,7 +64,7 @@ export type Logger = { [level in LogLevel]: (msg: string, metadata?: MetadataInp
 	enabled: (logLevel: LogLevel) => boolean;
 };
 
-// Keeps its v2.3.0 shape until 3.0.0, so a LogInt written against it still compiles.
+// Stays assignable from a v2.3.0 LogInt until 3.0.0.
 export type LogInt = { [level in LogLevel]: LogShorthand } & {
 	conf: LogConf;
 	enabled?: Logger["enabled"];
