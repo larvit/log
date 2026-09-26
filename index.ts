@@ -299,11 +299,7 @@ export function generateSpanId(): string {
 
 // Random 16-byte trace id as 32 hex chars.
 export function generateTraceId(): string {
-	const bytes = getRandomBytes(16);
-
-	bytes[0] = 0x01; // version 1 trace id
-
-	return bytesToHex(bytes);
+	return bytesToHex(getRandomBytes(16));
 }
 
 // W3C `traceparent` header value (`version-traceId-spanId-flags`); sampled by default.
