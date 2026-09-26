@@ -1339,7 +1339,7 @@ function warnOnce(conf: ResolvedLogConf, metadata: MetadataInput | undefined, ms
 
 const CONF_FORMATTER_DEPRECATED = "@larvit/log: conf.entryFormatter is deprecated and removed in 3.0.0, use conf.format";
 
-// One descriptor for every instance: a closure pair per `Log` breaks Goals #6's 1 KB budget.
+// One descriptor for every instance: Goals #7's 1 KB budget.
 const ENTRY_FORMATTER_ALIAS: PropertyDescriptor = {
 	configurable: true,
 	// So a child or a spread carries `format` alone, and never folds the alias a second time.

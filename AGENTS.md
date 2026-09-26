@@ -13,8 +13,6 @@ and who it is for, and a design decision that cannot be derived from them belong
 
 ## Decisions
 
-- 2026-09-16: `format` is the one formatting option; it takes `"text"`, `"json"` or a function.
-  `entryFormatter` is removed in 3.0.0. Valid while there is one formatter per instance.
 - 2026-09-16: the OTLP types (`OtlpSpan`, `OtlpAttribute`, `OtlpLogPayload`, `OtlpSpanPayload`)
   and `ResolvedLogConf` stay exported. `log.span` and `log.conf` are public, so declaration emit
   requires the first two and the last; queue implementers need the payloads.
@@ -152,14 +150,12 @@ and who it is for, and a design decision that cannot be derived from them belong
 - 2026-09-21: `format` is the formatter's one name, and `conf.entryFormatter` a deprecated alias of
   it, read and write, until 3.0.0 drops both. `entryFormatter` folds into `format`, winning over a
   `"text"`/`"json"` one as 2.x documented, and two *different* formatters throw: nothing can hold
-  that combination yet, while rejecting the documented one would break a minor. An `entryFormatter`
-  reaching an instance through inheritance is never folded, which only a hand-built parent conf can
-  do. The alias stays because v2.3.0 filled `conf.entryFormatter` on every instance, whichever
-  spelling set the formatter; it is one module-level descriptor, because a closure pair per `Log`
-  measured 1347 bytes against Goals #7's 1 KB, on `node:22-bookworm-slim` over 50 000 retained
-  instances. The formatter is resolved from `conf.format` where a line is written, so writing it
-  takes effect on a live instance, like `logLevel` and the sinks. Serves README → Goals #5 for the
-  one name, README → Goals #4 for the alias. Valid until 3.0.0 removes `entryFormatter`.
+  that combination yet, while rejecting the documented one would break a minor. The alias stays
+  because v2.3.0 filled `conf.entryFormatter` on every instance, whichever spelling set the
+  formatter; it is one module-level descriptor, because a closure pair per `Log` measured 1347
+  bytes against Goals #7's 1 KB, on `node:22-bookworm-slim` over 50 000 retained instances. Serves
+  README → Goals #5 for the one name, README → Goals #4 for the alias. Valid until 3.0.0 removes
+  `entryFormatter`.
 - 2026-09-21: `ResolvedLogConf` keeps `entryFormatter` in its required half while the property is
   non-enumerable, so a spread's type promises a formatter the spread does not carry. Accepted
   rather than fixed: v2.3.0 shipped the member required and a minor may not narrow it, per the
