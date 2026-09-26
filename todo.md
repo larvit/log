@@ -118,8 +118,8 @@ state. None of it is breaking.
   them. It is ~90 lines doing five jobs with three ordering constraints held nowhere but the line
   sequence, every one of nine comprehension-panel readers named it, and four named it the unit they
   would least want to touch because it is the only one whose failure mode is silent. The split
-  changes no contract, so it needs no major, and 2.5.0, 2.6.0 and 2.7.0 all edit those 90 lines
-  otherwise: the `traceparent` skip-set fix and the `spanName` warning both land in them. Refactor first and 3.0.0's diff gets smaller.
+  changes no contract, so it needs no major, and 2.6.0's `spanName` warning edits those 90
+  lines otherwise. Refactor first and 3.0.0's diff gets smaller.
 - [ ] Unref the batch timer, so a pending batch never holds a Node or Deno process, per README →
   Goals #7, and drop that goal's "until 2.5.0" clause. Today only the retry timer is unref'd, so
   any pending batch holds the process for up to `batchDelayMs`, and `round()` clears the batch
