@@ -18,6 +18,15 @@ level-string deprecations.
 An architecture, product and comprehension review on 2026-09-20 found everything below in that
 state. None of it is breaking.
 
+- [ ] Settle, in Goals #4, whether an option's read-back type may widen in a minor by exactly what
+  the option newly accepts. `format` reads `"text" | "json" | EntryFormatter` from 2.4.0, so
+  `const f: "text" | "json" | undefined = log.conf.format` stops compiling, while the goal says an
+  exported type changes only in a major; the same goal requires `entryFormatter`'s deprecation in
+  a minor, which needs `format` to take the function in that minor, and one conf under one type
+  carries the read side with it. Either add that clause to the goal, or move `format`-takes-a-
+  function to 3.0.0 and keep `entryFormatter` undeprecated until then. The maintainer's call;
+  `context` is already settled, since `LogOptions` takes the wider input and `LogConf` reads back
+  v2.3.0's `Metadata`.
 - [ ] Let a consumer upgrading from 2.2.0 close the allow-listed-header and opaque-url searches in
   one sentence, the way the path-leak advisory already lets them. `log.fetch`, both allow-lists and
   `captureQuery` all shipped in v2.3.0, so those two exposures have the same floor and neither
