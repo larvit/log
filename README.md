@@ -44,11 +44,11 @@ Priority order decides a tie.
    tells it from any other string. Until 2.5.0 a url nested in a request path still reaches
    `url.full` as written; the [changelog](CHANGELOG.md) says what to rotate.
 4. **Semver, read strictly, over what this README documents.** A minor only adds — an export, an
-   option, a value an option accepts, a field — where code not using it behaves as before. A major
-   is the only release that changes what exists: widening what a type you read can hold
-   (`log.conf`, `queue.conf`, `LogInt.conf`, anything handed back), even where the option behind
-   it accepts more; narrowing what a type you pass accepts; changing what a type you implement is
-   handed or must provide; the `format: "json"` output; each documented option, read back under its
+   option, a value an option accepts, a field, a span attribute — where code not using it behaves as
+   before. A major is the only release that changes what exists: widening what a key of a type you
+   read can hold (`log.conf`, `queue.conf`, `LogInt.conf`, anything handed back), even where the
+   option behind it accepts more; narrowing what a type you pass accepts; removing or widening what
+   a type you implement is handed, or adding to what it must provide; the `format: "json"` output; each documented option, read back under its
    own name; each documented instance field; each span attribute and value
    this README documents, on `log.span` and on the wire; a default; a supported runtime. What the
    README does not document — an undocumented key of a `conf`, enumerability, what a spread or
