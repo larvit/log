@@ -176,6 +176,9 @@
 - `Log`'s and `Logger`'s level methods and `context` accept `undefined` values, typed by the new
   `MetadataInput`; `LogInt`'s keep `Metadata` until 3.0.0. Such keys are dropped from console,
   custom-formatter and OTLP output, so `{ port: options.port }` with an optional field type-checks.
+  New export: `LogOptions`, what `new Log()` and `clone()` take. `LogConf` keeps `context` as
+  `Metadata`, and `log.conf.context` reads back with those keys already dropped, so a `LogConf`
+  you built for v2.3.0 still constructs and a read of `log.conf.context` still compiles.
   `Metadata` and `MetadataValue` are unchanged.
 - `log.enabled(level)`: `true` when a call at that level would output, so a caller can skip building
   expensive metadata; `false` for a level it does not know.
