@@ -182,6 +182,16 @@ and who it is for, and a design decision that cannot be derived from them belong
   data for the backend to link by, so an unsampled request's `log.error` still reaches the log
   store. Serves README → Goals #2. Valid until OTel's trace-based log filtering is stable and on by
   default.
+- 2026-09-26: a value an option gains in a minor is read back from `log.conf` under that option's
+  name, so `format` reads `"text" | "json" | EntryFormatter` from 2.4.0 and
+  `const f: "text" | "json" | undefined = log.conf.format` stops compiling. A conf is one object,
+  read and written under one type, so what an option accepts is what its key reads back; the read
+  side stays at v2.3.0 only by storing the function under another name, which the 2026-09-16
+  entry closes, or by a type that says string while holding a function. `context` widens on the
+  input alone, because an `undefined` key is dropped before the conf is built: `LogOptions` takes
+  `MetadataInput`, and `LogConf.context` stays `Metadata`, the split `MetadataInput` and
+  `Metadata` already make. Serves README → Goals #4. Valid while `log.conf` is one object read and
+  written under one type.
 - 2026-09-25, the maintainer: an empty `logLevel` (`""`, as compose's `${LOG_LEVEL}` substitutes
   for an unset variable) is a value the caller wrote: it logs at `"info"` and
   warns once, like any other unknown level, so the operator sees the empty substitution. Only

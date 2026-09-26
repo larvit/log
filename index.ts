@@ -36,7 +36,7 @@ export type LogConf = {
 	captureResponseHeaders?: string[];
 	clock?: Clock;
 	colors?: boolean;
-	context?: MetadataInput;
+	context?: Metadata;
 
 	/** @deprecated Removed in 3.0.0: use `format`. On `log.conf` this is an alias of `format`; reading or writing it warns. */
 	entryFormatter?: EntryFormatter;
@@ -59,6 +59,9 @@ export type LogConf = {
 
 // conf after the constructor fills its defaults: the always-set fields are no longer optional.
 export type ResolvedLogConf = LogConf & Required<Pick<LogConf, "clock" | "colors" | "entryFormatter" | "format" | "logLevel" | "stderr" | "stdout">>;
+
+// What the constructor and clone() take; `log.conf` reads back a LogConf, its undefined context keys dropped.
+export type LogOptions = Omit<LogConf, "context"> & { context?: MetadataInput };
 
 export type Logger = { [level in LogLevel]: (msg: string, metadata?: MetadataInput) => void } & {
 	enabled: (logLevel: LogLevel) => boolean;
@@ -1369,8 +1372,9 @@ export class Log implements LogInt {
 
 	span: OtlpSpan;
 
-	constructor(options?: LogConf | LogLevel | "none") {
-		const conf: LogConf = typeof options === "string" ? { logLevel: options } : { ...options };
+	constructor(options?: LogOptions | LogLevel | "none") {
+		const { context, ...rest }: LogOptions = typeof options === "string" ? { logLevel: options } : { ...options };
+		const conf: LogConf = context === undefined ? rest : { ...rest, context: withoutUndefined(context) };
 		const deprecatedFormatter = conf.entryFormatter !== undefined;
 		const overriddenFormat = deprecatedFormatter && typeof conf.format === "string";
 
@@ -1470,17 +1474,13 @@ export class Log implements LogInt {
 		};
 	}
 
-	public clone(options?: LogConf | LogLevel | "none") {
+	public clone(options?: LogOptions | LogLevel | "none") {
 		if (typeof options === "string") {
 			warnOnce(this.conf, this.context, "@larvit/log: log.clone(\"level\") is deprecated and removed in 3.0.0, use log.clone({ logLevel })");
 		}
 
-		const conf: LogConf = typeof options === "string" ? { logLevel: options } : { ...options };
-
-		conf.context = {
-			...this.context,
-			...withoutUndefined(conf.context),
-		};
+		const { context, ...rest }: LogOptions = typeof options === "string" ? { logLevel: options } : { ...options };
+		const conf: LogConf = { ...rest, context: { ...this.context, ...withoutUndefined(context) } };
 
 		// A clone is its own span, so it takes no spanName either.
 		const skip = new Set<keyof LogConf>([...EDGE_KEYS, "spanName", ...otlpKeysNotToInherit(conf)]);

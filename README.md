@@ -330,7 +330,7 @@ instead. `entryFormatter` is deprecated the same way: pass the function as `form
 | `captureResponseHeaders` | `string[]` | none | `log.fetch` only: response header names to record as `http.response.header.*`. Same redaction as `captureRequestHeaders`. |
 | `clock` | `Clock` | system clock | `{ now, setTimeout, clearTimeout }` behind every span and record timestamp. Passed on to the default `Queue`; a `Queue` you build takes its own. |
 | `colors` | `boolean` | `true` | ANSI colour codes in text output. Unset in code, the env decides: `NO_COLOR` (non-empty) turns it off; otherwise `FORCE_COLOR` turns it on, except `0` or `false` which turn it off. |
-| `context` | `Metadata` | `{}` | Added to every entry. Wins over a per-call key of the same name. |
+| `context` | `MetadataInput` | `{}` | Added to every entry. Wins over a per-call key of the same name. An `undefined` key is dropped, so `log.conf.context` reads back as `Metadata`. |
 | `entryFormatter` | `EntryFormatter` | none | Deprecated, removed in 3.0.0: pass the function as `format`. Wins over a `"text"`/`"json"` `format`; two different formatters, one per spelling, throw. On `log.conf` it is a deprecated alias of `format`: reading or writing it warns. |
 | `format` | `"text" \| "json" \| EntryFormatter` | `"text"` | Console output format, or a formatter of your own. Use the entry's `msTimestamp` rather than `new Date()` so console and OTLP timestamps of one entry match. Writing `log.conf.format` after construction takes effect from the next line. |
 | `logLevel` | `LogLevel \| "none"` | `"info"` | Minimum level to output. Any other value is kept as written, logs at `"info"` and warns once per `stderr` sink and value. |
@@ -435,10 +435,10 @@ Spans are queued when the response arrives and are registered with `flush()` at 
 | `generateTraceId()`, `generateSpanId()` | Random 32- and 16-hex-char ids. |
 | `Logger` | The six level methods, taking `MetadataInput`, and `enabled(level)`. Accept this in library code. |
 | `LogInt` | Six `LogShorthand` level methods plus `fetch`, `traceparent`, `end({ error }?)`, `conf`, `span`, and optional `enabled`, `flush`, `sampled`; 3.0.0 makes it `Logger` plus the rest, those three required. What `parentLog` takes. |
-| `LogConf`, `ResolvedLogConf` | The options object; `ResolvedLogConf` is `log.conf` with defaults applied. |
+| `LogOptions`, `LogConf`, `ResolvedLogConf` | What `new Log()` and `clone()` take; what `log.conf` reads back, with `context` a `Metadata`; `ResolvedLogConf` is `log.conf` with defaults applied. |
 | `LogLevel`, `LogShorthand` | Level name union; the signature of one `LogInt` level method. |
 | `Metadata`, `MetadataValue` | `Record<string, string \| number \| boolean>` and its value type: what a formatter and `log.context` see. |
-| `MetadataInput` | `Metadata` whose values may be `undefined`: what `Logger`'s level methods and `context` accept. |
+| `MetadataInput` | `Metadata` whose values may be `undefined`: what `Logger`'s level methods and `LogOptions.context` accept. |
 | `EntryFormatter`, `EntryFormatterConf` | A formatter, `(entry) => string`, and the entry it takes: `{ colors? (unset = on), logLevel, metadata?, msg, msTimestamp? }`. |
 | `OtlpSpan`, `OtlpAttribute`, `OtlpLogPayload`, `OtlpSpanPayload` | The OTLP wire shapes; `log.span` is an `OtlpSpan`. |
 | `OtlpQueue`, `OtlpPayload` | What `otlpQueue` takes, `{ enqueue, flush }`, and what `enqueue` receives, a log or span payload. |

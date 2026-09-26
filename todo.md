@@ -18,9 +18,6 @@ level-string deprecations.
 An architecture, product and comprehension review on 2026-09-20 found everything below in that
 state. None of it is breaking.
 
-- [ ] Keep `log.conf` readable at its v2.3.0 types, or record why a read-side widening in a minor
-  stands with Goals #4: `format` gained `EntryFormatter` and `context` values gained `undefined`, so
-  `const f: "text" | "json" | undefined = log.conf.format` stops compiling.
 - [ ] Let a consumer upgrading from 2.2.0 close the allow-listed-header and opaque-url searches in
   one sentence, the way the path-leak advisory already lets them. `log.fetch`, both allow-lists and
   `captureQuery` all shipped in v2.3.0, so those two exposures have the same floor and neither

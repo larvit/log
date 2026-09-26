@@ -1,4 +1,4 @@
-import { type EntryFormatter, type EntryFormatterConf, formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, type Logger, type LogInt, type LogLevel, LogLevels, type Metadata, msgJsonFormatter, msgTextFormatter, type OtlpPayload, type OtlpQueue, parseTraceparent, Queue, type QueueStorage, type ResolvedLogConf, type TimerHandle } from "./index.js";
+import { type EntryFormatter, type EntryFormatterConf, formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, type Logger, type LogInt, type LogLevel, LogLevels, type LogOptions, type Metadata, msgJsonFormatter, msgTextFormatter, type OtlpPayload, type OtlpQueue, parseTraceparent, Queue, type QueueStorage, type ResolvedLogConf, type TimerHandle } from "./index.js";
 import test from "./tap.js";
 
 // --- helpers ---------------------------------------------------------------
@@ -105,7 +105,7 @@ function fakeClock(startMs = 1758150000000) {
 function capture(conf?: ConstructorParameters<typeof Log>[0]) {
 	const stderr: string[] = [];
 	const stdout: string[] = [];
-	const opts: LogConf = typeof conf === "object" ? { ...conf } : { logLevel: conf };
+	const opts: LogOptions = typeof conf === "object" ? { ...conf } : { logLevel: conf };
 
 	opts.stderr = line => { stderr.push(line); };
 	opts.stdout = line => { stdout.push(line); };
@@ -618,6 +618,19 @@ test("the constructor and clone copy the caller's options object instead of fill
 	t.deepEqual(conf, { context: { service: "x" }, format: "json" }, "no default, inherited setting or formatter is written into it");
 	t.deepEqual(Object.keys(childConf), ["parentLog"], "nothing inherited from the parent is written into a child's");
 	t.strictEqual(parent.conf.logLevel, "info", "the instance still resolves its defaults");
+	t.end();
+});
+
+test("log.conf.context reads back at its v2.3.0 type, its undefined keys dropped before the conf is built", t => {
+	const options: LogOptions = { context: { port: undefined, service: "x" }, stderr: () => {} };
+	const log: LogInt = new Log(options);
+	// Typed, not inferred: widening LogConf["context"] to MetadataInput again fails the build here.
+	const read: Metadata | undefined = log.conf.context;
+
+	t.deepEqual(read, { service: "x" }, "the constructor drops the undefined key");
+	t.deepEqual(new Log(options).clone({ context: { region: undefined, zone: "y" } }).conf.context, { service: "x", zone: "y" }, "so does clone, after merging");
+	t.deepEqual(new Log({ parentLog: log }).conf.context, { service: "x" }, "a child inherits the dropped copy");
+	t.deepEqual(options.context, { port: undefined, service: "x" }, "the caller's context object is left as given");
 	t.end();
 });
 
