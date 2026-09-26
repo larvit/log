@@ -433,7 +433,7 @@ Spans are queued when the response arrives and are registered with `flush()` at 
 | `formatTraceparent(traceId, spanId, sampled?)` | Builds a W3C `traceparent` header value. |
 | `generateTraceId()`, `generateSpanId()` | Random 32- and 16-hex-char ids. |
 | `Logger` | The six level methods and `enabled(level)`. Accept this in library code. |
-| `LogInt` | `Logger` plus `fetch`, `traceparent`, `end({ error }?)`, `flush`, `conf`, `sampled`, `span`. What `parentLog` takes. |
+| `LogInt` | `Logger` plus `fetch`, `traceparent`, `end({ error }?)`, `flush`, `conf`, `sampled`, `span`; `enabled`, `flush` and `sampled` are optional until 3.0.0. What `parentLog` takes. |
 | `LogConf`, `ResolvedLogConf` | The options object; `ResolvedLogConf` is `log.conf` with defaults applied. |
 | `LogLevel`, `LogShorthand` | Level name union; the signature of one level method. |
 | `Metadata`, `MetadataValue` | `Record<string, string \| number \| boolean \| undefined>` and its value type. |

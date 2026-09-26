@@ -18,11 +18,6 @@ level-string deprecations.
 An architecture, product and comprehension review on 2026-09-20 found everything below in that
 state. None of it is breaking.
 
-- [ ] Tell a `LogInt` implementer what this release costs them. 2.4.0 adds `enabled`, `flush` and
-  `sampled` to the type, so a hand-written `LogInt` passed as `parentLog` stops compiling on
-  upgrade — and the CHANGELOG bullet that should warn them enumerates only "conf, end, fetch, span
-  and traceparent", omitting the two it added. README → Exports has it right, so the CHANGELOG is
-  the false one.
 - [ ] Let a consumer upgrading from 2.2.0 close the allow-listed-header and opaque-url searches in
   one sentence, the way the path-leak advisory already lets them. `log.fetch`, both allow-lists and
   `captureQuery` all shipped in v2.3.0, so those two exposures have the same floor and neither
@@ -216,6 +211,7 @@ Each one is a weigh against README → Goals first: ship it, or delete the item 
   a credential shape, and a value the consumer's own app had already redacted upstream. `REDACTED`
   shipped in 2.3.0 and Goals #4 promises each documented span value, so renaming it waits for the
   major.
+- [ ] Make `enabled`, `flush` and `sampled` required on `LogInt`.
 - [ ] Remove the level-string shorthand from `Log` and `clone`.
 - [ ] Remove `entryFormatter`, the option and the `conf` alias of `format` beside it; `format` is
   `"text" | "json" | ((entry) => string)`. This closes the one unsoundness 2.4.0 could not: the
