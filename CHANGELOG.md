@@ -180,6 +180,8 @@
   expensive metadata; `false` for a level it does not know.
 - Exported `Logger` type: the six level methods plus `enabled`. `LogInt` is `Logger` plus `conf`,
   `end`, `fetch`, `span` and `traceparent`. Libraries accept `Logger`; `parentLog` takes `LogInt`.
+- A trace id `generateTraceId` or a new span mints is sixteen random bytes. Its first byte was
+  fixed at `01`, so every such id began `01`.
 
 ## v2.3.0
 

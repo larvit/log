@@ -18,13 +18,6 @@ level-string deprecations.
 An architecture, product and comprehension review on 2026-09-20 found everything below in that
 state. None of it is breaking.
 
-- [ ] Make `generateTraceId` produce what three places say it produces: sixteen random bytes.
-  It fixes the first one to `0x01` under the comment `// version 1 trace id`, but W3C
-  Trace Context has no version field inside a trace id — the version is the header's own first
-  field, which `formatTraceparent` already writes as `00`. So the comment, `generateTraceId`'s own
-  "Random 16-byte trace id", and README → Exports' "Random 32- and 16-hex-char ids" are all false
-  together, entropy is 120 bits rather than 128, and every trace id this library mints begins `01`.
-  No test depends on it.
 - [ ] Tell a `LogInt` implementer what this release costs them. 2.4.0 adds `enabled`, `flush` and
   `sampled` to the type, so a hand-written `LogInt` passed as `parentLog` stops compiling on
   upgrade — and the CHANGELOG bullet that should warn them enumerates only "conf, end, fetch, span

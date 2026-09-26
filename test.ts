@@ -504,6 +504,7 @@ test("generateSpanId/generateTraceId produce valid, unique hex ids", t => {
 	t.ok(/^[0-9a-f]{16}$/.test(generateSpanId()), "spanId is 16 hex chars");
 	t.ok(/^[0-9a-f]{32}$/.test(generateTraceId()), "traceId is 32 hex chars");
 	t.notStrictEqual(generateSpanId(), generateSpanId(), "two span ids differ");
+	t.ok(Array.from({ length: 64 }, generateTraceId).some(id => !id.startsWith("01")), "no traceId byte is fixed");
 	t.end();
 });
 
