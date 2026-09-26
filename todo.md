@@ -24,7 +24,8 @@ state. None of it is breaking.
   exported type changes only in a major; the same goal requires `entryFormatter`'s deprecation in
   a minor, which needs `format` to take the function in that minor, and one conf under one type
   carries the read side with it. Either add that clause to the goal, or move `format`-takes-a-
-  function to 3.0.0 and keep `entryFormatter` undeprecated until then. The maintainer's call;
+  function to 3.0.0 and keep `entryFormatter` undeprecated until then, which reverts the Unreleased
+  deprecation and the 2026-09-16 entry and moves its removal to 4.0.0. The maintainer's call;
   `context` is already settled, since `LogOptions` takes the wider input and `LogConf` reads back
   v2.3.0's `Metadata`.
 - [ ] Let a consumer upgrading from 2.2.0 close the allow-listed-header and opaque-url searches in
