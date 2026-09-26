@@ -43,12 +43,13 @@ Priority order decides a tie.
    you allow-list that simply *is* a secret, because naming it is asking for it and no shape
    tells it from any other string. Until 2.5.0 a url nested in a request path still reaches
    `url.full` as written; the [changelog](CHANGELOG.md) says what to rotate.
-4. **Semver, read strictly, over what this README documents.** A minor only adds: a new option, or
-   a new value an option accepts, where code not using it behaves as before. A major is the only
-   release that changes what exists: an exported type in either direction, including one you
-   implement; the `format: "json"` output; each documented option and the type it reads back from
-   `log.conf` or `queue.conf` under its own name, which keeps that type until the major even where
-   the option accepts more; each documented instance field; each span attribute and value
+4. **Semver, read strictly, over what this README documents.** A minor only adds — an export, an
+   option, a value an option accepts, a field — where code not using it behaves as before. A major
+   is the only release that changes what exists: widening what a type you read can hold
+   (`log.conf`, `queue.conf`, `LogInt.conf`, anything handed back), even where the option behind
+   it accepts more; narrowing what a type you pass accepts; changing what a type you implement is
+   handed or must provide; the `format: "json"` output; each documented option, read back under its
+   own name; each documented instance field; each span attribute and value
    this README documents, on `log.span` and on the wire; a default; a supported runtime. What the
    README does not document — an undocumented key of a `conf`, enumerability, what a spread or
    `JSON.stringify` of one carries — may change in a minor. Every break
