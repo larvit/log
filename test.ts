@@ -1,4 +1,4 @@
-import { type DefinedMetadata, type EntryFormatter, type EntryFormatterConf, formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, type Logger, type LogInt, type LogLevel, LogLevels, msgJsonFormatter, msgTextFormatter, type OtlpPayload, type OtlpQueue, parseTraceparent, Queue, type QueueStorage, type ResolvedLogConf, type TimerHandle } from "./index.js";
+import { type EntryFormatter, type EntryFormatterConf, formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, type Logger, type LogInt, type LogLevel, LogLevels, type Metadata, msgJsonFormatter, msgTextFormatter, type OtlpPayload, type OtlpQueue, parseTraceparent, Queue, type QueueStorage, type ResolvedLogConf, type TimerHandle } from "./index.js";
 import test from "./tap.js";
 
 // --- helpers ---------------------------------------------------------------
@@ -31,9 +31,9 @@ function thrown(construct: () => void): string {
 
 // A queue's report sink, flattened to one object per line for deepEqual.
 function reportSink() {
-	const lines: DefinedMetadata[] = [];
+	const lines: Metadata[] = [];
 
-	return { lines, report: (msg: string, metadata: DefinedMetadata) => { lines.push({ msg, ...metadata }); } };
+	return { lines, report: (msg: string, metadata: Metadata) => { lines.push({ msg, ...metadata }); } };
 }
 
 // In-memory QueueStorage. `async` mimics AsyncStorage (promises); sync mimics localStorage.
@@ -994,7 +994,7 @@ test("Queue batches by time and by size, with keepalive under the browser cap", 
 test("Queue is bounded: drops the oldest when full and reports the count once", async t => {
 	const { calls } = stubFetch();
 	const reports = reportSink();
-	const throwingReport = (msg: string, metadata: DefinedMetadata) => {
+	const throwingReport = (msg: string, metadata: Metadata) => {
 		reports.report(msg, metadata);
 		throw new Error("sink broke");
 	};
@@ -1569,12 +1569,15 @@ test("traceparent adoption: incoming joins; malformed, parentLog and clone do no
 	t.strictEqual(child.span.parentSpanId, parent.span.spanId, "parentLog span is the parent");
 
 	const noop = () => {};
-	const v230Error = (msg: string, metadata?: { [key: string]: boolean | number | string }) => Object.values(metadata ?? {}).map(value => value.toString());
-	const v230Parent: LogInt = { conf: {}, debug: noop, end: async () => {}, error: v230Error, fetch: async () => new Response(), info: noop, silly: noop, span: parent.span, traceparent: () => "", verbose: noop, warn: noop };
+	const v230Level = (msg: string, metadata?: Metadata) => Object.values(metadata ?? {}).map(value => value.toString());
+	const v230Parent: LogInt = { conf: {}, debug: noop, end: async () => {}, error: v230Level, fetch: async () => new Response(), info: noop, silly: noop, span: parent.span, traceparent: () => "", verbose: noop, warn: v230Level };
+	const forwarded: Metadata = { key: "value" };
 	const v230Child = new Log({ parentLog: v230Parent });
 
 	t.strictEqual(v230Child.span.parentSpanId, parent.span.spanId, "a parentLog written against v2.3.0 is nested under");
 	t.strictEqual(v230Child.sampled, true, "and its missing sampled reads as sampled");
+	v230Parent.info("forwarded", forwarded);
+	t.strictEqual(JSON.parse(msgJsonFormatter({ logLevel: "info", metadata: forwarded, msg: "forwarded" })).key, "value", "and Metadata still forwards to a LogInt and a built-in formatter");
 
 	// A clone is its own trace, never re-adopting the base's traceparent.
 	t.notStrictEqual(adopted.clone().span.traceId, adopted.span.traceId, "clone starts its own trace");

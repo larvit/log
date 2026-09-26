@@ -22,7 +22,7 @@ export type EntryFormatterConf = {
 	// The instance's resolved `colors`. Unset means on.
 	colors?: boolean;
 	logLevel: LogLevel;
-	metadata?: DefinedMetadata;
+	metadata?: Metadata;
 	msg: string;
 	msTimestamp?: number;
 };
@@ -36,7 +36,7 @@ export type LogConf = {
 	captureResponseHeaders?: string[];
 	clock?: Clock;
 	colors?: boolean;
-	context?: Metadata;
+	context?: MetadataInput;
 
 	/** @deprecated Removed in 3.0.0: use `format`. On `log.conf` this is an alias of `format`; reading or writing it warns. */
 	entryFormatter?: EntryFormatter;
@@ -60,20 +60,12 @@ export type LogConf = {
 // conf after the constructor fills its defaults: the always-set fields are no longer optional.
 export type ResolvedLogConf = LogConf & Required<Pick<LogConf, "clock" | "colors" | "entryFormatter" | "format" | "logLevel" | "stderr" | "stdout">>;
 
-export type Logger = {
+export type Logger = { [level in LogLevel]: (msg: string, metadata?: MetadataInput) => void } & {
 	enabled: (logLevel: LogLevel) => boolean;
-	/* eslint-disable perfectionist/sort-object-types */
-	error: LogShorthand;
-	warn: LogShorthand;
-	info: LogShorthand;
-	verbose: LogShorthand;
-	debug: LogShorthand;
-	silly: LogShorthand;
-	/* eslint-enable perfectionist/sort-object-types */
 };
 
 // Keeps its v2.3.0 shape until 3.0.0, so a LogInt written against it still compiles.
-export type LogInt = { [level in LogLevel]: (msg: string, metadata?: DefinedMetadata) => void } & {
+export type LogInt = { [level in LogLevel]: LogShorthand } & {
 	conf: LogConf;
 	enabled?: Logger["enabled"];
 	end: (options?: { error?: unknown }) => Promise<void>;
@@ -94,11 +86,11 @@ export type Metadata = {
 
 // Primitive values only. String() coerces them for OTLP; the JSON formatter keeps them native.
 // bigint/objects are excluded: JSON.stringify throws on bigint and renders objects as "[object Object]".
-export type MetadataValue = boolean | number | string | undefined;
+export type MetadataValue = boolean | number | string;
 
-// What formatters, `log.context` and the OTLP builders receive: the input minus its undefined keys.
-export type DefinedMetadata = {
-	[key: string]: Exclude<MetadataValue, undefined>;
+// What a level method and `context` accept: an undefined key is dropped.
+export type MetadataInput = {
+	[key: string]: MetadataValue | undefined;
 };
 
 export type OtlpAttribute = {
@@ -195,8 +187,8 @@ export const LogLevels = {
 // A Map, so a JavaScript caller's `"constructor"` finds no level and `["debug"]` is never coerced into one.
 const SEVERITY_NUMBERS = new Map<unknown, number>(Object.entries(LogLevels).map(([logLevel, { severityNumber }]) => [logLevel, severityNumber]));
 
-function withoutUndefined(metadata: Metadata = {}): DefinedMetadata {
-	const defined: DefinedMetadata = {};
+function withoutUndefined(metadata: MetadataInput = {}): Metadata {
+	const defined: Metadata = {};
 
 	for (const key in metadata) {
 		const value = metadata[key];
@@ -394,7 +386,7 @@ function getNsTimestamp(msTimestamp: number): string {
 
 // Resource-level OTLP attributes (service.name + telemetry.sdk.*), shared by logs and spans.
 // Grafana/Loki reads service.name from here, not from the records.
-function buildResourceAttributes(context: DefinedMetadata): OtlpAttribute[] {
+function buildResourceAttributes(context: Metadata): OtlpAttribute[] {
 	return [
 		{ key: "service.name", value: { stringValue: String(context["service.name"] || "unnamed-service") } },
 		{ key: "telemetry.sdk.language", value: { stringValue: "ecmascript" } },
@@ -405,7 +397,7 @@ function buildResourceAttributes(context: DefinedMetadata): OtlpAttribute[] {
 
 // Unredacted, per README → Goals #3: the message, metadata and context are the caller's own text.
 function buildLogPayload(opts: {
-	attributes: DefinedMetadata,
+	attributes: Metadata,
 	logLevel: LogLevel,
 	msg: string,
 	msTimestamp: number,
@@ -439,7 +431,7 @@ function buildLogPayload(opts: {
 // Not pure: writes the resolved attributes onto `span` before returning its payload.
 // Unredacted, per README → Goals #3: context and the span name are the caller's own text.
 function buildSpanPayload(opts: {
-	context: DefinedMetadata,
+	context: Metadata,
 	span: OtlpSpan,
 }): OtlpSpanPayload {
 	const { context, span } = opts;
@@ -664,7 +656,7 @@ export type QueueConf = {
 	otlpAdditionalHeaders?: Record<string, string>;
 	otlpHttpBaseURI: string;
 	otlpProtocol?: "http/json" | "http/protobuf";
-	report?: (msg: string, metadata: DefinedMetadata) => void;
+	report?: (msg: string, metadata: Metadata) => void;
 	retryDelayMs?: number;
 	storage?: QueueStorage;
 };
@@ -1067,13 +1059,13 @@ export class Queue implements OtlpQueue {
 		}
 	}
 
-	private describe(batch: QueuedItem[], outcome: { message?: string, status?: number }): DefinedMetadata {
+	private describe(batch: QueuedItem[], outcome: { message?: string, status?: number }): Metadata {
 		const path = otlpPath(batch[0].payload);
 
 		return withoutUndefined({ error: outcome.message, items: batch.length, path, status: outcome.status, url: this.url + path });
 	}
 
-	private report(msg: string, metadata: DefinedMetadata): void {
+	private report(msg: string, metadata: Metadata): void {
 		try {
 			this.conf.report(msg, metadata);
 		} catch {
@@ -1333,11 +1325,11 @@ function describeLogLevel(value: unknown): string {
 	}
 }
 
-function writeWarning(conf: ResolvedLogConf, metadata: Metadata | undefined, msg: string): void {
+function writeWarning(conf: ResolvedLogConf, metadata: MetadataInput | undefined, msg: string): void {
 	conf.stderr(resolveFormatter(conf.format)({ colors: conf.colors, logLevel: "warn", metadata: withoutUndefined(metadata), msTimestamp: conf.clock.now(), msg }));
 }
 
-function warnOnce(conf: ResolvedLogConf, metadata: Metadata | undefined, msg: string): void {
+function warnOnce(conf: ResolvedLogConf, metadata: MetadataInput | undefined, msg: string): void {
 	if (firstWarning(conf, msg)) {
 		writeWarning(conf, metadata, msg);
 	}
@@ -1364,7 +1356,7 @@ const ENTRY_FORMATTER_ALIAS: PropertyDescriptor = {
 // --- Log -------------------------------------------------------------------
 
 export class Log implements LogInt {
-	context: DefinedMetadata;
+	context: Metadata;
 	ended: boolean = false;
 
 	readonly conf: ResolvedLogConf;
@@ -1515,7 +1507,7 @@ export class Log implements LogInt {
 		this.ended = true;
 		this.span.endTimeUnixNano = getNsTimestamp(this.conf.clock.now());
 
-		const context: DefinedMetadata = { ...this.context };
+		const context: Metadata = { ...this.context };
 
 		if (options?.error !== undefined && options.error !== null) {
 			const failure = spanFailure(options.error);
@@ -1563,7 +1555,7 @@ export class Log implements LogInt {
 		// childSpan can't throw; everything that can (e.g. `new Headers` on a bad name) is inside the
 		// try, so finally always settles the tracked promise and flush() can never hang on this fetch.
 		const span = this.childSpan(url.host, 3); // CLIENT; name refined below
-		const context: DefinedMetadata = { ...this.context };
+		const context: Metadata = { ...this.context };
 
 		try {
 			const method = (init?.method ?? "GET").toUpperCase();
@@ -1644,14 +1636,14 @@ export class Log implements LogInt {
 		return (SEVERITY_NUMBERS.get(logLevel) ?? -Infinity) >= threshold;
 	}
 
-	public error(msg: string, metadata?: Metadata) { this.log("error", msg, metadata); }
-	public warn(msg: string, metadata?: Metadata) { this.log("warn", msg, metadata); }
-	public info(msg: string, metadata?: Metadata) { this.log("info", msg, metadata); }
-	public verbose(msg: string, metadata?: Metadata) { this.log("verbose", msg, metadata); }
-	public debug(msg: string, metadata?: Metadata) { this.log("debug", msg, metadata); }
-	public silly(msg: string, metadata?: Metadata) { this.log("silly", msg, metadata); }
+	public error(msg: string, metadata?: MetadataInput) { this.log("error", msg, metadata); }
+	public warn(msg: string, metadata?: MetadataInput) { this.log("warn", msg, metadata); }
+	public info(msg: string, metadata?: MetadataInput) { this.log("info", msg, metadata); }
+	public verbose(msg: string, metadata?: MetadataInput) { this.log("verbose", msg, metadata); }
+	public debug(msg: string, metadata?: MetadataInput) { this.log("debug", msg, metadata); }
+	public silly(msg: string, metadata?: MetadataInput) { this.log("silly", msg, metadata); }
 
-	private log(logLevel: LogLevel, msg: string, metadata?: Metadata): void {
+	private log(logLevel: LogLevel, msg: string, metadata?: MetadataInput): void {
 		if (this.ended) {
 			throw new Error("Logging instance is already ended");
 		}
@@ -1661,7 +1653,7 @@ export class Log implements LogInt {
 		const msTimestamp = this.conf.clock.now();
 		const attributes = Object.assign(withoutUndefined(metadata), this.context);
 
-		const consoleMetadata: DefinedMetadata = { ...attributes };
+		const consoleMetadata: Metadata = { ...attributes };
 		if (this.conf.printTraceInfo) {
 			consoleMetadata.spanId = this.span.spanId;
 			consoleMetadata.traceId = this.span.traceId;
@@ -1685,7 +1677,7 @@ export class Log implements LogInt {
 		void promise.catch(() => {}).finally(() => this.inFlight.delete(promise));
 	}
 
-	private outputToConsole(logLevel: LogLevel, msg: string, metadata: DefinedMetadata, msTimestamp: number) {
+	private outputToConsole(logLevel: LogLevel, msg: string, metadata: Metadata, msTimestamp: number) {
 		const output = resolveFormatter(this.conf.format)({
 			colors: this.conf.colors,
 			logLevel,
@@ -1724,7 +1716,7 @@ export class Log implements LogInt {
 	}
 
 	// Queues an ended span, deriving its attributes/resource from `context`.
-	private exportSpan(span: OtlpSpan, context: DefinedMetadata): void {
+	private exportSpan(span: OtlpSpan, context: Metadata): void {
 		if (this.sampled) {
 			this.conf.otlpQueue?.enqueue(buildSpanPayload({ context, span }));
 		}

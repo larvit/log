@@ -18,13 +18,9 @@ level-string deprecations.
 An architecture, product and comprehension review on 2026-09-20 found everything below in that
 state. None of it is breaking.
 
-- [ ] Keep `msgJsonFormatter` and `msgTextFormatter` accepting `metadata` typed `Metadata`, as on
-  v2.3.0: `Metadata` now admits `undefined` values and `EntryFormatterConf.metadata` is
-  `DefinedMetadata`, so a wrapper forwarding its `Metadata` to them stops compiling, against
-  Goals #4.
-- [ ] Keep `log.conf.format` readable as the v2.3.0 `"text" | "json" | undefined`, or record why
-  widening it by `EntryFormatter` in a minor stands with Goals #4: `const f: "text" | "json" |
-  undefined = log.conf.format` stops compiling.
+- [ ] Keep `log.conf` readable at its v2.3.0 types, or record why a read-side widening in a minor
+  stands with Goals #4: `format` gained `EntryFormatter` and `context` values gained `undefined`, so
+  `const f: "text" | "json" | undefined = log.conf.format` stops compiling.
 - [ ] Let a consumer upgrading from 2.2.0 close the allow-listed-header and opaque-url searches in
   one sentence, the way the path-leak advisory already lets them. `log.fetch`, both allow-lists and
   `captureQuery` all shipped in v2.3.0, so those two exposures have the same floor and neither

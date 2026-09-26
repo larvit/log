@@ -432,12 +432,12 @@ Spans are queued when the response arrives and are registered with `flush()` at 
 | `parseTraceparent(header)` | `{ traceId, spanId, flags, sampled }` or `null` when malformed or version `ff`. |
 | `formatTraceparent(traceId, spanId, sampled?)` | Builds a W3C `traceparent` header value. |
 | `generateTraceId()`, `generateSpanId()` | Random 32- and 16-hex-char ids. |
-| `Logger` | The six level methods and `enabled(level)`. Accept this in library code. |
-| `LogInt` | `Logger` plus `fetch`, `traceparent`, `end({ error }?)`, `flush`, `conf`, `sampled`, `span`; until 3.0.0 `enabled`, `flush` and `sampled` are optional and level methods take `DefinedMetadata`. What `parentLog` takes. |
+| `Logger` | The six level methods, taking `MetadataInput`, and `enabled(level)`. Accept this in library code. |
+| `LogInt` | Six `LogShorthand` level methods plus `fetch`, `traceparent`, `end({ error }?)`, `conf`, `span`, and optional `enabled`, `flush`, `sampled`; 3.0.0 makes it `Logger` plus the rest, those three required. What `parentLog` takes. |
 | `LogConf`, `ResolvedLogConf` | The options object; `ResolvedLogConf` is `log.conf` with defaults applied. |
-| `LogLevel`, `LogShorthand` | Level name union; the signature of one level method. |
-| `Metadata`, `MetadataValue` | `Record<string, string \| number \| boolean \| undefined>` and its value type. |
-| `DefinedMetadata` | `Metadata` without `undefined` values: what a formatter and `log.context` see. |
+| `LogLevel`, `LogShorthand` | Level name union; the signature of one `LogInt` level method. |
+| `Metadata`, `MetadataValue` | `Record<string, string \| number \| boolean>` and its value type: what a formatter and `log.context` see. |
+| `MetadataInput` | `Metadata` whose values may be `undefined`: what a level method and `context` accept. |
 | `EntryFormatter`, `EntryFormatterConf` | A formatter, `(entry) => string`, and the entry it takes: `{ colors? (unset = on), logLevel, metadata?, msg, msTimestamp? }`. |
 | `OtlpSpan`, `OtlpAttribute`, `OtlpLogPayload`, `OtlpSpanPayload` | The OTLP wire shapes; `log.span` is an `OtlpSpan`. |
 | `OtlpQueue`, `OtlpPayload` | What `otlpQueue` takes, `{ enqueue, flush }`, and what `enqueue` receives, a log or span payload. |
