@@ -1569,10 +1569,11 @@ test("traceparent adoption: incoming joins; malformed, parentLog and clone do no
 	t.strictEqual(child.span.parentSpanId, parent.span.spanId, "parentLog span is the parent");
 
 	const noop = () => {};
-	const v230Parent: LogInt = { conf: {}, debug: noop, end: async () => {}, error: noop, fetch: async () => new Response(), info: noop, silly: noop, span: parent.span, traceparent: () => "", verbose: noop, warn: noop };
+	const v230Error = (msg: string, metadata?: { [key: string]: boolean | number | string }) => Object.values(metadata ?? {}).map(value => value.toString());
+	const v230Parent: LogInt = { conf: {}, debug: noop, end: async () => {}, error: v230Error, fetch: async () => new Response(), info: noop, silly: noop, span: parent.span, traceparent: () => "", verbose: noop, warn: noop };
 	const v230Child = new Log({ parentLog: v230Parent });
 
-	t.strictEqual(v230Child.span.parentSpanId, parent.span.spanId, "a LogInt written against v2.3.0 still type-checks as a parentLog");
+	t.strictEqual(v230Child.span.parentSpanId, parent.span.spanId, "a parentLog written against v2.3.0 is nested under");
 	t.strictEqual(v230Child.sampled, true, "and its missing sampled reads as sampled");
 
 	// A clone is its own trace, never re-adopting the base's traceparent.
