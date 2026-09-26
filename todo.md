@@ -18,17 +18,11 @@ level-string deprecations.
 An architecture, product and comprehension review on 2026-09-20 found everything below in that
 state. None of it is breaking.
 
-- [ ] Settle, in Goals #4, whether an option's read-back type may widen in a minor by exactly what
-  the option newly accepts; "an exported type in either direction, including one you implement" is
-  read both as widen/narrow and as consume/implement today. `format` reads
-  `"text" | "json" | EntryFormatter` from 2.4.0, so `const f: "text" | "json" | undefined =
-  log.conf.format` stops compiling, while the goal requires `entryFormatter`'s deprecation in a
-  minor, which needs `format` to take the function then, and `LogInt.conf: LogConf` carries the
-  read side with it. Either add the clause, or move `format`-takes-a-function to 3.0.0 and keep
-  `entryFormatter` undeprecated until then, reverting the Unreleased deprecation and the
-  2026-09-21 entry and moving its removal to 4.0.0. The `LogOptions`/`LogConf` split that settled
-  `context` is no answer here: a function `format` is stored and read back as given, where an
-  `undefined` context key is dropped before storage.
+- [ ] Keep `log.conf.format` reading `"text" | "json"` through 2.x, per Goals #4: `format` accepting a
+  function is an addition, but `ResolvedLogConf["format"]` widening with it stops
+  `const f: "text" | "json" | undefined = log.conf.format` compiling. A function formatter stays
+  readable from `log.conf` without a warning that names nowhere to move to, and the Unreleased
+  CHANGELOG and the 2026-09-21 decisions say what holds afterwards.
 - [ ] Let a consumer upgrading from 2.2.0 close the allow-listed-header and opaque-url searches in
   one sentence, the way the path-leak advisory already lets them. `log.fetch`, both allow-lists and
   `captureQuery` all shipped in v2.3.0, so those two exposures have the same floor and neither
