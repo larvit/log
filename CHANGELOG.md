@@ -173,15 +173,15 @@
   span. `OtlpSpan.status` gains an optional `message`. A `log.fetch` span that failed with a thrown
   error now carries the same status message, and its `error.type` fallback is the OpenTelemetry
   `_OTHER` instead of `fetch_error`.
-- `MetadataValue` accepts `undefined`; such keys are dropped from console, custom-formatter and OTLP
-  output, so `{ port: options.port }` with an optional field type-checks. Formatters and `log.context`
-  are typed with the new `DefinedMetadata`, so existing narrowing on their values still compiles.
+- Level methods and `context` accept `undefined` values, typed by the new `MetadataInput`; such keys
+  are dropped from console, custom-formatter and OTLP output, so `{ port: options.port }` with an
+  optional field type-checks. `Metadata` and `MetadataValue` are unchanged.
 - `log.enabled(level)`: `true` when a call at that level would output, so a caller can skip building
   expensive metadata; `false` for a level it does not know.
 - Exported `Logger` type: the six level methods plus `enabled`. Libraries accept `Logger`;
-  `parentLog` takes `LogInt`, which gains `enabled`, `flush` and `sampled` as optional members and
-  keeps its level methods' v2.3.0 metadata type, so a `LogInt` you wrote against v2.3.0 still
-  compiles. 3.0.0 makes it `Logger` plus the rest, those three required.
+  `parentLog` takes `LogInt`, which gains `enabled`, `flush` and `sampled` as optional members, so a
+  `LogInt` you wrote against v2.3.0 still compiles. 3.0.0 makes it `Logger` plus the rest, those
+  three required.
 - A trace id `generateTraceId` or a new span mints is sixteen random bytes; every one used to
   begin `01`. Match this library's spans on the `telemetry.sdk.name` resource attribute,
   `@larvit/log`.
