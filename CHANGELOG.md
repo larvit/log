@@ -181,7 +181,8 @@
 - Exported `Logger` type: the six level methods plus `enabled`. `LogInt` is `Logger` plus `conf`,
   `end`, `fetch`, `span` and `traceparent`. Libraries accept `Logger`; `parentLog` takes `LogInt`.
 - A trace id `generateTraceId` or a new span mints is sixteen random bytes; every one used to
-  begin `01`.
+  begin `01`. Match this library's spans on the `telemetry.sdk.name` resource attribute,
+  `@larvit/log`.
 
 ## v2.3.0
 
