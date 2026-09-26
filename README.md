@@ -192,7 +192,7 @@ rejects. `log.flush()` delivers what is queued without ending.
 
 `log.clone(options?)` makes an independent instance with the same settings. `context` merges per
 key; `parentLog`, `spanName` and `traceparent` are not copied, so a clone starts a new trace unless
-you pass one of them; any other option you pass wins. Copy settings with `clone()`, never a spread
+you pass `parentLog` or `traceparent`; any other option you pass wins. Copy settings with `clone()`, never a spread
 of `log.conf`, which carries `parentLog` and `traceparent` and whose shape a minor may change
 ([Goals #4](#goals)).
 
@@ -225,9 +225,8 @@ myClient.send({ headers: { traceparent: reqLog.traceparent() } });
 ```
 
 `clone()` rather than `parentLog`: when `parentLog` is set, `traceparent` is ignored and the
-instance nests under the parent instead. A malformed or version `ff` header is ignored and a fresh
-trace starts, so an untrusted header is safe to pass. `traceparent` applies only to the instance it
-is given to; children and clones do not inherit it.
+instance nests under the parent instead. A malformed header is ignored and a fresh trace starts, so
+an untrusted header is safe to pass.
 
 An unsampled header (flags `00`) is honoured: the instance and its children export no records or
 spans, `log.traceparent()` and `log.fetch` pass `00` on, and console output is unchanged.
@@ -338,7 +337,7 @@ instead. `entryFormatter` is deprecated the same way: pass the function as `form
 | `otlpHttpBaseURI` | `string` | none | Shorthand for `otlpQueue: new Queue({ otlpHttpBaseURI, otlpProtocol, otlpAdditionalHeaders })`. `user:pass@` in it authenticates, see [Queue exports](#queue-exports). |
 | `otlpProtocol` | `"http/json" \| "http/protobuf"` | `"http/json"` | Shorthand: the same option on the default `Queue`. |
 | `otlpQueue` | `OtlpQueue` | none | The [export queue](#queue-exports). Cannot be combined with the three shorthands above. Inherited by children and clones; one that sets a shorthand instead gets a queue of its own. |
-| `parentLog` | `LogInt` | none | Nest under this instance's span and inherit its options. Log entries attach to the parent's span. |
+| `parentLog` | `LogInt` | none | Nest under this instance's span and inherit its options except `traceparent`. Log entries attach to the parent's span. |
 | `printTraceInfo` | `boolean` | `false` | Append `spanId`, `traceId` and `spanName` to console output. |
 | `spanName` | `string` | `"unnamed-span"` | The instance's span name. Inherited from `parentLog` when set there. |
 | `stderr` | `(msg: string) => void` | `console.error` | Sink for `error` and `warn`. |

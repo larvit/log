@@ -1262,7 +1262,7 @@ function spanFailure(error: unknown): { message: string, type: string } {
 
 const OTLP_TRANSPORT_KEYS = ["otlpAdditionalHeaders", "otlpHttpBaseURI", "otlpProtocol"] as const;
 
-// Where this instance sits in a trace: never inherited, by a child or a clone.
+// Where this instance sits in a trace: never inherited by a child or a clone.
 const EDGE_KEYS = ["parentLog", "traceparent"] as const;
 
 // The keys of the OTLP spelling `conf` does not use, so inheriting never puts a queue beside an
@@ -1453,8 +1453,6 @@ export class Log implements LogInt {
 			});
 		}
 
-		// An in-process parentLog wins; otherwise adopt an incoming traceparent (cross-process parent);
-		// otherwise start a fresh trace.
 		let incoming: ReturnType<typeof parseTraceparent> = null;
 
 		if (!this.conf.parentLog && this.conf.traceparent) {
@@ -1489,7 +1487,6 @@ export class Log implements LogInt {
 
 		const conf: LogConf = typeof options === "string" ? { logLevel: options } : { ...options };
 
-		// Merge context per-key (overrides win) instead of replacing it wholesale.
 		conf.context = {
 			...this.context,
 			...withoutUndefined(conf.context),
