@@ -60,7 +60,6 @@ export type LogConf = {
 // conf after the constructor fills its defaults: the always-set fields are no longer optional.
 export type ResolvedLogConf = LogConf & Required<Pick<LogConf, "clock" | "colors" | "entryFormatter" | "format" | "logLevel" | "stderr" | "stdout">>;
 
-// What the constructor and clone() take; `log.conf` reads back a LogConf, its undefined context keys dropped.
 export type LogOptions = Omit<LogConf, "context"> & { context?: MetadataInput };
 
 export type Logger = { [level in LogLevel]: (msg: string, metadata?: MetadataInput) => void } & {
