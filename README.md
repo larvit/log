@@ -435,7 +435,7 @@ Spans are queued when the response arrives and are registered with `flush()` at 
 | `generateTraceId()`, `generateSpanId()` | Random 32- and 16-hex-char ids. |
 | `Logger` | The six level methods, taking `MetadataInput`, and `enabled(level)`. Accept this in library code. |
 | `LogInt` | Six `LogShorthand` level methods plus `fetch`, `traceparent`, `end({ error }?)`, `conf`, `span`, and optional `enabled`, `flush`, `sampled`; 3.0.0 makes it `Logger` plus the rest, those three required. What `parentLog` takes. |
-| `LogOptions`, `LogConf`, `ResolvedLogConf` | What `new Log()` and `clone()` take; what `log.conf` reads back, with `context` a `Metadata`; `ResolvedLogConf` is `log.conf` with defaults applied. |
+| `LogOptions`, `LogConf`, `ResolvedLogConf` | What `new Log()` and `clone()` take; `LogInt.conf`; `log.conf`, defaults applied. |
 | `LogLevel`, `LogShorthand` | Level name union; the signature of one `LogInt` level method. |
 | `Metadata`, `MetadataValue` | `Record<string, string \| number \| boolean>` and its value type: what a formatter and `log.context` see. |
 | `MetadataInput` | `Metadata` whose values may be `undefined`: what `Logger`'s level methods and `LogOptions.context` accept. |
