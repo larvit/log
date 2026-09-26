@@ -19,16 +19,16 @@ An architecture, product and comprehension review on 2026-09-20 found everything
 state. None of it is breaking.
 
 - [ ] Settle, in Goals #4, whether an option's read-back type may widen in a minor by exactly what
-  the option newly accepts. `format` reads `"text" | "json" | EntryFormatter` from 2.4.0, so
-  `const f: "text" | "json" | undefined = log.conf.format` stops compiling, while the goal says an
-  exported type changes only in a major; the same goal requires `entryFormatter`'s deprecation in
-  a minor, which needs `format` to take the function in that minor, and one conf under one type
-  carries the read side with it. Either add that clause to the goal, or move `format`-takes-a-
-  function to 3.0.0 and keep `entryFormatter` undeprecated until then, which reverts the Unreleased
-  deprecation and the 2026-09-16 entry and moves its removal to 4.0.0. The maintainer's call;
-  `context` is already settled, since `LogOptions` takes the wider input and `LogConf` reads back
-  v2.3.0's `Metadata`; the same split is no answer for `format`, because a function `format` is
-  stored and read back as given where an `undefined` context key is dropped before storage.
+  the option newly accepts; "an exported type in either direction, including one you implement" is
+  read both as widen/narrow and as consume/implement today. `format` reads
+  `"text" | "json" | EntryFormatter` from 2.4.0, so `const f: "text" | "json" | undefined =
+  log.conf.format` stops compiling, while the goal requires `entryFormatter`'s deprecation in a
+  minor, which needs `format` to take the function then, and `LogInt.conf: LogConf` carries the
+  read side with it. Either add the clause, or move `format`-takes-a-function to 3.0.0 and keep
+  `entryFormatter` undeprecated until then, reverting the Unreleased deprecation and the
+  2026-09-21 entry and moving its removal to 4.0.0. The `LogOptions`/`LogConf` split that settled
+  `context` is no answer here: a function `format` is stored and read back as given, where an
+  `undefined` context key is dropped before storage.
 - [ ] Let a consumer upgrading from 2.2.0 close the allow-listed-header and opaque-url searches in
   one sentence, the way the path-leak advisory already lets them. `log.fetch`, both allow-lists and
   `captureQuery` all shipped in v2.3.0, so those two exposures have the same floor and neither
