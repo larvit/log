@@ -18,11 +18,11 @@ level-string deprecations.
 An architecture, product and comprehension review on 2026-09-20 found everything below in that
 state. None of it is breaking.
 
-- [ ] Keep `log.conf.format` reading `"text" | "json"` through 2.x, per Goals #4: `format` accepting a
-  function is an addition, but `ResolvedLogConf["format"]` widening with it stops
-  `const f: "text" | "json" | undefined = log.conf.format` compiling. A function formatter stays
-  readable from `log.conf` without a warning that names nowhere to move to, and the Unreleased
-  CHANGELOG and the 2026-09-21 decisions say what holds afterwards.
+- [ ] Restore `format`'s v2.3.0 read type, `"text" | "json" | undefined`, on `log.conf`,
+  `ResolvedLogConf` and `LogInt.conf`, per Goals #4: in the declared type and in what it holds after
+  `new Log({ format: fn })`. A function formatter stays readable from `log.conf` without a warning
+  that names nowhere to move to, and the README option rows, the Unreleased CHANGELOG and the
+  2026-09-21 decisions say what holds afterwards.
 - [ ] Let a consumer upgrading from 2.2.0 close the allow-listed-header and opaque-url searches in
   one sentence, the way the path-leak advisory already lets them. `log.fetch`, both allow-lists and
   `captureQuery` all shipped in v2.3.0, so those two exposures have the same floor and neither
