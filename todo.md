@@ -18,6 +18,13 @@ level-string deprecations.
 An architecture, product and comprehension review on 2026-09-20 found everything below in that
 state. None of it is breaking.
 
+- [ ] Keep `msgJsonFormatter` and `msgTextFormatter` accepting `metadata` typed `Metadata`, as on
+  v2.3.0: `Metadata` now admits `undefined` values and `EntryFormatterConf.metadata` is
+  `DefinedMetadata`, so a wrapper forwarding its `Metadata` to them stops compiling, against
+  Goals #4.
+- [ ] Keep `log.conf.format` readable as the v2.3.0 `"text" | "json" | undefined`, or record why
+  widening it by `EntryFormatter` in a minor stands with Goals #4: `const f: "text" | "json" |
+  undefined = log.conf.format` stops compiling.
 - [ ] Let a consumer upgrading from 2.2.0 close the allow-listed-header and opaque-url searches in
   one sentence, the way the path-leak advisory already lets them. `log.fetch`, both allow-lists and
   `captureQuery` all shipped in v2.3.0, so those two exposures have the same floor and neither
@@ -211,7 +218,7 @@ Each one is a weigh against README → Goals first: ship it, or delete the item 
   a credential shape, and a value the consumer's own app had already redacted upstream. `REDACTED`
   shipped in 2.3.0 and Goals #4 promises each documented span value, so renaming it waits for the
   major.
-- [ ] Make `enabled`, `flush` and `sampled` required on `LogInt`.
+- [ ] Make `LogInt` `Logger` plus its own members, `enabled`, `flush` and `sampled` required.
 - [ ] Remove the level-string shorthand from `Log` and `clone`.
 - [ ] Remove `entryFormatter`, the option and the `conf` alias of `format` beside it; `format` is
   `"text" | "json" | ((entry) => string)`. This closes the one unsoundness 2.4.0 could not: the
