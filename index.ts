@@ -1370,7 +1370,7 @@ const INHERITED_BY: { [K in keyof LogConf]-?: readonly Derivation[] } = {
 	colors: CHILD_AND_CLONE,
 	// A clone merges its source's live `context` per key instead.
 	context: ["child"],
-	// Inherited through format, from the source's formatter in use.
+	// Its function is inherited beside format, by inheritSettings.
 	entryFormatter: [],
 	format: CHILD_AND_CLONE,
 	logLevel: CHILD_AND_CLONE,
@@ -1429,13 +1429,45 @@ function rejectQueueBesideShorthand(conf: LogSettings): void {
 	}
 }
 
+// One descriptor for every instance: Goals #7's 1 KB budget.
+const ENTRY_FORMATTER_ALIAS: PropertyDescriptor = {
+	configurable: true,
+	// So a spread never hands the alias back as an option the caller wrote.
+	enumerable: false,
+	get(this: ResolvedLogConf): EntryFormatter {
+		return formatterOf(this);
+	},
+	set(this: ResolvedLogConf, formatter: EntryFormatter) {
+		formatFunctions.set(this, formatter);
+	},
+};
+
 // A conf while it is resolved: `format` may still be a function.
 type LogSettings = Omit<LogOptions, "context"> & { context?: Metadata };
 
 function confFromOptions(options: LogOptions | LogLevel | "none" | undefined): LogSettings {
 	const { context, ...rest }: LogOptions = typeof options === "string" ? { logLevel: options } : { ...options };
+	const settings: LogSettings = context === undefined ? rest : { ...rest, context: withoutUndefined(context) };
+	const formatFunction = typeof options === "object" ? formatFunctions.get(options) : undefined;
 
-	return context === undefined ? rest : { ...rest, context: withoutUndefined(context) };
+	// So a clone's settings, handed to the constructor, keep the function they inherited.
+	if (formatFunction) {
+		formatFunctions.set(settings, formatFunction);
+	}
+
+	return settings;
+}
+
+// The source's function formatter. One this module did not store — another copy of it, or a
+// v2.3.0 LogInt — shows only as entryFormatter, which wins over its format as in v2.3.0.
+function sourceFormatFunction(sourceConf: LogConf): EntryFormatter | undefined {
+	const stored = formatFunctions.get(sourceConf);
+
+	if (stored || Object.getOwnPropertyDescriptor(sourceConf, "entryFormatter")?.get === ENTRY_FORMATTER_ALIAS.get) {
+		return stored;
+	}
+
+	return sourceConf.entryFormatter;
 }
 
 function inheritSettings(conf: LogSettings, source: { conf: LogConf, context?: Metadata }, derivation: Derivation): void {
@@ -1445,18 +1477,20 @@ function inheritSettings(conf: LogSettings, source: { conf: LogConf, context?: M
 
 	const skip = new Set(otlpKeysNotToInherit(conf));
 
-	// The caller's entryFormatter is their format.
-	if (conf.entryFormatter !== undefined) {
+	if (conf.format === undefined && conf.entryFormatter === undefined) {
+		const formatFunction = sourceFormatFunction(source.conf);
+
+		if (formatFunction) {
+			formatFunctions.set(conf, formatFunction);
+		}
+	} else {
 		skip.add("format");
 	}
 
 	for (const key of Object.keys(INHERITED_BY) as (keyof LogConf)[]) {
-		// entryFormatter last, for a source this module did not build: another copy of it, or a v2.3.0 LogInt.
-		const value = key === "format" ? formatFunctions.get(source.conf) ?? source.conf.format ?? source.conf.entryFormatter : source.conf[key];
-
-		if (INHERITED_BY[key].includes(derivation) && !skip.has(key) && conf[key] === undefined && value !== undefined) {
+		if (INHERITED_BY[key].includes(derivation) && !skip.has(key) && conf[key] === undefined && source.conf[key] !== undefined) {
 			// Same key on both sides, so the value type matches; `as never` satisfies the writer.
-			conf[key] = value as never;
+			conf[key] = source.conf[key] as never;
 		}
 	}
 }
@@ -1477,19 +1511,6 @@ function entryFormatterDeprecation(conf: LogSettings): string | undefined {
 
 	return "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format";
 }
-
-// One descriptor for every instance: Goals #7's 1 KB budget.
-const ENTRY_FORMATTER_ALIAS: PropertyDescriptor = {
-	configurable: true,
-	// So a spread never hands the alias back as an option the caller wrote.
-	enumerable: false,
-	get(this: ResolvedLogConf): EntryFormatter {
-		return formatterOf(this);
-	},
-	set(this: ResolvedLogConf, formatter: EntryFormatter) {
-		formatFunctions.set(this, formatter);
-	},
-};
 
 function withDefaults(conf: LogSettings): ResolvedLogConf {
 	if (conf.logLevel === undefined) {
@@ -1512,7 +1533,7 @@ function withDefaults(conf: LogSettings): ResolvedLogConf {
 
 	if (formatFunction) {
 		formatFunctions.set(conf, formatFunction);
-	} else if (conf.format === undefined) {
+	} else if (conf.format === undefined && !formatFunctions.has(conf)) {
 		conf.format = "text";
 	}
 
