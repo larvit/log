@@ -907,7 +907,8 @@ export class Queue implements OtlpQueue {
 		return this.pending;
 	}
 
-	// The only place a timer is installed: whatever it replaces is cleared, so no stray callback fires.
+	// The only place the batch or retry timer is installed: whatever it replaces is cleared, so no stray
+	// callback fires.
 	private setTimer(retry: boolean, delayMs: number): TimerHandle {
 		this.conf.clock.clearTimeout(this.timer?.handle);
 		this.timer = undefined;
@@ -1344,8 +1345,9 @@ function otlpKeysNotToInherit(conf: LogConf): (keyof LogConf)[] {
 	return OTLP_TRANSPORT_KEYS.some(key => conf[key] !== undefined) ? ["otlpQueue"] : [];
 }
 
-// Queues a Log built from its otlp* shorthand. Only one built from exactly the shorthand beside it
-// may sit with it in a conf: a clone, a child, a spread conf.
+// Queues a Log built from its otlp* shorthand and wrote into conf beside it, so a child, a clone or a
+// spread of that conf carries the pair. Only such a queue passes the rejection below, and only beside
+// the exact shorthand it was built from: otlpAdditionalHeaders by reference, as inheritance copies it.
 const defaultQueues = new WeakSet<OtlpQueue>();
 
 function isDefaultQueueFor(queue: OtlpQueue, conf: LogConf): boolean {
@@ -1473,7 +1475,7 @@ function withDefaults(conf: LogConf): ResolvedLogConf {
 
 // Defaults come last, so none hides an inherited value; the fold precedes them, so a defaulted
 // format never reads as one the caller wrote beside entryFormatter.
-function resolveLogConf(options: LogOptions | LogLevel | "none" | undefined): { conf: ResolvedLogConf, deprecations: string[] } {
+function resolveLogConf(options: LogOptions | LogLevel | "none" | undefined, report: QueueConf["report"]): { conf: ResolvedLogConf, deprecations: string[] } {
 	const conf = confFromOptions(options);
 	const deprecations: string[] = [];
 
@@ -1493,7 +1495,11 @@ function resolveLogConf(options: LogOptions | LogLevel | "none" | undefined): { 
 		deprecations.push(formatterDeprecation);
 	}
 
-	return { conf: withDefaults(conf), deprecations };
+	const resolved = withDefaults(conf);
+
+	buildDefaultQueue(resolved, report);
+
+	return { conf: resolved, deprecations };
 }
 
 // --- Log -------------------------------------------------------------------
@@ -1538,7 +1544,7 @@ export class Log implements LogInt {
 	span: OtlpSpan;
 
 	constructor(options?: LogOptions | LogLevel | "none") {
-		const { conf, deprecations } = resolveLogConf(options);
+		const { conf, deprecations } = resolveLogConf(options, (msg, metadata) => this.outputToConsole("error", msg, metadata, this.conf.clock.now()));
 
 		this.conf = conf;
 		// Own copy, so a clone/child never mutates a context object shared with another instance.
@@ -1547,8 +1553,6 @@ export class Log implements LogInt {
 		for (const msg of deprecations) {
 			warnOnce(conf, this.context, msg);
 		}
-
-		buildDefaultQueue(conf, (msg, metadata) => this.outputToConsole("error", msg, metadata, conf.clock.now()));
 
 		const { sampled, span } = openSpan(conf);
 
