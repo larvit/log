@@ -173,10 +173,10 @@ holds. Scoped to spans because the remaining credential rules are
 the queue's, and the conf-redaction and Basic-over-`http:` items rewrite that code. Valid while
 the source is a single `index.ts`.
 
-## `format` is the formatter's one name, `entryFormatter` its alias until 3.0.0
+## `format` is the formatter's one name, `conf.entryFormatter` its read path until 3.0.0
 
-2026-09-21: `format` is the formatter's one name, and `conf.entryFormatter` a deprecated alias of
-it, read and write, until 3.0.0 drops both. `entryFormatter` folds into `format`, winning over a
+2026-09-21: `format` is the formatter's one name, and `conf.entryFormatter` an alias of it, read
+and write, until 3.0.0 drops both. `entryFormatter` folds into `format`, winning over a
 `"text"`/`"json"` one as 2.x documented, and two *different* formatters throw: nothing can hold
 that combination yet, while rejecting the documented one would break a minor. The alias stays
 because v2.3.0 filled `conf.entryFormatter` on every instance, whichever spelling set the
@@ -184,6 +184,11 @@ formatter; it is one module-level descriptor, because a closure pair per `Log` m
 bytes against Goals #7's 1 KB, on `node:22-bookworm-slim` over 50 000 retained instances. Serves
 README → Goals #5 for the one name, README → Goals #4 for the alias. Valid until 3.0.0 removes
 `entryFormatter`.
+
+2026-09-28: `conf.format` keeps v2.3.0's read type, `"text" | "json" | undefined`, per Goals #4,
+so a function formatter reads back from `conf.entryFormatter` alone and `conf.format` reads
+`undefined`. Neither the read nor a write warns: 2.x has no other spelling to move to. 3.0.0 puts
+the function in `conf.format`.
 
 ## `ResolvedLogConf` keeps `entryFormatter` required
 

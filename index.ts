@@ -35,9 +35,9 @@ export type LogConf = {
 	colors?: boolean;
 	context?: Metadata;
 
-	/** @deprecated Removed in 3.0.0: use `format`. On `log.conf` this is an alias of `format`; reading or writing it warns. */
+	/** @deprecated Removed in 3.0.0: pass `format`. On `log.conf` it reads the formatter in use, which 3.0.0's `conf.format` holds. */
 	entryFormatter?: EntryFormatter;
-	format?: "text" | "json" | EntryFormatter;
+	format?: "text" | "json";
 	logLevel?: LogLevel | "none";
 	otlpAdditionalHeaders?: Record<string, string>;
 	otlpHttpBaseURI?: string;
@@ -51,9 +51,9 @@ export type LogConf = {
 	traceparent?: string;
 };
 
-export type ResolvedLogConf = LogConf & Required<Pick<LogConf, "clock" | "colors" | "entryFormatter" | "format" | "logLevel" | "stderr" | "stdout">>;
+export type ResolvedLogConf = LogConf & Required<Pick<LogConf, "clock" | "colors" | "entryFormatter" | "logLevel" | "stderr" | "stdout">>;
 
-export type LogOptions = Omit<LogConf, "context"> & { context?: MetadataInput };
+export type LogOptions = Omit<LogConf, "context" | "format"> & { context?: MetadataInput, format?: LogConf["format"] | EntryFormatter };
 
 export type Logger = { [level in LogLevel]: (msg: string, metadata?: MetadataInput) => void } & {
 	enabled: (logLevel: LogLevel) => boolean;
@@ -191,12 +191,15 @@ export function msgTextFormatter(conf: EntryFormatterConf) {
 	return str;
 }
 
-function resolveFormatter(format: LogConf["format"]): EntryFormatter {
-	if (typeof format === "function") {
-		return format;
+// A resolved conf's function `format`, which `conf.format` cannot hold before 3.0.0.
+const formatFunctions = new WeakMap<object, EntryFormatter>();
+
+function formatterOf(conf: LogConf): EntryFormatter {
+	if (conf.format === undefined) {
+		return formatFunctions.get(conf) ?? msgTextFormatter;
 	}
 
-	return format === "json" ? msgJsonFormatter : msgTextFormatter;
+	return conf.format === "json" ? msgJsonFormatter : msgTextFormatter;
 }
 
 // --- Trace ids and traceparent ---------------------------------------------
@@ -1344,7 +1347,7 @@ function describeLogLevel(value: unknown): string {
 }
 
 function writeWarning(conf: ResolvedLogConf, metadata: MetadataInput | undefined, msg: string): void {
-	conf.stderr(resolveFormatter(conf.format)({ colors: conf.colors, logLevel: "warn", metadata: withoutUndefined(metadata), msTimestamp: conf.clock.now(), msg }));
+	conf.stderr(formatterOf(conf)({ colors: conf.colors, logLevel: "warn", metadata: withoutUndefined(metadata), msTimestamp: conf.clock.now(), msg }));
 }
 
 function warnOnce(conf: ResolvedLogConf, metadata: MetadataInput | undefined, msg: string): void {
@@ -1370,7 +1373,7 @@ const INHERITED_BY: { [K in keyof LogConf]-?: readonly Derivation[] } = {
 	colors: CHILD_AND_CLONE,
 	// A clone merges its source's live `context` per key instead.
 	context: ["child"],
-	// Folded into format. Empty, so a Log source's alias getter is never read and never warns.
+	// Inherited through format.
 	entryFormatter: [],
 	format: CHILD_AND_CLONE,
 	logLevel: CHILD_AND_CLONE,
@@ -1389,7 +1392,7 @@ const INHERITED_BY: { [K in keyof LogConf]-?: readonly Derivation[] } = {
 
 // The keys of the OTLP spelling `conf` does not use, so inheriting never puts a queue beside an
 // endpoint it was not built from.
-function otlpKeysNotToInherit(conf: LogConf): (keyof LogConf)[] {
+function otlpKeysNotToInherit(conf: LogSettings): (keyof LogConf)[] {
 	if (conf.otlpQueue) {
 		return [...OTLP_TRANSPORT_KEYS];
 	}
@@ -1402,7 +1405,7 @@ function otlpKeysNotToInherit(conf: LogConf): (keyof LogConf)[] {
 // the exact shorthand it was built from: otlpAdditionalHeaders by reference, as inheritance copies it.
 const defaultQueues = new WeakSet<OtlpQueue>();
 
-function isDefaultQueueFor(queue: OtlpQueue, conf: LogConf): boolean {
+function isDefaultQueueFor(queue: OtlpQueue, conf: LogSettings): boolean {
 	return defaultQueues.has(queue)
 		&& queue instanceof Queue
 		&& queue.conf.otlpHttpBaseURI === conf.otlpHttpBaseURI
@@ -1423,19 +1426,22 @@ function buildDefaultQueue(conf: ResolvedLogConf, report: QueueConf["report"]): 
 	}
 }
 
-function rejectQueueBesideShorthand(conf: LogConf): void {
+function rejectQueueBesideShorthand(conf: LogSettings): void {
 	if (conf.otlpQueue && OTLP_TRANSPORT_KEYS.some(key => conf[key] !== undefined) && !isDefaultQueueFor(conf.otlpQueue, conf)) {
 		throw new Error("otlpQueue carries the endpoint: set otlpHttpBaseURI, otlpProtocol and otlpAdditionalHeaders on the queue, not beside it");
 	}
 }
 
-function confFromOptions(options: LogOptions | LogLevel | "none" | undefined): LogConf {
+// A conf while it is resolved: `format` may still be a function.
+type LogSettings = Omit<LogOptions, "context"> & { context?: Metadata };
+
+function confFromOptions(options: LogOptions | LogLevel | "none" | undefined): LogSettings {
 	const { context, ...rest }: LogOptions = typeof options === "string" ? { logLevel: options } : { ...options };
 
 	return context === undefined ? rest : { ...rest, context: withoutUndefined(context) };
 }
 
-function inheritSettings(conf: LogConf, source: { conf: LogConf, context?: Metadata }, derivation: Derivation): void {
+function inheritSettings(conf: LogSettings, source: { conf: LogConf, context?: Metadata }, derivation: Derivation): void {
 	if (derivation === "clone") {
 		conf.context = { ...source.context, ...conf.context };
 	}
@@ -1448,15 +1454,17 @@ function inheritSettings(conf: LogConf, source: { conf: LogConf, context?: Metad
 	}
 
 	for (const key of Object.keys(INHERITED_BY) as (keyof LogConf)[]) {
-		if (INHERITED_BY[key].includes(derivation) && !skip.has(key) && conf[key] === undefined && source.conf[key] !== undefined) {
+		const value = key === "format" ? source.conf.format ?? formatFunctions.get(source.conf) : source.conf[key];
+
+		if (INHERITED_BY[key].includes(derivation) && !skip.has(key) && conf[key] === undefined && value !== undefined) {
 			// Same key on both sides, so the value type matches; `as never` satisfies the writer.
-			conf[key] = source.conf[key] as never;
+			conf[key] = value as never;
 		}
 	}
 }
 
 // Returns the deprecation warning the caller's entryFormatter owes.
-function foldEntryFormatter(conf: LogConf): string | undefined {
+function foldEntryFormatter(conf: LogSettings): string | undefined {
 	if (conf.entryFormatter === undefined) {
 		return undefined;
 	}
@@ -1476,25 +1484,21 @@ function foldEntryFormatter(conf: LogConf): string | undefined {
 	return "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format";
 }
 
-const CONF_FORMATTER_DEPRECATED = "@larvit/log: conf.entryFormatter is deprecated and removed in 3.0.0, use conf.format";
-
 // One descriptor for every instance: Goals #7's 1 KB budget.
 const ENTRY_FORMATTER_ALIAS: PropertyDescriptor = {
 	configurable: true,
-	// So a spread carries `format` alone, and never folds the alias a second time.
+	// So a spread never folds the alias a second time.
 	enumerable: false,
 	get(this: ResolvedLogConf): EntryFormatter {
-		warnOnce(this, this.context, CONF_FORMATTER_DEPRECATED);
-
-		return resolveFormatter(this.format);
+		return formatterOf(this);
 	},
 	set(this: ResolvedLogConf, formatter: EntryFormatter) {
-		this.format = formatter;
-		warnOnce(this, this.context, CONF_FORMATTER_DEPRECATED);
+		formatFunctions.set(this, formatter);
+		delete this.format;
 	},
 };
 
-function withDefaults(conf: LogConf): ResolvedLogConf {
+function withDefaults(conf: LogSettings): ResolvedLogConf {
 	if (conf.logLevel === undefined) {
 		conf.logLevel = "info";
 	}
@@ -1507,7 +1511,10 @@ function withDefaults(conf: LogConf): ResolvedLogConf {
 		conf.colors = colorsFromEnv() ?? true;
 	}
 
-	if (conf.format === undefined) {
+	if (typeof conf.format === "function") {
+		formatFunctions.set(conf, conf.format);
+		delete conf.format;
+	} else if (conf.format === undefined) {
 		conf.format = "text";
 	}
 
@@ -1829,7 +1836,7 @@ export class Log implements LogInt {
 	}
 
 	private outputToConsole(logLevel: LogLevel, msg: string, metadata: Metadata, msTimestamp: number) {
-		const output = resolveFormatter(this.conf.format)({
+		const output = formatterOf(this.conf)({
 			colors: this.conf.colors,
 			logLevel,
 			metadata,
