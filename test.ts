@@ -1189,6 +1189,30 @@ test("Queue with storage writes through one writer, so changes made during a wri
 	t.end();
 });
 
+test("Queue flushed while storage loads sends the leftovers and leaves no batch timer behind", async t => {
+	const clock = fakeClock();
+	const storage = fakeStorage(true);
+	const getItem = storage.getItem;
+	let released = false;
+
+	storage.data.set("@larvit/log:otlp-queue", JSON.stringify([{ resourceLogs: [{ resource: { attributes: [] }, scopeLogs: [{ logRecords: [{ body: { stringValue: "leftover" }, severityNumber: 9, severityText: "INFO", timeUnixNano: nanos(clock.now()) }] }] }] }]));
+	storage.getItem = async key => {
+		await waitFor(() => released);
+
+		return getItem(key);
+	};
+
+	const { calls } = stubFetch();
+	const queue = new Queue({ clock, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, storage });
+	const flushed = queue.flush();
+
+	released = true;
+	await flushed;
+	t.deepEqual(exportedRecords(calls), ["leftover"], "the round waits for the load and sends what it held");
+	t.strictEqual(clock.pending.size, 0, "the batch timer the load installed is cleared by that round");
+	t.end();
+});
+
 test("Queue with storage survives a restart: leftovers go first and storage empties on delivery", async t => {
 	for (const async of [false, true]) {
 		const label = async ? "async storage" : "sync storage";
