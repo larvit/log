@@ -8,17 +8,9 @@ the prescribed repair.
 
 ### Comprehension, README → Goals #8
 
-The 2026-09-27 panel's baseline, in AGENTS.md → Decisions, is capped by Locality; the first two
-items are its causes, and each names how many of the nine readers hit it.
+The 2026-09-27 panel's baseline, in AGENTS.md → Decisions, is capped by Locality; the first
+item is its cause, and each names how many of the nine readers hit it.
 
-- [ ] Share the default `Queue` a `Log` builds with its children without writing it into `conf`,
-  or record why `conf` must carry it. Today a child inherits the endpoint beside the queue built
-  from it, and only `isQueueFor` comparing `otlpAdditionalHeaders` by reference keeps that child
-  from throwing; six readers reconstructed it by simulating a parent and child. `otlpQueue` is new
-  in 2.4.0, so what `log.conf.otlpQueue` reads on a shorthand instance is settled before it ships,
-  and the `JSON.stringify` item below may close with it. `isQueueFor` compares values, so
-  `new Log({ otlpQueue: new Queue({ otlpHttpBaseURI: u }), otlpHttpBaseURI: u })` is accepted,
-  where README → Queue exports, the `otlpQueue` row and the 2026-09-16 decision say it throws.
 - [ ] Hold the queue's scheduling state where one reader can check it: `running`, `pending`,
   `timer.retry` and `failures` together decide what `flush`, `round`, `setTimer` and
   `scheduleRetry` do. Nine of nine readers traced it by hand and four named it the unit they would
