@@ -76,8 +76,8 @@ mechanism, that is evidence of the problem, never the prescribed repair.
   "json" | EntryFormatter`, and the mapping between them is `formatterOf`, which is not exported. So
   a library author rendering a line from a conf they were handed has to re-implement it from
   `msgTextFormatter` and `msgJsonFormatter`, which no doc spells out. Exporting the resolver is
-  additive and the obvious shape; saying it in the README is the other. Whichever lands has to land before 3.0.0 takes the alias away. Found by
-  the 2026-09-21 product-owner review.
+  additive and the obvious shape; saying it in the README is the other. Whichever lands has to land
+  before 3.0.0 takes the alias away. Found by the 2026-09-21 product-owner review.
 - [ ] **Spell a redacted `url.full` the way OTel semconv asks: `https://REDACTED:REDACTED@host/x`.**
   Today the userinfo is dropped silently, so a span can carry `url.full` showing a credential-free
   url beside a `status.message` quoting `http://REDACTED@host/x`, and the reader is told both that

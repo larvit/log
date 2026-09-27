@@ -191,7 +191,8 @@ reads back from `conf.entryFormatter` alone and wins over any `conf.format`, as 
 writing `conf.format` on a function-formatted instance changes nothing. Reading or writing
 `conf.entryFormatter` does not warn, since 2.x has no other spelling to move to; its `@deprecated`
 tag stays, because Goals #4 deprecates every 3.0.0 break in a minor first, and names 3.0.0's
-`conf.format`.
+`conf.format`. A parent built by another copy of this module hands its child only a function, its
+built-in formatters included, so writing that child's `conf.format` changes nothing either.
 
 ## `ResolvedLogConf` keeps `entryFormatter` required
 
