@@ -19,9 +19,8 @@ None of it is breaking.
 
 ### Comprehension, README → Goals #8
 
-A nine-seat comprehension panel on 2026-09-27 scored the source 6/10 against the goal's 7.0. The
-four scoring seats gave Navigation 7, Locality 5.25, Shape 6 and Self-sufficiency 6, so Locality
-caps it; the first three items are its causes, and each names how many of the nine hit it.
+The 2026-09-27 panel's baseline, in AGENTS.md → Decisions, is capped by Locality; the first three
+items are its causes, and each names how many of the nine readers hit it.
 
 - [ ] Resolve a `Log`'s settings in one unit that the constructor and `clone()` both call, in named
   steps whose order the code states. Today two copy loops apply different rules — `clone()` skips
