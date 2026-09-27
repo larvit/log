@@ -345,6 +345,12 @@ export type OtlpPayload = PayloadByKind[OtlpKind];
 
 const PAYLOAD_KEYS: { [K in OtlpKind]: keyof PayloadByKind[K] } = { logs: "resourceLogs", traces: "resourceSpans" };
 
+// OTLP's Span.SpanKind and Status.StatusCode enum values.
+const SPAN_KIND_INTERNAL = 1;
+const SPAN_KIND_CLIENT = 3;
+const STATUS_CODE_UNSET = 0;
+const STATUS_CODE_ERROR = 2;
+
 // The one branch on a payload's kind, so a new kind fails to compile at every caller.
 function byKind<R>(payload: OtlpPayload, handlers: { [K in OtlpKind]: (payload: PayloadByKind[K]) => R }): R {
 	if (PAYLOAD_KEYS.logs in payload) {
@@ -1569,13 +1575,13 @@ function openSpan(conf: ResolvedLogConf): { sampled: boolean, span: OtlpSpan } {
 			droppedLinksCount: 0,
 			endTimeUnixNano: startedAt,
 			events: [],
-			kind: 1,
+			kind: SPAN_KIND_INTERNAL,
 			links: [],
 			name: conf.spanName || "unnamed-span",
 			parentSpanId: conf.parentLog?.span.spanId ?? incoming?.spanId,
 			spanId: generateSpanId(),
 			startTimeUnixNano: startedAt,
-			status: { code: 0 },
+			status: { code: STATUS_CODE_UNSET },
 			traceId: conf.parentLog?.span.traceId || incoming?.traceId || generateTraceId(),
 		},
 	};
@@ -1637,7 +1643,7 @@ export class Log implements LogInt {
 		if (options?.error !== undefined && options.error !== null) {
 			const failure = spanFailure(options.error);
 
-			this.span.status = { code: 2, message: failure.message };
+			this.span.status = { code: STATUS_CODE_ERROR, message: failure.message };
 			context["error.type"] = failure.type;
 		}
 
@@ -1679,7 +1685,7 @@ export class Log implements LogInt {
 	private async tracedFetch(url: URL, init: RequestInit | undefined, settle: () => void): Promise<Response> {
 		// childSpan can't throw; everything that can (e.g. `new Headers` on a bad name) is inside the
 		// try, so finally always settles the tracked promise and flush() can never hang on this fetch.
-		const span = this.childSpan(url.host, 3); // CLIENT; name refined below
+		const span = this.childSpan(url.host, SPAN_KIND_CLIENT);
 		const context: Metadata = { ...this.context };
 
 		try {
@@ -1712,7 +1718,7 @@ export class Log implements LogInt {
 			const res = await globalThis.fetch(url, { ...init, headers });
 
 			context["http.response.status_code"] = res.status;
-			span.status.code = res.status >= 400 ? 2 : 0; // 4xx/5xx are errors for client spans
+			span.status.code = res.status >= 400 ? STATUS_CODE_ERROR : STATUS_CODE_UNSET; // 4xx/5xx are errors for client spans
 
 			for (const name of this.conf.captureResponseHeaders ?? []) {
 				const value = res.headers.get(name);
@@ -1727,7 +1733,7 @@ export class Log implements LogInt {
 		} catch (err) {
 			const failure = spanFailure(err);
 
-			span.status = { code: 2, message: failure.message };
+			span.status = { code: STATUS_CODE_ERROR, message: failure.message };
 			context["error.type"] = failure.type;
 
 			throw err;
@@ -1835,7 +1841,7 @@ export class Log implements LogInt {
 			parentSpanId: this.span.spanId,
 			spanId: generateSpanId(),
 			startTimeUnixNano: now,
-			status: { code: 0 },
+			status: { code: STATUS_CODE_UNSET },
 			traceId: this.span.traceId,
 		};
 	}
