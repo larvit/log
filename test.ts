@@ -1269,10 +1269,11 @@ test("otlpQueue and the otlp* options are two spellings of one endpoint; inherit
 
 	t.ok(thrown(() => new Log({ otlpHttpBaseURI: "http://127.0.0.1:4319", otlpQueue: queue })).includes("otlpQueue"), "a queue plus a differing endpoint on Log is rejected, naming the option");
 	t.ok(thrown(() => new Log({ otlpProtocol: "http/protobuf", otlpQueue: queue })).includes("otlpQueue"), "a queue plus a differing protocol on Log is rejected");
+	t.ok(thrown(() => new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", otlpQueue: queue })).includes("otlpQueue"), "a queue plus the very endpoint it was built with is rejected too");
 
 	const parent = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", otlpProtocol: "http/protobuf" });
 
-	t.ok(parent.conf.otlpQueue instanceof Queue, "otlpHttpBaseURI builds a Queue");
+	t.ok(parent.conf.otlpQueue instanceof Queue, "otlpHttpBaseURI builds a Queue, read back as conf.otlpQueue");
 	t.strictEqual(new Log({ parentLog: parent }).conf.otlpQueue, parent.conf.otlpQueue, "a child shares the parent's queue");
 	t.strictEqual(parent.clone().conf.otlpQueue, parent.conf.otlpQueue, "a clone shares the queue");
 	t.notStrictEqual(new Log({ otlpHttpBaseURI: "http://127.0.0.1:4319", parentLog: parent }).conf.otlpQueue, parent.conf.otlpQueue, "a child with its own endpoint gets its own queue");
