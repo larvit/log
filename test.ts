@@ -691,6 +691,7 @@ test("entryFormatter still formats and warns once per stderr sink", t => {
 
 	log.info("hi");
 	t.strictEqual(stdout[0], "custom hi", "the deprecated formatter still formats output, and still wins over format: \"json\"");
+	t.strictEqual(log.conf.format, "json", "and format reads back as written, as in v2.3.0");
 	t.strictEqual(stderr.length, 1, "one warning per sink");
 	t.strictEqual(stderr[0], "custom @larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format — entryFormatter wins and the format beside it is ignored", "the warning goes through the instance's formatter, names the spelling to use instead and says which of the two wins");
 	log.info("again");
@@ -768,12 +769,18 @@ test("conf.entryFormatter reads and writes the formatter until 3.0.0", t => {
 	swap.log.conf.entryFormatter = swapped;
 	swap.log.info("hi");
 	t.strictEqual(swap.stdout[0], "swapped hi", "writing it swaps the formatter on a live instance, as it did in v2.3.0");
-	t.strictEqual(swap.log.conf.format, undefined, "and clears format, so the two names cannot disagree");
+	t.strictEqual(swap.log.conf.format, "text", "and leaves format as it was, as in v2.3.0");
 	t.strictEqual(swap.log.conf.entryFormatter, swapped, "a read after a write resolves what was written");
 	t.deepEqual(swap.stderr, [], "and warns about nothing");
 	swap.log.conf.format = "json";
-	swap.log.info("live");
-	t.strictEqual(JSON.parse(swap.stdout[1]).msg, "live", "format is read where a line is written, like logLevel and the sinks");
+	swap.log.info("still");
+	t.strictEqual(swap.stdout[1], "swapped still", "a function formatter wins over a format written after it");
+
+	const live = capture({ format: "text" });
+
+	live.log.conf.format = "json";
+	live.log.info("live");
+	t.strictEqual(JSON.parse(live.stdout[0]).msg, "live", "format is read where a line is written, like logLevel and the sinks");
 
 	// Only a hand-written LogInt's conf carries the deprecated name as a key of its own.
 	const handBuilt = capture({ format: (entry: EntryFormatterConf) => `parent ${entry.msg}` });
@@ -782,6 +789,17 @@ test("conf.entryFormatter reads and writes the formatter until 3.0.0", t => {
 	new Log({ parentLog: handBuilt.log }).info("hi");
 	t.deepEqual(handBuilt.stdout, ["parent hi"], "an inherited entryFormatter is not folded, so it never becomes the child's formatter");
 	t.deepEqual(handBuilt.stderr, [], "and warns about nothing: the app developer never wrote that spelling");
+
+	// What a parent built by another copy of this module, or a v2.3.0 LogInt, hands a child.
+	const foreign = new Log();
+	const foreignConf: LogConf = { entryFormatter: entry => `foreign ${entry.msg}` };
+
+	Object.defineProperty(foreign, "conf", { value: foreignConf });
+	const foreignChild = capture({ parentLog: foreign });
+
+	foreignChild.log.info("hi");
+	t.deepEqual(foreignChild.stdout, ["foreign hi"], "a parent's formatter this module did not store is inherited through its entryFormatter");
+	t.deepEqual(foreignChild.stderr, [], "and warns about nothing");
 	t.end();
 });
 

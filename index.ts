@@ -191,15 +191,12 @@ export function msgTextFormatter(conf: EntryFormatterConf) {
 	return str;
 }
 
-// A resolved conf's function `format`, which `conf.format` cannot hold before 3.0.0.
+// A resolved conf's function formatter, which `conf.format` cannot hold before 3.0.0. It wins
+// over a string `format`, as `entryFormatter` did in v2.3.0.
 const formatFunctions = new WeakMap<object, EntryFormatter>();
 
 function formatterOf(conf: LogConf): EntryFormatter {
-	if (conf.format === undefined) {
-		return formatFunctions.get(conf) ?? msgTextFormatter;
-	}
-
-	return conf.format === "json" ? msgJsonFormatter : msgTextFormatter;
+	return formatFunctions.get(conf) ?? (conf.format === "json" ? msgJsonFormatter : msgTextFormatter);
 }
 
 // --- Trace ids and traceparent ---------------------------------------------
@@ -1373,7 +1370,7 @@ const INHERITED_BY: { [K in keyof LogConf]-?: readonly Derivation[] } = {
 	colors: CHILD_AND_CLONE,
 	// A clone merges its source's live `context` per key instead.
 	context: ["child"],
-	// Inherited through format.
+	// Inherited through format, from the source's formatter in use.
 	entryFormatter: [],
 	format: CHILD_AND_CLONE,
 	logLevel: CHILD_AND_CLONE,
@@ -1454,7 +1451,8 @@ function inheritSettings(conf: LogSettings, source: { conf: LogConf, context?: M
 	}
 
 	for (const key of Object.keys(INHERITED_BY) as (keyof LogConf)[]) {
-		const value = key === "format" ? source.conf.format ?? formatFunctions.get(source.conf) : source.conf[key];
+		// entryFormatter last, for a source this module did not build: another copy of it, or a v2.3.0 LogInt.
+		const value = key === "format" ? formatFunctions.get(source.conf) ?? source.conf.format ?? source.conf.entryFormatter : source.conf[key];
 
 		if (INHERITED_BY[key].includes(derivation) && !skip.has(key) && conf[key] === undefined && value !== undefined) {
 			// Same key on both sides, so the value type matches; `as never` satisfies the writer.
@@ -1464,7 +1462,7 @@ function inheritSettings(conf: LogSettings, source: { conf: LogConf, context?: M
 }
 
 // Returns the deprecation warning the caller's entryFormatter owes.
-function foldEntryFormatter(conf: LogSettings): string | undefined {
+function entryFormatterDeprecation(conf: LogSettings): string | undefined {
 	if (conf.entryFormatter === undefined) {
 		return undefined;
 	}
@@ -1473,11 +1471,7 @@ function foldEntryFormatter(conf: LogSettings): string | undefined {
 		throw new Error("entryFormatter and format are two spellings of one formatter: pass only format");
 	}
 
-	const overridden = typeof conf.format === "string";
-
-	conf.format = conf.entryFormatter;
-
-	if (overridden) {
+	if (typeof conf.format === "string") {
 		return "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format — entryFormatter wins and the format beside it is ignored";
 	}
 
@@ -1487,14 +1481,13 @@ function foldEntryFormatter(conf: LogSettings): string | undefined {
 // One descriptor for every instance: Goals #7's 1 KB budget.
 const ENTRY_FORMATTER_ALIAS: PropertyDescriptor = {
 	configurable: true,
-	// So a spread never folds the alias a second time.
+	// So a spread never hands the alias back as an option the caller wrote.
 	enumerable: false,
 	get(this: ResolvedLogConf): EntryFormatter {
 		return formatterOf(this);
 	},
 	set(this: ResolvedLogConf, formatter: EntryFormatter) {
 		formatFunctions.set(this, formatter);
-		delete this.format;
 	},
 };
 
@@ -1511,9 +1504,14 @@ function withDefaults(conf: LogSettings): ResolvedLogConf {
 		conf.colors = colorsFromEnv() ?? true;
 	}
 
+	const formatFunction = typeof conf.format === "function" ? conf.format : conf.entryFormatter;
+
 	if (typeof conf.format === "function") {
-		formatFunctions.set(conf, conf.format);
 		delete conf.format;
+	}
+
+	if (formatFunction) {
+		formatFunctions.set(conf, formatFunction);
 	} else if (conf.format === undefined) {
 		conf.format = "text";
 	}
@@ -1531,8 +1529,8 @@ function withDefaults(conf: LogSettings): ResolvedLogConf {
 	return conf as ResolvedLogConf;
 }
 
-// Defaults come last, so none hides an inherited value; the fold precedes them, so a defaulted
-// format never reads as one the caller wrote beside entryFormatter.
+// Defaults come last, so none hides an inherited value; the entryFormatter check precedes them, so
+// a defaulted format never reads as one the caller wrote beside entryFormatter.
 function resolveLogConf(options: LogOptions | LogLevel | "none" | undefined, report: QueueConf["report"]): { conf: ResolvedLogConf, deprecations: string[] } {
 	const conf = confFromOptions(options);
 	const deprecations: string[] = [];
@@ -1547,7 +1545,7 @@ function resolveLogConf(options: LogOptions | LogLevel | "none" | undefined, rep
 
 	rejectQueueBesideShorthand(conf);
 
-	const formatterDeprecation = foldEntryFormatter(conf);
+	const formatterDeprecation = entryFormatterDeprecation(conf);
 
 	if (formatterDeprecation) {
 		deprecations.push(formatterDeprecation);

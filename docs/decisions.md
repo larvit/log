@@ -173,7 +173,7 @@ holds. Scoped to spans because the remaining credential rules are
 the queue's, and the conf-redaction and Basic-over-`http:` items rewrite that code. Valid while
 the source is a single `index.ts`.
 
-## `format` is the formatter's one name, `conf.entryFormatter` its read path until 3.0.0
+## `format` is the formatter's one name, `entryFormatter` its alias until 3.0.0
 
 2026-09-21: `format` is the formatter's one name, and `conf.entryFormatter` an alias of it, read
 and write, until 3.0.0 drops both. `entryFormatter` folds into `format`, winning over a
@@ -185,10 +185,13 @@ bytes against Goals #7's 1 KB, on `node:22-bookworm-slim` over 50 000 retained i
 README → Goals #5 for the one name, README → Goals #4 for the alias. Valid until 3.0.0 removes
 `entryFormatter`.
 
-2026-09-28: `conf.format` keeps v2.3.0's read type, `"text" | "json" | undefined`, per Goals #4,
-so a function formatter reads back from `conf.entryFormatter` alone and `conf.format` reads
-`undefined`. Neither the read nor a write warns: 2.x has no other spelling to move to. 3.0.0 puts
-the function in `conf.format`.
+2026-09-28: `conf.format` keeps v2.3.0's read type and read-back, per Goals #4: it never holds a
+function, and a string written beside `entryFormatter` reads back as written. A function formatter
+reads back from `conf.entryFormatter` alone and wins over any `conf.format`, as in v2.3.0, so
+writing `conf.format` on a function-formatted instance changes nothing. Reading or writing
+`conf.entryFormatter` does not warn, since 2.x has no other spelling to move to; its `@deprecated`
+tag stays, because Goals #4 deprecates every 3.0.0 break in a minor first, and names 3.0.0's
+`conf.format`.
 
 ## `ResolvedLogConf` keeps `entryFormatter` required
 
