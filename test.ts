@@ -622,6 +622,8 @@ test("the constructor and clone copy the caller's options object instead of fill
 	t.deepEqual(conf, { context: { service: "x" }, format: "json" }, "no default, inherited setting or formatter is written into it");
 	t.deepEqual(Object.keys(childConf), ["parentLog"], "nothing inherited from the parent is written into a child's");
 	t.strictEqual(parent.conf.logLevel, "info", "the instance still resolves its defaults");
+	t.notOk(Object.values(new Log({ parentLog: parent }).conf).some(value => value === undefined), "a child's conf holds no key its parent lacked");
+	t.notOk(Object.values(parent.clone().conf).some(value => value === undefined), "nor does a clone's");
 	t.end();
 });
 
