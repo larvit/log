@@ -6,11 +6,6 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ## 2.4.0
 
-- [ ] **Restore `format`'s v2.3.0 read type, `"text" | "json" | undefined`, on `log.conf`,
-  `ResolvedLogConf` and `LogInt.conf`.** Per Goals #4, it holds in the declared type and in what
-  `log.conf` holds after `new Log({ format: fn })`. A function formatter stays readable from
-  `log.conf` without a warning that names nowhere to move to, and the README option rows, the
-  Unreleased CHANGELOG and the 2026-09-21 decisions say what holds afterwards.
 - [ ] **Let a consumer upgrading from 2.2.0 close the allow-listed-header and opaque-url searches in
   one sentence.** The path-leak advisory already lets them. `log.fetch`, both allow-lists and
   `captureQuery` all shipped in v2.3.0, so those two exposures have the same floor and neither
@@ -77,10 +72,9 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 ### Everything else
 
 - [ ] **Make `conf.format` a complete replacement for the `conf.entryFormatter` alias 3.0.0
-  removes.** The alias hands back a callable `EntryFormatter`; `format` hands back `"text" | "json"
-  | EntryFormatter`, and the mapping between them is `resolveFormatter`, which is not exported. So a
-  library author rendering a line from a conf they were handed — the reader the deprecation warning
-  sends to `conf.format` — has to re-implement it from `msgTextFormatter` and `msgJsonFormatter`,
+  removes.** The alias hands back a callable `EntryFormatter`; 3.0.0's `format` hands back `"text" |
+  "json" | EntryFormatter`, and the mapping between them is `formatterOf`, which is not exported. So
+  a library author rendering a line from a conf they were handed has to re-implement it from `msgTextFormatter` and `msgJsonFormatter`,
   which no doc spells out. Exporting the resolver is additive and the obvious shape; saying it in
   the README is the other. Whichever lands has to land before 3.0.0 takes the alias away. Found by
   the 2026-09-21 product-owner review.

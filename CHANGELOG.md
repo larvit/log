@@ -118,18 +118,18 @@
   rejects drops that batch, reported as `OTLP export headers invalid, batch dropped` naming the
   header, never its value.
 - `format` also takes a formatter function, `(entry) => string`, and is what children and clones
-  inherit. New export: `EntryFormatter`; `ResolvedLogConf["format"]` widens to include a function.
+  inherit. New export: `EntryFormatter`.
   The `entryFormatter` option is deprecated: it still formats and still wins over a
   `"text"`/`"json"` `format`, writes one `warn` line per `stderr` sink for each distinct warning
   text whatever `logLevel` says, and 3.0.0 removes it. Two different formatters, one per spelling,
   throw.
-- `log.conf.entryFormatter` is deprecated too. Reading it still returns the formatter and writing
-  it still swaps it — through `format` now, so the two names cannot disagree — and either warns
-  once per `stderr` sink. Read `log.conf.format` instead. It is non-enumerable now, so
+- `log.conf.entryFormatter` still reads the formatter in use and writing it still swaps it; 3.0.0
+  removes it, and `log.conf.format` holds a function from then. Until then `log.conf.format` reads
+  `undefined` for a function formatter. `log.conf.entryFormatter` is non-enumerable now, so
   `{ ...log.conf }` and `Object.keys(log.conf)` no longer carry it, which is what lets a `format`
-  on a child apply; `ResolvedLogConf` still declares it, so
-  `const c: ResolvedLogConf = { ...log.conf }` compiles and `c.entryFormatter(entry)` throws at
-  runtime. 3.0.0 removes the member with the property.
+  on a child apply, and a spread no longer carries a function formatter at all: use `clone()`.
+  `ResolvedLogConf` still declares it, so `const c: ResolvedLogConf = { ...log.conf }` compiles
+  and `c.entryFormatter(entry)` throws at runtime.
 - `JSON.stringify(log.conf)` carries `format`, `"text"` by default, where v2.3.0 left the key
   absent unless you passed one — and omits it when you passed a function, as it omits any function.
   Not promised; see below.

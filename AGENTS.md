@@ -26,7 +26,7 @@ In [docs/decisions.md](docs/decisions.md):
 - `log.fetch` passes url userinfo through, and `spanFailure` redacts it
 - A captured value holding a credential records `REDACTED`
 - Every rule on credentials in a span sits in one source section
-- `format` is the formatter's one name, `entryFormatter` its alias until 3.0.0
+- `format` is the formatter's one name, `conf.entryFormatter` its read path until 3.0.0
 - `ResolvedLogConf` keeps `entryFormatter` required
 - `SENSITIVE_QUERY_KEYS` grows by name
 - An unsampled `traceparent` drops the span, never the log records

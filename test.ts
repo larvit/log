@@ -455,8 +455,16 @@ test("metadata and context appear in the output", t => {
 });
 
 test("format takes a formatter function, inherited by clones and children", t => {
-	const { log, stderr, stdout } = capture({ format: entry => `${entry.logLevel}|${entry.msg}` });
+	const formatter = (entry: EntryFormatterConf) => `${entry.logLevel}|${entry.msg}`;
+	const { log, stderr, stdout } = capture({ format: formatter });
+	const asLogInt: LogInt = log;
+	// Typed, not inferred: widening either read type again fails the build here.
+	const confRead: "json" | "text" | undefined = log.conf.format;
+	const logIntRead: "json" | "text" | undefined = asLogInt.conf.format;
 
+	t.strictEqual(confRead, undefined, "conf.format keeps v2.3.0's read type, so a function formatter never lands in it");
+	t.strictEqual(logIntRead, undefined, "and so does LogInt's conf");
+	t.strictEqual(log.conf.entryFormatter, formatter, "conf.entryFormatter reads the function back");
 	log.info("hi");
 	log.clone().info("cloned");
 	new Log({ parentLog: log }).info("child");
@@ -734,9 +742,9 @@ test("format and entryFormatter are one setting, and a resolved conf carries nei
 	const deprecated = capture({ entryFormatter: own });
 	const resolved: ResolvedLogConf = { ...deprecated.log.conf };
 
-	t.strictEqual(deprecated.log.conf.format, own, "a resolved conf holds the formatter under format, whichever spelling set it");
+	t.strictEqual(deprecated.log.conf.entryFormatter, own, "a resolved conf reads the formatter back from entryFormatter, whichever spelling set it");
 	t.deepEqual(Object.keys(deprecated.log.conf).filter(key => key === "entryFormatter"), [], "the deprecated name is not a key of its own, so nothing inherits or spreads it");
-	t.strictEqual(resolved.entryFormatter, undefined, "and a spread of a resolved conf carries format alone, so nothing folds a second time");
+	t.strictEqual(resolved.entryFormatter, undefined, "and a spread of a resolved conf never carries it, so nothing folds a second time");
 
 	const given: LogConf = { entryFormatter: own, stderr: () => {} };
 
@@ -745,14 +753,14 @@ test("format and entryFormatter are one setting, and a resolved conf carries nei
 	t.end();
 });
 
-test("conf.entryFormatter still reads and writes the formatter, deprecated, until 3.0.0", t => {
+test("conf.entryFormatter reads and writes the formatter until 3.0.0", t => {
 	const readback = capture({ format: "json" });
 
 	// Typed, not inferred: dropping the member from ResolvedLogConf again fails the build here.
 	const fromPublishedType: EntryFormatter = readback.log.conf.entryFormatter;
 
 	t.strictEqual(fromPublishedType, msgJsonFormatter, "reading it resolves format, as it did in v2.3.0 whichever spelling set the formatter, and off the published type too");
-	t.strictEqual(JSON.parse(readback.stderr[0] ?? "{}").msg, "@larvit/log: conf.entryFormatter is deprecated and removed in 3.0.0, use conf.format", "and warns once through the instance's formatter, naming the name to read instead");
+	t.deepEqual(readback.stderr, [], "and warns about nothing: conf.format cannot hold a function before 3.0.0");
 
 	const swap = capture({ colors: false });
 	const swapped = (entry: EntryFormatterConf) => `swapped ${entry.msg}`;
@@ -760,13 +768,9 @@ test("conf.entryFormatter still reads and writes the formatter, deprecated, unti
 	swap.log.conf.entryFormatter = swapped;
 	swap.log.info("hi");
 	t.strictEqual(swap.stdout[0], "swapped hi", "writing it swaps the formatter on a live instance, as it did in v2.3.0");
-	t.strictEqual(swap.log.conf.format, swapped, "through format, so the two names cannot disagree");
-	t.strictEqual(swap.stderr[0], "swapped @larvit/log: conf.entryFormatter is deprecated and removed in 3.0.0, use conf.format", "the write lands before the warning it raises, which the formatter just set then renders");
-
-	const afterWrite = swap.log.conf.entryFormatter;
-
-	t.strictEqual(afterWrite, swapped, "a read after a write resolves what was written");
-	t.strictEqual(swap.stderr.length, 1, "and shares the write's warning: one text, one sink");
+	t.strictEqual(swap.log.conf.format, undefined, "and clears format, so the two names cannot disagree");
+	t.strictEqual(swap.log.conf.entryFormatter, swapped, "a read after a write resolves what was written");
+	t.deepEqual(swap.stderr, [], "and warns about nothing");
 	swap.log.conf.format = "json";
 	swap.log.info("live");
 	t.strictEqual(JSON.parse(swap.stdout[1]).msg, "live", "format is read where a line is written, like logLevel and the sinks");
