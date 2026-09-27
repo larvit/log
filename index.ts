@@ -53,7 +53,7 @@ export type LogConf = {
 	stderr?: (msg: string) => void;
 	stdout?: (msg: string) => void;
 	// Incoming W3C traceparent to adopt: this log joins that trace and nests under that span.
-	// Ignored if malformed or if parentLog is set. Edge-only: not inherited by clones/children.
+	// Ignored if malformed or if parentLog is set.
 	traceparent?: string;
 };
 
@@ -1318,7 +1318,7 @@ const INHERITED_BY: { [K in keyof LogConf]-?: readonly Derivation[] } = {
 	colors: CHILD_AND_CLONE,
 	// A clone merges its source's live `context` per key instead.
 	context: ["child"],
-	// Folded into format.
+	// Folded into format. Empty, so a Log source's alias getter is never read and never warns.
 	entryFormatter: [],
 	format: CHILD_AND_CLONE,
 	logLevel: CHILD_AND_CLONE,
@@ -1760,7 +1760,7 @@ export class Log implements LogInt {
 		}
 	}
 
-	// A fresh child span under this log's span/trace, with its kind set at birth (no later mutation).
+	// A fresh child span under this log's span/trace.
 	private childSpan(name: string, kind: OtlpSpan["kind"]): OtlpSpan {
 		const now = getNsTimestamp(this.conf.clock.now());
 

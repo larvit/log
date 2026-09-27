@@ -71,6 +71,11 @@ items are its causes, and each names how many of the nine readers hit it.
   entry; only the span obeys it. `log()` returns before the enqueue whenever `sampled` is false.
   Afterwards the CHANGELOG bullet on the sampled flag, README → Join an incoming trace, the
   `traceparent` option row and the `sampled` field comment all say records still export.
+- [ ] Keep an injected `clock` from hanging `flush()` and `end()`. `tracedFetch` calls `childSpan`
+  before its `try`, on the comment that it cannot throw, but `getNsTimestamp` hands `BigInt` a
+  fraction whenever `now()` returns one — a `performance.now()`-based clock does — and a caller's
+  `now()` may throw outright; either way the tracked promise never settles. `clock` is new in
+  2.4.0.
 - [ ] Keep `JSON.stringify(log.conf)` from throwing. With OTLP configured `log.conf.otlpQueue` is
   the `Queue` itself, and once a batch timer is pending on Node its `Timeout` makes the structure
   circular, so a debug line that worked on v2.3.0 now crashes some calls and leaks credentials on
@@ -80,6 +85,10 @@ items are its causes, and each names how many of the nine readers hit it.
 ## 2.5.0 — close the credential story
 
 ### Security
+
+- [ ] Keep a parent's `otlpAdditionalHeaders` off a child or clone that names its own
+  `otlpHttpBaseURI`. It inherits the headers, so `new Log({ parentLog, otlpHttpBaseURI: other })`
+  sends the parent's bearer token to `other`, a host it was never issued for. Shipped in v2.3.0.
 
 - [ ] Keep a url nested in the request path out of `url.full`. `buildUrlFull` is `url.origin +
   url.pathname` and redacts only the query, so
