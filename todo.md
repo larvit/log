@@ -11,9 +11,6 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 The 2026-09-27 panel's baseline, in `docs/decisions.md`, is capped by Locality; each item names
 how many of the nine readers hit it.
 
-- [ ] **Name the OTLP span kind and status code values the source writes as bare numbers.** Today
-  they are `kind: 1`, `childSpan(url.host, 3)` and `status.code = 2`; five readers guessed what they
-  meant.
 - [ ] **Delete comments that restate the code or the README.** The `LogConf` field comments repeat
   the options table (eight readers), and so do the id-size, "set above", "Ends the span, then
   flushes", `traceparent()` and `exportSpan` lines. Their readers paid to learn nothing.
