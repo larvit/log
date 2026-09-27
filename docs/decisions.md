@@ -176,7 +176,7 @@ the source is a single `index.ts`.
 ## `format` is the formatter's one name, `entryFormatter` its alias until 3.0.0
 
 2026-09-21: `format` is the formatter's one name, and `conf.entryFormatter` an alias of it, read
-and write, until 3.0.0 drops both. `entryFormatter` folds into `format`, winning over a
+and write, until 3.0.0 drops both. `entryFormatter` is the same setting as `format`, winning over a
 `"text"`/`"json"` one as 2.x documented, and two *different* formatters throw: nothing can hold
 that combination yet, while rejecting the documented one would break a minor. The alias stays
 because v2.3.0 filled `conf.entryFormatter` on every instance, whichever spelling set the

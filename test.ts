@@ -703,6 +703,7 @@ test("entryFormatter still formats and warns once per stderr sink", t => {
 	clone.info("cloned");
 	t.deepEqual(cloneStderr, [], "a clone inherits the formatter without repeating the warning on its own sink");
 	t.strictEqual(stdout[stdout.length - 1], "custom cloned", "the clone kept the inherited formatter");
+	t.strictEqual(clone.conf.format, "json", "and reads back the format beside it, as in v2.3.0");
 
 	const builtIn = capture({ entryFormatter: msgTextFormatter });
 
@@ -787,18 +788,19 @@ test("conf.entryFormatter reads and writes the formatter until 3.0.0", t => {
 
 	Object.defineProperty(handBuilt.log.conf, "entryFormatter", { configurable: true, enumerable: true, value: () => "inherited" });
 	new Log({ parentLog: handBuilt.log }).info("hi");
-	t.deepEqual(handBuilt.stdout, ["parent hi"], "an inherited entryFormatter is not folded, so it never becomes the child's formatter");
+	t.deepEqual(handBuilt.stdout, ["parent hi"], "a formatter this module stored wins over the conf's own entryFormatter key");
 	t.deepEqual(handBuilt.stderr, [], "and warns about nothing: the app developer never wrote that spelling");
 
 	// What a parent built by another copy of this module, or a v2.3.0 LogInt, hands a child.
 	const foreign = new Log();
-	const foreignConf: LogConf = { entryFormatter: entry => `foreign ${entry.msg}` };
+	const foreignConf: LogConf = { entryFormatter: entry => `foreign ${entry.msg}`, format: "json" };
 
 	Object.defineProperty(foreign, "conf", { value: foreignConf });
 	const foreignChild = capture({ parentLog: foreign });
 
 	foreignChild.log.info("hi");
-	t.deepEqual(foreignChild.stdout, ["foreign hi"], "a parent's formatter this module did not store is inherited through its entryFormatter");
+	t.deepEqual(foreignChild.stdout, ["foreign hi"], "a parent's formatter this module did not store is inherited through its entryFormatter, which wins over its format");
+	t.strictEqual(foreignChild.log.conf.format, "json", "and the format beside it reads back on the child");
 	t.deepEqual(foreignChild.stderr, [], "and warns about nothing");
 	t.end();
 });
