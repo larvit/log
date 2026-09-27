@@ -8,16 +8,9 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ### Comprehension, README → Goals #8
 
-The 2026-09-27 panel's baseline, in AGENTS.md → Decisions, is capped by Locality; each item names
+The 2026-09-27 panel's baseline, in `docs/decisions.md`, is capped by Locality; each item names
 how many of the nine readers hit it.
 
-- [ ] **Move the decision log out of `AGENTS.md` into `docs/decisions.md`, leaving a one-line index
-  of the titles behind.** The org-wide documentation rule asks for it. It is ~130 lines of reasoning
-  in a file every session loads whole, and no entry has a title: "which entry settled header
-  redaction?" is answerable only by reading four 20-line paragraphs, so give each one a bolded title
-  line as part of the move. Nine of nine readers read the whole log to find one entry, three of them
-  found the entry on the sampled flag contradicting the code, and five needed an entry the code
-  beside it could have named in one line.
 - [ ] **Name the OTLP span kind and status code values the source writes as bare numbers.** Today
   they are `kind: 1`, `childSpan(url.host, 3)` and `status.code = 2`; five readers guessed what they
   meant.
@@ -46,7 +39,8 @@ how many of the nine readers hit it.
   `url.full` starting with `null`, but the repo's own 2026-09-19 decision records a second broken
   spelling, `https://example.comhttps://example.com/uuid`, which that search never finds.
 - [ ] **Export log records whatever the incoming `sampled` flag says; only the span obeys it.** Per
-  AGENTS.md's 2026-09-25 entry. `log()` returns before the enqueue whenever `sampled` is false.
+  `docs/decisions.md`'s 2026-09-25 entry. `log()` returns before the enqueue whenever `sampled` is
+  false.
   Afterwards the CHANGELOG bullet on the sampled flag, README → Join an incoming trace, the
   `traceparent` option row and the `sampled` field comment all say records still export.
 - [ ] **Restore `"fetch_error"` as a `log.fetch` span's `error.type` fallback.** v2.3.0's README
