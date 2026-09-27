@@ -705,6 +705,11 @@ test("entryFormatter still formats and warns once per stderr sink", t => {
 	t.strictEqual(stdout[stdout.length - 1], "custom cloned", "the clone kept the inherited formatter");
 	t.strictEqual(clone.conf.format, "json", "and reads back the format beside it, as in v2.3.0");
 
+	const other = capture({ format: entry => `other ${entry.msg}` });
+
+	log.clone({ parentLog: other.log }).info("nested");
+	t.strictEqual(stdout[stdout.length - 1], "custom nested", "a clone given a parentLog keeps its source's formatter, as it keeps a string format");
+
 	const builtIn = capture({ entryFormatter: msgTextFormatter });
 
 	builtIn.log.info("x");

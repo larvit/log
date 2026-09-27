@@ -1477,7 +1477,7 @@ function inheritSettings(conf: LogSettings, source: { conf: LogConf, context?: M
 
 	const skip = new Set(otlpKeysNotToInherit(conf));
 
-	if (conf.format === undefined && conf.entryFormatter === undefined) {
+	if (conf.format === undefined && conf.entryFormatter === undefined && !formatFunctions.has(conf)) {
 		const formatFunction = sourceFormatFunction(source.conf);
 
 		if (formatFunction) {
