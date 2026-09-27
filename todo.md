@@ -15,8 +15,54 @@ the prescribed repair.
 rotation advisories, the export queue, the injectable clock, `Logger`, and the `entryFormatter` and
 level-string deprecations.
 
-An architecture, product and comprehension review on 2026-09-20 found everything below in that
-state. None of it is breaking.
+None of it is breaking.
+
+### Comprehension, README → Goals #8
+
+A nine-seat comprehension panel on 2026-09-27 scored the source 6/10 against the goal's 7.0. The
+four scoring seats gave Navigation 7, Locality 5.25, Shape 6 and Self-sufficiency 6, so Locality
+caps it; the first three items are its causes, and each names how many of the nine hit it.
+
+- [ ] Resolve a `Log`'s settings in one unit that the constructor and `clone()` both call, in named
+  steps whose order the code states. Today two copy loops apply different rules — `clone()` skips
+  `spanName`, merges `context` and skips `format` beside an `entryFormatter` — and the ~100-line
+  constructor orders eight jobs by line sequence alone, with enumerability deciding what a child
+  inherits. Nine of nine readers ranked the constructor among their hardest places, four named it
+  the unit they would least modify, and eight diffed the two loops by hand. It changes no
+  contract, and 2.6.0's `spanName` warning and three 3.0.0 items edit the same lines.
+- [ ] Share the default `Queue` a `Log` builds with its children without writing it into `conf`,
+  or record why `conf` must carry it. Today a child inherits the endpoint beside the queue built
+  from it, and only `isQueueFor` comparing `otlpAdditionalHeaders` by reference keeps that child
+  from throwing; six readers reconstructed it by simulating a parent and child. `otlpQueue` is new
+  in 2.4.0, so what `log.conf.otlpQueue` reads on a shorthand instance is settled before it ships,
+  and the `JSON.stringify` item below may close with it.
+- [ ] Hold the queue's scheduling state where one reader can check it: `running`, `pending`,
+  `timer.retry` and `failures` together decide what `flush`, `round`, `setTimer` and
+  `scheduleRetry` do. Nine of nine readers traced it by hand and four named it the unit they would
+  least modify. Sending (`send`, `buildHeaders`, `describe`, `partialRejection`) separates from
+  buffering and scheduling on the way, so the 2.5.0 `fetch` injection lands on one unit. Ahead of
+  the 2.5.0 batch-timer, restored-batch and storage items, which edit the same methods.
+- [ ] Move the decision log out of `AGENTS.md` into `docs/decisions.md`, leaving a one-line index of
+  the titles behind, per the org-wide documentation rule. It is ~130 lines of reasoning in a file
+  every session loads whole, and no entry has a title: "which entry settled header redaction?" is
+  answerable only by reading four 20-line paragraphs, so give each one a bolded title line as part
+  of the move. Nine of nine readers read the whole log to find one entry, three of them found the
+  entry on the sampled flag contradicting the code, and five needed an entry the code beside it
+  could have named in one line.
+- [ ] Name the OTLP span kind and status code values the source writes as bare numbers: `kind: 1`,
+  `childSpan(url.host, 3)`, `status.code = 2`. Five readers guessed what they meant.
+- [ ] Delete comments that restate the code or the README: the `LogConf` field comments repeat the
+  options table (eight readers), and so do the id-size, "defaulted above", "Ends the span, then
+  flushes", `traceparent()` and `exportSpan` lines. Their readers paid to learn nothing.
+- [ ] Give `log.fetch` its own section, and file each helper where its question lives: batch merging
+  and `partialRejection` beside what they serve, the OTLP wire types beside the payload builders,
+  and nothing under a banner named for a technique, as "Reading a value of unknown shape" is. Both
+  architects mapped `log.fetch` wrongly first.
+- [ ] Rename the internal names that mislead: the span-attribute bag called `context` in `end`,
+  `tracedFetch`, `exportSpan` and `buildSpanPayload`, which shares its name with the option;
+  `changed()`, which persists; `capturedValue`, which redacts; and `add(items, front)`'s boolean.
+
+### Everything else
 
 - [ ] Restore `format`'s v2.3.0 read type, `"text" | "json" | undefined`, on `log.conf`,
   `ResolvedLogConf` and `LogInt.conf`, per Goals #4: in the declared type and in what it holds after
@@ -72,12 +118,6 @@ state. None of it is breaking.
 
 ### Everything else
 
-- [ ] Move the decision log out of `AGENTS.md` into `docs/decisions.md`, leaving a one-line index
-  of the titles behind, per the org-wide documentation rule. It is ~130 lines of reasoning in a
-  file every session loads whole, and no entry has a title: "which entry settled header
-  redaction?" is answerable only by reading four 20-line paragraphs, so give each one a bolded
-  title line as part of the move. First in this release: the security items above and the redaction
-  spellings below each record a decision there.
 - [ ] Make `conf.format` a complete replacement for the `conf.entryFormatter` alias 3.0.0 removes.
   The alias hands back a callable `EntryFormatter`; `format` hands back `"text" | "json" |
   EntryFormatter`, and the mapping between them is `resolveFormatter`, which is not exported. So a
@@ -106,13 +146,6 @@ state. None of it is breaking.
   two different formatters already throw. That combination has never produced a working request,
   so rejecting it is safe in a minor. Either take that, or deprecate the userinfo spelling here
   and reject it in 3.0.0.
-- [ ] Split the `Log` constructor into named steps — normalize options, inherit from parent, apply
-  defaults, resolve the OTLP queue, open the span — ahead of the 3.0.0 item that changes three of
-  them. It is ~90 lines doing five jobs with three ordering constraints held nowhere but the line
-  sequence, every one of nine comprehension-panel readers named it, and four named it the unit they
-  would least want to touch because it is the only one whose failure mode is silent. The split
-  changes no contract, so it needs no major, and 2.6.0's `spanName` warning edits those 90
-  lines otherwise. Refactor first and 3.0.0's diff gets smaller.
 - [ ] Unref the batch timer, so a pending batch never holds a Node or Deno process, per README →
   Goals #7, and drop that goal's "until 2.5.0" clause. Today only the retry timer is unref'd, so
   any pending batch holds the process for up to `batchDelayMs`, and `round()` clears the batch
@@ -128,6 +161,12 @@ state. None of it is breaking.
   discarded, and the retry finds them gone — so the round trip and the promise are both spent on
   the flagship offline path. Protect a restored batch, or stop promising a retry for what was
   dropped.
+- [ ] Keep a batch in the persisted queue until its send settles. `takeBatch` removes it from
+  `items` before `send`, so a record logged during the send saves the queue without it, and a
+  process that dies then loses the batch its storage exists to keep.
+- [ ] Name the instrumentation scope after this library. Today `scope.name` is the span name, and
+  batch merging splits `scopeSpans` by it, where OTel's scope identifies the instrumenting code.
+  The README documents neither, so it ships in a minor.
 - [ ] Keep a transient `storage` read failure from wiping the persisted queue. `load()` treats an
   unreadable `getItem` and corrupt content identically and then calls `removeItem`, so one flaky
   AsyncStorage read at startup loses everything a phone held offline. The full fix is larger than
@@ -187,6 +226,9 @@ README → Goals #4 promises a 2.x warning before each break below, so 3.0.0 wai
 
 Each one is a weigh against README → Goals first: ship it, or delete the item and record why not.
 
+- [ ] Name a `log.fetch` span and its errors as HTTP semconv does: `{method}` alone without a url
+  template, where today it is `{method} {host}`; an unknown method as `_OTHER` with
+  `http.request.method_original`; and `error.type` set to the status code on a 4xx or 5xx.
 - [ ] Resource attributes beyond `service.name`. `service.version` and `deployment.environment` are
   what the telemetry reader groups on in Grafana, and the shape is a map on the resource we already
   build.
@@ -210,6 +252,10 @@ Each one is a weigh against README → Goals first: ship it, or delete the item 
   `Queue` and POSTed to `/v1/metrics`, with the types carrying what a valid point must have. It
   waits for the major because an `OtlpQueue` implementer receives the wider union. Measure what
   the metrics messages add to the protobuf encoder against the 10 KB budget before deciding.
+
+- [ ] Retry only what OTLP/HTTP calls retryable — 429, 502, 503 and 504 — and honour
+  `Retry-After`. Today 408, 500 and 501 retry too, and README → Queue exports documents that set,
+  so narrowing it waits for the major; honouring `Retry-After` alone may ship earlier.
 
 - [ ] Give the redaction sentinel its own name — `REDACTED by @larvit/log` or similar. Today one
   token means three things to the telemetry reader: a header redacted by name, a value that matched
@@ -249,7 +295,7 @@ Each one is a weigh against README → Goals first: ship it, or delete the item 
 - [ ] Keep `otlpQueue` as the only OTLP representation in `conf`: build the default `Queue` from
   the three `otlp*` shorthands and clear them, so inheritance needs one rule and `isQueueFor` goes.
   Today `log.conf.otlpHttpBaseURI` stays readable, which is why this waits for a major. It lands on
-  the constructor 2.5.0 already split.
+  the settings resolution 2.4.0 already split out.
 - [ ] Keep credentials off `log.conf` and `queue.conf`. `otlpHttpBaseURI`'s `user:pass@` and an
   `otlpAdditionalHeaders` bearer token sit there verbatim, so a consumer who logs their own conf puts
   them in their log store. Goals #3 stops at what this library emits, so this is a Goals #4 break. The `otlpQueue`
