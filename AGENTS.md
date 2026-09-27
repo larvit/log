@@ -183,6 +183,11 @@ and who it is for, and a design decision that cannot be derived from them belong
   warns once, like any other unknown level, so the operator sees the empty substitution. Only
   `undefined` means unset. Serves README → Goals #5. Valid while an unknown `logLevel` logs at the
   default and warns.
+- 2026-09-27, the maintainer: the comprehension baseline is the 2026-09-27 four-seat panel at
+  depth 1 — 6/10 overall; Navigation 7, Locality 5.25, Shape 6, Self-sufficiency 6 — and a later
+  four-seat run at the same depth may not score lower. Comprehension work ships in the release it
+  is found in, ahead of that release's other items. Serves README → Goals #8. Valid until a later
+  run at or above 7.0 replaces the baseline.
 
 ## Working here
 
