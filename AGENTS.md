@@ -36,9 +36,9 @@ In [docs/decisions.md](docs/decisions.md):
 
 ## Working here
 
-- Source is a single `index.ts`, sectioned by `// --- name ---` banners. New code joins a
-  section whose banner stays true of it, or gets its own. A rule set answering one question — what
-  a reader has to check as a whole — lives in one section, never split across two.
+- New code in `index.ts` joins a `// --- name ---` section whose banner stays true of it, or gets
+  its own. A rule set answering one question — what a reader has to check as a whole — lives in one
+  section, never split across two.
 - A done `todo.md` item leaves the file: a change a consumer can observe is reworded for them
   under `CHANGELOG.md` → `## Unreleased`; anything else is deleted outright.
 - A release section with anything a consumer must act on — a rotation advisory, an exposure still
