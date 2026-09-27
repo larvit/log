@@ -1344,17 +1344,20 @@ function otlpKeysNotToInherit(conf: LogConf): (keyof LogConf)[] {
 	return OTLP_TRANSPORT_KEYS.some(key => conf[key] !== undefined) ? ["otlpQueue"] : [];
 }
 
-// A Queue built from exactly these transport options: the one case where both spellings may sit
-// together (a clone, a child, a spread conf).
-function isQueueFor(queue: OtlpQueue, conf: LogConf): boolean {
-	return queue instanceof Queue
+// Queues a Log built from its otlp* shorthand. Only one built from exactly the shorthand beside it
+// may sit with it in a conf: a clone, a child, a spread conf.
+const defaultQueues = new WeakSet<OtlpQueue>();
+
+function isDefaultQueueFor(queue: OtlpQueue, conf: LogConf): boolean {
+	return defaultQueues.has(queue)
+		&& queue instanceof Queue
 		&& queue.conf.otlpHttpBaseURI === conf.otlpHttpBaseURI
 		&& queue.conf.otlpProtocol === (conf.otlpProtocol ?? "http/json")
 		&& queue.conf.otlpAdditionalHeaders === conf.otlpAdditionalHeaders;
 }
 
 function rejectQueueBesideShorthand(conf: LogConf): void {
-	if (conf.otlpQueue && OTLP_TRANSPORT_KEYS.some(key => conf[key] !== undefined) && !isQueueFor(conf.otlpQueue, conf)) {
+	if (conf.otlpQueue && OTLP_TRANSPORT_KEYS.some(key => conf[key] !== undefined) && !isDefaultQueueFor(conf.otlpQueue, conf)) {
 		throw new Error("otlpQueue carries the endpoint: set otlpHttpBaseURI, otlpProtocol and otlpAdditionalHeaders on the queue, not beside it");
 	}
 }
@@ -1561,6 +1564,7 @@ export class Log implements LogInt {
 				otlpProtocol: this.conf.otlpProtocol,
 				report: (msg, metadata) => this.outputToConsole("error", msg, metadata, this.conf.clock.now()),
 			});
+			defaultQueues.add(this.conf.otlpQueue);
 		}
 	}
 

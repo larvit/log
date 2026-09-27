@@ -343,7 +343,7 @@ instead. `entryFormatter` is deprecated the same way: pass the function as `form
 | `otlpAdditionalHeaders` | `Record<string, string>` | none | Shorthand: the same option on the default `Queue`, see [Queue exports](#queue-exports). |
 | `otlpHttpBaseURI` | `string` | none | Shorthand for `otlpQueue: new Queue({ otlpHttpBaseURI, otlpProtocol, otlpAdditionalHeaders })`. `user:pass@` in it authenticates, see [Queue exports](#queue-exports). |
 | `otlpProtocol` | `"http/json" \| "http/protobuf"` | `"http/json"` | Shorthand: the same option on the default `Queue`. |
-| `otlpQueue` | `OtlpQueue` | none | The [export queue](#queue-exports). Cannot be combined with the three shorthands above. Inherited by children and clones; one that sets a shorthand instead gets a queue of its own. |
+| `otlpQueue` | `OtlpQueue` | none | The [export queue](#queue-exports). Cannot be combined with the three shorthands above; on an instance given them, `log.conf.otlpQueue` reads back the queue they built. Inherited by children and clones; one that sets a shorthand instead gets a queue of its own. |
 | `parentLog` | `LogInt` | none | Nest under this instance's span and inherit its options except `traceparent`. Log entries attach to the parent's span. |
 | `printTraceInfo` | `boolean` | `false` | Append `spanId`, `traceId` and `spanName` to console output. |
 | `spanName` | `string` | `"unnamed-span"` | The instance's span name. Inherited from `parentLog` when set there. |
