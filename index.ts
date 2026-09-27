@@ -1316,7 +1316,7 @@ const INHERITED_BY: { [K in keyof LogConf]-?: readonly Derivation[] } = {
 	captureResponseHeaders: CHILD_AND_CLONE,
 	clock: CHILD_AND_CLONE,
 	colors: CHILD_AND_CLONE,
-	// A clone merges it per key instead.
+	// A clone merges its source's live `context` per key instead.
 	context: ["child"],
 	// Folded into format.
 	entryFormatter: [],
@@ -1355,13 +1355,23 @@ function isQueueFor(queue: OtlpQueue, conf: LogConf): boolean {
 		&& queue.conf.otlpAdditionalHeaders === conf.otlpAdditionalHeaders;
 }
 
+function rejectQueueBesideShorthand(conf: LogConf): void {
+	if (conf.otlpQueue && OTLP_TRANSPORT_KEYS.some(key => conf[key] !== undefined) && !isQueueFor(conf.otlpQueue, conf)) {
+		throw new Error("otlpQueue carries the endpoint: set otlpHttpBaseURI, otlpProtocol and otlpAdditionalHeaders on the queue, not beside it");
+	}
+}
+
 function confFromOptions(options: LogOptions | LogLevel | "none" | undefined): LogConf {
 	const { context, ...rest }: LogOptions = typeof options === "string" ? { logLevel: options } : { ...options };
 
 	return context === undefined ? rest : { ...rest, context: withoutUndefined(context) };
 }
 
-function inheritSettings(conf: LogConf, source: LogConf, derivation: Derivation): void {
+function inheritSettings(conf: LogConf, source: { conf: LogConf, context?: Metadata }, derivation: Derivation): void {
+	if (derivation === "clone") {
+		conf.context = { ...source.context, ...conf.context };
+	}
+
 	const skip = new Set(otlpKeysNotToInherit(conf));
 
 	// The caller's entryFormatter is their format.
@@ -1370,9 +1380,9 @@ function inheritSettings(conf: LogConf, source: LogConf, derivation: Derivation)
 	}
 
 	for (const key of Object.keys(INHERITED_BY) as (keyof LogConf)[]) {
-		if (INHERITED_BY[key].includes(derivation) && !skip.has(key) && conf[key] === undefined) {
+		if (INHERITED_BY[key].includes(derivation) && !skip.has(key) && conf[key] === undefined && source.conf[key] !== undefined) {
 			// Same key on both sides, so the value type matches; `as never` satisfies the writer.
-			conf[key] = source[key] as never;
+			conf[key] = source.conf[key] as never;
 		}
 	}
 }
@@ -1458,8 +1468,10 @@ function resolveLogConf(options: LogOptions | LogLevel | "none" | undefined): { 
 	}
 
 	if (typeof conf.parentLog === "object") {
-		inheritSettings(conf, conf.parentLog.conf, "child");
+		inheritSettings(conf, conf.parentLog, "child");
 	}
+
+	rejectQueueBesideShorthand(conf);
 
 	const formatterDeprecation = foldEntryFormatter(conf);
 
@@ -1522,7 +1534,7 @@ export class Log implements LogInt {
 			warnOnce(conf, this.context, msg);
 		}
 
-		this.connectQueue();
+		this.buildDefaultQueue();
 
 		const { sampled, span } = openSpan(conf);
 
@@ -1537,18 +1549,13 @@ export class Log implements LogInt {
 
 		const conf = confFromOptions(options);
 
-		conf.context = { ...this.context, ...conf.context };
-		inheritSettings(conf, this.conf, "clone");
+		inheritSettings(conf, this, "clone");
 
 		return new Log(conf);
 	}
 
-	private connectQueue(): void {
-		if (this.conf.otlpQueue) {
-			if (OTLP_TRANSPORT_KEYS.some(key => this.conf[key] !== undefined) && !isQueueFor(this.conf.otlpQueue, this.conf)) {
-				throw new Error("otlpQueue carries the endpoint: set otlpHttpBaseURI, otlpProtocol and otlpAdditionalHeaders on the queue, not beside it");
-			}
-		} else if (this.conf.otlpHttpBaseURI) {
+	private buildDefaultQueue(): void {
+		if (!this.conf.otlpQueue && this.conf.otlpHttpBaseURI) {
 			this.conf.otlpQueue = new Queue({
 				clock: this.conf.clock,
 				otlpAdditionalHeaders: this.conf.otlpAdditionalHeaders,

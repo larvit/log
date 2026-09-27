@@ -271,7 +271,9 @@ Each one is a weigh against README → Goals first: ship it, or delete the item 
 - [ ] Let per-call metadata win over `context` on a key collision; the more specific value wins.
   Today `context` wins.
 - [ ] Merge a child's `context` per key with the parent's, as `clone()` does. Today a child's
-  `context` replaces the parent's wholesale.
+  `context` replaces the parent's wholesale. Settle first which parent value merges: a clone takes
+  the live `log.context`, a child today reads `conf.context`, so they differ once `log.context` is
+  written to.
 - [ ] Export metadata as typed OTLP attribute values instead of coercing every one to
   `stringValue`: `boolValue` for a boolean, `intValue` for a safe integer, `doubleValue` for any
   other number, so OTLP carries what the JSON formatter already emits. Breaking because a backend
