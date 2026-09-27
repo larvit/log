@@ -6,18 +6,6 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ## 2.4.0
 
-### Comprehension, README → Goals #8
-
-The 2026-09-27 panel's baseline, in `docs/decisions.md`, is capped by Locality; each item names
-how many of the nine readers hit it.
-
-- [ ] **Rename the internal names that mislead.** They are the span-attribute bag called `context`
-  in `end`, `tracedFetch`, `exportSpan` and `buildSpanPayload`, which shares its name with the
-  option; `changed()`, which persists; `capturedValue`, which redacts; and `add(items, front)`'s
-  boolean.
-
-### Everything else
-
 - [ ] **Restore `format`'s v2.3.0 read type, `"text" | "json" | undefined`, on `log.conf`,
   `ResolvedLogConf` and `LogInt.conf`.** Per Goals #4, it holds in the declared type and in what
   `log.conf` holds after `new Log({ format: fn })`. A function formatter stays readable from
@@ -64,7 +52,7 @@ how many of the nine readers hit it.
   capture option involved — the one credential shape that reaches a span on the default path,
   against Goals' "a url it fetches … never reaches a span". A fetch-through proxy, a CORS or image
   proxy, a webhook replay endpoint and a signed-url wrapper all take that shape, and
-  percent-encoding it changes nothing. `capturedValue` already holds the rule; what it does not
+  percent-encoding it changes nothing. `redactCredential` already holds the rule; what it does not
   settle is the cost, because a path is not a value: replacing the whole of it on a hit loses the
   endpoint the telemetry reader needs, where `/a//b@2x.png` would take the path with it, and
   splicing `REDACTED@` in the way `spanFailure` does covers the literal spelling only. Decide which,
@@ -125,7 +113,7 @@ how many of the nine readers hit it.
   failed-round half. A script that awaits neither `end()` nor `flush()` then exits without exporting
   what it queued, so the CHANGELOG says so, and README → Queue exports' "A retry timer never keeps…"
   covers every timer.
-- [ ] **Stop a restored batch being the first thing dropped.** `add(batch, true)` unshifts a failed
+- [ ] **Stop a restored batch being the first thing dropped.** `prepend(batch)` unshifts a failed
   batch to the front, and the `maxItems` trim then splices the excess off that same front. An
   offline phone at `maxItems` reports "OTLP export failed, will retry" for items it has already
   discarded, and the retry finds them gone — so the round trip and the promise are both spent on the
