@@ -123,9 +123,10 @@
   `"text"`/`"json"` `format`, writes one `warn` line per `stderr` sink for each distinct warning
   text whatever `logLevel` says, and 3.0.0 removes it. Two different formatters, one per spelling,
   throw.
-- `log.conf.entryFormatter` still reads the formatter in use and writing it still swaps it; 3.0.0
-  removes it, and `log.conf.format` holds a function from then. Until then `log.conf.format` reads
-  `undefined` for a function formatter. `log.conf.entryFormatter` is non-enumerable now, so
+- `log.conf.entryFormatter` still reads the formatter in use and writing it still swaps it, winning
+  over `log.conf.format` as in v2.3.0; 3.0.0 removes it, and `log.conf.format` holds a function
+  from then. Until then `log.conf.format` never holds one: it reads `undefined` after
+  `format: fn`. `log.conf.entryFormatter` is non-enumerable now, so
   `{ ...log.conf }` and `Object.keys(log.conf)` no longer carry it, which is what lets a `format`
   on a child apply, and a spread no longer carries a function formatter at all: use `clone()`.
   `ResolvedLogConf` still declares it, so `const c: ResolvedLogConf = { ...log.conf }` compiles
@@ -135,7 +136,7 @@
   Not promised; see below.
 - A `format` set on a child (`parentLog`) now applies; before, the parent's resolved formatter
   silently kept winning. `log.conf.format` is read where a line is written, so writing it swaps
-  the formatter on a live instance.
+  the formatter on a live instance that has no function formatter.
 - Copy an instance's settings with `clone()`. What a spread or `JSON.stringify` of
   `log.conf` carries is not part of the semver promise and may change in a minor.
 - Every deprecation line names the package: `@larvit/log: …`.

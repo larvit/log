@@ -74,8 +74,8 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 - [ ] **Make `conf.format` a complete replacement for the `conf.entryFormatter` alias 3.0.0
   removes.** The alias hands back a callable `EntryFormatter`; 3.0.0's `format` hands back `"text" |
   "json" | EntryFormatter`, and the mapping between them is `formatterOf`, which is not exported. So
-  a library author rendering a line from a conf they were handed has to re-implement it from `msgTextFormatter` and `msgJsonFormatter`,
-  which no doc spells out. Exporting the resolver is additive and the obvious shape; saying it in
+  a library author rendering a line from a conf they were handed has to re-implement it from
+  `msgTextFormatter` and `msgJsonFormatter`, which no doc spells out. Exporting the resolver is additive and the obvious shape; saying it in
   the README is the other. Whichever lands has to land before 3.0.0 takes the alias away. Found by
   the 2026-09-21 product-owner review.
 - [ ] **Spell a redacted `url.full` the way OTel semconv asks: `https://REDACTED:REDACTED@host/x`.**
