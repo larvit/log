@@ -711,8 +711,10 @@ function unref(timer: TimerHandle, fromSystemClock: boolean): void {
 
 // One round runs at a time, callers arriving mid-round join one next round, and setTimer installs
 // the one timer that starts a round — a batch wait, or a backoff flush() must not jump.
+type SchedulerConf = Pick<ResolvedQueueConf, "batchDelayMs" | "clock" | "retryDelayMs">;
+
 class ExportScheduler {
-	private readonly conf: ResolvedQueueConf;
+	private readonly conf: SchedulerConf;
 	private failures = 0;
 	private pending?: Promise<void>;
 	private readonly ready: Promise<void>;
@@ -721,7 +723,7 @@ class ExportScheduler {
 	private timer?: { handle: TimerHandle, retry: boolean };
 
 	// No round starts before ready settles.
-	constructor(conf: ResolvedQueueConf, ready: Promise<void>, round: () => Promise<void>) {
+	constructor(conf: SchedulerConf, ready: Promise<void>, round: () => Promise<void>) {
 		this.conf = conf;
 		this.ready = ready;
 		this.round = round;
@@ -735,8 +737,8 @@ class ExportScheduler {
 
 		if (!this.running) {
 			this.running = this.ready.then(() => {
-				// The round sends what the timer was waiting for. After ready, or a timer installed while
-				// storage loads would survive it.
+				// The round sends what the timer was waiting for. After ready, or a timer installed before
+				// it settles would survive the round.
 				this.conf.clock.clearTimeout(this.timer?.handle);
 				this.timer = undefined;
 
@@ -886,14 +888,17 @@ function mergePayloads(payloads: OtlpPayload[]): OtlpPayload {
 	});
 }
 
+// Read live, so a rotated otlpAdditionalHeaders reaches the next send; report is the caller's guarded one.
+type SenderConf = Pick<ResolvedQueueConf, "clock" | "otlpAdditionalHeaders" | "otlpHttpBaseURI" | "otlpProtocol">;
+
 class OtlpSender {
-	private readonly conf: ResolvedQueueConf;
+	private readonly conf: SenderConf;
 	private readonly headers: Headers;
 	private readonly protobuf: boolean;
 	private readonly report: ResolvedQueueConf["report"];
 	private readonly url: string;
 
-	constructor(conf: ResolvedQueueConf, report: ResolvedQueueConf["report"]) {
+	constructor(conf: SenderConf, report: ResolvedQueueConf["report"]) {
 		let base: URL;
 
 		try {
