@@ -411,7 +411,8 @@ function buildLogPayload(opts: {
 }
 
 // Not pure: writes the resolved attributes onto `span` before returning its payload.
-// Unredacted, per README → Goals #3: context and the span name are the caller's own text.
+// Unredacted: callers redact what they capture into `attributes`, and per README → Goals #3 the
+// context and span name go as written.
 function buildSpanPayload(opts: {
 	attributes: Metadata,
 	span: OtlpSpan,
