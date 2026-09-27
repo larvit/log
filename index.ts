@@ -88,66 +88,6 @@ export type MetadataInput = {
 	[key: string]: MetadataValue | undefined;
 };
 
-export type OtlpAttribute = {
-	key: string,
-	value: {
-		stringValue: string
-	}
-};
-
-export type OtlpLogPayload = {
-	resourceLogs: {
-		resource: {
-			attributes: OtlpAttribute[],
-		},
-		scopeLogs: {
-			logRecords: {
-				attributes?: OtlpAttribute[],
-				body: {
-					stringValue: string,
-				},
-				severityNumber: number,
-				severityText: string,
-				spanId?: string,
-				timeUnixNano: string,
-				traceId?: string,
-			}[],
-		}[],
-	}[],
-};
-
-export type OtlpSpan = {
-	attributes: OtlpAttribute[],
-	droppedAttributesCount: number,
-	droppedEventsCount: number,
-	droppedLinksCount: number,
-	endTimeUnixNano: string,
-	events: [],
-	kind: 0 | 1 | 2 | 3 | 4 | 5,
-	links: [],
-	name: string,
-	parentSpanId?: string,
-	spanId: string,
-	startTimeUnixNano: string,
-	status: { code: number, message?: string },
-	traceId: string,
-};
-
-export type OtlpSpanPayload = {
-	resourceSpans: {
-		resource: {
-			attributes: OtlpAttribute[],
-			droppedAttributesCount: number,
-		},
-		scopeSpans: {
-			scope: {
-				name: string,
-			},
-			spans: OtlpSpan[],
-		}[],
-	}[],
-};
-
 // --- Levels, metadata and entry formatting ---------------------------------
 
 export const LogLevels = {
@@ -312,7 +252,7 @@ export function parseTraceparent(header: string): { flags: string, sampled: bool
 	return { flags, sampled: (parseInt(flags, 16) & 1) === 1, spanId, traceId };
 }
 
-// --- Reading a value of unknown shape --------------------------------------
+// --- Describing a failure --------------------------------------------------
 
 // Total: a throwing getter yields undefined, so the flush path never rejects on its input.
 function stringField(value: unknown, key: string): string | undefined {
@@ -326,6 +266,66 @@ function stringField(value: unknown, key: string): string | undefined {
 }
 
 // --- OTLP payloads ---------------------------------------------------------
+
+export type OtlpAttribute = {
+	key: string,
+	value: {
+		stringValue: string
+	}
+};
+
+export type OtlpLogPayload = {
+	resourceLogs: {
+		resource: {
+			attributes: OtlpAttribute[],
+		},
+		scopeLogs: {
+			logRecords: {
+				attributes?: OtlpAttribute[],
+				body: {
+					stringValue: string,
+				},
+				severityNumber: number,
+				severityText: string,
+				spanId?: string,
+				timeUnixNano: string,
+				traceId?: string,
+			}[],
+		}[],
+	}[],
+};
+
+export type OtlpSpan = {
+	attributes: OtlpAttribute[],
+	droppedAttributesCount: number,
+	droppedEventsCount: number,
+	droppedLinksCount: number,
+	endTimeUnixNano: string,
+	events: [],
+	kind: 0 | 1 | 2 | 3 | 4 | 5,
+	links: [],
+	name: string,
+	parentSpanId?: string,
+	spanId: string,
+	startTimeUnixNano: string,
+	status: { code: number, message?: string },
+	traceId: string,
+};
+
+export type OtlpSpanPayload = {
+	resourceSpans: {
+		resource: {
+			attributes: OtlpAttribute[],
+			droppedAttributesCount: number,
+		},
+		scopeSpans: {
+			scope: {
+				name: string,
+			},
+			spans: OtlpSpan[],
+		}[],
+	}[],
+};
 
 type PayloadByKind = { logs: OtlpLogPayload, traces: OtlpSpanPayload };
 
@@ -1547,7 +1547,7 @@ function resolveLogConf(options: LogOptions | LogLevel | "none" | undefined, rep
 	return { conf: resolved, deprecations };
 }
 
-// --- Log -------------------------------------------------------------------
+// --- A Log's spans ---------------------------------------------------------
 
 function openSpan(conf: ResolvedLogConf): { sampled: boolean, span: OtlpSpan } {
 	const incoming = !conf.parentLog && conf.traceparent ? parseTraceparent(conf.traceparent) : null;
@@ -1573,6 +1573,105 @@ function openSpan(conf: ResolvedLogConf): { sampled: boolean, span: OtlpSpan } {
 		},
 	};
 }
+
+function childSpan(log: Pick<Log, "conf" | "span">, name: string, kind: OtlpSpan["kind"]): OtlpSpan {
+	const now = getNsTimestamp(log.conf.clock.now());
+
+	return {
+		attributes: [],
+		droppedAttributesCount: 0,
+		droppedEventsCount: 0,
+		droppedLinksCount: 0,
+		endTimeUnixNano: now,
+		events: [],
+		kind,
+		links: [],
+		name,
+		parentSpanId: log.span.spanId,
+		spanId: generateSpanId(),
+		startTimeUnixNano: now,
+		status: { code: STATUS_CODE_UNSET },
+		traceId: log.span.traceId,
+	};
+}
+
+function exportSpan(log: Pick<Log, "conf" | "sampled">, span: OtlpSpan, context: Metadata): void {
+	if (log.sampled) {
+		log.conf.otlpQueue?.enqueue(buildSpanPayload({ context, span }));
+	}
+}
+
+// --- log.fetch -------------------------------------------------------------
+
+type FetchingLog = Pick<Log, "conf" | "context" | "sampled" | "span">;
+
+async function tracedFetch(log: FetchingLog, url: URL, init: RequestInit | undefined, settle: () => void): Promise<Response> {
+	// childSpan can't throw; everything that can (e.g. `new Headers` on a bad name) is inside the
+	// try, so finally always settles the tracked promise and flush() can never hang on this fetch.
+	const span = childSpan(log, url.host, SPAN_KIND_CLIENT);
+	const context: Metadata = { ...log.context };
+
+	try {
+		const method = (init?.method ?? "GET").toUpperCase();
+
+		span.name = `${method} ${url.host}`;
+		Object.assign(context, {
+			"http.request.method": method,
+			"server.address": url.hostname,
+			"url.full": buildUrlFull(url, log.conf.captureQuery === true),
+			"url.scheme": url.protocol.replace(/:$/, ""),
+			...url.port ? { "server.port": Number(url.port) } : {},
+		});
+
+		const headers = new Headers(init?.headers);
+
+		if (!headers.has("traceparent")) {
+			headers.set("traceparent", formatTraceparent(span.traceId, span.spanId, log.sampled));
+		}
+
+		for (const name of log.conf.captureRequestHeaders ?? []) {
+			const value = headers.get(name);
+			const key = name.toLowerCase();
+
+			if (value !== null) {
+				context[`http.request.header.${key}`] = capturedHeaderValue(key, value);
+			}
+		}
+
+		const res = await globalThis.fetch(url, { ...init, headers });
+
+		context["http.response.status_code"] = res.status;
+		span.status.code = res.status >= 400 ? STATUS_CODE_ERROR : STATUS_CODE_UNSET;
+
+		for (const name of log.conf.captureResponseHeaders ?? []) {
+			const value = res.headers.get(name);
+			const key = name.toLowerCase();
+
+			if (value !== null) {
+				context[`http.response.header.${key}`] = capturedHeaderValue(key, value);
+			}
+		}
+
+		return res;
+	} catch (err) {
+		const failure = spanFailure(err);
+
+		span.status = { code: STATUS_CODE_ERROR, message: failure.message };
+		context["error.type"] = failure.type;
+
+		throw err;
+	} finally {
+		span.endTimeUnixNano = getNsTimestamp(log.conf.clock.now());
+		// settle() must run even if the queue throws, else flush() hangs on this fetch.
+		try {
+			exportSpan(log, span, context);
+		} finally {
+			settle();
+		}
+	}
+}
+
+// --- Log -------------------------------------------------------------------
 
 export class Log implements LogInt {
 	context: Metadata;
@@ -1633,7 +1732,7 @@ export class Log implements LogInt {
 			context["error.type"] = failure.type;
 		}
 
-		this.exportSpan(this.span, context);
+		exportSpan(this, this.span, context);
 		await this.flush();
 	}
 
@@ -1663,73 +1762,7 @@ export class Log implements LogInt {
 
 		this.track(new Promise<void>(resolve => { settle = resolve; }));
 
-		return this.tracedFetch(url, init, settle);
-	}
-
-	private async tracedFetch(url: URL, init: RequestInit | undefined, settle: () => void): Promise<Response> {
-		// childSpan can't throw; everything that can (e.g. `new Headers` on a bad name) is inside the
-		// try, so finally always settles the tracked promise and flush() can never hang on this fetch.
-		const span = this.childSpan(url.host, SPAN_KIND_CLIENT);
-		const context: Metadata = { ...this.context };
-
-		try {
-			const method = (init?.method ?? "GET").toUpperCase();
-
-			span.name = `${method} ${url.host}`;
-			Object.assign(context, {
-				"http.request.method": method,
-				"server.address": url.hostname,
-				"url.full": buildUrlFull(url, this.conf.captureQuery === true),
-				"url.scheme": url.protocol.replace(/:$/, ""),
-				...url.port ? { "server.port": Number(url.port) } : {},
-			});
-
-			const headers = new Headers(init?.headers);
-
-			if (!headers.has("traceparent")) {
-				headers.set("traceparent", formatTraceparent(span.traceId, span.spanId, this.sampled));
-			}
-
-			for (const name of this.conf.captureRequestHeaders ?? []) {
-				const value = headers.get(name);
-				const key = name.toLowerCase();
-
-				if (value !== null) {
-					context[`http.request.header.${key}`] = capturedHeaderValue(key, value);
-				}
-			}
-
-			const res = await globalThis.fetch(url, { ...init, headers });
-
-			context["http.response.status_code"] = res.status;
-			span.status.code = res.status >= 400 ? STATUS_CODE_ERROR : STATUS_CODE_UNSET;
-
-			for (const name of this.conf.captureResponseHeaders ?? []) {
-				const value = res.headers.get(name);
-				const key = name.toLowerCase();
-
-				if (value !== null) {
-					context[`http.response.header.${key}`] = capturedHeaderValue(key, value);
-				}
-			}
-
-			return res;
-		} catch (err) {
-			const failure = spanFailure(err);
-
-			span.status = { code: STATUS_CODE_ERROR, message: failure.message };
-			context["error.type"] = failure.type;
-
-			throw err;
-		} finally {
-			span.endTimeUnixNano = getNsTimestamp(this.conf.clock.now());
-			// settle() must run even if the queue throws, else flush() hangs on this fetch.
-			try {
-				this.exportSpan(span, context);
-			} finally {
-				settle();
-			}
-		}
+		return tracedFetch(this, url, init, settle);
 	}
 
 	public enabled(logLevel: LogLevel): boolean {
@@ -1804,33 +1837,6 @@ export class Log implements LogInt {
 			this.conf.stderr(output);
 		} else {
 			this.conf.stdout(output);
-		}
-	}
-
-	private childSpan(name: string, kind: OtlpSpan["kind"]): OtlpSpan {
-		const now = getNsTimestamp(this.conf.clock.now());
-
-		return {
-			attributes: [],
-			droppedAttributesCount: 0,
-			droppedEventsCount: 0,
-			droppedLinksCount: 0,
-			endTimeUnixNano: now,
-			events: [],
-			kind,
-			links: [],
-			name,
-			parentSpanId: this.span.spanId,
-			spanId: generateSpanId(),
-			startTimeUnixNano: now,
-			status: { code: STATUS_CODE_UNSET },
-			traceId: this.span.traceId,
-		};
-	}
-
-	private exportSpan(span: OtlpSpan, context: Metadata): void {
-		if (this.sampled) {
-			this.conf.otlpQueue?.enqueue(buildSpanPayload({ context, span }));
 		}
 	}
 }
