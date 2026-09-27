@@ -1288,6 +1288,11 @@ test("otlpQueue and the otlp* options are two spellings of one endpoint; inherit
 	t.strictEqual(custom.conf.otlpQueue, queue, "a child keeps the queue it was given");
 	t.strictEqual(custom.conf.otlpHttpBaseURI, undefined, "and does not inherit the parent's endpoint beside it");
 	t.doesNotThrow(() => new Log({ ...parent.conf, spanName: "sibling" }), "spreading a conf keeps its queue and endpoint together");
+	t.ok(thrown(() => new Log({ ...parent.conf, otlpHttpBaseURI: "http://127.0.0.1:4319" })).includes("otlpQueue"), "a default queue beside an endpoint it was not built from is rejected");
+
+	const headered = new Log({ otlpAdditionalHeaders: { authorization: "Bearer t0k3n" }, otlpHttpBaseURI: "http://127.0.0.1:4318" });
+
+	t.ok(thrown(() => new Log({ ...headered.conf, otlpAdditionalHeaders: { authorization: "Bearer t0k3n" } })).includes("otlpQueue"), "and beside an equal copy of its headers, which a rotation could make differ");
 	t.end();
 });
 
