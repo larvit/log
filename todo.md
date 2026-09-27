@@ -8,15 +8,9 @@ the prescribed repair.
 
 ### Comprehension, README → Goals #8
 
-The 2026-09-27 panel's baseline, in AGENTS.md → Decisions, is capped by Locality; the first
-item is its cause, and each names how many of the nine readers hit it.
+The 2026-09-27 panel's baseline, in AGENTS.md → Decisions, is capped by Locality; each item
+names how many of the nine readers hit it.
 
-- [ ] Hold the queue's scheduling state where one reader can check it: `running`, `pending`,
-  `timer.retry` and `failures` together decide what `flush`, `round`, `setTimer` and
-  `scheduleRetry` do. Nine of nine readers traced it by hand and four named it the unit they would
-  least modify. Sending (`send`, `buildHeaders`, `describe`, `partialRejection`) separates from
-  buffering and scheduling on the way, so the 2.5.0 `fetch` injection lands on one unit. Ahead of
-  the 2.5.0 batch-timer, restored-batch and storage items, which edit the same methods.
 - [ ] Move the decision log out of `AGENTS.md` into `docs/decisions.md`, leaving a one-line index of
   the titles behind, per the org-wide documentation rule. It is ~130 lines of reasoning in a file
   every session loads whole, and no entry has a title: "which entry settled header redaction?" is
@@ -29,9 +23,8 @@ item is its cause, and each names how many of the nine readers hit it.
 - [ ] Delete comments that restate the code or the README: the `LogConf` field comments repeat the
   options table (eight readers), and so do the id-size, "set above", "Ends the span, then
   flushes", `traceparent()` and `exportSpan` lines. Their readers paid to learn nothing.
-- [ ] Give `log.fetch` its own section, and file each helper where its question lives: batch merging
-  and `partialRejection` beside what they serve, the OTLP wire types beside the payload builders,
-  and nothing under a banner named for a technique, as "Reading a value of unknown shape" is. Both
+- [ ] Give `log.fetch` its own section, and file each helper where its question lives: the OTLP wire types beside
+  the payload builders, and nothing under a banner named for a technique, as "Reading a value of unknown shape" is. Both
   architects mapped `log.fetch` wrongly first.
 - [ ] Rename the internal names that mislead: the span-attribute bag called `context` in `end`,
   `tracedFetch`, `exportSpan` and `buildSpanPayload`, which shares its name with the option;

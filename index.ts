@@ -335,21 +335,6 @@ function stringField(value: unknown, key: string): string | undefined {
 	}
 }
 
-// OTLP partialSuccess: proto3 JSON writes the int64 count as a string, some collectors as a number.
-function partialRejection(body: unknown): { message?: string, rejected: number } | undefined {
-	try {
-		const partial: unknown = typeof body === "object" && body !== null ? Reflect.get(body, "partialSuccess") : undefined;
-
-		if (typeof partial !== "object" || partial === null) return undefined;
-
-		const rejected = Number(Reflect.get(partial, "rejectedLogRecords") ?? Reflect.get(partial, "rejectedSpans") ?? 0);
-
-		return rejected > 0 ? { message: stringField(partial, "errorMessage"), rejected } : undefined;
-	} catch {
-		return undefined;
-	}
-}
-
 // --- OTLP payloads ---------------------------------------------------------
 
 type PayloadByKind = { logs: OtlpLogPayload, traces: OtlpSpanPayload };
@@ -634,7 +619,7 @@ function encodeOtlpProtobuf(payload: OtlpPayload): Uint8Array<ArrayBuffer> {
 	return byKind(payload, { logs: encodeOtlpLogPayload, traces: encodeOtlpSpanPayload });
 }
 
-// --- OTLP export queue -----------------------------------------------------
+// --- OTLP export: types and queued items ----------------------------------
 
 // What Log exports through. Queue is the shipped implementation; any { enqueue, flush } will do.
 export type OtlpQueue = {
@@ -671,8 +656,6 @@ type SendFailure = { message: string, reportAs?: string, retry: boolean, status?
 
 // Browsers reject a keepalive request whose body is over 64 KiB.
 const KEEPALIVE_MAX_BYTES = 65536;
-const OTLP_EXPORT_TIMEOUT_MS = 3000;
-const RETRY_DELAY_MAX_MS = 30000;
 
 function utf8Length(str: string): number {
 	let bytes = 0;
@@ -695,6 +678,120 @@ function utf8Length(str: string): number {
 	return bytes;
 }
 
+// The JSON size bounds the protobuf size too, so one measure serves both transports.
+function withBytes(payload: OtlpPayload): QueuedItem {
+	return { bytes: utf8Length(JSON.stringify(payload)), payload };
+}
+
+function isOtlpPayload(value: unknown): value is OtlpPayload {
+	return typeof value === "object" && value !== null
+		&& Object.values(PAYLOAD_KEYS).some(key => Array.isArray(Reflect.get(value, key)));
+}
+
+// --- OTLP export: scheduling rounds ----------------------------------------
+
+const RETRY_DELAY_MAX_MS = 30000;
+
+// A pending retry must not keep a finished Node or Deno process alive.
+function unref(timer: TimerHandle, fromSystemClock: boolean): void {
+	if (typeof timer === "object" && typeof timer.unref === "function") {
+		timer.unref();
+
+		return;
+	}
+
+	const deno: unknown = Reflect.get(globalThis, "Deno");
+	const unrefTimer: unknown = typeof deno === "object" && deno !== null ? Reflect.get(deno, "unrefTimer") : undefined;
+
+	// An injected clock's number may not be a Deno timer id, and unrefing a stranger's is worse.
+	if (fromSystemClock && typeof timer === "number" && typeof unrefTimer === "function") {
+		unrefTimer(timer);
+	}
+}
+
+// One round runs at a time, callers arriving mid-round join one next round, and setTimer installs
+// the one timer that starts a round — a batch wait, or a backoff flush() must not jump.
+class ExportScheduler {
+	private readonly conf: ResolvedQueueConf;
+	private failures = 0;
+	private pending?: Promise<void>;
+	private readonly round: () => Promise<void>;
+	private running?: Promise<void>;
+	private timer?: { handle: TimerHandle, retry: boolean };
+
+	constructor(conf: ResolvedQueueConf, round: () => Promise<void>) {
+		this.conf = conf;
+		this.round = round;
+	}
+
+	// While a retry is pending, flush() attempts nothing new: the timer decides.
+	flush(): Promise<void> {
+		if (this.timer?.retry) {
+			return this.running ?? Promise.resolve();
+		}
+
+		if (!this.running) {
+			this.running = this.round().finally(() => { this.running = undefined; });
+
+			return this.running;
+		}
+
+		this.pending ??= this.running.then(() => {
+			this.pending = undefined;
+
+			return this.flush();
+		});
+
+		return this.pending;
+	}
+
+	schedule(): void {
+		if (!this.timer) {
+			this.setTimer(false, this.conf.batchDelayMs);
+		}
+	}
+
+	// A round sends what the timer was waiting for.
+	roundStarted(): void {
+		this.conf.clock.clearTimeout(this.timer?.handle);
+		this.timer = undefined;
+	}
+
+	succeeded(): void {
+		this.failures = 0;
+	}
+
+	// Returns the delay. A record enqueued mid-round leaves a batch timer behind; the backoff takes it over.
+	backoff(): number {
+		this.failures++;
+
+		const retryInMs = Math.min(this.conf.retryDelayMs * (2 ** (this.failures - 1)), RETRY_DELAY_MAX_MS);
+
+		unref(this.setTimer(true, retryInMs), this.conf.clock === systemClock);
+
+		return retryInMs;
+	}
+
+	// Whatever timer it replaces is cleared, so no stray callback fires.
+	private setTimer(retry: boolean, delayMs: number): TimerHandle {
+		this.conf.clock.clearTimeout(this.timer?.handle);
+		this.timer = undefined;
+
+		const handle = this.conf.clock.setTimeout(() => {
+			this.timer = undefined;
+			void this.flush();
+		}, delayMs);
+
+		this.timer = { handle, retry };
+
+		return handle;
+	}
+}
+
+// --- OTLP export: sending a batch ------------------------------------------
+
+const OTLP_EXPORT_TIMEOUT_MS = 3000;
+
 // A malformed percent escape passes through undecoded rather than throwing, so an odd password
 // cannot break the constructor.
 function basicAuth(base: URL): string | undefined {
@@ -713,14 +810,19 @@ function basicAuth(base: URL): string | undefined {
 	return `Basic ${btoa(String.fromCharCode(...new TextEncoder().encode(decoded.join(":"))))}`;
 }
 
-// The JSON size bounds the protobuf size too, so one measure serves both transports.
-function withBytes(payload: OtlpPayload): QueuedItem {
-	return { bytes: utf8Length(JSON.stringify(payload)), payload };
-}
+// OTLP partialSuccess: proto3 JSON writes the int64 count as a string, some collectors as a number.
+function partialRejection(body: unknown): { message?: string, rejected: number } | undefined {
+	try {
+		const partial: unknown = typeof body === "object" && body !== null ? Reflect.get(body, "partialSuccess") : undefined;
 
-function isOtlpPayload(value: unknown): value is OtlpPayload {
-	return typeof value === "object" && value !== null
-		&& Object.values(PAYLOAD_KEYS).some(key => Array.isArray(Reflect.get(value, key)));
+		if (typeof partial !== "object" || partial === null) return undefined;
+
+		const rejected = Number(Reflect.get(partial, "rejectedLogRecords") ?? Reflect.get(partial, "rejectedSpans") ?? 0);
+
+		return rejected > 0 ? { message: stringField(partial, "errorMessage"), rejected } : undefined;
+	} catch {
+		return undefined;
+	}
 }
 
 function otlpPath(payload: OtlpPayload): string {
@@ -780,67 +882,14 @@ function mergePayloads(payloads: OtlpPayload[]): OtlpPayload {
 	});
 }
 
-// A pending retry must not keep a finished Node or Deno process alive.
-function unref(timer: TimerHandle, fromSystemClock: boolean): void {
-	if (typeof timer === "object" && typeof timer.unref === "function") {
-		timer.unref();
-
-		return;
-	}
-
-	const deno: unknown = Reflect.get(globalThis, "Deno");
-	const unrefTimer: unknown = typeof deno === "object" && deno !== null ? Reflect.get(deno, "unrefTimer") : undefined;
-
-	// An injected clock's number may not be a Deno timer id, and unrefing a stranger's is worse.
-	if (fromSystemClock && typeof timer === "number" && typeof unrefTimer === "function") {
-		unrefTimer(timer);
-	}
-}
-
-export class Queue implements OtlpQueue {
-	readonly conf: ResolvedQueueConf;
-
+class OtlpSender {
+	private readonly conf: ResolvedQueueConf;
 	private readonly headers: Headers;
 	private readonly protobuf: boolean;
+	private readonly report: ResolvedQueueConf["report"];
 	private readonly url: string;
 
-	// Buffer: bytes is the running sum of items[].bytes, so add() and takeBatch() move both together.
-	private bytes = 0;
-	private dropped = 0;
-	private items: QueuedItem[] = [];
-
-	// Scheduling: one round runs at a time, callers arriving mid-round join one next round, and
-	// setTimer installs the one timer that starts it — a batch wait, or a backoff flush() must not jump.
-	private failures = 0;
-	private pending?: Promise<void>;
-	private running?: Promise<void>;
-	private timer?: { handle: TimerHandle, retry: boolean };
-
-	// Storage only: leftovers load before the first round, and saves coalesce into one writer.
-	private dirty = false;
-	private readonly ready: Promise<void>;
-	private saving?: Promise<void>;
-
-	constructor(conf: QueueConf) {
-		this.conf = {
-			...conf,
-			batchDelayMs: conf.batchDelayMs ?? 1000,
-			clock: conf.clock ?? systemClock,
-			key: conf.key ?? "@larvit/log:otlp-queue",
-			maxBatchBytes: conf.maxBatchBytes ?? KEEPALIVE_MAX_BYTES,
-			maxItems: conf.maxItems ?? 1000,
-			otlpProtocol: conf.otlpProtocol ?? "http/json",
-			report: conf.report ?? console.error,
-			retryDelayMs: conf.retryDelayMs ?? 1000,
-		};
-
-		// Validate eagerly: a malformed endpoint or clock fails here, not as an unhandled rejection mid-log.
-		const { clock } = this.conf;
-
-		if (typeof clock.clearTimeout !== "function" || typeof clock.now !== "function" || typeof clock.setTimeout !== "function") {
-			throw new Error("clock must be { now, setTimeout, clearTimeout }");
-		}
-
+	constructor(conf: ResolvedQueueConf, report: ResolvedQueueConf["report"]) {
 		let base: URL;
 
 		try {
@@ -858,139 +907,15 @@ export class Queue implements OtlpQueue {
 
 		const auth = basicAuth(base);
 
-		this.protobuf = this.conf.otlpProtocol === "http/protobuf";
+		this.conf = conf;
+		this.protobuf = conf.otlpProtocol === "http/protobuf";
+		this.report = report;
 		this.url = `${base.protocol}//${base.host}${base.pathname.replace(/\/$/, "")}`;
 		this.headers = new Headers({ "Content-Type": this.protobuf ? "application/x-protobuf" : "application/json" });
 
 		if (auth) {
 			this.headers.set("Authorization", auth);
 		}
-
-		this.ready = conf.storage ? this.load(conf.storage) : Promise.resolve();
-	}
-
-	enqueue(payload: OtlpPayload): void {
-		if (!isOtlpPayload(payload)) {
-			this.report("OTLP payload of unknown kind, dropped", {});
-
-			return;
-		}
-
-		this.add([withBytes(payload)]);
-		this.changed();
-
-		if (this.bytes >= this.conf.maxBatchBytes) {
-			void this.flush();
-		} else {
-			this.schedule();
-		}
-	}
-
-	// While a retry is pending, flush() attempts nothing new: the timer decides.
-	flush(): Promise<void> {
-		if (this.timer?.retry) {
-			return this.running ?? Promise.resolve();
-		}
-
-		if (!this.running) {
-			this.running = this.round().finally(() => { this.running = undefined; });
-
-			return this.running;
-		}
-
-		this.pending ??= this.running.then(() => {
-			this.pending = undefined;
-
-			return this.flush();
-		});
-
-		return this.pending;
-	}
-
-	// The only place the batch or retry timer is installed: whatever it replaces is cleared, so no stray
-	// callback fires.
-	private setTimer(retry: boolean, delayMs: number): TimerHandle {
-		this.conf.clock.clearTimeout(this.timer?.handle);
-		this.timer = undefined;
-
-		const handle = this.conf.clock.setTimeout(() => {
-			this.timer = undefined;
-			void this.flush();
-		}, delayMs);
-
-		this.timer = { handle, retry };
-
-		return handle;
-	}
-
-	private schedule(): void {
-		if (!this.timer) {
-			this.setTimer(false, this.conf.batchDelayMs);
-		}
-	}
-
-	private async round(): Promise<void> {
-		await this.ready;
-		this.conf.clock.clearTimeout(this.timer?.handle);
-		this.timer = undefined;
-
-		while (this.items.length) {
-			const batch = this.takeBatch();
-			const failure = await this.send(batch);
-
-			if (failure?.retry) {
-				this.add(batch, true);
-				this.changed();
-				this.scheduleRetry(batch, failure);
-				break;
-			}
-
-			this.failures = 0;
-			this.changed();
-
-			if (failure) {
-				this.report(failure.reportAs ?? "OTLP export rejected, batch dropped", this.describe(batch, failure));
-			}
-		}
-
-		this.reportDrops();
-	}
-
-	private scheduleRetry(batch: QueuedItem[], failure: SendFailure): void {
-		this.failures++;
-
-		const retryInMs = Math.min(this.conf.retryDelayMs * (2 ** (this.failures - 1)), RETRY_DELAY_MAX_MS);
-
-		// A record enqueued mid-round leaves a batch timer behind; the backoff takes it over.
-		unref(this.setTimer(true, retryInMs), this.conf.clock === systemClock);
-		this.report("OTLP export failed, will retry", { ...this.describe(batch, failure), retryInMs });
-	}
-
-	// The oldest item's kind, plus every later item of the same, up to maxBatchBytes.
-	private takeBatch(): QueuedItem[] {
-		const kind = payloadKind(this.items[0].payload);
-		const batch: QueuedItem[] = [];
-		let bytes = 0;
-
-		for (const item of this.items) {
-			if (payloadKind(item.payload) !== kind) {
-				continue;
-			}
-
-			if (batch.length && bytes + item.bytes > this.conf.maxBatchBytes) {
-				break;
-			}
-
-			batch.push(item);
-			bytes += item.bytes;
-		}
-
-		const taken = new Set(batch);
-
-		this.items = this.items.filter(item => !taken.has(item));
-		this.bytes -= bytes;
-
-		return batch;
 	}
 
 	// The value never joins the message; it is the likeliest place for a credential.
@@ -1008,7 +933,7 @@ export class Queue implements OtlpQueue {
 		return { headers };
 	}
 
-	private async send(batch: QueuedItem[]): Promise<SendFailure | undefined> {
+	async send(batch: QueuedItem[]): Promise<SendFailure | undefined> {
 		const { failure, headers } = this.buildHeaders();
 
 		if (failure) {
@@ -1062,10 +987,131 @@ export class Queue implements OtlpQueue {
 		}
 	}
 
-	private describe(batch: QueuedItem[], outcome: { message?: string, status?: number }): Metadata {
+	describe(batch: QueuedItem[], outcome: { message?: string, status?: number }): Metadata {
 		const path = otlpPath(batch[0].payload);
 
 		return withoutUndefined({ error: outcome.message, items: batch.length, path, status: outcome.status, url: this.url + path });
+	}
+}
+
+// --- OTLP export queue -----------------------------------------------------
+
+export class Queue implements OtlpQueue {
+	readonly conf: ResolvedQueueConf;
+
+	private readonly scheduler: ExportScheduler;
+	private readonly sender: OtlpSender;
+
+	// Buffer: bytes is the running sum of items[].bytes, so add() and takeBatch() move both together.
+	private bytes = 0;
+	private dropped = 0;
+	private items: QueuedItem[] = [];
+
+	// Storage only: leftovers load before the first round, and saves coalesce into one writer.
+	private dirty = false;
+	private readonly ready: Promise<void>;
+	private saving?: Promise<void>;
+
+	constructor(conf: QueueConf) {
+		this.conf = {
+			...conf,
+			batchDelayMs: conf.batchDelayMs ?? 1000,
+			clock: conf.clock ?? systemClock,
+			key: conf.key ?? "@larvit/log:otlp-queue",
+			maxBatchBytes: conf.maxBatchBytes ?? KEEPALIVE_MAX_BYTES,
+			maxItems: conf.maxItems ?? 1000,
+			otlpProtocol: conf.otlpProtocol ?? "http/json",
+			report: conf.report ?? console.error,
+			retryDelayMs: conf.retryDelayMs ?? 1000,
+		};
+
+		// Validate eagerly: a malformed endpoint or clock fails here, not as an unhandled rejection mid-log.
+		const { clock } = this.conf;
+
+		if (typeof clock.clearTimeout !== "function" || typeof clock.now !== "function" || typeof clock.setTimeout !== "function") {
+			throw new Error("clock must be { now, setTimeout, clearTimeout }");
+		}
+
+		this.sender = new OtlpSender(this.conf, (msg, metadata) => this.report(msg, metadata));
+		this.scheduler = new ExportScheduler(this.conf, () => this.round());
+		this.ready = conf.storage ? this.load(conf.storage) : Promise.resolve();
+	}
+
+	enqueue(payload: OtlpPayload): void {
+		if (!isOtlpPayload(payload)) {
+			this.report("OTLP payload of unknown kind, dropped", {});
+
+			return;
+		}
+
+		this.add([withBytes(payload)]);
+		this.changed();
+
+		if (this.bytes >= this.conf.maxBatchBytes) {
+			void this.flush();
+		} else {
+			this.scheduler.schedule();
+		}
+	}
+
+	flush(): Promise<void> {
+		return this.scheduler.flush();
+	}
+
+	private async round(): Promise<void> {
+		await this.ready;
+		this.scheduler.roundStarted();
+
+		while (this.items.length) {
+			const batch = this.takeBatch();
+			const failure = await this.sender.send(batch);
+
+			if (failure?.retry) {
+				this.add(batch, true);
+				this.changed();
+
+				const retryInMs = this.scheduler.backoff();
+
+				this.report("OTLP export failed, will retry", { ...this.sender.describe(batch, failure), retryInMs });
+				break;
+			}
+
+			this.scheduler.succeeded();
+			this.changed();
+
+			if (failure) {
+				this.report(failure.reportAs ?? "OTLP export rejected, batch dropped", this.sender.describe(batch, failure));
+			}
+		}
+
+		this.reportDrops();
+	}
+
+	// The oldest item's kind, plus every later item of the same, up to maxBatchBytes.
+	private takeBatch(): QueuedItem[] {
+		const kind = payloadKind(this.items[0].payload);
+		const batch: QueuedItem[] = [];
+		let bytes = 0;
+
+		for (const item of this.items) {
+			if (payloadKind(item.payload) !== kind) {
+				continue;
+			}
+
+			if (batch.length && bytes + item.bytes > this.conf.maxBatchBytes) {
+				break;
+			}
+
+			batch.push(item);
+			bytes += item.bytes;
+		}
+
+		const taken = new Set(batch);
+
+		this.items = this.items.filter(item => !taken.has(item));
+		this.bytes -= bytes;
+
+		return batch;
 	}
 
 	private report(msg: string, metadata: Metadata): void {
@@ -1123,7 +1169,7 @@ export class Queue implements OtlpQueue {
 			this.add(parsed.map(withBytes), true);
 
 			if (this.items.length) {
-				this.schedule();
+				this.scheduler.schedule();
 			}
 		} catch (err) {
 			this.report("OTLP queue storage unreadable, discarded", withoutUndefined({ error: stringField(err, "message"), key: this.conf.key }));
