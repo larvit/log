@@ -368,9 +368,9 @@ function getNsTimestamp(msTimestamp: number): string {
 }
 
 // Grafana/Loki reads service.name from here, not from the records.
-function buildResourceAttributes(context: Metadata): OtlpAttribute[] {
+function buildResourceAttributes(attributes: Metadata): OtlpAttribute[] {
 	return [
-		{ key: "service.name", value: { stringValue: String(context["service.name"] || "unnamed-service") } },
+		{ key: "service.name", value: { stringValue: String(attributes["service.name"] || "unnamed-service") } },
 		{ key: "telemetry.sdk.language", value: { stringValue: "ecmascript" } },
 		{ key: "telemetry.sdk.name", value: { stringValue: "@larvit/log" } },
 		{ key: "telemetry.sdk.version", value: { stringValue: "__version__" } },
@@ -413,24 +413,24 @@ function buildLogPayload(opts: {
 // Not pure: writes the resolved attributes onto `span` before returning its payload.
 // Unredacted, per README → Goals #3: context and the span name are the caller's own text.
 function buildSpanPayload(opts: {
-	context: Metadata,
+	attributes: Metadata,
 	span: OtlpSpan,
 }): OtlpSpanPayload {
-	const { context, span } = opts;
+	const { attributes, span } = opts;
 
 	// service.name is carried on the resource scope below, so it is excluded from the span attributes.
-	const attributes: OtlpAttribute[] = Object.entries(context)
+	const spanAttributes: OtlpAttribute[] = Object.entries(attributes)
 		.filter(([key]) => key !== "service.name")
 		.map(([key, value]) => ({ key, value: { stringValue: String(value) } }));
 
-	if (attributes.length) {
-		span.attributes = attributes;
+	if (spanAttributes.length) {
+		span.attributes = spanAttributes;
 	}
 
 	return {
 		resourceSpans: [{
 			resource: {
-				attributes: buildResourceAttributes(context),
+				attributes: buildResourceAttributes(attributes),
 				droppedAttributesCount: 0,
 			},
 			scopeSpans: [{
@@ -1005,7 +1005,7 @@ export class Queue implements OtlpQueue {
 	private readonly scheduler: ExportScheduler;
 	private readonly sender: OtlpSender;
 
-	// Buffer: bytes is the running sum of items[].bytes, so add() and takeBatch() move both together.
+	// Buffer: bytes is the running sum of items[].bytes, so countAndTrim() and takeBatch() move both together.
 	private bytes = 0;
 	private dropped = 0;
 	private items: QueuedItem[] = [];
@@ -1047,8 +1047,8 @@ export class Queue implements OtlpQueue {
 			return;
 		}
 
-		this.add([withBytes(payload)]);
-		this.changed();
+		this.append([withBytes(payload)]);
+		this.scheduleSave();
 
 		if (this.bytes >= this.conf.maxBatchBytes) {
 			void this.flush();
@@ -1067,8 +1067,8 @@ export class Queue implements OtlpQueue {
 			const failure = await this.sender.send(batch);
 
 			if (failure?.retry) {
-				this.add(batch, true);
-				this.changed();
+				this.prepend(batch);
+				this.scheduleSave();
 
 				const retryInMs = this.scheduler.backoff();
 
@@ -1077,7 +1077,7 @@ export class Queue implements OtlpQueue {
 			}
 
 			this.scheduler.resetBackoff();
-			this.changed();
+			this.scheduleSave();
 
 			if (failure) {
 				this.report(failure.reportAs ?? "OTLP export rejected, batch dropped", this.sender.describe(batch, failure));
@@ -1129,14 +1129,19 @@ export class Queue implements OtlpQueue {
 		}
 	}
 
-	// Appends (or, for a failed batch, puts back in front) and drops the oldest over maxItems.
-	private add(items: QueuedItem[], front = false): void {
-		if (front) {
-			this.items.unshift(...items);
-		} else {
-			this.items.push(...items);
-		}
+	private append(items: QueuedItem[]): void {
+		this.items.push(...items);
+		this.countAndTrim(items);
+	}
 
+	// A failed or persisted batch is older than anything queued since, so it goes in front.
+	private prepend(items: QueuedItem[]): void {
+		this.items.unshift(...items);
+		this.countAndTrim(items);
+	}
+
+	// Drops the oldest over maxItems.
+	private countAndTrim(items: QueuedItem[]): void {
 		for (const item of items) {
 			this.bytes += item.bytes;
 		}
@@ -1166,7 +1171,7 @@ export class Queue implements OtlpQueue {
 				throw new Error("not a list of OTLP payloads");
 			}
 
-			this.add(parsed.map(withBytes), true);
+			this.prepend(parsed.map(withBytes));
 
 			if (this.items.length) {
 				this.scheduler.schedule();
@@ -1182,7 +1187,7 @@ export class Queue implements OtlpQueue {
 		}
 	}
 
-	private changed(): void {
+	private scheduleSave(): void {
 		if (!this.conf.storage) {
 			return;
 		}
@@ -1232,7 +1237,7 @@ function percentDecoded(value: string): string {
 	});
 }
 
-function capturedValue(value: string): string {
+function redactCredential(value: string): string {
 	// URL_USERINFO cannot match without an `@`, and `%40` is the only escape that decodes to one.
 	if (!value.includes("@") && !value.includes("%40")) {
 		return value;
@@ -1244,8 +1249,8 @@ function capturedValue(value: string): string {
 // Header names carrying a credential by definition: RFC 9110 authentication, RFC 6265 cookies.
 const SENSITIVE_HEADER_NAMES = new Set(["authorization", "cookie", "proxy-authorization", "set-cookie"]);
 
-function capturedHeaderValue(name: string, value: string): string {
-	return SENSITIVE_HEADER_NAMES.has(name.toLowerCase()) ? "REDACTED" : capturedValue(value);
+function redactHeaderCredential(name: string, value: string): string {
+	return SENSITIVE_HEADER_NAMES.has(name.toLowerCase()) ? "REDACTED" : redactCredential(value);
 }
 
 // The URL log.fetch traces: a scheme written without "//" parses to an opaque path, where
@@ -1276,7 +1281,7 @@ function buildUrlFull(url: URL, captureQuery: boolean): string {
 	const kept = new URLSearchParams();
 
 	for (const [key, value] of new URLSearchParams(url.search)) {
-		kept.append(capturedValue(key), SENSITIVE_QUERY_KEYS.has(key.toLowerCase()) ? "REDACTED" : capturedValue(value));
+		kept.append(redactCredential(key), SENSITIVE_QUERY_KEYS.has(key.toLowerCase()) ? "REDACTED" : redactCredential(value));
 	}
 
 	return `${base}?${kept.toString()}`;
@@ -1595,9 +1600,9 @@ function childSpan(log: Pick<Log, "conf" | "span">, name: string, kind: OtlpSpan
 	};
 }
 
-function exportSpan(log: Pick<Log, "conf" | "sampled">, span: OtlpSpan, context: Metadata): void {
+function exportSpan(log: Pick<Log, "conf" | "sampled">, span: OtlpSpan, attributes: Metadata): void {
 	if (log.sampled) {
-		log.conf.otlpQueue?.enqueue(buildSpanPayload({ context, span }));
+		log.conf.otlpQueue?.enqueue(buildSpanPayload({ attributes, span }));
 	}
 }
 
@@ -1607,13 +1612,13 @@ async function tracedFetch(log: Pick<Log, "conf" | "context" | "sampled" | "span
 	// childSpan can't throw; everything that can (e.g. `new Headers` on a bad name) is inside the
 	// try, so finally always settles the tracked promise and flush() can never hang on this fetch.
 	const span = childSpan(log, url.host, SPAN_KIND_CLIENT);
-	const context: Metadata = { ...log.context };
+	const attributes: Metadata = { ...log.context };
 
 	try {
 		const method = (init?.method ?? "GET").toUpperCase();
 
 		span.name = `${method} ${url.host}`;
-		Object.assign(context, {
+		Object.assign(attributes, {
 			"http.request.method": method,
 			"server.address": url.hostname,
 			"url.full": buildUrlFull(url, log.conf.captureQuery === true),
@@ -1632,13 +1637,13 @@ async function tracedFetch(log: Pick<Log, "conf" | "context" | "sampled" | "span
 			const key = name.toLowerCase();
 
 			if (value !== null) {
-				context[`http.request.header.${key}`] = capturedHeaderValue(key, value);
+				attributes[`http.request.header.${key}`] = redactHeaderCredential(key, value);
 			}
 		}
 
 		const res = await globalThis.fetch(url, { ...init, headers });
 
-		context["http.response.status_code"] = res.status;
+		attributes["http.response.status_code"] = res.status;
 		span.status.code = res.status >= 400 ? STATUS_CODE_ERROR : STATUS_CODE_UNSET;
 
 		for (const name of log.conf.captureResponseHeaders ?? []) {
@@ -1646,7 +1651,7 @@ async function tracedFetch(log: Pick<Log, "conf" | "context" | "sampled" | "span
 			const key = name.toLowerCase();
 
 			if (value !== null) {
-				context[`http.response.header.${key}`] = capturedHeaderValue(key, value);
+				attributes[`http.response.header.${key}`] = redactHeaderCredential(key, value);
 			}
 		}
 
@@ -1655,14 +1660,14 @@ async function tracedFetch(log: Pick<Log, "conf" | "context" | "sampled" | "span
 		const failure = spanFailure(err);
 
 		span.status = { code: STATUS_CODE_ERROR, message: failure.message };
-		context["error.type"] = failure.type;
+		attributes["error.type"] = failure.type;
 
 		throw err;
 	} finally {
 		span.endTimeUnixNano = getNsTimestamp(log.conf.clock.now());
 		// settle() must run even if the queue throws, else flush() hangs on this fetch.
 		try {
-			exportSpan(log, span, context);
+			exportSpan(log, span, attributes);
 		} finally {
 			settle();
 		}
@@ -1721,16 +1726,16 @@ export class Log implements LogInt {
 		this.ended = true;
 		this.span.endTimeUnixNano = getNsTimestamp(this.conf.clock.now());
 
-		const context: Metadata = { ...this.context };
+		const attributes: Metadata = { ...this.context };
 
 		if (options?.error !== undefined && options.error !== null) {
 			const failure = spanFailure(options.error);
 
 			this.span.status = { code: STATUS_CODE_ERROR, message: failure.message };
-			context["error.type"] = failure.type;
+			attributes["error.type"] = failure.type;
 		}
 
-		exportSpan(this, this.span, context);
+		exportSpan(this, this.span, attributes);
 		await this.flush();
 	}
 
