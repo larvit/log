@@ -2,10 +2,6 @@
 
 Guidance for agents working on `@larvit/log`. Keep changes aligned with the README's goals.
 
-## What this is
-
-Structured logging with a tiny API and first-class OTLP (logs + traces) over `fetch`, with no OpenTelemetry SDK dependency. Works as a plain stdout/stderr logger when OTLP is not configured. `log.fetch()` auto-instruments outgoing HTTP (client spans + W3C `traceparent` propagation); the `traceparent` option joins upstream traces.
-
 ## Goals, audience and personas
 
 [README](README.md) → Goals and Audience. They are the public statement of where this is heading
@@ -200,4 +196,4 @@ and who it is for, and a design decision that cannot be derived from them belong
   open — leads with `### Security` holding it, ahead of `### Everything else`; one with none omits
   both headings. Thirty flat bullets is where a rotation notice goes unread.
 - Tests-first. The suite (`test.ts`) injects `stdout`/`stderr` and stubs the global `fetch`, so the same tests cover console + OTLP in both Node and the browser.
-- See [README](README.md) for build/test/release commands. Keep the README and this file in sync with any priority or workflow change.
+- See [README](README.md) for build/test/release commands.

@@ -1,21 +1,10 @@
 # Todo
 
-Every item sits under the release that ships it, and a release that holds anything a consumer must
-act on leads with `### Security`, the shape AGENTS.md → Working here already sets for
-`CHANGELOG.md`. Per README → Goals #4, everything breaking is deprecated in a 2.x minor first and
-lands in 3.0.0 with a `MIGRATION.md` entry.
-
 Each item states the problem and what must hold once it is gone. Working out *how* is part of the
 item, not settled by it: where an item names a mechanism, that is evidence of the problem, never
 the prescribed repair.
 
 ## 2.4.0
-
-`CHANGELOG.md` → `## Unreleased` holds what is done: six credential leaks closed with five
-rotation advisories, the export queue, the injectable clock, `Logger`, and the `entryFormatter` and
-level-string deprecations.
-
-None of it is breaking.
 
 ### Comprehension, README → Goals #8
 
@@ -27,7 +16,9 @@ items are its causes, and each names how many of the nine readers hit it.
   from it, and only `isQueueFor` comparing `otlpAdditionalHeaders` by reference keeps that child
   from throwing; six readers reconstructed it by simulating a parent and child. `otlpQueue` is new
   in 2.4.0, so what `log.conf.otlpQueue` reads on a shorthand instance is settled before it ships,
-  and the `JSON.stringify` item below may close with it.
+  and the `JSON.stringify` item below may close with it. `isQueueFor` compares values, so
+  `new Log({ otlpQueue: new Queue({ otlpHttpBaseURI: u }), otlpHttpBaseURI: u })` is accepted,
+  where README → Queue exports, the `otlpQueue` row and the 2026-09-16 decision say it throws.
 - [ ] Hold the queue's scheduling state where one reader can check it: `running`, `pending`,
   `timer.retry` and `failures` together decide what `flush`, `round`, `setTimer` and
   `scheduleRetry` do. Nine of nine readers traced it by hand and four named it the unit they would
@@ -44,7 +35,7 @@ items are its causes, and each names how many of the nine readers hit it.
 - [ ] Name the OTLP span kind and status code values the source writes as bare numbers: `kind: 1`,
   `childSpan(url.host, 3)`, `status.code = 2`. Five readers guessed what they meant.
 - [ ] Delete comments that restate the code or the README: the `LogConf` field comments repeat the
-  options table (eight readers), and so do the id-size, "defaulted above", "Ends the span, then
+  options table (eight readers), and so do the id-size, "set above", "Ends the span, then
   flushes", `traceparent()` and `exportSpan` lines. Their readers paid to learn nothing.
 - [ ] Give `log.fetch` its own section, and file each helper where its question lives: batch merging
   and `partialRejection` beside what they serve, the OTLP wire types beside the payload builders,
@@ -71,6 +62,9 @@ items are its causes, and each names how many of the nine readers hit it.
   entry; only the span obeys it. `log()` returns before the enqueue whenever `sampled` is false.
   Afterwards the CHANGELOG bullet on the sampled flag, README → Join an incoming trace, the
   `traceparent` option row and the `sampled` field comment all say records still export.
+- [ ] Restore `"fetch_error"` as a `log.fetch` span's `error.type` fallback, where v2.3.0's README
+  documented it, per Goals #4; `_OTHER` waits for 3.0.0 behind a 2.6.0 deprecation. Unreleased
+  swaps it in a minor.
 - [ ] Keep an injected `clock` from hanging `flush()` and `end()`. `tracedFetch` calls `childSpan`
   before its `try`, on the comment that it cannot throw, but `getNsTimestamp` hands `BigInt` a
   fraction whenever `now()` returns one — a `performance.now()`-based clock does — and a caller's
@@ -297,8 +291,7 @@ Each one is a weigh against README → Goals first: ship it, or delete the item 
   Add `ended` to `LogInt`.
 - [ ] Keep `otlpQueue` as the only OTLP representation in `conf`: build the default `Queue` from
   the three `otlp*` shorthands and clear them, so inheritance needs one rule and `isQueueFor` goes.
-  Today `log.conf.otlpHttpBaseURI` stays readable, which is why this waits for a major. It lands on
-  the settings resolution 2.4.0 already split out.
+  Today `log.conf.otlpHttpBaseURI` stays readable, which is why this waits for a major.
 - [ ] Keep credentials off `log.conf` and `queue.conf`. `otlpHttpBaseURI`'s `user:pass@` and an
   `otlpAdditionalHeaders` bearer token sit there verbatim, so a consumer who logs their own conf puts
   them in their log store. Goals #3 stops at what this library emits, so this is a Goals #4 break. The `otlpQueue`

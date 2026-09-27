@@ -1308,8 +1308,7 @@ type Derivation = "child" | "clone";
 
 const CHILD_AND_CLONE: readonly Derivation[] = ["child", "clone"];
 
-// Which derivations take a key from their source when the caller leaves it unset. Every key is
-// listed, so a new option has to state its rule.
+// Which derivations take a key from their source when the caller leaves it unset.
 const INHERITED_BY: { [K in keyof LogConf]-?: readonly Derivation[] } = {
 	captureQuery: CHILD_AND_CLONE,
 	captureRequestHeaders: CHILD_AND_CLONE,
@@ -1326,7 +1325,6 @@ const INHERITED_BY: { [K in keyof LogConf]-?: readonly Derivation[] } = {
 	otlpHttpBaseURI: CHILD_AND_CLONE,
 	otlpProtocol: CHILD_AND_CLONE,
 	otlpQueue: CHILD_AND_CLONE,
-	// Where this instance sits in a trace.
 	parentLog: [],
 	printTraceInfo: CHILD_AND_CLONE,
 	// A clone is its own span.
