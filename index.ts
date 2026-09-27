@@ -252,7 +252,7 @@ export function parseTraceparent(header: string): { flags: string, sampled: bool
 	return { flags, sampled: (parseInt(flags, 16) & 1) === 1, spanId, traceId };
 }
 
-// --- Describing a failure --------------------------------------------------
+// --- Reading a failure's message and code ----------------------------------
 
 // Total: a throwing getter yields undefined, so the flush path never rejects on its input.
 function stringField(value: unknown, key: string): string | undefined {
@@ -1603,9 +1603,7 @@ function exportSpan(log: Pick<Log, "conf" | "sampled">, span: OtlpSpan, context:
 
 // --- log.fetch -------------------------------------------------------------
 
-type FetchingLog = Pick<Log, "conf" | "context" | "sampled" | "span">;
-
-async function tracedFetch(log: FetchingLog, url: URL, init: RequestInit | undefined, settle: () => void): Promise<Response> {
+async function tracedFetch(log: Pick<Log, "conf" | "context" | "sampled" | "span">, url: URL, init: RequestInit | undefined, settle: () => void): Promise<Response> {
 	// childSpan can't throw; everything that can (e.g. `new Headers` on a bad name) is inside the
 	// try, so finally always settles the tracked promise and flush() can never hang on this fetch.
 	const span = childSpan(log, url.host, SPAN_KIND_CLIENT);
