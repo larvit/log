@@ -176,11 +176,12 @@ async function myRequestHandler(req, res) {
 }
 ```
 
-A child inherits every option it does not set itself except `traceparent`, `spanName` included. Setting `context` on a
-child replaces the parent's rather than merging, hence the spread above. The `service.name` context
-key becomes the OTLP resource's service name (default `"unnamed-service"`) rather than a per-entry
-attribute. A child's log entries attach to the parent's span; the child's own span holds its
-timing and is exported by `end()`.
+A child inherits every option it does not set itself, `spanName` included; `traceparent` never, and
+the OTLP options as [Queue exports](#queue-exports) says. Setting `context` on a child replaces the
+parent's rather than merging, hence the spread above. The `service.name` context key becomes the
+OTLP resource's service name (default `"unnamed-service"`) rather than a per-entry attribute. A
+child's log entries attach to the parent's span; the child's own span holds its timing and is
+exported by `end()`.
 
 `end()` closes the span, queues it and flushes the [export queue](#queue-exports); a span that is
 never ended is never sent. `end({ error })` also marks the span failed: status `ERROR` with the
@@ -239,8 +240,9 @@ spans, `log.traceparent()` and `log.fetch` pass `00` on, and console output is u
 ## Queue exports
 
 Every record and span goes through an export queue. `otlpHttpBaseURI` builds one, shared by every
-child and clone that sets no `otlp*` option of its own, so one process sends few POSTs and retries a batch the collector
-did not accept with backoff. Configure it yourself to persist the queue or to tune it:
+child and clone that sets no `otlp*` option of its own, so one process sends few POSTs and retries a
+batch the collector did not accept with backoff. Configure it yourself to persist the queue or to
+tune it:
 
 ```javascript
 import { Log, Queue } from "@larvit/log";
@@ -455,7 +457,7 @@ Instance fields: `log.conf`, `log.context`, `log.span`, `log.sampled`, `log.ende
 
 Everything runs in Docker with dependencies installed in the container, so no local `npm install`.
 The exceptions: `npm run lint` needs Node 20+ and `npm ci` on the host, and `npm run test-otlp`
-drives the collector with the host's Node.
+needs Node 18+ on the host.
 
 | Command | |
 |---|---|
