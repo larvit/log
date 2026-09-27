@@ -11,9 +11,6 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 The 2026-09-27 panel's baseline, in `docs/decisions.md`, is capped by Locality; each item names
 how many of the nine readers hit it.
 
-- [ ] **Delete comments that restate the code or the README.** The `LogConf` field comments repeat
-  the options table (eight readers), and so do the id-size, "set above", "Ends the span, then
-  flushes", `traceparent()` and `exportSpan` lines. Their readers paid to learn nothing.
 - [ ] **Give `log.fetch` its own section, and file each helper where its question lives.** The OTLP
   wire types go beside the payload builders, and nothing sits under a banner named for a technique,
   as "Reading a value of unknown shape" is. Both architects mapped `log.fetch` wrongly first.

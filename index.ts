@@ -28,11 +28,8 @@ export type EntryFormatterConf = {
 };
 
 export type LogConf = {
-	// log.fetch only: include the URL query string on the span (sensitive keys still redacted). Default false.
 	captureQuery?: boolean;
-	// log.fetch only: request header names to record as http.request.header.* (allow-list, none by default).
 	captureRequestHeaders?: string[];
-	// log.fetch only: response header names to record as http.response.header.* (allow-list, none by default).
 	captureResponseHeaders?: string[];
 	clock?: Clock;
 	colors?: boolean;
@@ -42,7 +39,6 @@ export type LogConf = {
 	entryFormatter?: EntryFormatter;
 	format?: "text" | "json" | EntryFormatter;
 	logLevel?: LogLevel | "none";
-	// The three otlp* transport options are shorthand for `otlpQueue: new Queue({ ...them })`; never both.
 	otlpAdditionalHeaders?: Record<string, string>;
 	otlpHttpBaseURI?: string;
 	otlpProtocol?: "http/json" | "http/protobuf";
@@ -52,12 +48,9 @@ export type LogConf = {
 	spanName?: string;
 	stderr?: (msg: string) => void;
 	stdout?: (msg: string) => void;
-	// Incoming W3C traceparent to adopt: this log joins that trace and nests under that span.
-	// Ignored if malformed or if parentLog is set.
 	traceparent?: string;
 };
 
-// conf after the constructor fills its defaults: the always-set fields are no longer optional.
 export type ResolvedLogConf = LogConf & Required<Pick<LogConf, "clock" | "colors" | "entryFormatter" | "format" | "logLevel" | "stderr" | "stdout">>;
 
 export type LogOptions = Omit<LogConf, "context"> & { context?: MetadataInput };
@@ -288,17 +281,14 @@ function getRandomBytes(size: number): Uint8Array {
 	return bytes;
 }
 
-// Random 8-byte span id as 16 hex chars.
 export function generateSpanId(): string {
 	return bytesToHex(getRandomBytes(8));
 }
 
-// Random 16-byte trace id as 32 hex chars.
 export function generateTraceId(): string {
 	return bytesToHex(getRandomBytes(16));
 }
 
-// W3C `traceparent` header value (`version-traceId-spanId-flags`); sampled by default.
 export function formatTraceparent(traceId: string, spanId: string, sampled: boolean = true): string {
 	return `00-${traceId}-${spanId}-${sampled ? "01" : "00"}`;
 }
@@ -377,7 +367,6 @@ function getNsTimestamp(msTimestamp: number): string {
 	return totalNanos.toString();
 }
 
-// Resource-level OTLP attributes (service.name + telemetry.sdk.*), shared by logs and spans.
 // Grafana/Loki reads service.name from here, not from the records.
 function buildResourceAttributes(context: Metadata): OtlpAttribute[] {
 	return [
@@ -525,7 +514,6 @@ class ProtoWriter {
 		return this;
 	}
 
-	// Embedded message: encode into a sub-writer, then write it length-delimited.
 	message(fieldNo: number, write: (sub: ProtoWriter) => void): this {
 		const sub = new ProtoWriter();
 
@@ -1527,7 +1515,6 @@ function withDefaults(conf: LogConf): ResolvedLogConf {
 
 	Object.defineProperty(conf, "entryFormatter", ENTRY_FORMATTER_ALIAS);
 
-	// Every optional field the resolved type requires is set above.
 	return conf as ResolvedLogConf;
 }
 
@@ -1630,7 +1617,6 @@ export class Log implements LogInt {
 		return new Log(conf);
 	}
 
-	// Ends the span, then flushes: one delivery attempt, not a guarantee.
 	public async end(options?: { error?: unknown }): Promise<void> {
 		if (this.ended) {
 			throw new Error("Logging instance is already ended");
@@ -1651,13 +1637,11 @@ export class Log implements LogInt {
 		await this.flush();
 	}
 
-	// Delivers everything queued so far, un-awaited log.fetch spans included, without ending the span.
 	public async flush(): Promise<void> {
 		await Promise.all([...this.inFlight]);
 		await this.conf.otlpQueue?.flush();
 	}
 
-	// The current span's context as a W3C `traceparent` header, for propagating to non-fetch clients.
 	public traceparent(): string {
 		return formatTraceparent(this.span.traceId, this.span.spanId, this.sampled);
 	}
@@ -1718,7 +1702,7 @@ export class Log implements LogInt {
 			const res = await globalThis.fetch(url, { ...init, headers });
 
 			context["http.response.status_code"] = res.status;
-			span.status.code = res.status >= 400 ? STATUS_CODE_ERROR : STATUS_CODE_UNSET; // 4xx/5xx are errors for client spans
+			span.status.code = res.status >= 400 ? STATUS_CODE_ERROR : STATUS_CODE_UNSET;
 
 			for (const name of this.conf.captureResponseHeaders ?? []) {
 				const value = res.headers.get(name);
@@ -1796,7 +1780,6 @@ export class Log implements LogInt {
 			return;
 		}
 
-		// Logs attach to the parent span when there is one, otherwise to this instance's span.
 		const span = this.conf.parentLog?.span.spanId ? this.conf.parentLog.span : this.span;
 
 		this.conf.otlpQueue.enqueue(buildLogPayload({ attributes, logLevel, msTimestamp, msg, span }));
@@ -1824,7 +1807,6 @@ export class Log implements LogInt {
 		}
 	}
 
-	// A fresh child span under this log's span/trace.
 	private childSpan(name: string, kind: OtlpSpan["kind"]): OtlpSpan {
 		const now = getNsTimestamp(this.conf.clock.now());
 
@@ -1846,7 +1828,6 @@ export class Log implements LogInt {
 		};
 	}
 
-	// Queues an ended span, deriving its attributes/resource from `context`.
 	private exportSpan(span: OtlpSpan, context: Metadata): void {
 		if (this.sampled) {
 			this.conf.otlpQueue?.enqueue(buildSpanPayload({ context, span }));
