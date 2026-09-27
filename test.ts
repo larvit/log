@@ -518,8 +518,12 @@ test("printTraceInfo appends span/trace info to output", t => {
 	t.end();
 });
 
-test("clone merges context (overrides win)", t => {
-	const log = new Log({ context: { foo: "bar" } });
+test("a clone merges context and takes no spanName; a child replaces context and inherits spanName", t => {
+	const log = new Log({ context: { foo: "bar" }, spanName: "parent" });
+
+	t.strictEqual(log.clone().span.name, "unnamed-span", "a clone takes no spanName");
+	t.strictEqual(new Log({ parentLog: log }).span.name, "parent", "a child inherits spanName");
+	t.deepEqual(new Log({ context: { baz: "fu" }, parentLog: log }).context, { baz: "fu" }, "a child's context replaces its parent's");
 
 	t.strictEqual(JSON.stringify(log.clone({ context: { baz: "fu" } }).context), "{\"foo\":\"bar\",\"baz\":\"fu\"}", "new keys merge in");
 	t.strictEqual(JSON.stringify(log.clone({ context: { foo: "burp" } }).context), "{\"foo\":\"burp\"}", "existing keys are overridden");

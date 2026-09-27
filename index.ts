@@ -1250,44 +1250,7 @@ function spanFailure(error: unknown): { message: string, type: string } {
 	return { message: redactUserinfo(message), type: stringField(error, "code") ?? stringField(error, "name") ?? "_OTHER" };
 }
 
-// --- Conf inheritance and deprecation --------------------------------------
-
-const OTLP_TRANSPORT_KEYS = ["otlpAdditionalHeaders", "otlpHttpBaseURI", "otlpProtocol"] as const;
-
-// Where this instance sits in a trace: never inherited by a child or a clone.
-const EDGE_KEYS = ["parentLog", "traceparent"] as const;
-
-// The keys of the OTLP spelling `conf` does not use, so inheriting never puts a queue beside an
-// endpoint it was not built from.
-function otlpKeysNotToInherit(conf: LogConf): (keyof LogConf)[] {
-	if (conf.otlpQueue) {
-		return [...OTLP_TRANSPORT_KEYS];
-	}
-
-	return OTLP_TRANSPORT_KEYS.some(key => conf[key] !== undefined) ? ["otlpQueue"] : [];
-}
-
-// A Queue built from exactly these transport options: the one case where both spellings may sit
-// together (a clone, a child, a spread conf).
-function isQueueFor(queue: OtlpQueue, conf: LogConf): boolean {
-	return queue instanceof Queue
-		&& queue.conf.otlpHttpBaseURI === conf.otlpHttpBaseURI
-		&& queue.conf.otlpProtocol === (conf.otlpProtocol ?? "http/json")
-		&& queue.conf.otlpAdditionalHeaders === conf.otlpAdditionalHeaders;
-}
-
-// The deprecated spelling folded into `format`, so nothing inherited can override what the caller passed.
-function foldEntryFormatter(conf: LogConf): void {
-	if (conf.entryFormatter === undefined) {
-		return;
-	}
-
-	if (typeof conf.format === "function" && conf.format !== conf.entryFormatter) {
-		throw new Error("entryFormatter and format are two spellings of one formatter: pass only format");
-	}
-
-	conf.format = conf.entryFormatter;
-}
+// --- Warnings written once per stderr sink ---------------------------------
 
 const warned = new WeakMap<(msg: string) => void, Set<unknown>>();
 
@@ -1337,12 +1300,110 @@ function warnOnce(conf: ResolvedLogConf, metadata: MetadataInput | undefined, ms
 	}
 }
 
+// --- Resolving a Log's settings --------------------------------------------
+
+const OTLP_TRANSPORT_KEYS = ["otlpAdditionalHeaders", "otlpHttpBaseURI", "otlpProtocol"] as const;
+
+type Derivation = "child" | "clone";
+
+const CHILD_AND_CLONE: readonly Derivation[] = ["child", "clone"];
+
+// Which derivations take a key from their source when the caller leaves it unset. Every key is
+// listed, so a new option has to state its rule.
+const INHERITED_BY: { [K in keyof LogConf]-?: readonly Derivation[] } = {
+	captureQuery: CHILD_AND_CLONE,
+	captureRequestHeaders: CHILD_AND_CLONE,
+	captureResponseHeaders: CHILD_AND_CLONE,
+	clock: CHILD_AND_CLONE,
+	colors: CHILD_AND_CLONE,
+	// A clone merges it per key instead.
+	context: ["child"],
+	// Folded into format.
+	entryFormatter: [],
+	format: CHILD_AND_CLONE,
+	logLevel: CHILD_AND_CLONE,
+	otlpAdditionalHeaders: CHILD_AND_CLONE,
+	otlpHttpBaseURI: CHILD_AND_CLONE,
+	otlpProtocol: CHILD_AND_CLONE,
+	otlpQueue: CHILD_AND_CLONE,
+	// Where this instance sits in a trace.
+	parentLog: [],
+	printTraceInfo: CHILD_AND_CLONE,
+	// A clone is its own span.
+	spanName: ["child"],
+	stderr: CHILD_AND_CLONE,
+	stdout: CHILD_AND_CLONE,
+	traceparent: [],
+};
+
+// The keys of the OTLP spelling `conf` does not use, so inheriting never puts a queue beside an
+// endpoint it was not built from.
+function otlpKeysNotToInherit(conf: LogConf): (keyof LogConf)[] {
+	if (conf.otlpQueue) {
+		return [...OTLP_TRANSPORT_KEYS];
+	}
+
+	return OTLP_TRANSPORT_KEYS.some(key => conf[key] !== undefined) ? ["otlpQueue"] : [];
+}
+
+// A Queue built from exactly these transport options: the one case where both spellings may sit
+// together (a clone, a child, a spread conf).
+function isQueueFor(queue: OtlpQueue, conf: LogConf): boolean {
+	return queue instanceof Queue
+		&& queue.conf.otlpHttpBaseURI === conf.otlpHttpBaseURI
+		&& queue.conf.otlpProtocol === (conf.otlpProtocol ?? "http/json")
+		&& queue.conf.otlpAdditionalHeaders === conf.otlpAdditionalHeaders;
+}
+
+function confFromOptions(options: LogOptions | LogLevel | "none" | undefined): LogConf {
+	const { context, ...rest }: LogOptions = typeof options === "string" ? { logLevel: options } : { ...options };
+
+	return context === undefined ? rest : { ...rest, context: withoutUndefined(context) };
+}
+
+function inheritSettings(conf: LogConf, source: LogConf, derivation: Derivation): void {
+	const skip = new Set(otlpKeysNotToInherit(conf));
+
+	// The caller's entryFormatter is their format.
+	if (conf.entryFormatter !== undefined) {
+		skip.add("format");
+	}
+
+	for (const key of Object.keys(INHERITED_BY) as (keyof LogConf)[]) {
+		if (INHERITED_BY[key].includes(derivation) && !skip.has(key) && conf[key] === undefined) {
+			// Same key on both sides, so the value type matches; `as never` satisfies the writer.
+			conf[key] = source[key] as never;
+		}
+	}
+}
+
+// Returns the deprecation warning the caller's entryFormatter owes.
+function foldEntryFormatter(conf: LogConf): string | undefined {
+	if (conf.entryFormatter === undefined) {
+		return undefined;
+	}
+
+	if (typeof conf.format === "function" && conf.format !== conf.entryFormatter) {
+		throw new Error("entryFormatter and format are two spellings of one formatter: pass only format");
+	}
+
+	const overridden = typeof conf.format === "string";
+
+	conf.format = conf.entryFormatter;
+
+	if (overridden) {
+		return "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format — entryFormatter wins and the format beside it is ignored";
+	}
+
+	return "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format";
+}
+
 const CONF_FORMATTER_DEPRECATED = "@larvit/log: conf.entryFormatter is deprecated and removed in 3.0.0, use conf.format";
 
 // One descriptor for every instance: Goals #7's 1 KB budget.
 const ENTRY_FORMATTER_ALIAS: PropertyDescriptor = {
 	configurable: true,
-	// So a child or a spread carries `format` alone, and never folds the alias a second time.
+	// So a spread carries `format` alone, and never folds the alias a second time.
 	enumerable: false,
 	get(this: ResolvedLogConf): EntryFormatter {
 		warnOnce(this, this.context, CONF_FORMATTER_DEPRECATED);
@@ -1355,7 +1416,86 @@ const ENTRY_FORMATTER_ALIAS: PropertyDescriptor = {
 	},
 };
 
+function withDefaults(conf: LogConf): ResolvedLogConf {
+	if (conf.logLevel === undefined) {
+		conf.logLevel = "info";
+	}
+
+	if (conf.clock === undefined) {
+		conf.clock = systemClock;
+	}
+
+	if (conf.colors === undefined) {
+		conf.colors = colorsFromEnv() ?? true;
+	}
+
+	if (conf.format === undefined) {
+		conf.format = "text";
+	}
+
+	if (conf.stderr === undefined) {
+		conf.stderr = console.error;
+	}
+
+	if (conf.stdout === undefined) {
+		conf.stdout = console.log;
+	}
+
+	Object.defineProperty(conf, "entryFormatter", ENTRY_FORMATTER_ALIAS);
+
+	// Every optional field the resolved type requires is set above.
+	return conf as ResolvedLogConf;
+}
+
+// Defaults come last, so none hides an inherited value; the fold precedes them, so a defaulted
+// format never reads as one the caller wrote beside entryFormatter.
+function resolveLogConf(options: LogOptions | LogLevel | "none" | undefined): { conf: ResolvedLogConf, deprecations: string[] } {
+	const conf = confFromOptions(options);
+	const deprecations: string[] = [];
+
+	if (typeof options === "string") {
+		deprecations.push("@larvit/log: new Log(\"level\") is deprecated and removed in 3.0.0, use new Log({ logLevel })");
+	}
+
+	if (typeof conf.parentLog === "object") {
+		inheritSettings(conf, conf.parentLog.conf, "child");
+	}
+
+	const formatterDeprecation = foldEntryFormatter(conf);
+
+	if (formatterDeprecation) {
+		deprecations.push(formatterDeprecation);
+	}
+
+	return { conf: withDefaults(conf), deprecations };
+}
+
 // --- Log -------------------------------------------------------------------
+
+function openSpan(conf: ResolvedLogConf): { sampled: boolean, span: OtlpSpan } {
+	const incoming = !conf.parentLog && conf.traceparent ? parseTraceparent(conf.traceparent) : null;
+	const startedAt = getNsTimestamp(conf.clock.now());
+
+	return {
+		sampled: conf.parentLog?.sampled ?? incoming?.sampled ?? true,
+		span: {
+			attributes: [],
+			droppedAttributesCount: 0,
+			droppedEventsCount: 0,
+			droppedLinksCount: 0,
+			endTimeUnixNano: startedAt,
+			events: [],
+			kind: 1,
+			links: [],
+			name: conf.spanName || "unnamed-span",
+			parentSpanId: conf.parentLog?.span.spanId ?? incoming?.spanId,
+			spanId: generateSpanId(),
+			startTimeUnixNano: startedAt,
+			status: { code: 0 },
+			traceId: conf.parentLog?.span.traceId || incoming?.traceId || generateTraceId(),
+		},
+	};
+}
 
 export class Log implements LogInt {
 	context: Metadata;
@@ -1372,66 +1512,38 @@ export class Log implements LogInt {
 	span: OtlpSpan;
 
 	constructor(options?: LogOptions | LogLevel | "none") {
-		const { context, ...rest }: LogOptions = typeof options === "string" ? { logLevel: options } : { ...options };
-		const conf: LogConf = context === undefined ? rest : { ...rest, context: withoutUndefined(context) };
-		const deprecatedFormatter = conf.entryFormatter !== undefined;
-		const overriddenFormat = deprecatedFormatter && typeof conf.format === "string";
+		const { conf, deprecations } = resolveLogConf(options);
 
-		foldEntryFormatter(conf);
-
-		if (typeof conf.parentLog === "object") {
-			const parentConf = conf.parentLog.conf;
-			const skip = new Set<keyof LogConf>([...EDGE_KEYS, ...otlpKeysNotToInherit(conf)]);
-
-			for (const key of Object.keys(parentConf) as (keyof LogConf)[]) {
-				if (!skip.has(key) && conf[key] === undefined) {
-					// Same key on both sides, so the value type matches; `as never` satisfies the writer.
-					conf[key] = parentConf[key] as never;
-				}
-			}
-		}
-
-		if (conf.logLevel === undefined) {
-			conf.logLevel = "info";
-		}
-
-		if (conf.clock === undefined) {
-			conf.clock = systemClock;
-		}
-
-		if (conf.colors === undefined) {
-			conf.colors = colorsFromEnv() ?? true;
-		}
-
-		if (conf.format === undefined) {
-			conf.format = "text";
-		}
-
-		if (conf.stderr === undefined) {
-			conf.stderr = console.error;
-		}
-
-		if (conf.stdout === undefined) {
-			conf.stdout = console.log;
-		}
-
-		Object.defineProperty(conf, "entryFormatter", ENTRY_FORMATTER_ALIAS);
-
-		// Every optional field the resolved type requires has been defaulted above.
-		this.conf = conf as ResolvedLogConf;
+		this.conf = conf;
 		// Own copy, so a clone/child never mutates a context object shared with another instance.
-		this.context = withoutUndefined(this.conf.context);
+		this.context = withoutUndefined(conf.context);
 
+		for (const msg of deprecations) {
+			warnOnce(conf, this.context, msg);
+		}
+
+		this.connectQueue();
+
+		const { sampled, span } = openSpan(conf);
+
+		this.sampled = sampled;
+		this.span = span;
+	}
+
+	public clone(options?: LogOptions | LogLevel | "none") {
 		if (typeof options === "string") {
-			warnOnce(this.conf, this.context, "@larvit/log: new Log(\"level\") is deprecated and removed in 3.0.0, use new Log({ logLevel })");
+			warnOnce(this.conf, this.context, "@larvit/log: log.clone(\"level\") is deprecated and removed in 3.0.0, use log.clone({ logLevel })");
 		}
 
-		if (overriddenFormat) {
-			warnOnce(this.conf, this.context, "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format — entryFormatter wins and the format beside it is ignored");
-		} else if (deprecatedFormatter) {
-			warnOnce(this.conf, this.context, "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format");
-		}
+		const conf = confFromOptions(options);
 
+		conf.context = { ...this.context, ...conf.context };
+		inheritSettings(conf, this.conf, "clone");
+
+		return new Log(conf);
+	}
+
+	private connectQueue(): void {
 		if (this.conf.otlpQueue) {
 			if (OTLP_TRANSPORT_KEYS.some(key => this.conf[key] !== undefined) && !isQueueFor(this.conf.otlpQueue, this.conf)) {
 				throw new Error("otlpQueue carries the endpoint: set otlpHttpBaseURI, otlpProtocol and otlpAdditionalHeaders on the queue, not beside it");
@@ -1445,57 +1557,6 @@ export class Log implements LogInt {
 				report: (msg, metadata) => this.outputToConsole("error", msg, metadata, this.conf.clock.now()),
 			});
 		}
-
-		let incoming: ReturnType<typeof parseTraceparent> = null;
-
-		if (!this.conf.parentLog && this.conf.traceparent) {
-			incoming = parseTraceparent(this.conf.traceparent);
-		}
-
-		const startedAt = getNsTimestamp(this.conf.clock.now());
-
-		this.sampled = this.conf.parentLog?.sampled ?? incoming?.sampled ?? true;
-		this.span = {
-			attributes: [],
-			droppedAttributesCount: 0,
-			droppedEventsCount: 0,
-			droppedLinksCount: 0,
-			endTimeUnixNano: startedAt,
-			events: [],
-			kind: 1,
-			links: [],
-			name: this.conf.spanName || "unnamed-span",
-			parentSpanId: this.conf.parentLog?.span.spanId ?? incoming?.spanId,
-			spanId: generateSpanId(),
-			startTimeUnixNano: startedAt,
-			status: { code: 0 },
-			traceId: this.conf.parentLog?.span.traceId || incoming?.traceId || generateTraceId(),
-		};
-	}
-
-	public clone(options?: LogOptions | LogLevel | "none") {
-		if (typeof options === "string") {
-			warnOnce(this.conf, this.context, "@larvit/log: log.clone(\"level\") is deprecated and removed in 3.0.0, use log.clone({ logLevel })");
-		}
-
-		const { context, ...rest }: LogOptions = typeof options === "string" ? { logLevel: options } : { ...options };
-		const conf: LogConf = { ...rest, context: { ...this.context, ...withoutUndefined(context) } };
-
-		// A clone is its own span, so it takes no spanName either.
-		const skip = new Set<keyof LogConf>([...EDGE_KEYS, "spanName", ...otlpKeysNotToInherit(conf)]);
-
-		// The caller's entryFormatter is their format; leave the pair for the constructor to fold and warn about.
-		if (conf.entryFormatter !== undefined) {
-			skip.add("format");
-		}
-
-		for (const key of Object.keys(this.conf) as (keyof LogConf)[]) {
-			if (!skip.has(key) && conf[key] === undefined) {
-				conf[key] = this.conf[key] as never;
-			}
-		}
-
-		return new Log(conf);
 	}
 
 	// Ends the span, then flushes: one delivery attempt, not a guarantee.
