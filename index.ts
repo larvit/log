@@ -715,12 +715,15 @@ class ExportScheduler {
 	private readonly conf: ResolvedQueueConf;
 	private failures = 0;
 	private pending?: Promise<void>;
+	private readonly ready: Promise<void>;
 	private readonly round: () => Promise<void>;
 	private running?: Promise<void>;
 	private timer?: { handle: TimerHandle, retry: boolean };
 
-	constructor(conf: ResolvedQueueConf, round: () => Promise<void>) {
+	// No round starts before ready settles.
+	constructor(conf: ResolvedQueueConf, ready: Promise<void>, round: () => Promise<void>) {
 		this.conf = conf;
+		this.ready = ready;
 		this.round = round;
 	}
 
@@ -731,7 +734,14 @@ class ExportScheduler {
 		}
 
 		if (!this.running) {
-			this.running = this.round().finally(() => { this.running = undefined; });
+			this.running = this.ready.then(() => {
+				// The round sends what the timer was waiting for. After ready, or a timer installed while
+				// storage loads would survive it.
+				this.conf.clock.clearTimeout(this.timer?.handle);
+				this.timer = undefined;
+
+				return this.round();
+			}).finally(() => { this.running = undefined; });
 
 			return this.running;
 		}
@@ -751,17 +761,11 @@ class ExportScheduler {
 		}
 	}
 
-	// A round sends what the timer was waiting for.
-	roundStarted(): void {
-		this.conf.clock.clearTimeout(this.timer?.handle);
-		this.timer = undefined;
-	}
-
-	succeeded(): void {
+	resetBackoff(): void {
 		this.failures = 0;
 	}
 
-	// Returns the delay. A record enqueued mid-round leaves a batch timer behind; the backoff takes it over.
+	// A record enqueued mid-round leaves a batch timer behind; the backoff takes it over.
 	backoff(): number {
 		this.failures++;
 
@@ -1033,8 +1037,8 @@ export class Queue implements OtlpQueue {
 		}
 
 		this.sender = new OtlpSender(this.conf, (msg, metadata) => this.report(msg, metadata));
-		this.scheduler = new ExportScheduler(this.conf, () => this.round());
 		this.ready = conf.storage ? this.load(conf.storage) : Promise.resolve();
+		this.scheduler = new ExportScheduler(this.conf, this.ready, () => this.round());
 	}
 
 	enqueue(payload: OtlpPayload): void {
@@ -1059,9 +1063,6 @@ export class Queue implements OtlpQueue {
 	}
 
 	private async round(): Promise<void> {
-		await this.ready;
-		this.scheduler.roundStarted();
-
 		while (this.items.length) {
 			const batch = this.takeBatch();
 			const failure = await this.sender.send(batch);
@@ -1076,7 +1077,7 @@ export class Queue implements OtlpQueue {
 				break;
 			}
 
-			this.scheduler.succeeded();
+			this.scheduler.resetBackoff();
 			this.changed();
 
 			if (failure) {

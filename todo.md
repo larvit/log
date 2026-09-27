@@ -23,9 +23,9 @@ names how many of the nine readers hit it.
 - [ ] Delete comments that restate the code or the README: the `LogConf` field comments repeat the
   options table (eight readers), and so do the id-size, "set above", "Ends the span, then
   flushes", `traceparent()` and `exportSpan` lines. Their readers paid to learn nothing.
-- [ ] Give `log.fetch` its own section, and file each helper where its question lives: the OTLP wire types beside
-  the payload builders, and nothing under a banner named for a technique, as "Reading a value of unknown shape" is. Both
-  architects mapped `log.fetch` wrongly first.
+- [ ] Give `log.fetch` its own section, and file each helper where its question lives: the OTLP
+  wire types beside the payload builders, and nothing under a banner named for a technique, as
+  "Reading a value of unknown shape" is. Both architects mapped `log.fetch` wrongly first.
 - [ ] Rename the internal names that mislead: the span-attribute bag called `context` in `end`,
   `tracedFetch`, `exportSpan` and `buildSpanPayload`, which shares its name with the option;
   `changed()`, which persists; `capturedValue`, which redacts; and `add(items, front)`'s boolean.
