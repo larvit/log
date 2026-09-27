@@ -19,16 +19,9 @@ None of it is breaking.
 
 ### Comprehension, README → Goals #8
 
-The 2026-09-27 panel's baseline, in AGENTS.md → Decisions, is capped by Locality; the first three
+The 2026-09-27 panel's baseline, in AGENTS.md → Decisions, is capped by Locality; the first two
 items are its causes, and each names how many of the nine readers hit it.
 
-- [ ] Resolve a `Log`'s settings in one unit that the constructor and `clone()` both call, in named
-  steps whose order the code states. Today two copy loops apply different rules — `clone()` skips
-  `spanName`, merges `context` and skips `format` beside an `entryFormatter` — and the ~100-line
-  constructor orders eight jobs by line sequence alone, with enumerability deciding what a child
-  inherits. Nine of nine readers ranked the constructor among their hardest places, four named it
-  the unit they would least modify, and eight diffed the two loops by hand. It changes no
-  contract, and 2.6.0's `spanName` warning and three 3.0.0 items edit the same lines.
 - [ ] Share the default `Queue` a `Log` builds with its children without writing it into `conf`,
   or record why `conf` must carry it. Today a child inherits the endpoint beside the queue built
   from it, and only `isQueueFor` comparing `otlpAdditionalHeaders` by reference keeps that child
