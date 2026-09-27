@@ -1356,6 +1356,19 @@ function isDefaultQueueFor(queue: OtlpQueue, conf: LogConf): boolean {
 		&& queue.conf.otlpAdditionalHeaders === conf.otlpAdditionalHeaders;
 }
 
+function buildDefaultQueue(conf: ResolvedLogConf, report: QueueConf["report"]): void {
+	if (!conf.otlpQueue && conf.otlpHttpBaseURI) {
+		conf.otlpQueue = new Queue({
+			clock: conf.clock,
+			otlpAdditionalHeaders: conf.otlpAdditionalHeaders,
+			otlpHttpBaseURI: conf.otlpHttpBaseURI,
+			otlpProtocol: conf.otlpProtocol,
+			report,
+		});
+		defaultQueues.add(conf.otlpQueue);
+	}
+}
+
 function rejectQueueBesideShorthand(conf: LogConf): void {
 	if (conf.otlpQueue && OTLP_TRANSPORT_KEYS.some(key => conf[key] !== undefined) && !isDefaultQueueFor(conf.otlpQueue, conf)) {
 		throw new Error("otlpQueue carries the endpoint: set otlpHttpBaseURI, otlpProtocol and otlpAdditionalHeaders on the queue, not beside it");
@@ -1535,7 +1548,7 @@ export class Log implements LogInt {
 			warnOnce(conf, this.context, msg);
 		}
 
-		this.buildDefaultQueue();
+		buildDefaultQueue(conf, (msg, metadata) => this.outputToConsole("error", msg, metadata, conf.clock.now()));
 
 		const { sampled, span } = openSpan(conf);
 
@@ -1553,19 +1566,6 @@ export class Log implements LogInt {
 		inheritSettings(conf, this, "clone");
 
 		return new Log(conf);
-	}
-
-	private buildDefaultQueue(): void {
-		if (!this.conf.otlpQueue && this.conf.otlpHttpBaseURI) {
-			this.conf.otlpQueue = new Queue({
-				clock: this.conf.clock,
-				otlpAdditionalHeaders: this.conf.otlpAdditionalHeaders,
-				otlpHttpBaseURI: this.conf.otlpHttpBaseURI,
-				otlpProtocol: this.conf.otlpProtocol,
-				report: (msg, metadata) => this.outputToConsole("error", msg, metadata, this.conf.clock.now()),
-			});
-			defaultQueues.add(this.conf.otlpQueue);
-		}
 	}
 
 	// Ends the span, then flushes: one delivery attempt, not a guarantee.

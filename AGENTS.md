@@ -179,12 +179,14 @@ and who it is for, and a design decision that cannot be derived from them belong
   warns once, like any other unknown level, so the operator sees the empty substitution. Only
   `undefined` means unset. Serves README → Goals #5. Valid while an unknown `logLevel` logs at the
   default and warns.
-- 2026-09-27: the default `Queue` a `Log` builds from the `otlp*` shorthand lives in `conf.otlpQueue`,
-  beside the shorthand it was built from. A `parentLog` is any `LogInt`, whose `conf` is all a child
-  reads from it, so the queue shares through a wrapper only from there; and 3.0.0's plan makes
-  `conf.otlpQueue` the one OTLP spelling, so moving it off `conf` now would move it back then. Only
-  a queue this library built may sit beside the shorthand, and only the one built from exactly it;
-  a queue the consumer built is rejected beside any shorthand, even an identical one. Serves
+- 2026-09-27, the implementing agent: the default `Queue` a `Log` builds from the `otlp*` shorthand
+  lives in `conf.otlpQueue`, beside the shorthand it was built from. A `parentLog` is any `LogInt`,
+  whose `conf` holds every setting a child reads from it, so only there does the queue share
+  through a wrapper; and 3.0.0's plan makes `conf.otlpQueue` the one OTLP spelling, so moving it off
+  `conf` now would move it back then. Only a queue this library built may sit beside the
+  shorthand, and only beside exactly the shorthand it was built from; a queue the consumer built is
+  rejected beside any shorthand, even an identical one. It leaves `JSON.stringify(log.conf)`
+  circular, so `todo.md`'s item fixes that on the `Queue`, which stays readable on `conf`. Serves
   README → Goals #6. Valid until 3.0.0 clears the shorthand from `conf`.
 - 2026-09-27, the maintainer: the comprehension baseline is the 2026-09-27 four-seat panel at
   depth 1 — 6/10 overall; Navigation 7, Locality 5.25, Shape 6, Self-sufficiency 6 — and a later
