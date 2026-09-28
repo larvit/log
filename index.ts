@@ -191,8 +191,7 @@ export function msgTextFormatter(conf: EntryFormatterConf) {
 	return str;
 }
 
-// A resolved conf's function formatter, which `conf.format` cannot hold before 3.0.0. It wins
-// over a string `format`, as `entryFormatter` did in v2.3.0.
+// A conf's function formatter, which `conf.format` cannot hold before 3.0.0.
 const formatFunctions = new WeakMap<object, EntryFormatter>();
 
 function formatterOf(conf: LogConf): EntryFormatter {
@@ -1442,7 +1441,7 @@ const ENTRY_FORMATTER_ALIAS: PropertyDescriptor = {
 	},
 };
 
-// A conf while it is resolved: `format` may still be a function.
+// A conf while it is resolved.
 type LogSettings = Omit<LogOptions, "context"> & { context?: Metadata };
 
 function confFromOptions(options: LogOptions | LogLevel | "none" | undefined): LogSettings {
@@ -1458,8 +1457,8 @@ function confFromOptions(options: LogOptions | LogLevel | "none" | undefined): L
 	return settings;
 }
 
-// The source's function formatter. One this module did not store — another copy of it, or a
-// v2.3.0 LogInt — shows only as entryFormatter, which wins over its format as in v2.3.0.
+// One this module did not store — another copy of it, or a v2.3.0 LogInt — shows only as
+// entryFormatter, which wins over its format as in v2.3.0.
 function sourceFormatFunction(sourceConf: LogConf): EntryFormatter | undefined {
 	const stored = formatFunctions.get(sourceConf);
 
@@ -1495,7 +1494,6 @@ function inheritSettings(conf: LogSettings, source: { conf: LogConf, context?: M
 	}
 }
 
-// Returns the deprecation warning the caller's entryFormatter owes.
 function entryFormatterDeprecation(conf: LogSettings): string | undefined {
 	if (conf.entryFormatter === undefined) {
 		return undefined;
