@@ -1434,19 +1434,19 @@ function buildUrlFull(url: URL, captureQuery: boolean): string {
 
 // buildUrlFull's cut and query rule, spliced into each url the text quotes. A fragment is read as a
 // query whose pairs a `?` or `#` also separates, since a hash route (`#/cb?access_token=`) carries
-// one; a url nested in a query value is redacted inside that value, so the outer query runs past it.
-function redactQuotedUrls(text: string): string {
+// one; a url nested in a query pair is redacted inside that pair, so the outer query runs past it.
+// Eight urls deep, a pair still holding one records `REDACTED`, before the stack runs out.
+function redactQuotedUrls(text: string, depth = 0): string {
 	const redactPairs = (pairs: string, pair: RegExp) => pairs.replace(pair, found => {
 		const assignAt = found.indexOf("=");
+		const key = assignAt < 0 ? found : found.slice(0, assignAt);
+		const redacted = redactCredential(key) + (assignAt < 0 ? "" : "=" + redactQueryValue(percentDecoded(key), found.slice(assignAt + 1)));
 
-		if (assignAt < 0) {
-			return redactCredential(found);
+		if (redacted !== found || !found.includes("//")) {
+			return redacted;
 		}
 
-		const value = found.slice(assignAt + 1);
-		const redacted = redactQueryValue(percentDecoded(found.slice(0, assignAt)), value);
-
-		return redactCredential(found.slice(0, assignAt)) + "=" + (redacted === value ? redactQuotedUrls(value) : redacted);
+		return depth < 8 ? redactQuotedUrls(found, depth + 1) : "REDACTED";
 	});
 
 	return text.replace(/((?:\bhttps?:)?\/\/[^\s"<>/?#]*)([^\s"<>?#]*)([^\s"<>]*)/gi, (_, head: string, path: string, tail: string) => {
