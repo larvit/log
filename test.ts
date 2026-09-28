@@ -1350,8 +1350,9 @@ test("otlpQueue and the otlp* options are two spellings of one endpoint; inherit
 
 	const elsewhere = [new Log({ otlpHttpBaseURI: "https://other.test", parentLog: headered }), headered.clone({ otlpHttpBaseURI: "http://127.0.0.1:4319" })];
 
-	t.deepEqual(elsewhere.map(log => (log.conf.otlpQueue as Queue).conf.otlpAdditionalHeaders), [undefined, undefined], "a child or clone sending to another origin leaves the parent's headers behind");
-	t.strictEqual((new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318/tenant", parentLog: headered }).conf.otlpQueue as Queue).conf.otlpAdditionalHeaders, headered.conf.otlpAdditionalHeaders, "one sending to the same origin keeps them");
+	t.deepEqual(elsewhere.map(log => log.conf.otlpAdditionalHeaders), [undefined, undefined], "a child or clone sending to another origin leaves the parent's headers behind");
+	t.strictEqual(new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318/tenant", parentLog: headered }).conf.otlpAdditionalHeaders, headered.conf.otlpAdditionalHeaders, "one sending to the same origin keeps them");
+	t.strictEqual(new Log({ otlpAdditionalHeaders: headered.conf.otlpAdditionalHeaders }).clone({ otlpHttpBaseURI: "https://other.test" }).conf.otlpAdditionalHeaders, headered.conf.otlpAdditionalHeaders, "so does one whose source names no endpoint the headers belong to");
 	t.end();
 });
 
