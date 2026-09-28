@@ -1289,11 +1289,60 @@ function traceableUrl(input: string | URL): URL | undefined {
 	return url.protocol === "http:" || url.protocol === "https:" ? url : undefined;
 }
 
+const URL_SCHEME = /https?:\/\//i;
+const startsWithUrl = (text: string) => URL_SCHEME.exec(text)?.index === 0;
+
+// Each pass shrinks the string or leaves it as it was, so this ends.
+function fullyPercentDecoded(value: string): string {
+	for (let decoded = percentDecoded(value); decoded !== value; decoded = percentDecoded(value)) {
+		value = decoded;
+	}
+
+	return value;
+}
+
+// Twelve base64 chars decode to nine bytes, one more than `https://`; atob needs no padding.
+function base64Head(text: string): string {
+	try {
+		return atob(text.slice(0, 12).replace(/[^\w+/-][\s\S]*/, "").replace(/-/g, "+").replace(/_/g, "/"));
+	} catch {
+		return "";
+	}
+}
+
+function nestedUrlStart(path: string): number | undefined {
+	const holdsScheme = URL_SCHEME.test(fullyPercentDecoded(path));
+
+	for (let i = 1; i < path.length; i++) {
+		const segmentStart = path[i - 1] === "/";
+
+		if (!holdsScheme && !segmentStart) {
+			continue;
+		}
+
+		const rest = fullyPercentDecoded(path.slice(i));
+
+		if ((holdsScheme && startsWithUrl(rest)) || (segmentStart && startsWithUrl(base64Head(rest)))) {
+			return i;
+		}
+	}
+
+	// Decoding the whole path can join escapes no single suffix holds; cut it all.
+	return holdsScheme ? 1 : undefined;
+}
+
 // Every key OTel semconv's default deny-list has named, plus every S3 and GCS query-signing generation's credential keys.
 const SENSITIVE_QUERY_KEYS = new Set(["awsaccesskeyid", "googleaccessid", "sig", "signature", "x-amz-credential", "x-amz-security-token", "x-amz-signature", "x-goog-credential", "x-goog-signature"]);
 
 // `url.origin` omits userinfo, which is what keeps the outer url's credentials off the span.
 function buildUrlFull(url: URL, captureQuery: boolean): string {
+	const nestedStart = nestedUrlStart(url.pathname);
+
+	// A nested url's own query parses as this url's, so it goes with the rest.
+	if (nestedStart !== undefined) {
+		return url.origin + url.pathname.slice(0, nestedStart) + "REDACTED";
+	}
+
 	const base = url.origin + url.pathname;
 
 	if (!captureQuery || !url.search) {

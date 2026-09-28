@@ -4,6 +4,11 @@
 
 ### Security
 
+- **`log.fetch` cuts a url nested in the request path out of `url.full`.** From its scheme on,
+  raw, percent-encoded any number of times, or base64-encoded as a path segment, and the query with
+  it: `https://proxy.test/fetch/https://user:pass@cb.test/x` records
+  `https://proxy.test/fetch/REDACTED`. This closes the exposure v2.4.0 left open; its rotation
+  advisory still applies to spans exported before this release.
 - **A child or clone sending to another origin than its source's no longer inherits
   `otlpAdditionalHeaders`.** Since v1.4.0 for a child and v2.2.0 for a clone,
   `new Log({ parentLog, otlpHttpBaseURI: other })` sent the parent's headers, a bearer token

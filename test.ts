@@ -1795,6 +1795,35 @@ test("log.fetch captureQuery keeps the query but redacts known-sensitive keys an
 	t.end();
 });
 
+test("log.fetch cuts a url nested in the request path out of url.full from where it starts", async t => {
+	const cases: [string, string][] = [
+		["https://proxy.test/fetch/https://myuser:hunter2@cb.test/x", "https://proxy.test/fetch/REDACTED"],
+		["https://proxy.test/fetch/https://cb.test/x?access_token=hunter2", "https://proxy.test/fetch/REDACTED"],
+		["https://proxy.test/r/to=HTTP://cb.test/x", "https://proxy.test/r/to=REDACTED"],
+		["https://proxy.test/fetch/https%3A%2F%2Fcb.test%2Fx%3Fsig%3Dhunter2", "https://proxy.test/fetch/REDACTED"],
+		["https://proxy.test/fetch/https%253A%252F%252Fmyuser%253Ahunter2%2540cb.test%252Fx", "https://proxy.test/fetch/REDACTED"],
+		["https://proxy.test/fetch/%68ttps://cb.test/hunter2", "https://proxy.test/fetch/REDACTED"],
+		["https://proxy.test/b64/aHR0cHM6Ly9jYi50ZXN0L2E/Yg==/hunter2", "https://proxy.test/b64/REDACTED"],
+		["https://proxy.test/b64/aHR0cHM6Ly9jYi50ZXN0L2E_Yg/hunter2", "https://proxy.test/b64/REDACTED"],
+		["https://proxy.test/b64/aHR0cDovL2NiLnRlc3QveA%3D%3D?hunter2", "https://proxy.test/b64/REDACTED"],
+		["https://api.test/docs/http-guide/aHR0?q=hi", "https://api.test/docs/http-guide/aHR0?q=hi"],
+	];
+
+	for (const [input, expected] of cases) {
+		const { calls } = stubFetch();
+		const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+
+		await log.fetch(input);
+		await log.end();
+
+		const urlFull = clientSpan(calls).attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue;
+
+		t.strictEqual(urlFull, expected, input);
+	}
+
+	t.end();
+});
+
 test("log.fetch leaves a non-http(s) URL untraced", async t => {
 	const { calls } = stubFetch();
 	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
