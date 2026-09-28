@@ -433,8 +433,9 @@ That covers the shapes a credential is recognisable in, not every credential: a 
 Never put credentials in the url; pass an `Authorization` header, and strip userinfo from a url you
 did not build. `log.fetch` mirrors the runtime: Node and browsers refuse such a url, while React
 Native hands it to the platform, where iOS sends the credentials and Android sends none, leaving
-you the 401. A rejection quoting the url reaches the status message as `http://REDACTED@host/x`,
-redacted from the runtime's own text.
+you the 401. A rejection quoting the url reaches the status message redacted in the runtime's own
+text, as `url.full` is with `captureQuery` on and its fragment read as a query:
+`http://REDACTED@host/x?access_token=REDACTED`.
 
 `REDACTED` does not always stand for a credential: a `?key=` lookup or a `?token=` pagination
 cursor records it, an address glued to a host, as in `https://api.test,mail@example.com`, redacts
