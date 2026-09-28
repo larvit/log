@@ -9,7 +9,7 @@
   on Node or in a browser exported the token in the rejection the runtime quotes the url into: as
   the `log.fetch` span's status, and as the `end({ error })` status of a span you forwarded that
   rejection to; only the userinfo was redacted. Now a listed query key's value records `REDACTED`,
-  in a fragment too, and a url nested in the path is cut:
+  so does a fragment, and a url nested in the path is cut:
   `https://REDACTED@h.test/x?access_token=REDACTED`. Any `end({ error })` message quoting a url is
   redacted the same way, so a `?key=` lookup or a `?token=` cursor in one records `REDACTED` and a
   dashboard grouping on status messages sees it change. Search status messages for `access_token`,
