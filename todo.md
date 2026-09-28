@@ -6,12 +6,6 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ## 2.4.0
 
-- [ ] **Keep `JSON.stringify(log.conf)` from throwing.** With OTLP configured `log.conf.otlpQueue`
-  is the `Queue` itself, and once a batch timer is pending on Node its `Timeout` makes the structure
-  circular, so a debug line that worked on v2.3.0 now crashes some calls and leaks credentials on
-  the rest. What a stringify carries is outside Goals #4, but a logging library crashing the app is
-  not.
-
 ## 2.5.0 — close the credential story
 
 ### Security

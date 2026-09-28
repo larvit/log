@@ -1075,6 +1075,11 @@ export class Queue implements OtlpQueue {
 		return this.scheduler.flush();
 	}
 
+	// A pending batch timer is a circular Timeout on Node, so stringifying working state would throw.
+	toJSON(): ResolvedQueueConf {
+		return this.conf;
+	}
+
 	private async round(): Promise<void> {
 		while (this.items.length) {
 			const batch = this.takeBatch();
