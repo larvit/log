@@ -6,10 +6,10 @@
 
 - **`captureQuery` redacts the value of a query key named `access_token`, `api_key`, `apikey`, `key`
   or `token`, in any casing.** Since v2.3.0, `log.fetch("https://api.test/me?access_token=…")` with
-  `captureQuery` on exported the token in `url.full`; rotate any bearer token or API key sent in a
-  query under one of these names. A value that is no secret, such as a `key` lookup or a `token`
-  pagination cursor, records `REDACTED` too, so a dashboard grouping on such a `url.full` sees it
-  change.
+  `captureQuery` on exported the token in `url.full`; search `url.full` for one of these names
+  followed by `=` and anything but `REDACTED`, and rotate what it finds. A value that is no secret,
+  such as a `key` lookup or a `token` pagination cursor, records `REDACTED` too, so a dashboard
+  grouping on such a `url.full` sees it change.
 - **`log.fetch` cuts a url nested in the request path out of `url.full`.** Cut from where it
   starts, and the query with it: any `http:` or `https:` url, and any other one holding userinfo,
   `//user:pass@host` included, whether raw, percent-encoded any number of times, or base64-encoded
