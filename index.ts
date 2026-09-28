@@ -1432,7 +1432,16 @@ function buildUrlFull(url: URL, captureQuery: boolean): string {
 	return `${base}?${kept.toString()}`;
 }
 
-// buildUrlFull's cut and query rule, spliced into the text in place; a fragment is read as a query.
+function redactQueryPairs(text: string, pair: RegExp): string {
+	return text.replace(pair, found => {
+		const assignAt = found.indexOf("=");
+
+		return assignAt < 0 ? redactCredential(found) : redactCredential(found.slice(0, assignAt)) + "=" + redactQueryValue(percentDecoded(found.slice(0, assignAt)), found.slice(assignAt + 1));
+	});
+}
+
+// buildUrlFull's cut and query rule, spliced into the text in place. A fragment is read as a query
+// whose pairs a `?` or `#` also separates, since a hash route (`#/cb?access_token=`) carries one.
 function redactQuotedUrl(head: string, path: string, tail: string): string {
 	const nestedStart = nestedUrlStart(path);
 
@@ -1440,7 +1449,11 @@ function redactQuotedUrl(head: string, path: string, tail: string): string {
 		return head + path.slice(0, nestedStart) + "REDACTED";
 	}
 
-	return head + path + tail.replace(/([^?&#=]+)(=[^?&#]*)?/g, (_, key: string, assigned?: string) => redactCredential(key) + (assigned === undefined ? "" : "=" + redactQueryValue(percentDecoded(key), assigned.slice(1))));
+	const fragmentAt = tail.includes("#") ? tail.indexOf("#") : tail.length;
+	const query = tail.slice(0, fragmentAt);
+	const fragment = tail.slice(fragmentAt);
+
+	return head + path + (query && "?" + redactQueryPairs(query.slice(1), /[^&]+/g)) + (fragment && "#" + redactQueryPairs(fragment.slice(1), /[^?&#]+/g));
 }
 
 function failureMessage(error: unknown): string {
@@ -1454,7 +1467,7 @@ function failureMessage(error: unknown): string {
 		}
 	}
 
-	return redactUserinfo(message.replace(/\b(https?:\/\/[^\s"<>`/?#]*)([^\s"<>`?#]*)([^\s"<>`]*)/gi, (_, head: string, path: string, tail: string) => redactQuotedUrl(head, path, tail)));
+	return redactUserinfo(message.replace(/\b(https?:\/\/[^\s"<>/?#]*)([^\s"<>?#]*)([^\s"<>]*)/gi, (_, head: string, path: string, tail: string) => redactQuotedUrl(head, path, tail)));
 }
 
 // --- Warnings written once per stderr sink ---------------------------------
