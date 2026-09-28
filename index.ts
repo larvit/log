@@ -254,14 +254,24 @@ export function parseTraceparent(header: string): { flags: string, sampled: bool
 // --- Reading a failure's message and code ----------------------------------
 
 // Total: a throwing getter yields undefined, so the flush path never rejects on its input.
-function stringField(value: unknown, key: string): string | undefined {
+function readField(value: unknown, key: string): unknown {
 	try {
-		const field: unknown = typeof value === "object" && value !== null ? Reflect.get(value, key) : undefined;
-
-		return typeof field === "string" ? field : undefined;
+		return typeof value === "object" && value !== null ? Reflect.get(value, key) : undefined;
 	} catch {
 		return undefined;
 	}
+}
+
+function stringField(value: unknown, key: string): string | undefined {
+	const read = readField(value, key);
+
+	return typeof read === "string" ? read : undefined;
+}
+
+function numberField(value: unknown, key: string): string | undefined {
+	const read = readField(value, key);
+
+	return typeof read === "number" ? String(read) : undefined;
 }
 
 // --- OTLP payloads ---------------------------------------------------------
@@ -1287,8 +1297,7 @@ function buildUrlFull(url: URL, captureQuery: boolean): string {
 	return `${base}?${kept.toString()}`;
 }
 
-// error.type per OTel semconv, whose fallback is "_OTHER"; log.fetch keeps v2.3.0's "fetch_error" until 3.0.0.
-function spanFailure(error: unknown, typeFallback: string): { message: string, type: string } {
+function failureMessage(error: unknown): string {
 	let message = stringField(error, "message");
 
 	if (message === undefined) {
@@ -1299,7 +1308,7 @@ function spanFailure(error: unknown, typeFallback: string): { message: string, t
 		}
 	}
 
-	return { message: redactUserinfo(message), type: stringField(error, "code") ?? stringField(error, "name") ?? typeFallback };
+	return redactUserinfo(message);
 }
 
 // --- Warnings written once per stderr sink ---------------------------------
@@ -1682,10 +1691,9 @@ async function tracedFetch(log: Pick<Log, "conf" | "context" | "sampled" | "span
 
 		return res;
 	} catch (err) {
-		const failure = spanFailure(err, "fetch_error");
-
-		span.status = { code: STATUS_CODE_ERROR, message: failure.message };
-		attributes["error.type"] = failure.type;
+		span.status = { code: STATUS_CODE_ERROR, message: failureMessage(err) };
+		// v2.3.0's documented value; semconv's rule, as end() applies it, waits for 3.0.0.
+		attributes["error.type"] = stringField(err, "code") ?? numberField(err, "code") ?? stringField(err, "name") ?? "fetch_error";
 
 		throw err;
 	} finally {
@@ -1754,10 +1762,8 @@ export class Log implements LogInt {
 		const attributes: Metadata = { ...this.context };
 
 		if (options?.error !== undefined && options.error !== null) {
-			const failure = spanFailure(options.error, "_OTHER");
-
-			this.span.status = { code: STATUS_CODE_ERROR, message: failure.message };
-			attributes["error.type"] = failure.type;
+			this.span.status = { code: STATUS_CODE_ERROR, message: failureMessage(options.error) };
+			attributes["error.type"] = stringField(options.error, "code") ?? stringField(options.error, "name") ?? "_OTHER";
 		}
 
 		exportSpan(this, this.span, attributes);
