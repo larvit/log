@@ -1646,8 +1646,16 @@ function exportSpan(log: Pick<Log, "conf" | "sampled">, span: OtlpSpan, attribut
 
 // --- log.fetch -------------------------------------------------------------
 
+// A throwing clock or queue costs the span, never the platform's result.
 async function tracedFetch(log: Pick<Log, "conf" | "context" | "sampled" | "span">, url: URL, init: RequestInit | undefined): Promise<Response> {
-	const span = childSpan(log, url.host, SPAN_KIND_CLIENT);
+	let span: OtlpSpan;
+
+	try {
+		span = childSpan(log, url.host, SPAN_KIND_CLIENT);
+	} catch {
+		return globalThis.fetch(url, init);
+	}
+
 	const attributes: Metadata = { ...log.context };
 
 	try {
@@ -1699,8 +1707,12 @@ async function tracedFetch(log: Pick<Log, "conf" | "context" | "sampled" | "span
 
 		throw err;
 	} finally {
-		span.endTimeUnixNano = getNsTimestamp(log.conf.clock.now());
-		exportSpan(log, span, attributes);
+		try {
+			span.endTimeUnixNano = getNsTimestamp(log.conf.clock.now());
+			exportSpan(log, span, attributes);
+		} catch {
+			// The span is dropped.
+		}
 	}
 }
 
@@ -1754,17 +1766,22 @@ export class Log implements LogInt {
 			throw new Error("Logging instance is already ended");
 		}
 		this.ended = true;
-		this.span.endTimeUnixNano = getNsTimestamp(this.conf.clock.now());
 
-		const attributes: Metadata = { ...this.context };
+		// What is already queued is delivered even when the span's own close throws.
+		try {
+			this.span.endTimeUnixNano = getNsTimestamp(this.conf.clock.now());
 
-		if (options?.error !== undefined && options.error !== null) {
-			this.span.status = { code: STATUS_CODE_ERROR, message: failureMessage(options.error) };
-			attributes["error.type"] = stringField(options.error, "code") ?? stringField(options.error, "name") ?? "_OTHER";
+			const attributes: Metadata = { ...this.context };
+
+			if (options?.error !== undefined && options.error !== null) {
+				this.span.status = { code: STATUS_CODE_ERROR, message: failureMessage(options.error) };
+				attributes["error.type"] = stringField(options.error, "code") ?? stringField(options.error, "name") ?? "_OTHER";
+			}
+
+			exportSpan(this, this.span, attributes);
+		} finally {
+			await this.flush();
 		}
-
-		exportSpan(this, this.span, attributes);
-		await this.flush();
 	}
 
 	public async flush(): Promise<void> {

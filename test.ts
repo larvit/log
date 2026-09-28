@@ -1948,7 +1948,7 @@ test("log.fetch with an invalid header rejects but never hangs end()", async t =
 	t.end();
 });
 
-test("log.fetch under a clock whose now() is fractional or throws never hangs flush() or end()", async t => {
+test("a clock whose now() is fractional or throws never changes a log.fetch result or hangs end()", async t => {
 	const { calls } = stubFetch();
 	const timers = { clearTimeout: (timer?: TimerHandle) => clearTimeout(timer), setTimeout: (callback: () => void, delayMs: number) => setTimeout(callback, delayMs) };
 	const fractional = new Log({ clock: { ...timers, now: () => 1758150000000.3 }, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {}, stdout: () => {} });
@@ -1965,13 +1965,21 @@ test("log.fetch under a clock whose now() is fractional or throws never hangs fl
 
 		return Date.now();
 	};
-	const throwing = new Log({ clock: { ...timers, now: brokenNow }, stderr: () => {} });
+	const throwing = new Log({ clock: { ...timers, now: brokenNow }, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {}, stdout: () => {} });
 
-	broken = true;
-	t.strictEqual(await throwing.fetch("https://api.test/x").then(() => "resolved", () => "rejected"), "rejected", "a throwing now() rejects the fetch");
-	await throwing.flush();
-	t.ok(true, "and flush() still resolves");
-	t.strictEqual(await throwing.end().then(() => "resolved", () => "rejected"), "rejected", "and end() rejects on the clock, never hangs");
+	throwing.info("before");
+	stubFetch(path => {
+		if (path === "/closes") broken = true;
+
+		return undefined;
+	});
+	t.strictEqual((await throwing.fetch("https://api.test/closes")).status, 200, "a now() throwing as the span closes leaves the platform's response");
+	t.strictEqual((await throwing.fetch("https://api.test/opens")).status, 200, "and one throwing as it opens still sends the request");
+
+	const { calls: ended } = stubFetch();
+
+	t.strictEqual(await throwing.end().then(() => "resolved", () => "rejected"), "rejected", "end() rejects on the clock, never hangs");
+	t.deepEqual(exportedRecords(ended), ["before"], "and still delivers what was queued");
 	t.end();
 });
 
