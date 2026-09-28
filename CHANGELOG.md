@@ -3,20 +3,24 @@
 ## v2.4.0
 
 An export queue that batches, retries and can hold records and spans across an app restart;
-credentials kept out of spans, `stderr` and the request url; `format` taking a formatter function;
-and `log.enabled`, the `Logger` type, the `clock` option and an honoured unsampled `traceparent`.
-Read Security first: several entries ask you to rotate credentials v2.3.0 exported.
+fewer ways for a credential to reach a span or `stderr`, with some still open; `format` taking a
+formatter function; and `log.enabled`, the `Logger` type, the `clock` option and an honoured
+unsampled `traceparent`. A child no longer inherits its parent's `traceparent`, and
+`entryFormatter` and the level-string shorthand are deprecated.
+Read Security first: several entries ask you to rotate credentials v2.3.0 exported, and some
+exposures are still open.
 
 ### Security
 
-- **`spanName` and the other text you write yourself are exported as written.** Goals now say plainly which text this library will never clean for you: the log message,
+- **Name a span after its route, never its url: `spanName` and other text you write is exported as
+  written.** Goals now say plainly which text this library will never clean for you: the log message,
   metadata, `context`, `spanName`, and a header or query value you allow-list that simply *is* a
   secret. Nothing exported has changed — `spanName` has always gone out as you wrote it — but if
   you build one from a request url (`spanName: "GET " + req.url`), its credentials reach your
   tracing backend, in the span name, the scope name and, under `printTraceInfo`, your console; a
   child log inherits the name, so one such `spanName` labels the whole trace. Name the route, not
   the url.
-- **A url nested in a request path still reaches `url.full` with its credentials.** Not fixed, and
+- **`log.fetch` still exports credentials in a url nested in the request path, in `url.full`.** Not fixed, and
   exporting on every such call until it is: `url.full` is built from the origin and the path, and only
   the query is redacted, so
   `log.fetch("https://proxy.test/fetch/https://user:pass@cb.test/x")` — the shape a fetch-through
@@ -31,7 +35,7 @@ Read Security first: several entries ask you to rotate credentials v2.3.0 export
   base64-encoded url. Rotate any token a hit holds; a SigV4 one not base64-encoded also holds
   `aws4_request` and follows the presigned-url bullet below, `captureQuery` or not. `log.fetch` first exported
   `url.full` in v2.3.0, so no older span carries it.
-- **An allow-listed credential header, or url credentials in a captured value, record `REDACTED`.**
+- **An allow-listed credential header, or url credentials in a captured value, records `REDACTED`.**
   A header you allow-list is no longer a way to export a credential: `authorization`,
   `proxy-authorization`, `cookie` and `set-cookie` named in `captureRequestHeaders` or
   `captureResponseHeaders` record `REDACTED`, so the span still shows the header was there. Any
@@ -84,7 +88,7 @@ Read Security first: several entries ask you to rotate credentials v2.3.0 export
   so there is nothing to rotate on account of this platform difference; the exposure is the network path to the host, in
   the clear if that url is `http:`. Pass an `Authorization` header, and strip userinfo from a url
   you did not build.
-- **`log.fetch` traces only `http:` and `https:` urls.** Anything else is fetched
+- **`log.fetch` traces only a url that resolves to `http:` or `https:`.** Anything else is fetched
   untraced — no span, and no `traceparent` sent. It used to export a span whose `url.full` held
   whatever the url did: written without `//`, a url parses to an opaque path, so
   `log.fetch("myapp:user:pass@host/x")` exported `nulluser:pass@host/x` and a `data:` url exported
@@ -99,17 +103,17 @@ Read Security first: several entries ask you to rotate credentials v2.3.0 export
   **If you have ever set `user:pass@` in `otlpHttpBaseURI`, rotate those credentials**: they are in
   whatever collects your `stderr`, findable by searching it for your collector's hostname.
   Percent-encode any `/ ? #` in a password, and a literal `%` as `%25`.
-- **`log.conf` and `queue.conf` hold your OTLP credentials as written until 3.0.0.** `queue.conf`
-  holds `otlpHttpBaseURI`, `user:pass@` included, and
+- **Not fixed until 3.0.0: `log.conf` and `queue.conf` hold your OTLP credentials as written.**
+  `queue.conf` holds `otlpHttpBaseURI`, `user:pass@` included, and
   `otlpAdditionalHeaders`, a bearer token included, exactly as you gave them, and `log.conf` holds
   them too, whether you set them on `Log` or on the `Queue` you passed as `otlpQueue`. Logging,
   serialising or sending either `conf` puts the credentials wherever it lands. Don't log a `conf`.
   **If you ever have, rotate those credentials**: search where it landed for `otlpHttpBaseURI` and
   `otlpAdditionalHeaders`, which every serialised `conf` holding them carries.
-- **A `Queue` on `storage: localStorage` serialises the whole localStorage with its `conf`.** Open:
-  a `Queue` given `storage: localStorage` serialises, inside either `conf`, with every
-  localStorage entry of the origin under `"storage"`. Search where a `conf` landed for `"storage":`
-  and rotate any session token it carries.
+- **Not fixed: a stringified `conf` whose `Queue` uses `storage: localStorage` carries every
+  localStorage entry of the origin.** Serialising either `conf` writes them under `"storage"`.
+  **If you have, rotate any session token it carries**: search where a `conf` landed for
+  `"storage":`.
 
 ### Everything else
 
@@ -158,15 +162,14 @@ Read Security first: several entries ask you to rotate credentials v2.3.0 export
 - **A `format` set on a child now applies.** Before, on a child (`parentLog`), the parent's resolved formatter
   silently kept winning. `log.conf.format` is read where a line is written, so writing it swaps
   the formatter on a live instance that has no function formatter.
-- **Copy an instance's settings with `clone()`.** What a spread or `JSON.stringify` of
-  `log.conf` carries is not part of the semver promise and may change in a minor.
+- **What a spread or `JSON.stringify` of `log.conf` carries is outside semver; copy settings with
+  `clone()`.** It may change in a minor.
 - **Every deprecation line names the package**: `@larvit/log: …`.
 - **The level-string shorthand, `new Log("debug")` and `log.clone("debug")`, is deprecated.** It still
   sets the level, writes one `warn` line per `stderr` sink for each distinct warning text,
   whatever `logLevel` says, and 3.0.0 removes it. Pass `{ logLevel }` instead.
 - **New `clock` option on `Log` and `Queue`, so a test drives time.** `{ now, setTimeout, clearTimeout }` behind every span and
-  record timestamp and behind the queue's batch, retry and send-timeout timers, so a test drives
-  time instead of waiting on it. Defaults to the system clock, inherited by children and clones.
+  record timestamp and behind the queue's batch, retry and send-timeout timers. Defaults to the system clock, inherited by children and clones.
   New exports: `Clock`, `TimerHandle`.
 - **The constructor and `clone()` leave the options object they are given untouched.** They no
   longer write defaults, inherited settings or the built `Queue`
@@ -203,14 +206,12 @@ Read Security first: several entries ask you to rotate credentials v2.3.0 export
   `Metadata`, and `log.conf.context` reads back with those keys already dropped, so a `LogConf`
   you built for v2.3.0 still constructs and a read of `log.conf.context` still compiles.
   `Metadata` and `MetadataValue` are unchanged.
-- **New `log.enabled(level)`, so a caller skips building metadata nobody will see.** `true` when a call at that level would output, so a caller can skip building
-  expensive metadata; `false` for a level it does not know.
+- **New `log.enabled(level)`, so a caller skips building metadata nobody will see.** `true` when a call at that level would output; `false` for a level it does not know.
 - **New `Logger` type for a library that accepts a logger.** The six level methods plus `enabled`. Libraries accept `Logger`;
   `parentLog` takes `LogInt`, which gains `enabled`, `flush` and `sampled` as optional members, so a
   `LogInt` you wrote against v2.3.0 still compiles. 3.0.0 makes it `Logger` plus the rest, those
   three required.
-- **Trace ids are sixteen random bytes.** Every one `generateTraceId` or a new span minted used to
-  begin `01`. Match this library's spans on the `telemetry.sdk.name` resource attribute,
+- **Trace ids are sixteen random bytes, no longer beginning `01`.** Match this library's spans on the `telemetry.sdk.name` resource attribute,
   `@larvit/log`.
 
 ## v2.3.0
