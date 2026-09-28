@@ -1776,11 +1776,12 @@ test("log.fetch captureQuery keeps the query but redacts known-sensitive keys an
 	const { calls } = stubFetch();
 	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 
-	await log.fetch("https://api.test/x?q=hi&Signature=abc&Signature=def&next=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&deep=https%253A%252F%252Fmyuser%253Ahunter2%2540cb.test%252Fx&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAEXAMPLE%2F20260923%2Feu-north-1%2Fs3%2Faws4_request&X-Amz-Security-Token=FwoGZXIvYXdz&X-Amz-Signature=8b1c9f&X-Goog-Credential=svc%40proj.iam.gserviceaccount.com%2F20260923%2Fauto%2Fstorage%2Fgoog4_request&GoogleAccessId=svc%40proj.iam.gserviceaccount.com&https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fz");
+	await log.fetch("https://api.test/x?q=hi&Signature=abc&Signature=def&next=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&deep=https%253A%252F%252Fmyuser%253Ahunter2%2540cb.test%252Fx&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAEXAMPLE%2F20260923%2Feu-north-1%2Fs3%2Faws4_request&X-Amz-Security-Token=FwoGZXIvYXdz&X-Amz-Signature=8b1c9f&X-Goog-Credential=svc%40proj.iam.gserviceaccount.com%2F20260923%2Fauto%2Fstorage%2Fgoog4_request&GoogleAccessId=svc%40proj.iam.gserviceaccount.com&access_token=ya29tok&API_KEY=k1api&apikey=k2api&key=k3api&Token=k4tok&keyword=kept&https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fz");
 	await log.end();
 
 	const urlFull = clientSpan(calls).attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue;
 	const presigned = ["GoogleAccessId", "X-Amz-Credential", "X-Amz-Security-Token", "X-Amz-Signature", "X-Goog-Credential"];
+	const tokens = ["access_token", "API_KEY", "apikey", "key", "Token"];
 
 	t.ok(urlFull.includes("q=hi"), "non-sensitive query param is kept");
 	t.ok(urlFull.includes("Signature=REDACTED&Signature=REDACTED"), "a repeated sensitive key keeps one redaction per occurrence");
@@ -1792,6 +1793,9 @@ test("log.fetch captureQuery keeps the query but redacts known-sensitive keys an
 	t.ok(urlFull.includes("X-Amz-Algorithm=AWS4-HMAC-SHA256"), "a presigned url's non-credential params are kept");
 	for (const key of presigned) t.ok(urlFull.includes(`${key}=REDACTED`), `${key} records REDACTED`);
 	t.ok(!/AKIAEXAMPLE|FwoGZXIvYXdz|8b1c9f|gserviceaccount/.test(urlFull), "no presigned credential value is leaked");
+	for (const key of tokens) t.ok(urlFull.includes(`&${key}=REDACTED`), `${key} records REDACTED`);
+	t.ok(!/ya29tok|k1api|k2api|k3api|k4tok/.test(urlFull), "no token value is leaked");
+	t.ok(urlFull.includes("keyword=kept"), "a key merely starting with a listed name is kept");
 	t.end();
 });
 
