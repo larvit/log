@@ -1432,31 +1432,27 @@ function buildUrlFull(url: URL, captureQuery: boolean): string {
 	return `${base}?${kept.toString()}`;
 }
 
-// buildUrlFull's cut and query rule, spliced into each url the text quotes. A fragment is read as a
-// query whose pairs a `?` or `#` also separates, since a hash route (`#/cb?access_token=`) carries
-// one; a url nested in a query pair is redacted inside that pair, so the outer query runs past it.
-// Eight urls deep, a pair still holding one records `REDACTED`, before the stack runs out.
+// buildUrlFull's cut and query rule, spliced into each url the text quotes, and a fragment records
+// `REDACTED`. A url nested in a query pair is redacted inside that pair, so the outer query runs past
+// it; eight urls deep, a pair still holding one records `REDACTED`, before the stack runs out.
 function redactQuotedUrls(text: string, depth = 0): string {
-	const redactPairs = (pairs: string, pair: RegExp) => pairs.replace(pair, whole => {
+	const redactPair = (whole: string) => {
 		const found = !whole.includes("//") ? whole : depth < 8 ? redactQuotedUrls(whole, depth + 1) : "REDACTED";
 		const assignAt = found.indexOf("=");
 		const key = assignAt < 0 ? found : found.slice(0, assignAt);
 
 		return redactCredential(key) + (assignAt < 0 ? "" : "=" + redactQueryValue(percentDecoded(key), found.slice(assignAt + 1)));
-	});
+	};
 
-	return text.replace(/((?:\bhttps?:)?\/\/[^\s"<>/?#]*)([^\s"<>?#]*)([^\s"<>]*)/gi, (_, head: string, path: string, tail: string) => {
+	// Only whitespace ends a url a runtime quotes as written, so a raw `"` or `<` stays inside it.
+	return text.replace(/((?:\bhttps?:)?\/\/[^\s/?#]*)([^\s?#]*)(\?[^\s#]*)?(#\S*)?/gi, (_, head: string, path: string, query = "", fragment = "") => {
 		const nestedStart = nestedUrlStart(path);
 
 		if (nestedStart !== undefined) {
 			return head + path.slice(0, nestedStart) + "REDACTED";
 		}
 
-		const fragmentAt = tail.includes("#") ? tail.indexOf("#") : tail.length;
-		const query = tail.slice(0, fragmentAt);
-		const fragment = tail.slice(fragmentAt);
-
-		return head + path + (query && "?" + redactPairs(query.slice(1), /[^&]+/g)) + (fragment && "#" + redactPairs(fragment.slice(1), /[^?&#]+/g));
+		return head + path + (query && "?" + query.slice(1).replace(/[^&]+/g, redactPair)) + (fragment && "#REDACTED");
 	});
 }
 
