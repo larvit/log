@@ -265,6 +265,6 @@ run at or above 7.0 replaces the baseline.
 2026-09-28, the maintainer: `JSON.stringify` of a `Queue`, and so of `log.conf`, carries the
 queue's `conf` and none of its working state — items, timers, scheduler — which is what made it
 circular. Credentials in that `conf` stringify as written, as `log.conf`'s own `otlp*` keys beside
-a queue built from them already do: README → Goals #3 stops at what this library emits, and redacting in a `toJSON`
-would be a second spelling of 3.0.0's item keeping credentials off `conf`. Serves README → Goals
-#3. Valid until 3.0.0 keeps credentials off `log.conf` and `queue.conf`.
+a queue built from them already do: README → Goals #3 stops at what this library emits, and
+redacting in a `toJSON` would be a second spelling of 3.0.0's item keeping credentials off `conf`.
+Serves README → Goals #3. Valid until 3.0.0 keeps credentials off `log.conf` and `queue.conf`.
