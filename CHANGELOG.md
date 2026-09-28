@@ -112,7 +112,7 @@ exposures are still open.
   `otlpAdditionalHeaders`, which every serialised `conf` holding them carries.
 - **Not fixed: a stringified `conf` whose `Queue` uses `storage: localStorage` carries every
   localStorage entry of the origin.** Serialising either `conf` writes them under `"storage"`.
-  **If you have, rotate any session token it carries**: search where a `conf` landed for
+  **If you have serialised one, rotate any session token it carries**: search where a `conf` landed for
   `"storage":`.
 
 ### Everything else
