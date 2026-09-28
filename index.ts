@@ -1432,28 +1432,36 @@ function buildUrlFull(url: URL, captureQuery: boolean): string {
 	return `${base}?${kept.toString()}`;
 }
 
-function redactQueryPairs(text: string, pair: RegExp): string {
-	return text.replace(pair, found => {
+// buildUrlFull's cut and query rule, spliced into each url the text quotes. A fragment is read as a
+// query whose pairs a `?` or `#` also separates, since a hash route (`#/cb?access_token=`) carries
+// one; a url nested in a query value is redacted inside that value, so the outer query runs past it.
+function redactQuotedUrls(text: string): string {
+	const redactPairs = (pairs: string, pair: RegExp) => pairs.replace(pair, found => {
 		const assignAt = found.indexOf("=");
 
-		return assignAt < 0 ? redactCredential(found) : redactCredential(found.slice(0, assignAt)) + "=" + redactQueryValue(percentDecoded(found.slice(0, assignAt)), found.slice(assignAt + 1));
+		if (assignAt < 0) {
+			return redactCredential(found);
+		}
+
+		const value = found.slice(assignAt + 1);
+		const redacted = redactQueryValue(percentDecoded(found.slice(0, assignAt)), value);
+
+		return redactCredential(found.slice(0, assignAt)) + "=" + (redacted === value ? redactQuotedUrls(value) : redacted);
 	});
-}
 
-// buildUrlFull's cut and query rule, spliced into the text in place. A fragment is read as a query
-// whose pairs a `?` or `#` also separates, since a hash route (`#/cb?access_token=`) carries one.
-function redactQuotedUrl(head: string, path: string, tail: string): string {
-	const nestedStart = nestedUrlStart(path);
+	return text.replace(/((?:\bhttps?:)?\/\/[^\s"<>/?#]*)([^\s"<>?#]*)([^\s"<>]*)/gi, (_, head: string, path: string, tail: string) => {
+		const nestedStart = nestedUrlStart(path);
 
-	if (nestedStart !== undefined) {
-		return head + path.slice(0, nestedStart) + "REDACTED";
-	}
+		if (nestedStart !== undefined) {
+			return head + path.slice(0, nestedStart) + "REDACTED";
+		}
 
-	const fragmentAt = tail.includes("#") ? tail.indexOf("#") : tail.length;
-	const query = tail.slice(0, fragmentAt);
-	const fragment = tail.slice(fragmentAt);
+		const fragmentAt = tail.includes("#") ? tail.indexOf("#") : tail.length;
+		const query = tail.slice(0, fragmentAt);
+		const fragment = tail.slice(fragmentAt);
 
-	return head + path + (query && "?" + redactQueryPairs(query.slice(1), /[^&]+/g)) + (fragment && "#" + redactQueryPairs(fragment.slice(1), /[^?&#]+/g));
+		return head + path + (query && "?" + redactPairs(query.slice(1), /[^&]+/g)) + (fragment && "#" + redactPairs(fragment.slice(1), /[^?&#]+/g));
+	});
 }
 
 function failureMessage(error: unknown): string {
@@ -1467,7 +1475,7 @@ function failureMessage(error: unknown): string {
 		}
 	}
 
-	return redactUserinfo(message.replace(/((?:\bhttps?:)?\/\/[^\s"<>/?#]*)([^\s"<>?#]*)((?:(?!(?:\bhttps?:)?\/\/)[^\s"<>])*)/gi, (_, head: string, path: string, tail: string) => redactQuotedUrl(head, path, tail)));
+	return redactUserinfo(redactQuotedUrls(message));
 }
 
 // --- Warnings written once per stderr sink ---------------------------------
