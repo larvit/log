@@ -1406,6 +1406,8 @@ function nestedUrlStart(path: string): number | undefined {
 // Every key OTel semconv's default deny-list has named, every S3 and GCS query-signing generation's credential keys, and the names a bearer token or API key travels under.
 const SENSITIVE_QUERY_KEYS = new Set(["access_token", "api_key", "apikey", "awsaccesskeyid", "googleaccessid", "key", "sig", "signature", "token", "x-amz-credential", "x-amz-security-token", "x-amz-signature", "x-goog-credential", "x-goog-signature"]);
 
+const redactQueryValue = (key: string, value: string) => SENSITIVE_QUERY_KEYS.has(key.toLowerCase()) ? "REDACTED" : redactCredential(value);
+
 // `url.origin` omits userinfo, which is what keeps the outer url's credentials off the span.
 function buildUrlFull(url: URL, captureQuery: boolean): string {
 	const nestedStart = nestedUrlStart(url.pathname);
@@ -1424,10 +1426,21 @@ function buildUrlFull(url: URL, captureQuery: boolean): string {
 	const kept = new URLSearchParams();
 
 	for (const [key, value] of new URLSearchParams(url.search)) {
-		kept.append(redactCredential(key), SENSITIVE_QUERY_KEYS.has(key.toLowerCase()) ? "REDACTED" : redactCredential(value));
+		kept.append(redactCredential(key), redactQueryValue(key, value));
 	}
 
 	return `${base}?${kept.toString()}`;
+}
+
+// buildUrlFull's cut and query rule, spliced into the text in place; a fragment is read as a query.
+function redactQuotedUrl(head: string, path: string, tail: string): string {
+	const nestedStart = nestedUrlStart(path);
+
+	if (nestedStart !== undefined) {
+		return head + path.slice(0, nestedStart) + "REDACTED";
+	}
+
+	return head + path + tail.replace(/([^?&#=]+)(=[^?&#]*)?/g, (_, key: string, assigned?: string) => redactCredential(key) + (assigned === undefined ? "" : "=" + redactQueryValue(percentDecoded(key), assigned.slice(1))));
 }
 
 function failureMessage(error: unknown): string {
@@ -1441,7 +1454,7 @@ function failureMessage(error: unknown): string {
 		}
 	}
 
-	return redactUserinfo(message);
+	return redactUserinfo(message.replace(/\b(https?:\/\/[^\s"<>`/?#]*)([^\s"<>`?#]*)([^\s"<>`]*)/gi, (_, head: string, path: string, tail: string) => redactQuotedUrl(head, path, tail)));
 }
 
 // --- Warnings written once per stderr sink ---------------------------------

@@ -8,12 +8,6 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ### Security
 
-- [ ] **Redact a listed query key's value in a span's `status.message`, whatever `captureQuery` is
-  set to.** Node and browsers reject a url with userinfo by quoting it whole, and `failureMessage`
-  redacts only the userinfo, so `log.fetch("https://u:p@h.test/x?access_token=SECRET")` exports
-  `https://REDACTED@h.test/x?access_token=SECRET` — any key README → Credentials in a captured
-  value lists, and its nested-url cut, skipped. Live since 2.4.0; the CHANGELOG owes a rotation
-  advisory.
 - [ ] **Weigh redacting the query keys `access-token`, `accesstoken`, `api-key`, `auth_token`,
   `client_secret`, `id_token`, `password`, `refresh_token`, `secret` and `subscription-key` too,
   and add those that carry a credential.** With `captureQuery` on, `url.full` exports each one's

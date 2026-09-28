@@ -4,6 +4,14 @@
 
 ### Security
 
+- **A span's status message redacts a quoted url as `url.full` does, whatever `captureQuery` says.**
+  Since v2.4.0, `log.fetch("https://u:p@h.test/x?access_token=…")` on Node or in a browser exported
+  the token in the rejection the runtime quotes the url into, as the `log.fetch` span's status and
+  as `end({ error })`'s once you forwarded it; only the userinfo was redacted. Now a listed query
+  key's value records `REDACTED`, in the fragment too, and a url nested in the path is cut:
+  `https://REDACTED@h.test/x?access_token=REDACTED`. Search status messages for a key README → Credentials in a
+  captured value lists, followed by `=` and anything but `REDACTED`, and for `%3F` and `%253F`, and
+  rotate what it finds.
 - **`captureQuery` redacts the value of a query key named `access_token`, `api_key`, `apikey`, `key`
   or `token`, in any casing.** Since v2.3.0, `log.fetch("https://api.test/me?access_token=…")` with
   `captureQuery` on exported the token in `url.full`; search `url.full` for one of these names
