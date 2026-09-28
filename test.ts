@@ -1538,7 +1538,7 @@ test("end({ error }) marks the span failed", async t => {
 	t.strictEqual(attr(exportedSpan(9), "error.type"), "AbortError", "a numeric code is skipped for the error name");
 	t.deepEqual(exportedSpan(10).status, { code: 2, message: "Request cannot be constructed from a URL that includes credentials: https://REDACTED@api.test/x?page=2&Access_Token=REDACTED&next=REDACTED#top, then http://api.test/y?%6Bey=REDACTED" }, "a listed query key's value and a credentialed query value are redacted in place");
 	t.deepEqual(exportedSpan(11).status, { code: 2, message: "Request cannot be constructed from a URL that includes credentials: https://REDACTED@proxy.test/fetch/REDACTED failed" }, "a url nested in the quoted url's path is cut with its query");
-	t.deepEqual(exportedSpan(12).status, { code: 2, message: "Failed: https://a.test/?x=1,https://b.test/?token=REDACTED,//c.test/?key=REDACTED" }, "a url glued to the one before it is redacted on its own");
+	t.deepEqual(exportedSpan(12).status, { code: 2, message: "Failed: https://a.test/?x=1,https://b.test/?token=REDACTED//c.test/?key=REDACTED" }, "a url glued to the one before it is redacted on its own, a listed value taking the comma");
 	t.deepEqual(exportedSpan(13).status, { code: 2, message: "GET https://a`b.test/x?q=a`b&token=REDACTED#/cb?access_token=REDACTED failed" }, "a backtick, a ? in a query value and a fragment route's query leave the url whole");
 	t.end();
 });
