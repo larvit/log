@@ -1291,15 +1291,17 @@ function traceableUrl(input: string | URL): URL | undefined {
 
 // Every percent-encoding layer decoded and, as a WHATWG parser does, tab and newline dropped; each
 // char keeps the index in `text` it came from, or where its escape run starts when that is unclear.
-// Without an escape nothing moves, and `sources` is empty.
-function decodedWithSources(text: string): { decoded: string, sources: number[] } {
+// Without an escape nothing moves, and `sources` is empty. Past eight layers `complete` is false.
+function decodedWithSources(text: string): { complete: boolean, decoded: string, sources: number[] } {
 	if (!text.includes("%")) {
-		return { decoded: text, sources: [] };
+		return { complete: true, decoded: text, sources: [] };
 	}
 
-	let sources = Array.from(text, (_, i) => i);
+	const indices = (chars: string) => Array.from({ length: chars.length }, (_, i) => i);
+	let sources = indices(text);
+	let changed = true;
 
-	for (let changed = true; changed;) {
+	for (let pass = 0; changed && pass < 8; pass++) {
 		let next = "";
 		let last = 0;
 		const nextSources: number[] = [];
@@ -1322,9 +1324,9 @@ function decodedWithSources(text: string): { decoded: string, sources: number[] 
 		sources = nextSources;
 	}
 
-	const kept = Array.from(text, (_, i) => i).filter(i => !"\t\n\r".includes(text[i]));
+	const kept = indices(text).filter(i => !"\t\n\r".includes(text[i]));
 
-	return { decoded: kept.map(i => text[i]).join(""), sources: kept.map(i => sources[i]) };
+	return { complete: !changed, decoded: kept.map(i => text[i]).join(""), sources: kept.map(i => sources[i]) };
 }
 
 // Every case of `h` encodes to a base64 head of `a` or `S`, and eight chars decode to `https:`.
@@ -1339,8 +1341,9 @@ function startsBase64Url(text: string): boolean {
 }
 
 function nestedUrlStart(path: string): number | undefined {
-	const { decoded, sources } = decodedWithSources(path);
-	const scheme = /https?:/i.exec(decoded)?.index ?? decoded.length;
+	const { complete, decoded, sources } = decodedWithSources(path);
+	// An escape left undecoded may still spell a scheme, so it cuts too.
+	const scheme = (complete ? /https?:/i : /https?:|%/i).exec(decoded)?.index ?? decoded.length;
 
 	for (let i = 1; i < scheme; i++) {
 		if (decoded[i - 1] === "/" && startsBase64Url(decoded.slice(i, i + 8))) {
