@@ -155,8 +155,8 @@
   into the options object they are given, so one object reused for several instances no longer
   makes them share a queue.
 - An incoming `traceparent` with the sampled flag off is honoured: the instance and its children
-  export no records or spans, and `log.traceparent()` and `log.fetch` pass `00` downstream. Console
-  output is unchanged. New `log.sampled` field, on `LogInt`; `parseTraceparent` returns `sampled`
+  export no spans, and `log.traceparent()` and `log.fetch` pass `00` downstream. Log records still
+  export. New `log.sampled` field, on `LogInt`; `parseTraceparent` returns `sampled`
   and rejects version `ff`.
 - Any 2xx is JSON export success; before, a body other than `{}` or `{"partialSuccess":{}}` was
   reported as a rejection. A `partialSuccess` with a rejected count is reported through `report`

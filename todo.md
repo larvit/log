@@ -6,11 +6,6 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ## 2.4.0
 
-- [ ] **Export log records whatever the incoming `sampled` flag says; only the span obeys it.** Per
-  `docs/decisions.md`'s 2026-09-25 entry. `log()` returns before the enqueue whenever `sampled` is
-  false.
-  Afterwards the CHANGELOG bullet on the sampled flag, README → Join an incoming trace, the
-  `traceparent` option row and the `sampled` field comment all say records still export.
 - [ ] **Restore `"fetch_error"` as a `log.fetch` span's `error.type` fallback.** v2.3.0's README
   documented it, so Goals #4 holds it; `_OTHER` waits for 3.0.0 behind a 2.6.0 deprecation.
   Unreleased swaps it in a minor.
@@ -183,6 +178,8 @@ Each one is a weigh against README → Goals first: ship it, or delete the item 
 - [ ] **Let a consumer sample by ratio.** A fleet of phones on cellular has no way to cap what it
   sends, so the 1000-item queue bound is a sampling decision made by accident. An incoming
   `traceparent` flag still wins where there is one.
+- [ ] **Set a log record's `flags` to the W3C trace flags.** An unsampled request's records export
+  without their span, and nothing on them tells the backend that span will never arrive.
 - [ ] **Propagate `tracestate`.** It is invisible when unused, and the W3C rules it must hold to —
   512-char limit, list-member ordering, the `ot` vendor key — are where the cost sits.
 - [ ] **Size a queued payload without materializing its JSON.** `log.info` with OTLP configured

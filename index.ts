@@ -1710,7 +1710,7 @@ export class Log implements LogInt {
 	// Un-awaited log.fetch calls, awaited by flush() so their spans are queued before the queue flushes.
 	private inFlight = new Set<Promise<unknown>>();
 
-	// W3C sampled flag; false exports nothing and propagates 00.
+	// W3C sampled flag; false exports no spans and propagates 00.
 	readonly sampled: boolean;
 
 	span: OtlpSpan;
@@ -1837,7 +1837,7 @@ export class Log implements LogInt {
 		}
 		this.outputToConsole(logLevel, msg, consoleMetadata, msTimestamp);
 
-		if (!this.conf.otlpQueue || !this.sampled) {
+		if (!this.conf.otlpQueue) {
 			return;
 		}
 
