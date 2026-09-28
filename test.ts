@@ -1518,6 +1518,7 @@ test("end({ error }) marks the span failed", async t => {
 	await new Log(conf).end({ error: new DOMException("aborted", "AbortError") });
 	await new Log(conf).end({ error: new TypeError("Request cannot be constructed from a URL that includes credentials: https://myuser:hunter2@api.test/x?page=2&Access_Token=s3cr3t&next=https%3A%2F%2Fu%3Ahunter2%40cb.test#top, then http://api.test/y?%6Bey=s3cr3t") });
 	await new Log(conf).end({ error: new TypeError("Request cannot be constructed from a URL that includes credentials: https://myuser:hunter2@proxy.test/fetch/https%3A%2F%2Fcb.test%2Fx%3Fsig%3Ds3cr3t?a=1 failed") });
+	await new Log(conf).end({ error: new TypeError("GET https://a`b.test/x?q=a`b&token=s3cr3t?more#/cb?access_token=s3cr3t failed") });
 
 	t.deepEqual(exportedSpan(0).status, { code: 2, message: "refused" }, "status is ERROR with the error message");
 	t.strictEqual(attr(exportedSpan(0), "error.type"), "ECONNREFUSED", "error.type is the error's code when it has one");
@@ -1536,6 +1537,7 @@ test("end({ error }) marks the span failed", async t => {
 	t.strictEqual(attr(exportedSpan(9), "error.type"), "AbortError", "a numeric code is skipped for the error name");
 	t.deepEqual(exportedSpan(10).status, { code: 2, message: "Request cannot be constructed from a URL that includes credentials: https://REDACTED@api.test/x?page=2&Access_Token=REDACTED&next=REDACTED#top, then http://api.test/y?%6Bey=REDACTED" }, "a listed query key's value and a credentialed query value are redacted in place");
 	t.deepEqual(exportedSpan(11).status, { code: 2, message: "Request cannot be constructed from a URL that includes credentials: https://REDACTED@proxy.test/fetch/REDACTED failed" }, "a url nested in the quoted url's path is cut with its query");
+	t.deepEqual(exportedSpan(12).status, { code: 2, message: "GET https://a`b.test/x?q=a`b&token=REDACTED#/cb?access_token=REDACTED failed" }, "a backtick, a ? in a query value and a fragment route's query leave the url whole");
 	t.end();
 });
 
