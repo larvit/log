@@ -176,8 +176,7 @@
 - `end({ error })` marks the instance's span failed: status `ERROR` with the error's message, and an
   `error.type` span attribute from the error's `code`, else `name`. `log.error()` does not mark the
   span. `OtlpSpan.status` gains an optional `message`. A `log.fetch` span that failed with a thrown
-  error now carries the same status message, and its `error.type` fallback is the OpenTelemetry
-  `_OTHER` instead of `fetch_error`.
+  error now carries the same status message.
 - `Log`'s and `Logger`'s level methods and `context` accept `undefined` values, typed by the new
   `MetadataInput`; `LogInt`'s keep `Metadata` until 3.0.0. Such keys are dropped from console,
   custom-formatter and OTLP output, so `{ port: options.port }` with an optional field type-checks.

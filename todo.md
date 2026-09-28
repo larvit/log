@@ -6,9 +6,6 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ## 2.4.0
 
-- [ ] **Restore `"fetch_error"` as a `log.fetch` span's `error.type` fallback.** v2.3.0's README
-  documented it, so Goals #4 holds it; `_OTHER` waits for 3.0.0 behind a 2.6.0 deprecation.
-  Unreleased swaps it in a minor.
 - [ ] **Keep an injected `clock` from hanging `flush()` and `end()`.** `tracedFetch` calls
   `childSpan` before its `try`, on the comment that it cannot throw, but `getNsTimestamp` hands
   `BigInt` a fraction whenever `now()` returns one — a `performance.now()`-based clock does — and a
@@ -146,6 +143,8 @@ README → Goals #4 promises a 2.x warning before each break below, so 3.0.0 wai
   an http(s) url: `log.fetch` then traces that invented url and fetches it with `init` alone,
   dropping the request's own method, body and headers. The signature says `string | URL`, so a
   TypeScript consumer cannot reach it.
+- [ ] **Announce in the README and CHANGELOG that 3.0.0 changes a `log.fetch` span's `error.type`
+  fallback from `"fetch_error"` to semconv's `"_OTHER"`, so a query on the old value moves first.**
 - [ ] **Announce in the README that 3.0.0 adds a metrics kind to `OtlpPayload`, so an `OtlpQueue`
   implementer handles one before it arrives.**
 - [ ] **Announce in the README and CHANGELOG that 3.0.0 stops `log.conf` and `queue.conf` handing
@@ -206,6 +205,8 @@ Each one is a weigh against README → Goals first: ship it, or delete the item 
   a credential shape, and a value the consumer's own app had already redacted upstream. `REDACTED`
   shipped in 2.3.0 and Goals #4 promises each documented span value, so renaming it waits for the
   major.
+- [ ] **Set a `log.fetch` span's `error.type` fallback to `"_OTHER"`, as `end({ error })` already
+  does.**
 - [ ] **Make `LogInt` `Logger` plus its own members, `enabled`, `flush` and `sampled` required.**
 - [ ] **Remove the level-string shorthand from `Log` and `clone`.**
 - [ ] **Remove `entryFormatter`, the option and the `conf` alias of `format` beside it.** `format`
