@@ -43,8 +43,10 @@ In [docs/decisions.md](docs/decisions.md):
   section, never split across two.
 - A done `todo.md` item leaves the file: a change a consumer can observe is reworded for them
   under `CHANGELOG.md` → `## Unreleased`; anything else is deleted outright.
+- A release section opens with a few lines on its most important changes, and each bullet with a
+  bold one-sentence tagline of the change, so the taglines alone say what the release holds.
 - A release section with anything a consumer must act on — a rotation advisory, an exposure still
-  open — leads with `### Security` holding it, ahead of `### Everything else`; one with none omits
+  open — puts `### Security` holding it right after that intro, ahead of `### Everything else`; one with none omits
   both headings. Thirty flat bullets is where a rotation notice goes unread.
 - Tests-first. The suite (`test.ts`) injects `stdout`/`stderr` and stubs the global `fetch`, so the same tests cover console + OTLP in both Node and the browser.
 - See [README](README.md) for build/test/release commands.
