@@ -57,6 +57,13 @@ mechanism, that is evidence of the problem, never the prescribed repair.
   `msgTextFormatter` and `msgJsonFormatter`, which no doc spells out. Exporting the resolver is
   additive and the obvious shape; saying it in the README is the other. Whichever lands has to land
   before 3.0.0 takes the alias away. Found by the 2026-09-21 product-owner review.
+- [ ] **Make README → Goals' "`log.fetch` mirrors the runtime's `fetch`" true, in the code or in
+  its wording.** Three spots break it: a `captureRequestHeaders` name that is not a valid header
+  name (`"x y"`) rejects every traced call before the request goes out; a `Request` passed as
+  `init` loses its `method` and `body`, which `{ ...init, headers }` does not copy, so a POST goes
+  out as a GET; and the added `traceparent` is not CORS-safelisted, so a cross-origin simple request
+  gains a preflight a server may refuse. A `Request` as `input` is 2.6.0's item. Rewording a goal
+  is the human's; found by the 2026-09-28 prose pass.
 - [ ] **Spell a redacted `url.full` the way OTel semconv asks: `https://REDACTED:REDACTED@host/x`.**
   Today the userinfo is dropped silently, so a span can carry `url.full` showing a credential-free
   url beside a `status.message` quoting `http://REDACTED@host/x`, and the reader is told both that
