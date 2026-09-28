@@ -1467,7 +1467,7 @@ function failureMessage(error: unknown): string {
 		}
 	}
 
-	return redactUserinfo(message.replace(/((?:\bhttps?:)?\/\/[^\s"<>/?#]*)([^\s"<>?#]*)([^\s"<>]*)/gi, (_, head: string, path: string, tail: string) => redactQuotedUrl(head, path, tail)));
+	return redactUserinfo(message.replace(/((?:\bhttps?:)?\/\/[^\s"<>/?#]*)([^\s"<>?#]*)((?:(?!(?:\bhttps?:)?\/\/)[^\s"<>])*)/gi, (_, head: string, path: string, tail: string) => redactQuotedUrl(head, path, tail)));
 }
 
 // --- Warnings written once per stderr sink ---------------------------------
