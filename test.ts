@@ -1514,7 +1514,7 @@ test("end({ error }) marks the span failed", async t => {
 	await new Log(conf).end({ error: new TypeError("Request cannot be constructed from a URL that includes credentials: http://myuser:hunter2@api.test/x, retried against https://backup:s3cr3t@api.test/x") });
 	await new Log(conf).end({ error: new Error("GET https://api.test/mail@example.com?to=a@b failed") });
 	// Scheme-relative: Node cannot parse one without a base and quotes it back as given.
-	await new Log(conf).end({ error: new TypeError("Failed to parse URL from //myuser:hunter2@api.test/x") });
+	await new Log(conf).end({ error: new TypeError("Failed to parse URL from //myuser:hunter2@api.test/x?access_token=s3cr3t") });
 	await new Log(conf).end({ error: new DOMException("aborted", "AbortError") });
 	await new Log(conf).end({ error: new TypeError("Request cannot be constructed from a URL that includes credentials: https://myuser:hunter2@api.test/x?page=2&Access_Token=s3cr3t&next=https%3A%2F%2Fu%3Ahunter2%40cb.test#top, then http://api.test/y?%6Bey=s3cr3t") });
 	await new Log(conf).end({ error: new TypeError("Request cannot be constructed from a URL that includes credentials: https://myuser:hunter2@proxy.test/fetch/https%3A%2F%2Fcb.test%2Fx%3Fsig%3Ds3cr3t?a=1 failed") });
@@ -1533,7 +1533,7 @@ test("end({ error }) marks the span failed", async t => {
 	t.deepEqual(exportedSpan(5).status, { code: 2, message: "_OTHER" }, "a value that cannot be stringified still ends and exports the span");
 	t.deepEqual(exportedSpan(6).status, { code: 2, message: "Request cannot be constructed from a URL that includes credentials: http://REDACTED@api.test/x, retried against https://REDACTED@api.test/x" }, "userinfo is redacted from every url the error message quotes");
 	t.deepEqual(exportedSpan(7).status, { code: 2, message: "GET https://api.test/mail@example.com?to=a@b failed" }, "an @ outside the userinfo position is left alone");
-	t.deepEqual(exportedSpan(8).status, { code: 2, message: "Failed to parse URL from //REDACTED@api.test/x" }, "userinfo is redacted from a scheme-relative url too");
+	t.deepEqual(exportedSpan(8).status, { code: 2, message: "Failed to parse URL from //REDACTED@api.test/x?access_token=REDACTED" }, "a scheme-relative url is redacted too");
 	t.strictEqual(attr(exportedSpan(9), "error.type"), "AbortError", "a numeric code is skipped for the error name");
 	t.deepEqual(exportedSpan(10).status, { code: 2, message: "Request cannot be constructed from a URL that includes credentials: https://REDACTED@api.test/x?page=2&Access_Token=REDACTED&next=REDACTED#top, then http://api.test/y?%6Bey=REDACTED" }, "a listed query key's value and a credentialed query value are redacted in place");
 	t.deepEqual(exportedSpan(11).status, { code: 2, message: "Request cannot be constructed from a URL that includes credentials: https://REDACTED@proxy.test/fetch/REDACTED failed" }, "a url nested in the quoted url's path is cut with its query");
