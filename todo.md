@@ -128,6 +128,8 @@ README → Goals #4 promises a 2.x warning before each break below, so 3.0.0 wai
   uses, and the `### Security` grouping. Neither covers a deprecation, so `entryFormatter` and the
   `new Log("debug")` shorthand tell a consumer their code stops working in 3.0.0 from inside `###
   Everything else`, unmarked.
+- [ ] **Publish an `index.js.map` that maps the published `index.js`.** It describes tsc's output,
+  which uglify then minifies and, since 2.5.0, mangles.
 - [ ] **Publish the artifact the gate tested.** `push.yaml` builds and tests `index.js` inside the
   container; `publish.yaml` builds a second one on the runner and publishes that, so the thing
   consumers install is never the thing CI proved. Build once, upload, publish that. Pinning the base
