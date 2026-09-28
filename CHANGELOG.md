@@ -11,8 +11,8 @@
   `/wiki/Http:_Status` does, is cut too, so a dashboard grouping on such a `url.full` sees it change.
   Still exported as written: a scheme-relative `//user:pass@host` or another scheme's url nested in
   the path, base64 not starting a segment, and base64 of a percent-encoded url. The v2.4.0 rotation
-  advisory holds for spans exported before this release, and for those shapes; search for `SFRUU`
-  as well as `aHR0c`, which begins an upper-case one.
+  advisory holds for spans exported before this release, and for those shapes; search for `SFRUU`,
+  which begins an upper-case one, as well as `aHR0c`.
 - **A child or clone sending to another origin than its source's no longer inherits
   `otlpAdditionalHeaders`.** Since v1.4.0 for a child and v2.2.0 for a clone,
   `new Log({ parentLog, otlpHttpBaseURI: other })` sent the parent's headers, a bearer token
