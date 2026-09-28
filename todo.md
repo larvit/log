@@ -6,13 +6,6 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ## 2.4.0
 
-- [ ] **Keep an injected `clock` from hanging `flush()` and `end()`.** `tracedFetch` calls
-  `childSpan` before its `try`, on the comment that it cannot throw, but `getNsTimestamp` hands
-  `BigInt` a fraction whenever `now()` returns one — a `performance.now()`-based clock does — and a
-  caller's `now()` may throw outright; either way the tracked promise never settles. A `setTimeout`
-  that throws rejects the round, and the `pending` flush chained on it keeps that rejection, since
-  `this.pending = undefined` sits in the skipped `.then`: every later mid-round `flush()` returns it
-  and queues no round. `clock` is new in 2.4.0.
 - [ ] **Keep `JSON.stringify(log.conf)` from throwing.** With OTLP configured `log.conf.otlpQueue`
   is the `Queue` itself, and once a batch timer is pending on Node its `Timeout` makes the structure
   circular, so a debug line that worked on v2.3.0 now crashes some calls and leaks credentials on

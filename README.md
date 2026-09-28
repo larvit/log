@@ -452,7 +452,7 @@ Spans are queued when the response arrives and are registered with `flush()` at 
 | `EntryFormatter`, `EntryFormatterConf` | A formatter, `(entry) => string`, and the entry it takes: `{ colors? (unset = on), logLevel, metadata?, msg, msTimestamp? }`. |
 | `OtlpSpan`, `OtlpAttribute`, `OtlpLogPayload`, `OtlpSpanPayload` | The OTLP wire shapes; `log.span` is an `OtlpSpan`. |
 | `OtlpQueue`, `OtlpPayload` | What `otlpQueue` takes, `{ enqueue, flush }`, and what `enqueue` receives, a log or span payload. |
-| `Clock`, `TimerHandle` | The `clock` option, `{ now, setTimeout, clearTimeout }` with `now()` in integer epoch milliseconds, and what its `setTimeout` hands back. |
+| `Clock`, `TimerHandle` | The `clock` option, `{ now, setTimeout, clearTimeout }` with `now()` in epoch milliseconds, and what its `setTimeout` hands back. |
 | `QueueConf`, `ResolvedQueueConf`, `QueueStorage` | `Queue`'s options, `queue.conf` with defaults applied, and the `storage` shape, `{ getItem, setItem, removeItem }`. |
 
 Instance fields: `log.conf`, `log.context`, `log.span`, `log.sampled`, `log.ended`.
