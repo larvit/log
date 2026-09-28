@@ -127,8 +127,8 @@
   over `log.conf.format` as in v2.3.0; 3.0.0 removes it, and `log.conf.format` holds a function
   from then. Until then `log.conf.format` never holds one: it reads `undefined` after
   `format: fn`. `log.conf.entryFormatter` is non-enumerable now, so
-  `{ ...log.conf }` and `Object.keys(log.conf)` no longer carry it, which is what lets a `format`
-  on a child apply, and a spread no longer carries a function formatter at all: use `clone()`.
+  `{ ...log.conf }` and `Object.keys(log.conf)` no longer carry it, and a spread no longer carries
+  a function formatter at all: use `clone()`.
   `ResolvedLogConf` still declares it, so `const c: ResolvedLogConf = { ...log.conf }` compiles
   and `c.entryFormatter(entry)` throws at runtime.
 - `JSON.stringify(log.conf)` carries `format`, `"text"` by default, where v2.3.0 left the key
