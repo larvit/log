@@ -285,9 +285,9 @@ starts and the rest records `REDACTED`, the query with it whatever `captureQuery
 `https://proxy.test/fetch/REDACTED`. An `http:` or `https:` url is keyed on its scheme alone,
 because its path and query — the latter parsing as the outer url's — can hold a signature or
 `access_token` with no shape; not on `//` after it, since `https:\\u:p@host` and `https:u:p@host`
-parse to the same credentials. Any other url is keyed on its userinfo — after `ftp:` or `ws(s):`,
-which parse like `https:`, or after a doubled slash — since a bare `word:` is a path's own syntax
-(`/v1/p1:batchGet`), and a doubled slash is a sloppy join. Splicing `REDACTED@` covers the literal
+parse to the same credentials. Any other url is keyed on non-empty userinfo — after `ftp:` or
+`ws(s):`, which parse like `https:`, or after a doubled slash — since a bare `word:` is a path's own
+syntax (`/v1/p1:batchGet`), and a doubled slash is a sloppy join. Splicing `REDACTED@` covers the literal
 spelling only, and replacing the whole path loses the endpoint README → Audience #3 reads. Valid
 while `url.full` exports the request path. Serves README → Goals #3.
 

@@ -1330,21 +1330,42 @@ function decodedWithSources(text: string): { complete: boolean, decoded: string,
 	return { complete: !changed, decoded: text, sources };
 }
 
-// A nested url starts at an http(s) scheme, or at userinfo after another special scheme or a
-// doubled slash. The group capturing it is a suffix of the match.
-const nestedUrl = (userinfo: string) => new RegExp(`(https?:)|(?:^|[^\\w+.-])((?:ftp|wss?):[\\\\/]*${userinfo}*@)|[\\\\/]([\\\\/]${userinfo}*@)`, "i");
-const NESTED_URL = nestedUrl("[^\\s/\\\\?#]");
-// Base64 decodes to noise, which userinfo must not run across to a later `@`: printable ASCII only.
-const NESTED_URL_IN_BASE64 = nestedUrl("[!\"$-.0->@-[\\]-~]");
+const earliest = (starts: (number | undefined)[]) => {
+	const found = starts.filter(start => start !== undefined);
 
-function nestedUrlIndex(text: string, pattern: RegExp): number | undefined {
-	const match = pattern.exec(text);
+	return found.length === 0 ? undefined : Math.min(...found);
+};
 
-	if (match !== null) {
-		const url = match[1] ?? match[2] ?? match[3];
+// An http(s) url starts at its scheme; any other needs non-empty userinfo after `ftp:`, `ws(s):` or
+// a doubled slash. Base64 decodes to noise, which userinfo must not run across: printable ASCII only.
+function nestedUrlIndex(text: string, printable: boolean): number | undefined {
+	const outsideUserinfo = printable ? /[^!-~]|[#/?\\]/ : /[\s#/?\\]/;
+	// One pass from the end, so a path of many candidates stays linear.
+	const reachesAt: boolean[] = [];
 
-		return match.index + match[0].length - url.length;
+	for (let i = text.length - 1; i >= 0; i--) {
+		reachesAt[i] = text[i] === "@" || (!outsideUserinfo.test(text[i]) && reachesAt[i + 1] === true);
 	}
+
+	const userinfoAt = (i: number) => text[i] !== "@" && reachesAt[i] === true;
+	let special: number | undefined;
+	let doubledSlash: number | undefined;
+
+	for (const match of text.matchAll(/(?:ftp|wss?):[\\/]*/gi)) {
+		if (!/[\w+.-]/.test(text[match.index - 1] ?? "") && userinfoAt(match.index + match[0].length)) {
+			special = match.index;
+			break;
+		}
+	}
+
+	for (let i = 1; i < text.length; i++) {
+		if (/^[\\/]{2}$/.test(text.slice(i - 1, i + 1)) && userinfoAt(i + 1)) {
+			doubledSlash = i;
+			break;
+		}
+	}
+
+	return earliest([/https?:/i.exec(text)?.index, special, doubledSlash]);
 }
 
 // Every base64 or base64url run, decoded at each of its four alignments, then percent-decoded.
@@ -1355,7 +1376,7 @@ function base64NestedUrlStart(text: string): number | undefined {
 		for (let alignment = 0; alignment < 4; alignment++) {
 			const chars = run[0].slice(alignment, alignment + (Math.floor((run[0].length - alignment) / 4) * 4));
 			const { decoded, sources } = decodedWithSources(atob(chars.replace(/-/g, "+").replace(/_/g, "/")));
-			const found = nestedUrlIndex(decoded, NESTED_URL_IN_BASE64);
+			const found = nestedUrlIndex(decoded, true);
 
 			if (found !== undefined) {
 				start = Math.min(start ?? Infinity, run.index + alignment + (Math.floor((sources[found] ?? found) / 3) * 4));
@@ -1371,13 +1392,11 @@ function base64NestedUrlStart(text: string): number | undefined {
 function nestedUrlStart(path: string): number | undefined {
 	const { complete, decoded, sources } = decodedWithSources(path);
 	// An escape left undecoded may still spell a url, so it cuts too.
-	const starts = [nestedUrlIndex(decoded, NESTED_URL), base64NestedUrlStart(decoded), complete ? undefined : decoded.indexOf("%")].filter(start => start !== undefined);
+	const start = earliest([nestedUrlIndex(decoded, false), base64NestedUrlStart(decoded), complete ? undefined : decoded.indexOf("%")]);
 
-	if (starts.length === 0) {
+	if (start === undefined) {
 		return undefined;
 	}
-
-	const start = Math.min(...starts);
 
 	return sources[start] ?? start;
 }
