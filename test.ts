@@ -1807,6 +1807,7 @@ test("log.fetch cuts a url nested in the request path out of url.full from where
 		["https://proxy.test/fetch/https:myuser:hunter2@cb.test/x", "https://proxy.test/fetch/REDACTED"],
 		["https://proxy.test/fetch/https:%2F%09%2Fmyuser:hunter2@cb.test/x", "https://proxy.test/fetch/REDACTED"],
 		["https://proxy.test/fetch/h%09tt%0Aps://myuser:hunter2@cb.test/x", "https://proxy.test/fetch/REDACTED"],
+		["https://proxy.test/fetch/%%0968ttps:%2F%2Fcb.test%2Fx%3Fsig%3Dhunter2", "https://proxy.test/fetch/REDACTED"],
 		["https://proxy.test/fetch%2FaHR0cHM6Ly9jYi50ZXN0L2E_Yg/hunter2", "https://proxy.test/fetch%2FREDACTED"],
 		["https://wiki.test/wiki/Http:_Status", "https://wiki.test/wiki/REDACTED"],
 		[`https://proxy.test/${"%F0%9F%98%80".repeat(40)}/https://myuser:hunter2@cb.test/x`, `https://proxy.test/${"%F0%9F%98%80".repeat(40)}/REDACTED`],

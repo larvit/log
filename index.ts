@@ -1289,7 +1289,7 @@ function traceableUrl(input: string | URL): URL | undefined {
 	return url.protocol === "http:" || url.protocol === "https:" ? url : undefined;
 }
 
-// Every percent-encoding layer decoded and, as a WHATWG parser does, tab and newline dropped; each
+// Every percent-encoding layer decoded, each dropping tab and newline as a WHATWG parser does; every
 // char keeps the index in `text` it came from, or where its escape run starts when that is unclear.
 // Without an escape nothing moves, and `sources` is empty. From eight layers on `complete` is false.
 function decodedWithSources(text: string): { complete: boolean, decoded: string, sources: number[] } {
@@ -1297,8 +1297,7 @@ function decodedWithSources(text: string): { complete: boolean, decoded: string,
 		return { complete: true, decoded: text, sources: [] };
 	}
 
-	const indices = (chars: string) => Array.from({ length: chars.length }, (_, i) => i);
-	let sources = indices(text);
+	let sources = Array.from({ length: text.length }, (_, i) => i);
 	let changed = true;
 
 	for (let pass = 0; changed && pass < 8; pass++) {
@@ -1306,8 +1305,12 @@ function decodedWithSources(text: string): { complete: boolean, decoded: string,
 		let last = 0;
 		const nextSources: number[] = [];
 		const keep = (chars: string, source: (offset: number) => number) => {
-			next += chars;
-			for (let offset = 0; offset < chars.length; offset++) nextSources.push(sources[source(offset)]);
+			for (let offset = 0; offset < chars.length; offset++) {
+				if (!"\t\n\r".includes(chars[offset])) {
+					next += chars[offset];
+					nextSources.push(sources[source(offset)]);
+				}
+			}
 		};
 
 		for (const run of text.matchAll(/(?:%[0-9A-Fa-f]{2})+/g)) {
@@ -1324,9 +1327,7 @@ function decodedWithSources(text: string): { complete: boolean, decoded: string,
 		sources = nextSources;
 	}
 
-	const kept = indices(text).filter(i => !"\t\n\r".includes(text[i]));
-
-	return { complete: !changed, decoded: kept.map(i => text[i]).join(""), sources: kept.map(i => sources[i]) };
+	return { complete: !changed, decoded: text, sources };
 }
 
 // Every case of `h` encodes to a base64 head of `a` or `S`, and eight chars decode to `https:`.
