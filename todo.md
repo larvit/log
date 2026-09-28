@@ -155,9 +155,6 @@ README → Goals #4 promises a 2.x warning before each break below, so 3.0.0 wai
   uses, and the `### Security` grouping. Neither covers a deprecation, so `entryFormatter` and the
   `new Log("debug")` shorthand tell a consumer their code stops working in 3.0.0 from inside `###
   Everything else`, unmarked.
-- [ ] **Split README → Goals #4's list of what only a major changes into bullets, so a reader finds
-  "each span attribute and value this README documents" without parsing a 15-line sentence.** It is
-  the clause that decides most minor-versus-major questions, and today it sits eighth of about ten.
 - [ ] **Publish the artifact the gate tested.** `push.yaml` builds and tests `index.js` inside the
   container; `publish.yaml` builds a second one on the runner and publishes that, so the thing
   consumers install is never the thing CI proved. Build once, upload, publish that. Pinning the base

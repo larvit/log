@@ -47,3 +47,4 @@ In [docs/decisions.md](docs/decisions.md):
   both headings. Thirty flat bullets is where a rotation notice goes unread.
 - Tests-first. The suite (`test.ts`) injects `stdout`/`stderr` and stubs the global `fetch`, so the same tests cover console + OTLP in both Node and the browser.
 - See [README](README.md) for build/test/release commands.
+- Don't wait on CodeRabbit: under 10 stars it reviews only when triggered by hand.
