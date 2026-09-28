@@ -212,11 +212,14 @@ no shape that tells them from any other opaque value, and the semconv list is a 
 maximum, so more names break no spec. An access key id and a `GoogleAccessId` are identifiers, not
 secrets, and are redacted anyway: semconv redacted `AWSAccessKeyId` for years, and a reader who
 needs the key knows which bucket they fetched from. The rest of a presigned url is kept, because
-`X-Amz-Date` and `X-Amz-Expires` are what README → Audience #3 reads to explain a 403. 2026-09-28,
-the maintainer: it adds `access_token`, RFC 6750's query spelling of a bearer token, and `api_key`,
-`apikey`, `key` and `token`, the names the wild sends one under: turning `captureQuery` on names no
-parameter, so Goal #3's "naming it is asking for it" does not cover them, and a false hit costs the
-reader a value, never the key. Serves README → Goals #3; over-redaction in a minor stands on the
+`X-Amz-Date` and `X-Amz-Expires` are what README → Audience #3 reads to explain a 403.
+
+2026-09-28, the maintainer: it adds `access_token`, RFC 6750's query spelling of a bearer token, and
+`api_key`, `apikey`, `key` and `token`, the names the wild sends one under: turning `captureQuery`
+on names no parameter, so Goal #3's "naming it is asking for it" does not cover them, and a false
+hit costs the reader a value, never the key.
+
+Serves README → Goals #3; over-redaction in a minor stands on the
 2026-09-20 captured-value entry. Valid while the deny-list names query keys, not shapes.
 
 ## An unsampled `traceparent` drops the span, never the log records
