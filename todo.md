@@ -20,15 +20,20 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ### Everything else
 
+- [ ] **Stop decoding base64 in a request path, so every base64 value exports intact.**
+  README → Goals #3 leaves a url base64-encoded into a path to the caller; today a random id whose
+  decoding spells `http:` or `//x@` is cut. Drop the base64 half of the nested-url cut, its tests,
+  and its lines in README → Credentials in a captured value, the CHANGELOG entry and the decision
+  entry, and say in the CHANGELOG that base64 in a path is exported as written.
 - [ ] **Export `resolveFormatter`, so `conf.format` fully replaces the `conf.entryFormatter` alias
   3.0.0 removes.** The alias hands back a callable `EntryFormatter`; 3.0.0's `format` hands back
   `"text" | "json" | EntryFormatter`, and the mapping between them is the unexported `formatterOf`.
   Decided 2026-09-28.
-- [ ] **Keep an invalid name in `captureRequestHeaders` or `captureResponseHeaders` from changing a
-  `log.fetch` result.** `headers.get("x y")` throws a `TypeError`, so a bad request-side name rejects
-  every traced call before the request goes out, and a bad response-side one turns a response the
-  platform delivered into a rejection — against Goals' "`log.fetch` mirrors the runtime's `fetch`".
-  No working config holds such a name, so rejecting it where the option is set breaks nobody.
+- [ ] **Warn once per `report` sink about an invalid name in `captureRequestHeaders` or
+  `captureResponseHeaders`, and skip it, so it never changes a `log.fetch` result.**
+  `headers.get("x y")` throws a `TypeError`, so a bad request-side name rejects every traced call
+  before the request goes out, and a bad response-side one turns a response the platform delivered
+  into a rejection.
 - [ ] **Send a `Request` passed as `init` with its own method, body and headers.** `fetch(url,
   request)` is valid and TypeScript accepts it, but `{ ...init, headers }` copies own properties
   only, and a `Request`'s are prototype getters: `log.fetch(url, new Request(url, { method: "POST",
@@ -36,8 +41,7 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 - [ ] **Say in README → `log.fetch` in depth that a cross-origin call needs `traceparent` in the
   server's `Access-Control-Allow-Headers`.** The header is not CORS-safelisted, so it turns a simple
   request into a preflighted one, and a server that refuses it fails a call plain `fetch` would have
-  made. Injecting it is what `log.fetch` is for, so the behaviour stays; reword Goals' "never a
-  request the platform would not have made" to own the preflight.
+  made. README → Goals already owns the preflight.
 - [ ] **Spell a redacted `url.full` the way OTel semconv asks: `https://REDACTED:REDACTED@host/x`.**
   Today the userinfo is dropped silently, so a span can carry `url.full` showing a credential-free
   url beside a `status.message` quoting `http://REDACTED@host/x`, and the reader is told both that
@@ -62,11 +66,12 @@ mechanism, that is evidence of the problem, never the prescribed repair.
   failed-round half. A script that awaits neither `end()` nor `flush()` then exits without exporting
   what it queued, so the CHANGELOG says so, and README → Queue exports' "A retry timer never keeps…"
   covers every timer.
-- [ ] **Stop a restored batch being the first thing dropped.** `prepend(batch)` unshifts a failed
+- [ ] **Keep a restored batch through the `maxItems` trim, so the retry promised for it holds.**
+  README → Audience says so. `prepend(batch)` unshifts a failed
   batch to the front, and the `maxItems` trim then splices the excess off that same front. An
   offline phone at `maxItems` reports "OTLP export failed, will retry" for items it has already
   discarded, and the retry finds them gone — so the round trip and the promise are both spent on the
-  flagship offline path. Protect a restored batch, or stop promising a retry for what was dropped.
+  flagship offline path.
 - [ ] **Keep a batch in the persisted queue until its send settles.** `takeBatch` removes it from
   `items` before `send`, so a record logged during the send saves the queue without it, and a
   process that dies then loses the batch its storage exists to keep.

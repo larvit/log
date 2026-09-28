@@ -43,7 +43,8 @@ Priority order decides a tie.
    metadata, `context` and `spanName`. So is a header you allow-list that simply *is* a secret,
    because naming it is asking for it, and a query value under a name
    [Credentials in a captured value](#credentials-in-a-captured-value) does not list, because no
-   shape tells it from any other string.
+   shape tells it from any other string. So is a url you base64-encode into a request path: a
+   base64 value always exports intact, and keeping a credential out of one is yours.
 4. **Semver, read strictly, over what this README documents.** A minor only adds — an export, an
    option, a value an option accepts, a field, a span attribute — where code not using it behaves as
    before. What the README does not document — an undocumented key of a `conf`, enumerability, what
@@ -74,8 +75,10 @@ Priority order decides a tie.
 
 **`log.fetch` mirrors the runtime's `fetch`.** It accepts what that `fetch` accepts, and the
 response, the rejection and the promise you see are exactly what it produced. What it adds is
-outbound trace context and a span — never a request the platform would not have made, and never a
-success the platform would have refused.
+outbound trace context and a span, and never a success the platform would have refused. The request
+differs from yours only by `traceparent`, which is not CORS-safelisted, so a cross-origin call is
+preflighted and needs the server to allow that header. An option it cannot apply, such as an
+invalid header name to capture, warns once and is skipped, never changing the call.
 
 **Metrics travel, they do not accumulate.** Any OTLP metric shape — gauge, delta or cumulative sum,
 histogram — may be handed over already aggregated, and this library encodes, batches and delivers
@@ -106,8 +109,8 @@ current Chromium. React Native is supported from 0.74, where Hermes gained `Text
 
 **Do not rely on** the text output line, which is written for people to read — parse
 `format: "json"` instead. Nor on delivery: the export queue is best-effort, it keeps what `storage`
-accepted and drops the oldest past `maxItems`, because telemetry is not payload data. A major stops
-being maintained when the next one ships.
+accepted and drops the oldest past `maxItems`, keeping a batch it has promised to retry, because
+telemetry is not payload data. A major stops being maintained when the next one ships.
 
 ## Install
 
