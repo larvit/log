@@ -1347,7 +1347,8 @@ function nestedUrlIndex(text: string, printable: boolean): number | undefined {
 		reachesAt[i] = text[i] === "@" || (!outsideUserinfo.test(text[i]) && reachesAt[i + 1] === true);
 	}
 
-	const userinfoAt = (i: number) => text[i] !== "@" && reachesAt[i] === true;
+	// A parser splits userinfo at its last `@`, so a leading one is userinfo too.
+	const userinfoAt = (i: number) => i < text.length && !outsideUserinfo.test(text[i]) && reachesAt[i + 1] === true;
 	let special: number | undefined;
 	let doubledSlash: number | undefined;
 
