@@ -1289,7 +1289,8 @@ function traceableUrl(input: string | URL): URL | undefined {
 	return url.protocol === "http:" || url.protocol === "https:" ? url : undefined;
 }
 
-const URL_SCHEME = /https?:\/\//i;
+// A WHATWG parser reads a url from `https:` on, whatever slashes follow.
+const URL_SCHEME = /https?:/i;
 const startsWithUrl = (text: string) => URL_SCHEME.exec(text)?.index === 0;
 
 // Each pass shrinks the string or leaves it as it was, so this ends.
@@ -1301,10 +1302,10 @@ function fullyPercentDecoded(value: string): string {
 	return value;
 }
 
-// Twelve base64 chars decode to nine bytes, one more than `https://`; atob needs no padding.
+// Eight base64 chars decode to `https:`; atob needs no padding.
 function base64Head(text: string): string {
 	try {
-		return atob(text.slice(0, 12).replace(/[^\w+/-][\s\S]*/, "").replace(/-/g, "+").replace(/_/g, "/"));
+		return atob(text.slice(0, 8).replace(/[^\w+/-][\s\S]*/, "").replace(/-/g, "+").replace(/_/g, "/"));
 	} catch {
 		return "";
 	}

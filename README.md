@@ -416,8 +416,8 @@ and `set-cookie`, and the value of a query key named, in any casing, `awsaccessk
 generation made it, and an Azure SAS url. Redacted wherever it appears: any other captured header
 value, or kept query key or value, that holds url userinfo — which records `REDACTED` in place of
 the whole of itself, through one layer of percent-encoding but not two. Cut from `url.full`: a url
-nested in the request path — `http://` or `https://` under any layers of percent-encoding, or a
-path segment that base64 or base64url decodes to one — and everything after it, the query included:
+nested in the request path — `http:` or `https:` under any layers of percent-encoding, or a path
+segment that base64 or base64url decodes to one — and everything after it, the query included:
 `https://proxy.test/fetch/https://user:pass@cb.test/x` records `https://proxy.test/fetch/REDACTED`.
 
 That covers the shapes a credential is recognisable in, not every credential: a value that simply
