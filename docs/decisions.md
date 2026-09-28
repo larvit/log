@@ -213,7 +213,10 @@ not a maximum, so more names break no spec. An access key id and a `GoogleAccess
 identifiers, not secrets, and are redacted anyway: semconv redacted `AWSAccessKeyId` for years, and
 a reader who needs the key knows which bucket they fetched from. The rest of a presigned url is
 kept, because `X-Amz-Date` and `X-Amz-Expires` are what README → Audience #3 reads to explain a
-403. Serves README → Goals #3; over-redaction in a minor stands on the 2026-09-20 captured-value
+403. 2026-09-28, the maintainer: it adds `access_token`, RFC 6750's query spelling of a bearer
+token, and `api_key`, `apikey`, `key` and `token`, the names the wild sends one under: turning
+`captureQuery` on names no parameter, so Goal #3's "naming it is asking for it" does not cover
+them, and a false hit costs the reader a value, never the key. Serves README → Goals #3; over-redaction in a minor stands on the 2026-09-20 captured-value
 entry. Valid while the deny-list names query keys, not shapes.
 
 ## An unsampled `traceparent` drops the span, never the log records
@@ -264,7 +267,39 @@ run at or above 7.0 replaces the baseline.
 
 2026-09-28, the maintainer: `JSON.stringify` of a `Queue`, and so of `log.conf`, carries the
 queue's `conf` and none of its working state — items, timers, scheduler — which is what made it
-circular. Credentials in that `conf` stringify as written, as `log.conf`'s own `otlp*` keys beside
+circular. `storage` is left out too, from 2.5.0: what it holds is read only to restore the queue,
+and a browser's `localStorage` holds the origin's session tokens. Credentials in that `conf` stringify as written, as `log.conf`'s own `otlp*` keys beside
 a queue built from them already do: README → Goals #3 stops at what this library emits, and
 redacting in a `toJSON` would be a second spelling of 3.0.0's item keeping credentials off `conf`.
 Serves README → Goals #3. Valid until 3.0.0 keeps credentials off `log.conf` and `queue.conf`.
+
+## A url nested in a request path is cut from where it starts
+
+2026-09-28, the maintainer: where `url.full`'s path holds a url matching `redactCredential`'s rule,
+in any percent-encoding it sees through, the path is kept up to where that url starts and the rest
+records `REDACTED`: `https://proxy.test/fetch/REDACTED`. Splicing `REDACTED@` covers the literal
+spelling only, and replacing the whole path loses the endpoint README → Audience #3 reads. Serves
+README → Goals #3.
+
+## Basic credentials over plain `http:` warn once
+
+2026-09-28, the maintainer: an `otlpHttpBaseURI` that is `http:`, carries `user:pass@` and names a
+non-loopback host writes one warning per `report` sink, and still sends. Refusing it would break
+the in-cluster `http:` collector, a deliberate and common setup. Serves README → Goals #3 without
+spending #4.
+
+## `resolveFormatter` is exported
+
+2026-09-28, the maintainer: the resolver from a conf to the `EntryFormatter` it writes with is
+exported, so a library author handed a conf renders a line the way the instance does once 3.0.0
+takes `conf.entryFormatter` away. Serves README → Goals #5 and Audience #2; an export is a minor
+under #4.
+
+## Both credential spellings stay, and their combination warns
+
+2026-09-28, the maintainer: `user:pass@` in `otlpHttpBaseURI` and `otlpAdditionalHeaders: {
+Authorization }` both stay: a vendor hands the endpoint over as one `https://id:token@host` string,
+the only shape one env var carries, and a bearer token has no userinfo spelling. The two can
+disagree, so setting both warns once per `report` sink in 2.x and throws in the constructor from
+3.0.0; v2.4.0 documents the header winning, so rejecting it sooner would spend README → Goals #4.
+Serves README → Goals #5.

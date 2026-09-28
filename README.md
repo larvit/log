@@ -38,11 +38,13 @@ Priority order decides a tie.
    Approximating part of the spec is worse than omitting it.
 3. **A credential never leaves.** A credential hidden inside something you hand this library to
    *use* — a url it fetches, a header or query value it captures, the OTLP endpoint — never
-   reaches a span, a record or `stderr`. Text you write yourself as telemetry is exported as you
-   wrote it: the log message, metadata, `context` and `spanName`. So is a header or query value
-   you allow-list that simply *is* a secret, because naming it is asking for it and no shape
-   tells it from any other string. Until 2.5.0 a url nested in a request path still reaches
-   `url.full` as written; the [changelog](CHANGELOG.md) says what to rotate.
+   reaches a span, a record or `stderr`, and what a `storage` holds is read only to restore the
+   queue. Text you write yourself as telemetry is exported as you wrote it: the log message,
+   metadata, `context` and `spanName`. So is a header you allow-list that simply *is* a secret,
+   because naming it is asking for it, and a query value under a name no credential rule knows,
+   because no shape tells it from any other string. Until 2.5.0 a url nested in a request path
+   still reaches `url.full` as written, and a stringified `conf` carries what its `storage` holds;
+   the [changelog](CHANGELOG.md) says what to rotate.
 4. **Semver, read strictly, over what this README documents.** A minor only adds — an export, an
    option, a value an option accepts, a field, a span attribute — where code not using it behaves as
    before. What the README does not document — an undocumented key of a `conf`, enumerability, what
