@@ -13,6 +13,10 @@ mechanism, that is evidence of the problem, never the prescribed repair.
   exports `token=SECRET`: the url match stops at whitespace, where `url.full` for that url would
   redact it. A runtime quotes the serialized url, which holds no space, so only a message the
   caller built reaches it.
+- [ ] **Redact a listed key in a url nested in a captured query key.** With `captureQuery` on,
+  `log.fetch("https://proxy.test/?https://t.test/x?token=SECRET")` exports `token=SECRET` in
+  `url.full`: `URLSearchParams` reads `https://t.test/x?token` as the key, which no rule lists.
+  A span's status message already redacts it.
 - [ ] **Weigh redacting the query keys `access-token`, `accesstoken`, `api-key`, `auth_token`,
   `client_secret`, `id_token`, `password`, `refresh_token`, `secret` and `subscription-key` too,
   and add those that carry a credential.** With `captureQuery` on, `url.full` exports each one's
