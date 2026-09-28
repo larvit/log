@@ -436,8 +436,9 @@ Native hands it to the platform, where iOS sends the credentials and Android sen
 you the 401. A rejection quoting the url reaches the status message as `http://REDACTED@host/x`,
 redacted from the runtime's own text.
 
-`REDACTED` does not always stand for a credential: an address glued to a host, as in
-`https://api.test,mail@example.com`, redacts too, a `location` of `https://cdn.test//logo@2x.png`
+`REDACTED` does not always stand for a credential: a `?key=` lookup or a `?token=` pagination
+cursor records it, an address glued to a host, as in `https://api.test,mail@example.com`, redacts
+too, a `location` of `https://cdn.test//logo@2x.png`
 records `REDACTED` whole, and a path holding `http:`, or `//` then a name holding `@`, is cut —
 `https://wiki.test/wiki/Http:_Status` records `https://wiki.test/wiki/REDACTED` — and so, rarely,
 is a random id whose base64 decoding spells one.
