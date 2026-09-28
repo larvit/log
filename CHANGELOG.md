@@ -97,8 +97,9 @@
   serialising or sending either `conf` puts the credentials wherever it lands. Don't log a `conf`.
   **If you ever have, rotate those credentials**: search where it landed for `otlpHttpBaseURI` and
   `otlpAdditionalHeaders`, which every serialised `conf` holding them carries.
-  A `Queue` given `storage: localStorage` serialises with every localStorage entry of the origin, so
-  rotate any session token such a `conf` carried.
+- Open: a `Queue` given `storage: localStorage` serialises, inside either `conf`, with every
+  localStorage entry of the origin under `"storage"`. Search where a `conf` landed for `"storage":`
+  and rotate any session token it carries.
 
 ### Everything else
 
@@ -139,8 +140,8 @@
   and `c.entryFormatter(entry)` throws at runtime.
 - `JSON.stringify(log.conf)` carries `format`, `"text"` by default, where v2.3.0 left the key
   absent unless you passed one — and omits it when you passed a function, as it omits any function.
-  With OTLP configured it carries `otlpQueue` — the one `otlpHttpBaseURI` builds included — as the
-  queue's `conf`, so dropping the top-level `otlp*` keys no longer keeps the credentials out.
+  With OTLP configured it carries a `Queue` in `otlpQueue` — the one `otlpHttpBaseURI` builds
+  included — as its `conf`, so dropping the top-level `otlp*` keys no longer keeps the credentials out.
   Not promised; see below.
 - A `format` set on a child (`parentLog`) now applies; before, the parent's resolved formatter
   silently kept winning. `log.conf.format` is read where a line is written, so writing it swaps
