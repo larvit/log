@@ -313,6 +313,7 @@ header winning, so rejecting it sooner would spend README → Goals #4. Serves R
 
 ## Inherited `otlpAdditionalHeaders` follow the endpoint's origin
 
-2026-09-28: a child or clone inherits `otlpAdditionalHeaders` only when its `otlpHttpBaseURI` has
-its source's origin, the line fetch draws when a redirect drops `Authorization`; a new path on the
-same collector keeps working. Serves README → Goals #3.
+2026-09-28: a child or clone naming its own `otlpHttpBaseURI` inherits `otlpAdditionalHeaders`
+only from a source with no endpoint or one of the same origin, the line fetch draws when a redirect
+drops `Authorization`; a new path on the same collector keeps working. Serves README → Goals #3's
+headline, "a credential never leaves", on the wire.
