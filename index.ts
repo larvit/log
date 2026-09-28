@@ -1437,16 +1437,12 @@ function buildUrlFull(url: URL, captureQuery: boolean): string {
 // one; a url nested in a query pair is redacted inside that pair, so the outer query runs past it.
 // Eight urls deep, a pair still holding one records `REDACTED`, before the stack runs out.
 function redactQuotedUrls(text: string, depth = 0): string {
-	const redactPairs = (pairs: string, pair: RegExp) => pairs.replace(pair, found => {
+	const redactPairs = (pairs: string, pair: RegExp) => pairs.replace(pair, whole => {
+		const found = !whole.includes("//") ? whole : depth < 8 ? redactQuotedUrls(whole, depth + 1) : "REDACTED";
 		const assignAt = found.indexOf("=");
 		const key = assignAt < 0 ? found : found.slice(0, assignAt);
-		const redacted = redactCredential(key) + (assignAt < 0 ? "" : "=" + redactQueryValue(percentDecoded(key), found.slice(assignAt + 1)));
 
-		if (redacted !== found || !found.includes("//")) {
-			return redacted;
-		}
-
-		return depth < 8 ? redactQuotedUrls(found, depth + 1) : "REDACTED";
+		return redactCredential(key) + (assignAt < 0 ? "" : "=" + redactQueryValue(percentDecoded(key), found.slice(assignAt + 1)));
 	});
 
 	return text.replace(/((?:\bhttps?:)?\/\/[^\s"<>/?#]*)([^\s"<>?#]*)([^\s"<>]*)/gi, (_, head: string, path: string, tail: string) => {
