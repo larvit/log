@@ -8,11 +8,6 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ### Security
 
-- [ ] **Redact `access_token`, `api_key`, `apikey`, `key` and `token` in a captured query.**
-  RFC 6750 §2.3 defines `access_token` as a way to send a bearer token, so with `captureQuery` on
-  `log.fetch("https://graph.test/me?access_token=…")` exports a live one. Add the names to README
-  → Credentials in a captured value. Live since 2.3.0, so the CHANGELOG owes a rotation advisory.
-  Decided 2026-09-28.
 - [ ] **Warn once per `report` sink when an `Authorization`, either spelling, goes over plain
   `http:` to a non-loopback host.** Now that they are really sent, anything on the network path can
   read them (CWE-319). The request still goes: an in-cluster
