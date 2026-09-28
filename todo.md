@@ -8,6 +8,10 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ### Security
 
+- [ ] **Weigh redacting the query keys `access-token`, `api-key`, `client_secret`, `id_token`,
+  `refresh_token` and `subscription-key` too, and add those that carry a credential.** With
+  `captureQuery` on, `url.full` exports each one's value today: a hyphenated spelling of a name the
+  list holds, Azure API Management's key, and OAuth's secrets.
 - [ ] **Warn once per `report` sink when an `Authorization`, either spelling, goes over plain
   `http:` to a non-loopback host.** Now that they are really sent, anything on the network path can
   read them (CWE-319). The request still goes: an in-cluster
