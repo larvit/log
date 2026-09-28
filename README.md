@@ -397,7 +397,7 @@ Span attributes follow the OpenTelemetry HTTP semantic conventions:
 | Attribute | Value |
 |---|---|
 | `http.request.method` | Request method, `GET` when unset |
-| `url.full` | The URL without the outer userinfo. Query string dropped unless `captureQuery`, where a credentialed key or value records `REDACTED`. From a url nested in the path on, query included, `REDACTED` |
+| `url.full` | The URL without the outer userinfo. Query string dropped unless `captureQuery`, where a credentialed key or value records `REDACTED`. A url nested in the path, and everything after it, the query included, records `REDACTED` |
 | `url.scheme`, `server.address`, `server.port` | From the URL; port only when explicit |
 | `http.request.header.<name>` | Headers listed in `captureRequestHeaders` |
 | `http.response.status_code` | Response status |
@@ -411,16 +411,18 @@ them per call site.
 
 ### Credentials in a captured value
 
-Redacted, whatever you list them for: the headers `authorization`, `proxy-authorization`, `cookie`
-and `set-cookie`, and the value of a query key named, in any casing, `awsaccesskeyid`,
-`googleaccessid`, `sig`, `signature`, `x-amz-credential`, `x-amz-security-token`, `x-amz-signature`,
-`x-goog-credential` or `x-goog-signature` — a presigned S3-compatible or GCS url, whichever signing
-generation made it, and an Azure SAS url. Redacted wherever it appears: any other captured header
-value, or kept query key or value, that holds url userinfo — which records `REDACTED` in place of
-the whole of itself, through one layer of percent-encoding but not two. Cut from `url.full`: a url
-nested in the request path — `http:` or `https:` under any layers of percent-encoding, or a path
-segment that base64 or base64url decodes to one — and everything after it, the query included:
-`https://proxy.test/fetch/https://user:pass@cb.test/x` records `https://proxy.test/fetch/REDACTED`.
+- **Redacted, whatever you list them for:** the headers `authorization`, `proxy-authorization`,
+  `cookie` and `set-cookie`, and the value of a query key named, in any casing, `awsaccesskeyid`,
+  `googleaccessid`, `sig`, `signature`, `x-amz-credential`, `x-amz-security-token`,
+  `x-amz-signature`, `x-goog-credential` or `x-goog-signature` — a presigned S3-compatible or GCS
+  url, whichever signing generation made it, and an Azure SAS url.
+- **Redacted wherever it appears:** any other captured header value, or kept query key or value,
+  that holds url userinfo — which records `REDACTED` in place of the whole of itself, through one
+  layer of percent-encoding but not two.
+- **Cut from `url.full`, with everything after it and the query:** a url nested in the request
+  path — `http:` or `https:` under any layers of percent-encoding, or a path segment whose base64 or
+  base64url decoding starts with one. `https://proxy.test/fetch/https://user:pass@cb.test/x` records
+  `https://proxy.test/fetch/REDACTED`.
 
 That covers the shapes a credential is recognisable in, not every credential: a value that simply
 *is* a secret is exported as you sent it ([Goals](#goals) #3), and so is a nested url of any shape
@@ -430,9 +432,10 @@ percent-encoded url.
 Never put credentials in the url; pass an `Authorization` header, and strip userinfo from a url you
 did not build. `log.fetch` mirrors the runtime: Node and browsers refuse such a url, while React
 Native hands it to the platform, where iOS sends the credentials and Android sends none, leaving
-you the 401. A rejection quoting the url reaches the status message as `http://REDACTED@host/x` —
-a redaction of what the runtime wrote, not a guarantee. `REDACTED` does not always stand for a
-credential either: an address glued to a host, as in `https://api.test,mail@example.com`, redacts
+you the 401. A rejection quoting the url reaches the status message as `http://REDACTED@host/x`,
+redacted from the runtime's own text.
+
+`REDACTED` does not always stand for a credential: an address glued to a host, as in `https://api.test,mail@example.com`, redacts
 too, a `location` of `https://cdn.test//logo@2x.png` records `REDACTED` whole, and a path merely
 holding `http:` is cut: `https://wiki.test/wiki/Http:_Status` records `https://wiki.test/wiki/REDACTED`.
 
