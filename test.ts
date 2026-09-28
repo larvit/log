@@ -1368,6 +1368,7 @@ test("JSON.stringify of a conf holding a Queue carries the queue's conf, even wi
 	Object.assign(storage, { self: storage });
 	t.notOk(JSON.stringify(stored.conf).includes("s3cr3t"), "what a storage holds stays out, and a circular one no longer throws");
 	t.notOk(stored.conf.otlpQueue instanceof Queue && JSON.stringify(stored.conf.otlpQueue.conf).includes("s3cr3t"), "so does queue.conf's own stringify");
+	t.ok(stored.conf.otlpQueue instanceof Queue && { ...stored.conf.otlpQueue.conf }.storage === undefined, "and a spread of it");
 	t.ok(stored.conf.otlpQueue instanceof Queue && stored.conf.otlpQueue.conf.storage === storage, "the live conf keeps its storage");
 	await stored.end();
 	t.end();
