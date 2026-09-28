@@ -8,6 +8,11 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ### Security
 
+- [ ] **Redact a listed query key in a status-message url a hand-built message quotes past a
+  space.** `end({ error: new Error("GET https://a.test/?q=hello world&token=SECRET failed") })`
+  exports `token=SECRET`: the url match stops at whitespace, where `url.full` for that url would
+  redact it. A runtime quotes the serialized url, which holds no space, so only a message the
+  caller built reaches it.
 - [ ] **Weigh redacting the query keys `access-token`, `accesstoken`, `api-key`, `auth_token`,
   `client_secret`, `id_token`, `password`, `refresh_token`, `secret` and `subscription-key` too,
   and add those that carry a credential.** With `captureQuery` on, `url.full` exports each one's
