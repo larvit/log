@@ -124,11 +124,11 @@
   text whatever `logLevel` says, and 3.0.0 removes it. Two different formatters, one per spelling,
   throw.
 - `log.conf.entryFormatter` is deprecated and non-enumerable now: `{ ...log.conf }` and
-  `Object.keys(log.conf)` no longer carry it, so a spread carries `format` without the function
-  formatter that won over it — use `clone()`. 3.0.0 removes it, and `log.conf.format` holds a
-  function from then. Until then keep reading it: it reads the formatter in use, writing it swaps
-  it, and it wins over `log.conf.format` as in v2.3.0, which never holds a function and reads
-  `undefined` after `format: fn`.
+  `Object.keys(log.conf)` no longer carry it, so a spread carries at most a `"text"`/`"json"`
+  `format`, never the function formatter — use `clone()`. 3.0.0 removes it, and `log.conf.format`
+  holds a function from then. Until then keep reading it: it reads the formatter in use, writing it
+  swaps it, and it wins over `log.conf.format` as in v2.3.0. `log.conf.format` never holds a
+  function; it reads `undefined` after `format: fn`.
   `ResolvedLogConf` still declares it, so `const c: ResolvedLogConf = { ...log.conf }` compiles
   and `c.entryFormatter(entry)` throws at runtime.
 - `JSON.stringify(log.conf)` carries `format`, `"text"` by default, where v2.3.0 left the key
