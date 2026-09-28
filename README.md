@@ -435,7 +435,7 @@ Never put credentials in the url; pass an `Authorization` header, and strip user
 did not build. `log.fetch` mirrors the runtime: Node and browsers refuse such a url, while React
 Native hands it to the platform, where iOS sends the credentials and Android sends none, leaving
 you the 401. A url a status message quotes, in such a rejection or an `end({ error })` message, is
-redacted in place as `url.full` is with `captureQuery` on, and a fragment's pairs too:
+redacted in place as `url.full` is with `captureQuery` on, and its fragment records `REDACTED`:
 `http://REDACTED@host/x?access_token=REDACTED`.
 
 `REDACTED` does not always stand for a credential: a `?key=` lookup or a `?token=` pagination
