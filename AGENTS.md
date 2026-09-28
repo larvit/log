@@ -35,6 +35,10 @@ In [docs/decisions.md](docs/decisions.md):
 - A v2.3.0 copy's child loses a function formatter
 - The comprehension baseline
 - A stringified `Queue` carries its `conf` only
+- A url nested in a request path is cut from where it starts
+- Basic credentials over plain `http:` warn once
+- `resolveFormatter` is exported
+- Both credential spellings stay, and their combination warns
 
 ## Working here
 

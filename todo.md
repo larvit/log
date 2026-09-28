@@ -8,53 +8,36 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ### Security
 
-- [ ] **Keep a `Queue`'s `storage` out of `JSON.stringify(log.conf)`, or record that it stays.**
-  `Queue.toJSON` returns its `conf`, `storage` included, so a browser app on `storage: localStorage`
-  that stringifies `log.conf` writes the origin's whole localStorage — session tokens and the
-  queue's buffered records — wherever that line goes; on Node a storage adapter holding a circular
-  client still makes the stringify throw. The 2026-09-28 decision covers credentials written into
-  the conf, not data a storage object holds. Found by the 2026-09-28 stability review.
+- [ ] **Leave `storage` out of a stringified `Queue`.** `Queue.toJSON` returns its `conf`, `storage`
+  included, so a browser app on `storage: localStorage` that stringifies `log.conf` writes the
+  origin's whole localStorage — session tokens and the queue's buffered records — wherever that
+  line goes; on Node a storage adapter holding a circular client still makes the stringify throw.
+  Drop Goals #3's "until 2.5.0" clause for it. Decided 2026-09-28.
 - [ ] **Keep a parent's `otlpAdditionalHeaders` off a child or clone that names its own
   `otlpHttpBaseURI`.** It inherits the headers, so `new Log({ parentLog, otlpHttpBaseURI: other })`
   sends the parent's bearer token to `other`, a host it was never issued for. Shipped in v2.3.0.
 
-- [ ] **Keep a url nested in the request path out of `url.full`.** `buildUrlFull` is `url.origin +
-  url.pathname` and redacts only the query, so
+- [ ] **Keep a url nested in the request path out of `url.full`, cut from where it starts.**
+  `buildUrlFull` is `url.origin + url.pathname` and redacts only the query, so
   `log.fetch("https://proxy.test/fetch/https://user:pass@cb.test/x")` exports that password with no
-  capture option involved — the one credential shape that reaches a span on the default path,
-  against Goals' "a url it fetches … never reaches a span". A fetch-through proxy, a CORS or image
-  proxy, a webhook replay endpoint and a signed-url wrapper all take that shape, and
-  percent-encoding it changes nothing. `redactCredential` already holds the rule; what it does not
-  settle is the cost, because a path is not a value: replacing the whole of it on a hit loses the
-  endpoint the telemetry reader needs, where `/a//b@2x.png` would take the path with it, and
-  splicing `REDACTED@` in the way `spanFailure` does covers the literal spelling only. Decide which,
-  and record it beside the 2026-09-20 entry that settled the same question for values. The 2.4.0
-  CHANGELOG carries this as an open exposure with a rotation advisory.
-- [ ] **Keep a bearer token carried as a query parameter out of `url.full`.** RFC 6750 §2.3 defines
-  `access_token` as a way to send one, and OAuth providers still accept it, so with `captureQuery`
-  on `log.fetch("https://graph.test/me?access_token=…")` exports a live token that no rule catches:
-  `SENSITIVE_QUERY_KEYS` names signing-scheme parameters only, and a token has no shape. Whether the
-  answer is the one RFC-defined name, the names the wild uses beside it (`api_key`, `apikey`, `key`,
-  `token`), or a statement that `captureQuery` is an allow-list the caller owns and Goal 3's "naming
-  it is asking for it" already covers it, is open; the 2026-09-23 decision leaves a name as an
-  addition to the set. Live since 2.3.0, so a name that lands owes a rotation advisory.
-- [ ] **Signal or refuse Basic credentials sent over plain `http:` to a non-loopback host.** Now
-  that they are really sent, anything on the network path can read them (CWE-319). Either warn once
-  per `report` sink when the endpoint is `http:` and carries userinfo, or require `https:` with an
-  opt-out, which is breaking and so wants the 2.x deprecation first. The rule matters more than the
-  mechanism: a loopback-only test warns for
-  `http://otel-collector.observability.svc.cluster.local:4318`, which is a deliberate and common
-  setup, not a mistake.
+  capture option involved. It should record `https://proxy.test/fetch/REDACTED`, in every
+  percent-encoding `redactCredential` sees through. Drop Goals #3's "until 2.5.0" clause for it;
+  the 2.4.0 CHANGELOG carries it as an open exposure with a rotation advisory. Decided 2026-09-28.
+- [ ] **Redact `access_token`, `api_key`, `apikey`, `key` and `token` in a captured query.**
+  RFC 6750 §2.3 defines `access_token` as a way to send a bearer token, so with `captureQuery` on
+  `log.fetch("https://graph.test/me?access_token=…")` exports a live one. Live since 2.3.0, so the
+  CHANGELOG owes a rotation advisory. Decided 2026-09-28.
+- [ ] **Warn once per `report` sink when Basic credentials go over plain `http:` to a non-loopback
+  host.** Now that they are really sent, anything on the network path can read them (CWE-319). The
+  request still goes: an in-cluster `http://otel-collector…svc.cluster.local:4318` is deliberate.
+  Decided 2026-09-28.
 
 ### Everything else
 
-- [ ] **Make `conf.format` a complete replacement for the `conf.entryFormatter` alias 3.0.0
-  removes.** The alias hands back a callable `EntryFormatter`; 3.0.0's `format` hands back `"text" |
-  "json" | EntryFormatter`, and the mapping between them is `formatterOf`, which is not exported. So
-  a library author rendering a line from a conf they were handed has to re-implement it from
-  `msgTextFormatter` and `msgJsonFormatter`, which no doc spells out. Exporting the resolver is
-  additive and the obvious shape; saying it in the README is the other. Whichever lands has to land
-  before 3.0.0 takes the alias away. Found by the 2026-09-21 product-owner review.
+- [ ] **Export `resolveFormatter`, so `conf.format` fully replaces the `conf.entryFormatter` alias
+  3.0.0 removes.** The alias hands back a callable `EntryFormatter`; 3.0.0's `format` hands back
+  `"text" | "json" | EntryFormatter`, and the mapping between them is the unexported `formatterOf`.
+  Decided 2026-09-28.
 - [ ] **Keep an invalid name in `captureRequestHeaders` or `captureResponseHeaders` from changing a
   `log.fetch` result.** `headers.get("x y")` throws a `TypeError`, so a bad request-side name rejects
   every traced call before the request goes out, and a bad response-side one turns a response the
@@ -81,14 +64,9 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 - [ ] **Report a 401 or 403 export as `OTLP export unauthorized, batch dropped`.** Working auth
   makes a wrong credential reachable for the first time, and it is the likeliest misconfiguration of
   `otlpHttpBaseURI` userinfo; today it reads as any other 4xx.
-- [ ] **Settle the two credential spellings, `user:pass@` in `otlpHttpBaseURI` and
-  `otlpAdditionalHeaders: { Authorization }`.** They now build the same header, which "one spelling
-  per goal" says to collapse. The product-owner review argues for keeping both — a collector vendor
-  hands the endpoint over as one `https://id:token@host` string, which is also the only shape a
-  single env var carries — and rejecting the *combination* in the constructor instead, the way two
-  different formatters already throw. That combination has never produced a working request, so
-  rejecting it is safe in a minor. Either take that, or deprecate the userinfo spelling here and
-  reject it in 3.0.0.
+- [ ] **Warn once per `report` sink when `otlpHttpBaseURI` carries `user:pass@` and
+  `otlpAdditionalHeaders` sets `Authorization`.** The two can disagree, and v2.4.0 documents the
+  header winning. Decided 2026-09-28.
 - [ ] **Unref the batch timer, so a pending batch never holds a Node or Deno process.** README →
   Goals #7 asks for it; drop that goal's "until 2.5.0" clause. Today only the retry timer is
   unref'd, so any pending batch holds the process for up to `batchDelayMs`, and `round()` clears the
@@ -258,6 +236,8 @@ Each one is a weigh against README → Goals first: ship it, or delete the item 
   puts them in their log store. Goals #3 stops at what this library emits, so this is a Goals #4
   break. The `otlpQueue` item above clears `log.conf`; `queue.conf` still needs redacting, or its
   credentials held off it.
+- [ ] **Reject `user:pass@` in `otlpHttpBaseURI` beside an `Authorization` in
+  `otlpAdditionalHeaders`, in the constructor.** 2.5.0 warns first.
 - [ ] **Require `spanName` whenever `otlpQueue` is set or inherited.** A child or clone of an
   OTLP-configured instance must name its span, and the constructor rejects one that does not, so no
   backend shows `unnamed-span`.
