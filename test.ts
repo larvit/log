@@ -1826,7 +1826,9 @@ test("log.fetch cuts a url nested in the request path out of url.full from where
 		["https://proxy.test/fetch/Ly91c2VyOnMzY3JldEBkYi5leGFtcGxlLmNvbQ/oYEC5m", "https://proxy.test/fetch/REDACTED"],
 		["https://api.test/docs/http-guide/aHR0?q=hi", "https://api.test/docs/http-guide/aHR0?q=hi"],
 		["https://api.test/v1/projects/p1:batchGet", "https://api.test/v1/projects/p1:batchGet"],
-		["https://api.test/v1/news:list", "https://api.test/v1/news:list"],
+		["https://api.test/v1/news:alice@x.test", "https://api.test/v1/news:alice@x.test"],
+		["https://proxy.test/cb64/aHR0cHM6Ly9teXVzZXI6aHVudGVyMkBjYi50ZXN0L3g", "https://proxy.test/cb64/REDACTED"],
+		["https://cdn.test/assets//@2x.png", "https://cdn.test/assets//@2x.png"],
 		["https://cdn.test/assets//logo.png", "https://cdn.test/assets//logo.png"],
 	];
 
@@ -1842,6 +1844,23 @@ test("log.fetch cuts a url nested in the request path out of url.full from where
 		t.strictEqual(urlFull, expected, input.slice(0, 80));
 	}
 
+	t.end();
+});
+
+test("log.fetch cuts a long path holding many scheme candidates in linear time", async t => {
+	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+
+	stubFetch();
+
+	for (const path of ["ftp:".repeat(16384), btoa("ftp:".repeat(12288))]) {
+		const started = performance.now();
+
+		await log.fetch(`https://proxy.test/${path}`);
+
+		t.ok(performance.now() - started < 250, `${path.slice(0, 8)}… is cut in ${Math.round(performance.now() - started)} ms`);
+	}
+
+	await log.end();
 	t.end();
 });
 
