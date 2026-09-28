@@ -46,8 +46,8 @@ In [docs/decisions.md](docs/decisions.md):
 - A release section opens with a few lines on its most important changes, and each bullet with a
   bold one-sentence tagline of the change, so the taglines alone say what the release holds.
 - A release section with anything a consumer must act on — a rotation advisory, an exposure still
-  open — puts `### Security` holding it right after that intro, ahead of `### Everything else`; one with none omits
-  both headings. Thirty flat bullets is where a rotation notice goes unread.
+  open — puts `### Security` holding it right after that intro, ahead of `### Everything else`;
+  one with none omits both headings. Thirty flat bullets is where a rotation notice goes unread.
 - Tests-first. The suite (`test.ts`) injects `stdout`/`stderr` and stubs the global `fetch`, so the same tests cover console + OTLP in both Node and the browser.
 - See [README](README.md) for build/test/release commands.
 - Don't wait on CodeRabbit: under 10 stars it reviews only when triggered by hand.
