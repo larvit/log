@@ -395,7 +395,7 @@ Span attributes follow the OpenTelemetry HTTP semantic conventions:
 | `http.request.header.<name>` | Headers listed in `captureRequestHeaders` |
 | `http.response.status_code` | Response status |
 | `http.response.header.<name>` | Headers listed in `captureResponseHeaders` |
-| `error.type` | On a thrown error: its `code`, else `name`, else `"_OTHER"` |
+| `error.type` | On a thrown error: its `code`, else `name`, else `"fetch_error"` |
 
 A 4xx/5xx response marks the span errored; a thrown error does too, with its message as the status
 message. The response or error reaches the caller unchanged. Bodies are never captured.

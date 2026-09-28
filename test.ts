@@ -1846,6 +1846,7 @@ test("log.fetch marks error spans for 4xx and for network failures, propagating 
 		if (path === "/missing") return response({ status: 404 });
 		if (path === "/boom") throw Object.assign(new Error("down"), { code: "ECONNREFUSED" });
 		if (path === "/abort") throw new DOMException("aborted", "AbortError");
+		if (path === "/bare") throw "bare";
 
 		return undefined;
 	});
@@ -1867,6 +1868,7 @@ test("log.fetch marks error spans for 4xx and for network failures, propagating 
 	t.ok(threw, "the underlying network error propagates to the caller");
 
 	await log.fetch("https://api.test/abort").catch(() => {});
+	await log.fetch("https://api.test/bare").catch(() => {});
 	await log.end();
 
 	const spans = exportedSpans(calls);
@@ -1878,6 +1880,7 @@ test("log.fetch marks error spans for 4xx and for network failures, propagating 
 	t.deepEqual(spanBoom.status, { code: 2, message: "down" }, "the network-failure span is ERROR with the error message");
 	t.strictEqual(attr(spanBoom, "error.type"), "ECONNREFUSED", "error.type captured from the error code");
 	t.ok(spans.some(span => attr(span, "error.type") === "AbortError"), "a numeric code (DOMException) is skipped for the error name");
+	t.ok(spans.some(span => attr(span, "error.type") === "fetch_error"), "error.type is \"fetch_error\" when there is neither code nor name");
 	t.end();
 });
 

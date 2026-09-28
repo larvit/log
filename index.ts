@@ -1287,8 +1287,8 @@ function buildUrlFull(url: URL, captureQuery: boolean): string {
 	return `${base}?${kept.toString()}`;
 }
 
-// error.type per OTel semconv; "_OTHER" is its fallback.
-function spanFailure(error: unknown): { message: string, type: string } {
+// error.type per OTel semconv, whose fallback is "_OTHER"; log.fetch keeps v2.3.0's "fetch_error" until 3.0.0.
+function spanFailure(error: unknown, typeFallback: string): { message: string, type: string } {
 	let message = stringField(error, "message");
 
 	if (message === undefined) {
@@ -1299,7 +1299,7 @@ function spanFailure(error: unknown): { message: string, type: string } {
 		}
 	}
 
-	return { message: redactUserinfo(message), type: stringField(error, "code") ?? stringField(error, "name") ?? "_OTHER" };
+	return { message: redactUserinfo(message), type: stringField(error, "code") ?? stringField(error, "name") ?? typeFallback };
 }
 
 // --- Warnings written once per stderr sink ---------------------------------
@@ -1682,7 +1682,7 @@ async function tracedFetch(log: Pick<Log, "conf" | "context" | "sampled" | "span
 
 		return res;
 	} catch (err) {
-		const failure = spanFailure(err);
+		const failure = spanFailure(err, "fetch_error");
 
 		span.status = { code: STATUS_CODE_ERROR, message: failure.message };
 		attributes["error.type"] = failure.type;
@@ -1754,7 +1754,7 @@ export class Log implements LogInt {
 		const attributes: Metadata = { ...this.context };
 
 		if (options?.error !== undefined && options.error !== null) {
-			const failure = spanFailure(options.error);
+			const failure = spanFailure(options.error, "_OTHER");
 
 			this.span.status = { code: STATUS_CODE_ERROR, message: failure.message };
 			attributes["error.type"] = failure.type;
