@@ -753,8 +753,7 @@ class ExportScheduler {
 			return this.running;
 		}
 
-		// On either outcome: a callback skipped on rejection would leave pending set, and every later
-		// joiner handed that rejection with no round queued.
+		// Both outcomes: a rejection-only skip left pending set, failing every later joiner.
 		const next = () => {
 			this.pending = undefined;
 
@@ -1788,13 +1787,13 @@ export class Log implements LogInt {
 			return globalThis.fetch(input, init);
 		}
 
-		// Registered synchronously, so a later await log.flush() delivers a fire-and-forget log.fetch(),
-		// and settled whatever tracedFetch throws, so it cannot hang.
-		const traced = tracedFetch(this, url, init);
+		// Registered synchronously, so a later await log.flush() delivers a fire-and-forget log.fetch().
+		// Settled on the caller's promise, never tracked from it: a handler there would mark its rejection handled.
+		let settle!: () => void;
 
-		this.track(traced.then(() => undefined, () => undefined));
+		this.track(new Promise<void>(resolve => { settle = resolve; }));
 
-		return traced;
+		return tracedFetch(this, url, init).finally(settle);
 	}
 
 	public enabled(logLevel: LogLevel): boolean {

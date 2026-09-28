@@ -1898,16 +1898,32 @@ test("log.fetch keeps a caller-supplied traceparent", async t => {
 	t.end();
 });
 
-test("await log.end() drains a fire-and-forget log.fetch span", async t => {
-	const { calls } = stubFetch();
+test("await log.end() drains a fire-and-forget log.fetch span, and its rejection still goes unhandled", async t => {
+	const { calls } = stubFetch(path => {
+		if (path === "/fail") throw new TypeError("network down");
+
+		return undefined;
+	});
 	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+	const unhandled: unknown[] = [];
+	const onNode = (reason: unknown) => { unhandled.push(reason); };
+	const onBrowser = (event: PromiseRejectionEvent) => { event.preventDefault(); unhandled.push(event.reason); };
+	const nodeProcess = typeof process === "undefined" ? undefined : process;
+
+	nodeProcess?.on("unhandledRejection", onNode);
+	globalThis.addEventListener?.("unhandledrejection", onBrowser);
 
 	log.fetch("https://api.test/bg"); // deliberately NOT awaited
+	log.fetch("https://api.test/fail"); // deliberately NOT awaited
 
 	await log.end();
+	await new Promise(resolve => setTimeout(resolve, 10));
+	nodeProcess?.off("unhandledRejection", onNode);
+	globalThis.removeEventListener?.("unhandledrejection", onBrowser);
 
 	// The span must be delivered by the time end() resolves, else a short-lived process would exit first.
-	t.strictEqual(clientSpan(calls).name, "GET api.test", "the client span was exported before end() resolved");
+	t.strictEqual(exportedSpans(calls).find(span => span.kind === 3 && span.status.code !== 2)?.name, "GET api.test", "the client span was exported before end() resolved");
+	t.strictEqual(unhandled.length, 1, "a rejection nobody awaited reaches the runtime, as plain fetch's would");
 	t.end();
 });
 
@@ -1955,6 +1971,7 @@ test("log.fetch under a clock whose now() is fractional or throws never hangs fl
 	t.strictEqual(await throwing.fetch("https://api.test/x").then(() => "resolved", () => "rejected"), "rejected", "a throwing now() rejects the fetch");
 	await throwing.flush();
 	t.ok(true, "and flush() still resolves");
+	t.strictEqual(await throwing.end().then(() => "resolved", () => "rejected"), "rejected", "and end() rejects on the clock, never hangs");
 	t.end();
 });
 
