@@ -1,18 +1,23 @@
 # Changelog
 
-## Unreleased
+## v2.4.0
+
+An export queue that batches, retries and can hold records and spans across an app restart;
+credentials kept out of spans, `stderr` and the request url; `format` taking a formatter function;
+and `log.enabled`, the `Logger` type, the `clock` option and an honoured unsampled `traceparent`.
+Read Security first: several entries ask you to rotate credentials v2.3.0 exported.
 
 ### Security
 
-- Goals now say plainly which text this library will never clean for you: the log message,
+- **`spanName` and the other text you write yourself are exported as written.** Goals now say plainly which text this library will never clean for you: the log message,
   metadata, `context`, `spanName`, and a header or query value you allow-list that simply *is* a
   secret. Nothing exported has changed — `spanName` has always gone out as you wrote it — but if
   you build one from a request url (`spanName: "GET " + req.url`), its credentials reach your
   tracing backend, in the span name, the scope name and, under `printTraceInfo`, your console; a
   child log inherits the name, so one such `spanName` labels the whole trace. Name the route, not
   the url.
-- Not fixed, and still exporting on every such call until it is: a url nested in the request **path**
-  reaches `url.full` as you wrote it. `url.full` is built from the origin and the path, and only
+- **A url nested in a request path still reaches `url.full` with its credentials.** Not fixed, and
+  exporting on every such call until it is: `url.full` is built from the origin and the path, and only
   the query is redacted, so
   `log.fetch("https://proxy.test/fetch/https://user:pass@cb.test/x")` — the shape a fetch-through
   proxy, a CORS or image proxy or a webhook replay endpoint takes — exports that password to your
@@ -26,7 +31,8 @@
   base64-encoded url. Rotate any token a hit holds; a SigV4 one not base64-encoded also holds
   `aws4_request` and follows the presigned-url bullet below, `captureQuery` or not. `log.fetch` first exported
   `url.full` in v2.3.0, so no older span carries it.
-- A header you allow-list is no longer a way to export a credential: `authorization`,
+- **An allow-listed credential header, or url credentials in a captured value, record `REDACTED`.**
+  A header you allow-list is no longer a way to export a credential: `authorization`,
   `proxy-authorization`, `cookie` and `set-cookie` named in `captureRequestHeaders` or
   `captureResponseHeaders` record `REDACTED`, so the span still shows the header was there. Any
   other captured header value records `REDACTED` too where it holds url userinfo — a `referer` or a
@@ -44,7 +50,8 @@
   attributes and `url.full` for `@`, `%40` or `%2540`. `log.fetch`, both allow-lists and
   `captureQuery` first shipped in v2.3.0, so a span an older version exported holds none of these
   attributes.
-- With `captureQuery` on, a presigned SigV4 url — S3 or any S3-compatible store — exported its
+- **Presigned SigV4 and GCS credentials in a captured query record `REDACTED`.** With
+  `captureQuery` on, a presigned SigV4 url — S3 or any S3-compatible store — exported its
   `X-Amz-Signature`, the access key id in `X-Amz-Credential` and the session token in
   `X-Amz-Security-Token` in `url.full`; a GCS url exported the service account's email in
   `X-Goog-Credential` or `GoogleAccessId`, its signature already redacted. All five now record
@@ -58,7 +65,7 @@
   starting `ASIA` is temporary, and the url died with that session whatever `X-Amz-Expires` says:
   revoke the role's active sessions only if it may still be open. Any other is a long-term key:
   rotate it.
-- A span's status message no longer carries url credentials: userinfo in a url the message quotes
+- **A span's status message no longer carries url credentials.** Userinfo in a url the message quotes
   is exported as `http://REDACTED@host/x`. On Node and in browsers `fetch` refuses a url carrying
   credentials and quotes the whole url into its `TypeError`, which reached the backend both as the
   `log.fetch` span's own status and, once you caught that rejection and forwarded it, as
@@ -66,7 +73,8 @@
   `log.span.status.message` now shows the redacted text, and `error.type` is untouched. Nothing to
   rotate: no released version exported a span status message at all — `end()` took no argument and
   `OtlpSpan.status` had no `message` — so both routes exist only alongside their own redaction.
-- Not fixed: on React Native, whose `fetch` is an `XMLHttpRequest` polyfill,
+- **On React Native, `log.fetch` of a `user:pass@` url still hands the credentials to the
+  platform.** Not fixed: on React Native, whose `fetch` is an `XMLHttpRequest` polyfill,
   `log.fetch("https://user:pass@host/x")` reaches the platform with the credentials still in the
   url, where Node and browsers refuse it outright. On iOS the URL loading system answers the
   server's `WWW-Authenticate` challenge with them, so they go on the wire; on Android OkHttp sends
@@ -76,7 +84,7 @@
   so there is nothing to rotate on account of this platform difference; the exposure is the network path to the host, in
   the clear if that url is `http:`. Pass an `Authorization` header, and strip userinfo from a url
   you did not build.
-- `log.fetch` traces only a URL that resolves to `http:` or `https:`; anything else is fetched
+- **`log.fetch` traces only `http:` and `https:` urls.** Anything else is fetched
   untraced — no span, and no `traceparent` sent. It used to export a span whose `url.full` held
   whatever the url did: written without `//`, a url parses to an opaque path, so
   `log.fetch("myapp:user:pass@host/x")` exported `nulluser:pass@host/x` and a `data:` url exported
@@ -84,53 +92,56 @@
   search your tracing backend for spans whose `url.full` starts with `null` or matches
   `https?://[^/]*https?:.*`, which finds a `blob:` url's `https://example.comhttps://example.com/uuid`.
   `log.fetch` first exported `url.full` in v2.3.0, so no older span carries it.
-- Credentials in `otlpHttpBaseURI` no longer reach `stderr`, and basic auth works. `fetch` rejects
+- **Credentials in `otlpHttpBaseURI` no longer reach `stderr`, and basic auth works.** `fetch` rejects
   a `user:pass@` url outright on Node and in browsers, and that rejection quoted the whole url —
   credentials included — into the error line of every failed export. `user:pass@` is now sent as an
   `Authorization: Basic` header, percent-decoded, and the request url carries none.
   **If you have ever set `user:pass@` in `otlpHttpBaseURI`, rotate those credentials**: they are in
   whatever collects your `stderr`, findable by searching it for your collector's hostname.
   Percent-encode any `/ ? #` in a password, and a literal `%` as `%25`.
-- Not fixed until 3.0.0: `queue.conf` holds `otlpHttpBaseURI`, `user:pass@` included, and
+- **`log.conf` and `queue.conf` hold your OTLP credentials as written until 3.0.0.** `queue.conf`
+  holds `otlpHttpBaseURI`, `user:pass@` included, and
   `otlpAdditionalHeaders`, a bearer token included, exactly as you gave them, and `log.conf` holds
   them too, whether you set them on `Log` or on the `Queue` you passed as `otlpQueue`. Logging,
   serialising or sending either `conf` puts the credentials wherever it lands. Don't log a `conf`.
   **If you ever have, rotate those credentials**: search where it landed for `otlpHttpBaseURI` and
   `otlpAdditionalHeaders`, which every serialised `conf` holding them carries.
-- Open: a `Queue` given `storage: localStorage` serialises, inside either `conf`, with every
+- **A `Queue` on `storage: localStorage` serialises the whole localStorage with its `conf`.** Open:
+  a `Queue` given `storage: localStorage` serialises, inside either `conf`, with every
   localStorage entry of the origin under `"storage"`. Search where a `conf` landed for `"storage":`
   and rotate any session token it carries.
 
 ### Everything else
 
-- A child (`new Log({ parentLog })`) no longer inherits its parent's `traceparent`:
+- **A child no longer inherits its parent's `traceparent`.** For `new Log({ parentLog })`,
   `child.conf.traceparent` is `undefined` unless you pass one, as a clone's already was. Read the
   incoming header from the parent's `conf`, or propagate with `log.traceparent()`. The child's span
   was never affected.
-- A `logLevel` that is not a level — `LOG_LEVEL=trace` from pino, `http` from winston — no longer
-  throws from every level method. It logs at `"info"` and writes one `warn` line per `stderr` sink
+- **An unknown `logLevel` logs at `info` and warns, instead of throwing.** A `logLevel` that is not a
+  level — `LOG_LEVEL=trace` from pino, `http` from winston — threw from every level method. It logs at `"info"` and writes one `warn` line per `stderr` sink
   naming the value.
-- A failed export no longer holds a Node or Deno process open. A record logged while the failing
+- **A failed export no longer holds a Node or Deno process open.** A record logged while the failing
   round was in flight scheduled a batch send of its own that the retry backoff did not take over,
   so the process stayed alive for up to `batchDelayMs` after `await log.flush()` or
   `await log.end()` had already returned.
-- With `captureQuery` on, a query key that repeats keeps every occurrence in `url.full`. A repeated
+- **A repeated query key keeps every occurrence in `url.full`.** With `captureQuery` on, a repeated
   known-sensitive key — `?Signature=a&Signature=b` — used to collapse to one `REDACTED`.
-- An `otlpHttpBaseURI` that is not `http:` or `https:` is rejected in the constructor, where
+- **An `otlpHttpBaseURI` that is not `http:` or `https:` throws in the constructor.**
   `otlp:collector.example.com` used to build a queue that could never export. Written without
   `//`, such a URI parses to an opaque path, which put any `user:pass@` in it straight back into
   the reported url.
-- A header in `otlpAdditionalHeaders` replaces the one the queue sets itself whatever its casing,
-  and is read afresh on each send, so a rotated token takes effect. A name or value the runtime
+- **A header in `otlpAdditionalHeaders` wins over the queue's own, and is read on every send.** It
+  replaces the one the queue sets itself whatever its casing, and is read afresh on each send, so a rotated token takes effect. A name or value the runtime
   rejects drops that batch, reported as `OTLP export headers invalid, batch dropped` naming the
   header, never its value.
-- `format` also takes a formatter function, `(entry) => string`, and is what children and clones
+- **`format` takes a formatter function, and the `entryFormatter` option is deprecated.** It is
+  `(entry) => string`, and `format` is what children and clones
   inherit. New export: `EntryFormatter`.
   The `entryFormatter` option is deprecated: it still formats and still wins over a
   `"text"`/`"json"` `format`, writes one `warn` line per `stderr` sink for each distinct warning
   text whatever `logLevel` says, and 3.0.0 removes it. Two different formatters, one per spelling,
   throw.
-- `log.conf.entryFormatter` is deprecated and non-enumerable now: `{ ...log.conf }` and
+- **`log.conf.entryFormatter` is deprecated and non-enumerable.** `{ ...log.conf }` and
   `Object.keys(log.conf)` no longer carry it, so a spread carries at most a `"text"`/`"json"`
   `format`, never the function formatter — use `clone()`. 3.0.0 removes it, and `log.conf.format`
   holds a function from then. Until then keep reading it: it reads the formatter in use, writing it
@@ -138,39 +149,41 @@
   function; it reads `undefined` after `format: fn`.
   `ResolvedLogConf` still declares it, so `const c: ResolvedLogConf = { ...log.conf }` compiles
   and `c.entryFormatter(entry)` throws at runtime.
-- `JSON.stringify(log.conf)` carries `format`, `"text"` by default, where v2.3.0 left the key
+- **`JSON.stringify(log.conf)` carries `format` and, with OTLP, the queue's `conf`.** It carries
+  `format`, `"text"` by default, where v2.3.0 left the key
   absent unless you passed one — and omits it when you passed a function, as it omits any function.
   With OTLP configured it carries a `Queue` in `otlpQueue` — the one `otlpHttpBaseURI` builds
   included — as its `conf`, so dropping the top-level `otlp*` keys no longer keeps the credentials out.
   Not promised; see below.
-- A `format` set on a child (`parentLog`) now applies; before, the parent's resolved formatter
+- **A `format` set on a child now applies.** Before, on a child (`parentLog`), the parent's resolved formatter
   silently kept winning. `log.conf.format` is read where a line is written, so writing it swaps
   the formatter on a live instance that has no function formatter.
-- Copy an instance's settings with `clone()`. What a spread or `JSON.stringify` of
+- **Copy an instance's settings with `clone()`.** What a spread or `JSON.stringify` of
   `log.conf` carries is not part of the semver promise and may change in a minor.
-- Every deprecation line names the package: `@larvit/log: …`.
-- The level-string shorthand, `new Log("debug")` and `log.clone("debug")`, is deprecated: it still
+- **Every deprecation line names the package**: `@larvit/log: …`.
+- **The level-string shorthand, `new Log("debug")` and `log.clone("debug")`, is deprecated.** It still
   sets the level, writes one `warn` line per `stderr` sink for each distinct warning text,
   whatever `logLevel` says, and 3.0.0 removes it. Pass `{ logLevel }` instead.
-- `clock` option on `Log` and `Queue`: `{ now, setTimeout, clearTimeout }` behind every span and
+- **New `clock` option on `Log` and `Queue`, so a test drives time.** `{ now, setTimeout, clearTimeout }` behind every span and
   record timestamp and behind the queue's batch, retry and send-timeout timers, so a test drives
   time instead of waiting on it. Defaults to the system clock, inherited by children and clones.
   New exports: `Clock`, `TimerHandle`.
-- The constructor and `clone()` no longer write defaults, inherited settings or the built `Queue`
+- **The constructor and `clone()` leave the options object they are given untouched.** They no
+  longer write defaults, inherited settings or the built `Queue`
   into the options object they are given, so one object reused for several instances no longer
   makes them share a queue.
-- An incoming `traceparent` with the sampled flag off is honoured: the instance and its children
+- **An incoming `traceparent` with the sampled flag off is honoured.** The instance and its children
   export no spans, and `log.traceparent()` and `log.fetch` pass `00` downstream. Log records still
   export. New `log.sampled` field, on `LogInt`; `parseTraceparent` returns `sampled`
   and rejects version `ff`.
-- Any 2xx is JSON export success; before, a body other than `{}` or `{"partialSuccess":{}}` was
+- **Any 2xx is JSON export success.** Before, a body other than `{}` or `{"partialSuccess":{}}` was
   reported as a rejection. A `partialSuccess` with a rejected count is reported through `report`
   as `OTLP export partially rejected`, with `rejected` and the collector's `errorMessage` as `error`.
-- `colors: false` turns off the ANSI colour codes in text output. Unset in code, `NO_COLOR`
+- **`colors: false` turns off the ANSI colour codes in text output.** Unset in code, `NO_COLOR`
   (non-empty) turns it off; otherwise `FORCE_COLOR` turns it on, except `0` or `false` which turn
   it off. A value set in code wins over both. Inherited by children and clones. Formatters receive the setting as `EntryFormatterConf.colors`; `msgTextFormatter`
   colours unless it is `false`.
-- Export queue. Records and spans are batched into one POST per path, by time (1 s) or size (64 KiB),
+- **An export queue batches, retries and can persist records and spans.** Records and spans are batched into one POST per path, by time (1 s) or size (64 KiB),
   sent with `keepalive` and retried with backoff on a network error, timeout, 408, 429 or 5xx; other
   non-2xx drops the batch. One stderr line per failed attempt. Bounded at 1000 items, oldest dropped
   and the count reported once. `otlpHttpBaseURI` builds the default `Queue`, read back as `log.conf.otlpQueue` and shared by
@@ -178,24 +191,25 @@
   `new Queue({ otlpHttpBaseURI, storage: AsyncStorage })` to survive an app restart. `log.flush()` delivers without ending; `end()` flushes after closing
   the span. New exports: `Queue`, `OtlpQueue`, `OtlpPayload`, `QueueConf`, `ResolvedQueueConf`,
   `QueueStorage`.
-- `end({ error })` marks the instance's span failed: status `ERROR` with the error's message, and an
+- **`end({ error })` marks the instance's span failed.** Status `ERROR` with the error's message, and an
   `error.type` span attribute from the error's string `code`, else `name`, else `"_OTHER"`. `log.error()` does not mark the
   span. `OtlpSpan.status` gains an optional `message`. A `log.fetch` span that failed with a thrown
   error now carries the same status message.
-- `Log`'s and `Logger`'s level methods and `context` accept `undefined` values, typed by the new
+- **Level methods and `context` accept `undefined` values, and drop those keys.** `Log`'s and
+  `Logger`'s level methods and `context` accept them, typed by the new
   `MetadataInput`; `LogInt`'s keep `Metadata` until 3.0.0. Such keys are dropped from console,
   custom-formatter and OTLP output, so `{ port: options.port }` with an optional field type-checks.
   New export: `LogOptions`, what `new Log()` and `clone()` take. `LogConf` keeps `context` as
   `Metadata`, and `log.conf.context` reads back with those keys already dropped, so a `LogConf`
   you built for v2.3.0 still constructs and a read of `log.conf.context` still compiles.
   `Metadata` and `MetadataValue` are unchanged.
-- `log.enabled(level)`: `true` when a call at that level would output, so a caller can skip building
+- **New `log.enabled(level)`, so a caller skips building metadata nobody will see.** `true` when a call at that level would output, so a caller can skip building
   expensive metadata; `false` for a level it does not know.
-- Exported `Logger` type: the six level methods plus `enabled`. Libraries accept `Logger`;
+- **New `Logger` type for a library that accepts a logger.** The six level methods plus `enabled`. Libraries accept `Logger`;
   `parentLog` takes `LogInt`, which gains `enabled`, `flush` and `sampled` as optional members, so a
   `LogInt` you wrote against v2.3.0 still compiles. 3.0.0 makes it `Logger` plus the rest, those
   three required.
-- A trace id `generateTraceId` or a new span mints is sixteen random bytes; every one used to
+- **Trace ids are sixteen random bytes.** Every one `generateTraceId` or a new span minted used to
   begin `01`. Match this library's spans on the `telemetry.sdk.name` resource attribute,
   `@larvit/log`.
 

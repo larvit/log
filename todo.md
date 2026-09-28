@@ -4,8 +4,6 @@ Each item opens with a bold one-sentence tagline of what must hold once its prob
 states the problem. Working out *how* is part of the item, not settled by it: where an item names a
 mechanism, that is evidence of the problem, never the prescribed repair.
 
-## 2.4.0
-
 ## 2.5.0 — close the credential story
 
 ### Security
