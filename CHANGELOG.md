@@ -174,7 +174,7 @@
   the span. New exports: `Queue`, `OtlpQueue`, `OtlpPayload`, `QueueConf`, `ResolvedQueueConf`,
   `QueueStorage`.
 - `end({ error })` marks the instance's span failed: status `ERROR` with the error's message, and an
-  `error.type` span attribute from the error's `code`, else `name`. `log.error()` does not mark the
+  `error.type` span attribute from the error's string `code`, else `name`, else `"_OTHER"`. `log.error()` does not mark the
   span. `OtlpSpan.status` gains an optional `message`. A `log.fetch` span that failed with a thrown
   error now carries the same status message.
 - `Log`'s and `Logger`'s level methods and `context` accept `undefined` values, typed by the new

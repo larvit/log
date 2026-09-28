@@ -185,7 +185,7 @@ exported by `end()`.
 
 `end()` closes the span, queues it and flushes the [export queue](#queue-exports); a span that is
 never ended is never sent. `end({ error })` also marks the span failed: status `ERROR` with the
-error's message, and an `error.type` attribute from its `code`, else `name`; a `null` or `undefined`
+error's message, and an `error.type` attribute from its string `code`, else `name`, else `"_OTHER"`; a `null` or `undefined`
 error is a plain `end()`. Userinfo in a url the message quotes becomes `REDACTED`; nothing else in
 the message is, so keep a token out of an error message. A logged `log.error()` never fails the
 span; a recovered error is not a failed operation. `await` it to make one delivery attempt before the
