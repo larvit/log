@@ -1289,7 +1289,7 @@ function traceableUrl(input: string | URL): URL | undefined {
 	return url.protocol === "http:" || url.protocol === "https:" ? url : undefined;
 }
 
-// Every percent-encoding layer decoded, each dropping tab and newline as a WHATWG parser does; every
+// Every percent-encoding layer decoded, each dropping tab, CR and LF as a WHATWG parser does; every
 // char keeps the index in `text` it came from, or where its escape run starts when that is unclear.
 // Without an escape nothing moves, and `sources` is empty. From eight layers on `complete` is false.
 function decodedWithSources(text: string): { complete: boolean, decoded: string, sources: number[] } {
