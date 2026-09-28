@@ -4,6 +4,10 @@
 
 ### Security
 
+- **A child or clone sending to another origin no longer inherits `otlpAdditionalHeaders`.** Since
+  v2.3.0, `new Log({ parentLog, otlpHttpBaseURI: other })` sent the parent's headers, a bearer token
+  included, to `other`; rotate any token that may have reached such a host. Set the headers on the
+  child where that host should get them.
 - **A `Queue`'s `storage` no longer reaches a stringified `log.conf` or `queue.conf`.** `storage` is
   non-enumerable on `queue.conf`, so a `localStorage` given as one stays out of `JSON.stringify` and
   of a spread; the v2.4.0 entry says what to rotate. A `Queue` built from `{ ...queue.conf }` has no

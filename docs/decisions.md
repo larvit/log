@@ -310,3 +310,9 @@ the only shape one env var carries, and a bearer token has no userinfo spelling.
 disagree, so setting both warns once per `report` sink in 2.x and throws in the constructor from
 3.0.0, checked when the queue is built — a header added later is not rechecked; v2.4.0 documents the
 header winning, so rejecting it sooner would spend README → Goals #4. Serves README → Goals #5.
+
+## Inherited `otlpAdditionalHeaders` follow the endpoint's origin
+
+2026-09-28: a child or clone inherits `otlpAdditionalHeaders` only when its `otlpHttpBaseURI` has
+its source's origin, the line fetch draws when a redirect drops `Authorization`; a new path on the
+same collector keeps working. Serves README → Goals #3.

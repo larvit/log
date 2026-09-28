@@ -8,10 +8,6 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ### Security
 
-- [ ] **Keep a parent's `otlpAdditionalHeaders` off a child or clone that names its own
-  `otlpHttpBaseURI`.** It inherits the headers, so `new Log({ parentLog, otlpHttpBaseURI: other })`
-  sends the parent's bearer token to `other`, a host it was never issued for. Shipped in v2.3.0.
-
 - [ ] **Cut a url nested in the request path out of `url.full` from its scheme on, in every
   percent-encoding or base64, userinfo or not.**
   `buildUrlFull` is `url.origin + url.pathname` and redacts only the query, so
