@@ -35,7 +35,7 @@ export type LogConf = {
 	colors?: boolean;
 	context?: Metadata;
 
-	/** @deprecated Removed in 3.0.0: pass `format`. On `log.conf` it reads the formatter in use, which 3.0.0's `conf.format` holds. */
+	/** @deprecated Removed in 3.0.0: pass `format`. On `log.conf`, keep reading this until 3.0.0; `conf.format` holds no function before then. */
 	entryFormatter?: EntryFormatter;
 	format?: "text" | "json";
 	logLevel?: LogLevel | "none";
