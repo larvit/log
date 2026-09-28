@@ -219,9 +219,8 @@ entry. Valid while the deny-list names query keys, not shapes.
 ## An unsampled `traceparent` drops the span, never the log records
 
 2026-09-25, the maintainer: an incoming `traceparent` with the sampled flag off drops the span,
-never the log records. OTel's stable logs spec defines no sampling; a record carries the flag as
-data for the backend to link by, so an unsampled request's `log.error` still reaches the log
-store. Serves README → Goals #2. Valid until OTel's trace-based log filtering is stable and on by
+never the log records. OTel's stable logs spec defines no sampling; a record links to its trace
+by id, so an unsampled request's `log.error` still reaches the log store. Serves README → Goals #2. Valid until OTel's trace-based log filtering is stable and on by
 default.
 
 ## An empty `logLevel` logs at `info` and warns
