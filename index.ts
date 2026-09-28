@@ -1076,7 +1076,7 @@ export class Queue implements OtlpQueue {
 	}
 
 	// A pending timer is a circular Timeout on Node, so stringifying working state would throw.
-	toJSON(): ResolvedQueueConf {
+	toJSON(): object {
 		return this.conf;
 	}
 
