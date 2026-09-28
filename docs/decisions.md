@@ -175,8 +175,8 @@ the source is a single `index.ts`.
 
 ## `format` is the formatter's one name, `entryFormatter` its alias until 3.0.0
 
-2026-09-21: `format` is the formatter's one name, and `conf.entryFormatter` an alias of it, read
-and write, until 3.0.0 drops both. `entryFormatter` is the same setting as `format`, winning over a
+2026-09-21: `format` is the formatter's one name, and `conf.entryFormatter` a deprecated alias of
+it, read and write, until 3.0.0 drops both. `entryFormatter` is the same setting as `format`, winning over a
 `"text"`/`"json"` one as 2.x documented, and two *different* formatters throw: nothing can hold
 that combination yet, while rejecting the documented one would break a minor. The alias stays
 because v2.3.0 filled `conf.entryFormatter` on every instance, whichever spelling set the
@@ -185,14 +185,15 @@ bytes against Goals #7's 1 KB, on `node:22-bookworm-slim` over 50 000 retained i
 README → Goals #5 for the one name, README → Goals #4 for the alias. Valid until 3.0.0 removes
 `entryFormatter`.
 
-2026-09-28: `conf.format` keeps v2.3.0's read type and read-back, per Goals #4: it never holds a
-function, and a string written beside `entryFormatter` reads back as written. A function formatter
-reads back from `conf.entryFormatter` alone and wins over any `conf.format`, as in v2.3.0, so
-writing `conf.format` on a function-formatted instance changes nothing. Reading or writing
-`conf.entryFormatter` does not warn, since 2.x has no other spelling to move to; its `@deprecated`
-tag stays, because Goals #4 deprecates every 3.0.0 break in a minor first, and names 3.0.0's
-`conf.format`. A parent built by another copy of this module hands its child only a function, its
-built-in formatters included, so writing that child's `conf.format` changes nothing either.
+2026-09-28, superseding the alias above on `log.conf`: `conf.format` keeps v2.3.0's read type, per
+Goals #4: it never holds a function, and a string written beside `entryFormatter` reads back as
+written. A function formatter reads back from `conf.entryFormatter` alone and wins over any
+`conf.format`, as in v2.3.0, so writing `conf.format` on a function-formatted instance changes
+nothing. Reading or writing `conf.entryFormatter` does not warn, since 2.x has no other spelling to
+move to. Its `@deprecated` tag stays and names 3.0.0's `conf.format`, because Goals #4 deprecates
+every 3.0.0 break in a minor first. A parent built by another copy of this module hands its child
+only a function, its built-in formatters included, so writing that child's `conf.format` changes
+nothing either.
 
 ## `ResolvedLogConf` keeps `entryFormatter` required
 
