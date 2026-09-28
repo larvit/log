@@ -57,13 +57,20 @@ mechanism, that is evidence of the problem, never the prescribed repair.
   `msgTextFormatter` and `msgJsonFormatter`, which no doc spells out. Exporting the resolver is
   additive and the obvious shape; saying it in the README is the other. Whichever lands has to land
   before 3.0.0 takes the alias away. Found by the 2026-09-21 product-owner review.
-- [ ] **Make README → Goals' "`log.fetch` mirrors the runtime's `fetch`" true, in the code or in
-  its wording.** Three spots break it: a `captureRequestHeaders` name that is not a valid header
-  name (`"x y"`) rejects every traced call before the request goes out; a `Request` passed as
-  `init` loses its `method` and `body`, which `{ ...init, headers }` does not copy, so a POST goes
-  out as a GET; and the added `traceparent` is not CORS-safelisted, so a cross-origin simple request
-  gains a preflight a server may refuse. A `Request` as `input` is 2.6.0's item. Rewording a goal
-  is the human's; found by the 2026-09-28 prose pass.
+- [ ] **Keep an invalid name in `captureRequestHeaders` or `captureResponseHeaders` from changing a
+  `log.fetch` result.** `headers.get("x y")` throws a `TypeError`, so a bad request-side name rejects
+  every traced call before the request goes out, and a bad response-side one turns a response the
+  platform delivered into a rejection — against Goals' "`log.fetch` mirrors the runtime's `fetch`".
+  No working config holds such a name, so rejecting it where the option is set breaks nobody.
+- [ ] **Send a `Request` passed as `init` with its own method, body and headers.** `fetch(url,
+  request)` is valid and TypeScript accepts it, but `{ ...init, headers }` copies own properties
+  only, and a `Request`'s are prototype getters: `log.fetch(url, new Request(url, { method: "POST",
+  body }))` sends a GET with no body. A `Request` as the *input* is 2.6.0's item.
+- [ ] **Say in README → `log.fetch` in depth that a cross-origin call needs `traceparent` in the
+  server's `Access-Control-Allow-Headers`.** The header is not CORS-safelisted, so it turns a simple
+  request into a preflighted one, and a server that refuses it fails a call plain `fetch` would have
+  made. Injecting it is what `log.fetch` is for, so the behaviour stays; reword Goals' "never a
+  request the platform would not have made" to own the preflight.
 - [ ] **Spell a redacted `url.full` the way OTel semconv asks: `https://REDACTED:REDACTED@host/x`.**
   Today the userinfo is dropped silently, so a span can carry `url.full` showing a credential-free
   url beside a `status.message` quoting `http://REDACTED@host/x`, and the reader is told both that
@@ -239,7 +246,12 @@ Each one is a weigh against README → Goals first: ship it, or delete the item 
 - [ ] **Make nothing throw after `end()`.** Level methods still write to the console and their OTLP
   records attach to the ended span, entering the queue like any other record, so the queue's
   size/time flush exports them with no further call. `end()` a second time resolves `{ err }`. Add
-  `ended` to `LogInt`.
+  `ended` to `LogInt`. `log.fetch` on an ended log sends untraced, where today it throws
+  synchronously, which the runtime's `fetch` never does.
+- [ ] **Send `traceparent` cross-origin only to urls the caller lists, or record why not.** OTel's
+  browser fetch instrumentation defaults that way (`propagateTraceHeaderCorsUrls`), because the
+  header preflights a cross-origin request; today `log.fetch` sends it everywhere, so narrowing it
+  changes a default.
 - [ ] **Keep `otlpQueue` as the only OTLP representation in `conf`.** Build the default `Queue` from
   the three `otlp*` shorthands and clear them, so inheritance needs one rule and `isQueueFor` goes.
   Today `log.conf.otlpHttpBaseURI` stays readable, which is why this waits for a major.
