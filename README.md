@@ -435,7 +435,8 @@ redacted from the runtime's own text.
 `REDACTED` does not always stand for a credential: an address glued to a host, as in
 `https://api.test,mail@example.com`, redacts too, a `location` of `https://cdn.test//logo@2x.png`
 records `REDACTED` whole, and a path merely holding `http:`, or `//` before an `@`, is cut:
-`https://wiki.test/wiki/Http:_Status` records `https://wiki.test/wiki/REDACTED`.
+`https://wiki.test/wiki/Http:_Status` records `https://wiki.test/wiki/REDACTED`. So, rarely, is a
+random id whose base64 decoding happens to spell `//x@`.
 
 Spans are queued when the response arrives and are registered with `flush()` at call time, so
 `await log.end()` delivers a `log.fetch()` you never awaited.

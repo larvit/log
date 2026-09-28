@@ -9,10 +9,12 @@
   `//user:pass@host` included, whether raw, percent-encoded any number of times, or base64-encoded
   anywhere in the path. `https://proxy.test/fetch/https://user:pass@cb.test/x` records
   `https://proxy.test/fetch/REDACTED`. A path merely containing `http:` or `https:`, as
-  `/wiki/Http:_Status` does, or `//` before an `@`, is cut too, so a dashboard grouping on such a
-  `url.full` sees it change. The v2.4.0 rotation advisory holds for spans exported before this
-  release; search for `aHR0c`, `h0dH` and `odHRw`, or `SFRUU`, `hUVF` and `IVFR` for an upper-case
-  scheme; a mixed-case one matches none of them.
+  `/wiki/Http:_Status` does, or `//` before an `@`, is cut too, and so, rarely, is a random id whose
+  base64 decoding happens to spell `//x@`, so a dashboard grouping on such a `url.full` sees it
+  change. The v2.4.0 rotation advisory holds for spans exported before this release. Base64 of an
+  `http:` or `https:` url is found by searching for `aHR0c`, `h0dH` and `odHRw`, or `SFRUU`, `hUVF`
+  and `IVFR` for an upper-case scheme; a mixed-case one, and base64 of any other shape, matches none
+  of them.
 - **A child or clone sending to another origin than its source's no longer inherits
   `otlpAdditionalHeaders`.** Since v1.4.0 for a child and v2.2.0 for a clone,
   `new Log({ parentLog, otlpHttpBaseURI: other })` sent the parent's headers, a bearer token
