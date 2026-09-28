@@ -45,20 +45,21 @@ Priority order decides a tie.
    `url.full` as written; the [changelog](CHANGELOG.md) says what to rotate.
 4. **Semver, read strictly, over what this README documents.** A minor only adds — an export, an
    option, a value an option accepts, a field, a span attribute — where code not using it behaves as
-   before, and may change what the README does not document — an undocumented key of a `conf`,
-   enumerability, what a spread or `JSON.stringify` of one carries. Every break is deprecated in a
-   minor first and lands in the next major with a `MIGRATION.md` entry; a feature whose right shape
-   breaks waits for that major, never shipping early in a worse one. Only a major changes:
+   before. What the README does not document — an undocumented key of a `conf`, enumerability, what
+   a spread or `JSON.stringify` of one carries — may change in a minor. A break, anything below, is
+   deprecated in a minor first and lands in the next major with a `MIGRATION.md` entry; a feature
+   whose right shape breaks waits for that major, never shipping early in a worse one. Only a major
+   changes:
    - each documented option, read back under its own name, and each documented instance field;
    - each span attribute and value this README documents, on `log.span` and on the wire;
    - the `format: "json"` output;
    - a default;
    - a supported runtime;
-   - a type you read (`log.conf`, `queue.conf`, `LogInt.conf`, anything handed back): widening what
-     a key can hold, even where the option behind it accepts more;
-   - a type you pass: narrowing what it accepts;
-   - a type you implement: removing a key it is handed, widening what one holds, or adding to what
-     it must provide.
+   - what a key of a type you read (`log.conf`, `queue.conf`, `LogInt.conf`, anything handed back)
+     can hold: widening it, even where the option behind it accepts more;
+   - what a type you pass accepts: narrowing it;
+   - the keys a type you implement is handed or must provide: removing one it is handed, widening
+     what one holds, or adding to what it must provide.
 5. **A very easy API.** `log.info("msg", { key })` is the whole one-line path. Nobody learns OTLP
    to log.
 6. **Composable.** Instances nest, inherit, and attach to an upstream trace.
