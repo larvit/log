@@ -279,12 +279,12 @@ credentials off `log.conf` and `queue.conf`.
 ## A url nested in a request path is cut from where it starts
 
 2026-09-28, the maintainer: where `url.full`'s path holds a url — `http:` or `https:` followed by
-`//`, raw or under any number of percent-encoding layers, or a path segment whose base64 decoding
-starts that way — the path is kept up to where that url's scheme, or that segment, starts and the
-rest records `REDACTED`: `https://proxy.test/fetch/REDACTED`. Keyed on the scheme, not on userinfo,
-because a nested url carries its query in the path too, where a signature or `access_token` has no
-shape. Splicing `REDACTED@` covers the literal spelling only, and replacing the whole path loses the
-endpoint README → Audience #3 reads. Serves README → Goals #3.
+`//`, raw or under any number of percent-encoding layers, or a path segment whose base64 or
+base64url decoding, padded or not, starts that way — the path is kept up to where that url's scheme,
+or that segment, starts and the rest records `REDACTED`: `https://proxy.test/fetch/REDACTED`. Keyed
+on the scheme, not on userinfo, because a nested url carries its query in the path too, where a
+signature or `access_token` has no shape. Splicing `REDACTED@` covers the literal spelling only, and
+replacing the whole path loses the endpoint README → Audience #3 reads. Serves README → Goals #3.
 
 ## An `Authorization` over plain `http:` warns once
 
