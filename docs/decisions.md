@@ -216,8 +216,8 @@ kept, because `X-Amz-Date` and `X-Amz-Expires` are what README → Audience #3 r
 403. 2026-09-28, the maintainer: it adds `access_token`, RFC 6750's query spelling of a bearer
 token, and `api_key`, `apikey`, `key` and `token`, the names the wild sends one under: turning
 `captureQuery` on names no parameter, so Goal #3's "naming it is asking for it" does not cover
-them, and a false hit costs the reader a value, never the key. Serves README → Goals #3; over-redaction in a minor stands on the 2026-09-20 captured-value
-entry. Valid while the deny-list names query keys, not shapes.
+them, and a false hit costs the reader a value, never the key. Serves README → Goals #3;
+over-redaction in a minor stands on the 2026-09-20 captured-value entry. Valid while the deny-list names query keys, not shapes.
 
 ## An unsampled `traceparent` drops the span, never the log records
 
@@ -263,30 +263,35 @@ four-seat run at the same depth may not score lower. Comprehension work ships in
 is found in, ahead of that release's other items. Serves README → Goals #8. Valid until a later
 run at or above 7.0 replaces the baseline.
 
-## A stringified `Queue` carries its `conf` only
+## A stringified `Queue` carries its `conf`, less `storage` from 2.5.0
 
 2026-09-28, the maintainer: `JSON.stringify` of a `Queue`, and so of `log.conf`, carries the
 queue's `conf` and none of its working state — items, timers, scheduler — which is what made it
 circular. `storage` is left out too, from 2.5.0: what it holds is read only to restore the queue,
-and a browser's `localStorage` holds the origin's session tokens. Credentials in that `conf` stringify as written, as `log.conf`'s own `otlp*` keys beside
+and a browser's `localStorage` holds the origin's session tokens. That is data the app never
+handed this library as configuration, and `toJSON` is the only route by which the library writes
+it out; a credential in `conf` is one the app wrote there itself. Credentials in that `conf` stringify as written, as `log.conf`'s own `otlp*` keys beside
 a queue built from them already do: README → Goals #3 stops at what this library emits, and
 redacting in a `toJSON` would be a second spelling of 3.0.0's item keeping credentials off `conf`.
 Serves README → Goals #3. Valid until 3.0.0 keeps credentials off `log.conf` and `queue.conf`.
 
 ## A url nested in a request path is cut from where it starts
 
-2026-09-28, the maintainer: where `url.full`'s path holds a url matching `redactCredential`'s rule,
-in any percent-encoding it sees through, the path is kept up to where that url starts and the rest
-records `REDACTED`: `https://proxy.test/fetch/REDACTED`. Splicing `REDACTED@` covers the literal
-spelling only, and replacing the whole path loses the endpoint README → Audience #3 reads. Serves
-README → Goals #3.
+2026-09-28, the maintainer: where `url.full`'s path holds a url — `http:` or `https:` followed by
+`//`, raw or under any number of percent-encoding layers — the path is kept up to where that url's
+scheme starts and the rest records `REDACTED`: `https://proxy.test/fetch/REDACTED`. Keyed on the
+scheme, not on userinfo, because a nested url carries its query in the path too, where a signature
+or `access_token` has no shape. Splicing `REDACTED@` covers the literal spelling only, and
+replacing the whole path loses the endpoint README → Audience #3 reads. Serves README → Goals #3.
 
 ## Basic credentials over plain `http:` warn once
 
-2026-09-28, the maintainer: an `otlpHttpBaseURI` that is `http:`, carries `user:pass@` and names a
-non-loopback host writes one warning per `report` sink, and still sends. Refusing it would break
-the in-cluster `http:` collector, a deliberate and common setup. Serves README → Goals #3 without
-spending #4.
+2026-09-28, the maintainer: an `http:` `otlpHttpBaseURI` naming a host other than `localhost`,
+`127.0.0.0/8` or `::1` writes one warning per `report` sink when it carries `user:pass@` or
+`otlpAdditionalHeaders` sets `Authorization`, and still sends. The line names the host, never the
+credential. Both spellings warn, so moving the credential never silences the exposure; refusing
+would break the in-cluster `http:` collector, a deliberate and common setup. Serves README → Goals
+#3's headline, "a credential never leaves", on the wire, without spending #4.
 
 ## `resolveFormatter` is exported
 
@@ -301,5 +306,5 @@ under #4.
 Authorization }` both stay: a vendor hands the endpoint over as one `https://id:token@host` string,
 the only shape one env var carries, and a bearer token has no userinfo spelling. The two can
 disagree, so setting both warns once per `report` sink in 2.x and throws in the constructor from
-3.0.0; v2.4.0 documents the header winning, so rejecting it sooner would spend README → Goals #4.
+3.0.0, checked when the queue is built — a header added later is not rechecked; v2.4.0 documents the header winning, so rejecting it sooner would spend README → Goals #4.
 Serves README → Goals #5.

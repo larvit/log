@@ -34,7 +34,7 @@ In [docs/decisions.md](docs/decisions.md):
 - The default `Queue` lives in `conf.otlpQueue`
 - A v2.3.0 copy's child loses a function formatter
 - The comprehension baseline
-- A stringified `Queue` carries its `conf` only
+- A stringified `Queue` carries its `conf`, less `storage` from 2.5.0
 - A url nested in a request path is cut from where it starts
 - Basic credentials over plain `http:` warn once
 - `resolveFormatter` is exported
