@@ -268,7 +268,7 @@ function stringField(value: unknown, key: string): string | undefined {
 	return typeof read === "string" ? read : undefined;
 }
 
-function numberField(value: unknown, key: string): string | undefined {
+function numberFieldAsString(value: unknown, key: string): string | undefined {
 	const read = readField(value, key);
 
 	return typeof read === "number" ? String(read) : undefined;
@@ -1693,7 +1693,7 @@ async function tracedFetch(log: Pick<Log, "conf" | "context" | "sampled" | "span
 	} catch (err) {
 		span.status = { code: STATUS_CODE_ERROR, message: failureMessage(err) };
 		// v2.3.0's documented value; semconv's rule, as end() applies it, waits for 3.0.0.
-		attributes["error.type"] = stringField(err, "code") ?? numberField(err, "code") ?? stringField(err, "name") ?? "fetch_error";
+		attributes["error.type"] = stringField(err, "code") ?? numberFieldAsString(err, "code") ?? stringField(err, "name") ?? "fetch_error";
 
 		throw err;
 	} finally {
