@@ -8,13 +8,6 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ### Security
 
-- [ ] **Cut a url nested in the request path out of `url.full` from its scheme on, in every
-  percent-encoding or base64, userinfo or not.**
-  `buildUrlFull` is `url.origin + url.pathname` and redacts only the query, so
-  `log.fetch("https://proxy.test/fetch/https://user:pass@cb.test/x")` exports that password with no
-  capture option involved, and a nested signed query exports its signature. It should record
-  `https://proxy.test/fetch/REDACTED`. Drop Goals #3's "until 2.5.0" clause for it;
-  the 2.4.0 CHANGELOG carries it as an open exposure with a rotation advisory. Decided 2026-09-28.
 - [ ] **Redact `access_token`, `api_key`, `apikey`, `key` and `token` in a captured query.**
   RFC 6750 §2.3 defines `access_token` as a way to send a bearer token, so with `captureQuery` on
   `log.fetch("https://graph.test/me?access_token=…")` exports a live one. Add the names to README

@@ -43,8 +43,7 @@ Priority order decides a tie.
    metadata, `context` and `spanName`. So is a header you allow-list that simply *is* a secret,
    because naming it is asking for it, and a query value under a name
    [Credentials in a captured value](#credentials-in-a-captured-value) does not list, because no
-   shape tells it from any other string. Until 2.5.0 a url nested in a request path still reaches
-   `url.full` as written; the [changelog](CHANGELOG.md) says what to rotate.
+   shape tells it from any other string.
 4. **Semver, read strictly, over what this README documents.** A minor only adds — an export, an
    option, a value an option accepts, a field, a span attribute — where code not using it behaves as
    before. What the README does not document — an undocumented key of a `conf`, enumerability, what
@@ -416,12 +415,13 @@ and `set-cookie`, and the value of a query key named, in any casing, `awsaccessk
 `x-goog-credential` or `x-goog-signature` — a presigned S3-compatible or GCS url, whichever signing
 generation made it, and an Azure SAS url. Redacted wherever it appears: any other captured header
 value, or kept query key or value, that holds url userinfo — which records `REDACTED` in place of
-the whole of itself, through one layer of percent-encoding but not two.
+the whole of itself, through one layer of percent-encoding but not two. Cut from `url.full`: a url
+nested in the request path — `http://` or `https://` under any layers of percent-encoding, or a
+path segment that base64 or base64url decodes to one — and everything after it, the query included:
+`https://proxy.test/fetch/https://user:pass@cb.test/x` records `https://proxy.test/fetch/REDACTED`.
 
 That covers the shapes a credential is recognisable in, not every credential: a value that simply
-*is* a secret is exported as you sent it ([Goals](#goals) #3), and a url nested in the request
-**path**, as a fetch-through proxy takes, stays in `url.full` as you wrote it, credentials and all,
-with no option involved.
+*is* a secret is exported as you sent it ([Goals](#goals) #3).
 
 Never put credentials in the url; pass an `Authorization` header, and strip userinfo from a url you
 did not build. `log.fetch` mirrors the runtime: Node and browsers refuse such a url, while React
