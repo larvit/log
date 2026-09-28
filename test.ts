@@ -1485,6 +1485,7 @@ test("end({ error }) marks the span failed", async t => {
 	await new Log(conf).end({ error: new Error("GET https://api.test/mail@example.com?to=a@b failed") });
 	// Scheme-relative: Node cannot parse one without a base and quotes it back as given.
 	await new Log(conf).end({ error: new TypeError("Failed to parse URL from //myuser:hunter2@api.test/x") });
+	await new Log(conf).end({ error: new DOMException("aborted", "AbortError") });
 
 	t.deepEqual(exportedSpan(0).status, { code: 2, message: "refused" }, "status is ERROR with the error message");
 	t.strictEqual(attr(exportedSpan(0), "error.type"), "ECONNREFUSED", "error.type is the error's code when it has one");
@@ -1500,6 +1501,7 @@ test("end({ error }) marks the span failed", async t => {
 	t.deepEqual(exportedSpan(6).status, { code: 2, message: "Request cannot be constructed from a URL that includes credentials: http://REDACTED@api.test/x, retried against https://REDACTED@api.test/x" }, "userinfo is redacted from every url the error message quotes");
 	t.deepEqual(exportedSpan(7).status, { code: 2, message: "GET https://api.test/mail@example.com?to=a@b failed" }, "an @ outside the userinfo position is left alone");
 	t.deepEqual(exportedSpan(8).status, { code: 2, message: "Failed to parse URL from //REDACTED@api.test/x" }, "userinfo is redacted from a scheme-relative url too");
+	t.strictEqual(attr(exportedSpan(9), "error.type"), "AbortError", "a numeric code is skipped for the error name");
 	t.end();
 });
 
@@ -1879,7 +1881,7 @@ test("log.fetch marks error spans for 4xx and for network failures, propagating 
 	t.deepEqual(span404.status, { code: 2 }, "the 4xx span is ERROR without a status message");
 	t.deepEqual(spanBoom.status, { code: 2, message: "down" }, "the network-failure span is ERROR with the error message");
 	t.strictEqual(attr(spanBoom, "error.type"), "ECONNREFUSED", "error.type captured from the error code");
-	t.ok(spans.some(span => attr(span, "error.type") === "AbortError"), "a numeric code (DOMException) is skipped for the error name");
+	t.ok(spans.some(span => attr(span, "error.type") === "20"), "a numeric code (DOMException) is kept, as v2.3.0 documented");
 	t.ok(spans.some(span => attr(span, "error.type") === "fetch_error"), "error.type is \"fetch_error\" when there is neither code nor name");
 	t.end();
 });
