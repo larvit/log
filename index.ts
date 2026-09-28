@@ -1416,7 +1416,7 @@ function sameOrigin(uri: string, other: string): boolean {
 }
 
 // The OTLP keys a derivation must not take: a queue beside an endpoint it was not built from, or
-// headers beside an origin other than their endpoint's, where fetch drops them on a redirect too.
+// headers beside an origin other than their endpoint's, where fetch drops `Authorization` on a redirect.
 function otlpKeysNotToInherit(conf: LogSettings, sourceConf: LogConf): (keyof LogConf)[] {
 	if (conf.otlpQueue) {
 		return [...OTLP_TRANSPORT_KEYS];
