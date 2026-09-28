@@ -43,8 +43,8 @@ Priority order decides a tie.
    metadata, `context` and `spanName`. So is a header you allow-list that simply *is* a secret,
    because naming it is asking for it, and a query value under a name
    [Credentials in a captured value](#credentials-in-a-captured-value) does not list, because no
-   shape tells it from any other string. Until 2.5.0 a url nested in a request path in a shape
-   [Credentials in a captured value](#credentials-in-a-captured-value) does not cut still reaches
+   shape tells it from any other string. Until 2.5.0, a url nested in a request path that
+   [Credentials in a captured value](#credentials-in-a-captured-value) does not cut reaches
    `url.full` as written; the [changelog](CHANGELOG.md) says what to rotate.
 4. **Semver, read strictly, over what this README documents.** A minor only adds — an export, an
    option, a value an option accepts, a field, a span attribute — where code not using it behaves as
@@ -397,7 +397,7 @@ Span attributes follow the OpenTelemetry HTTP semantic conventions:
 | Attribute | Value |
 |---|---|
 | `http.request.method` | Request method, `GET` when unset |
-| `url.full` | The URL without the outer userinfo. Query string dropped unless `captureQuery`, where a credentialed key or value records `REDACTED` |
+| `url.full` | The URL without the outer userinfo. Query string dropped unless `captureQuery`, where a credentialed key or value records `REDACTED`. From a url nested in the path on, query included, `REDACTED` |
 | `url.scheme`, `server.address`, `server.port` | From the URL; port only when explicit |
 | `http.request.header.<name>` | Headers listed in `captureRequestHeaders` |
 | `http.response.status_code` | Response status |
@@ -424,7 +424,8 @@ segment that base64 or base64url decodes to one — and everything after it, the
 
 That covers the shapes a credential is recognisable in, not every credential: a value that simply
 *is* a secret is exported as you sent it ([Goals](#goals) #3), and so is a nested url of any shape
-not listed above — `//user:pass@host`, another scheme, base64 not starting a segment.
+not listed above — `//user:pass@host`, another scheme, base64 not starting a segment, base64 of a
+percent-encoded url.
 
 Never put credentials in the url; pass an `Authorization` header, and strip userinfo from a url you
 did not build. `log.fetch` mirrors the runtime: Node and browsers refuse such a url, while React
@@ -432,7 +433,8 @@ Native hands it to the platform, where iOS sends the credentials and Android sen
 you the 401. A rejection quoting the url reaches the status message as `http://REDACTED@host/x` —
 a redaction of what the runtime wrote, not a guarantee. `REDACTED` does not always stand for a
 credential either: an address glued to a host, as in `https://api.test,mail@example.com`, redacts
-too, and a `location` of `https://cdn.test//logo@2x.png` records `REDACTED` whole.
+too, a `location` of `https://cdn.test//logo@2x.png` records `REDACTED` whole, and a path merely
+holding `http:` is cut: `https://wiki.test/wiki/Http:_Status` records `https://wiki.test/wiki/REDACTED`.
 
 Spans are queued when the response arrives and are registered with `flush()` at call time, so
 `await log.end()` delivers a `log.fetch()` you never awaited.
