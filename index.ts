@@ -1550,8 +1550,8 @@ function withDefaults(conf: LogSettings): ResolvedLogConf {
 	return conf as ResolvedLogConf;
 }
 
-// Defaults come last, so none hides an inherited value; the entryFormatter check precedes them, so
-// a defaulted format never reads as one the caller wrote beside entryFormatter.
+// Defaults come last, so none hides an inherited value; the entryFormatter check precedes them,
+// which move a function format out of conf.
 function resolveLogConf(options: LogOptions | LogLevel | "none" | undefined, report: QueueConf["report"]): { conf: ResolvedLogConf, deprecations: string[] } {
 	const conf = confFromOptions(options);
 	const deprecations: string[] = [];
