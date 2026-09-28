@@ -1672,7 +1672,7 @@ test("log.traceparent() emits the current span context", t => {
 	t.end();
 });
 
-test("an unsampled traceparent exports nothing, passes 00 on and still prints", async t => {
+test("an unsampled traceparent exports records but no spans, passes 00 on and still prints", async t => {
 	const { calls } = stubFetch();
 	const stdout: string[] = [];
 	const traceparent = formatTraceparent(generateTraceId(), generateSpanId(), false);
@@ -1694,13 +1694,14 @@ test("an unsampled traceparent exports nothing, passes 00 on and still prints", 
 	await log.end();
 
 	t.ok(callHeader(calls.find(call => call.path === "/x")!, "traceparent")?.endsWith("-00"), "log.fetch propagates the unsampled flag");
-	t.strictEqual(calls.filter(call => call.path !== "/x").length, 0, "no record or span reaches the collector");
+	t.strictEqual(exportedRecords(calls).join(","), "kept on the console,child record", "records export whatever the flag says");
+	t.strictEqual(exportedSpans(calls).length, 0, "no span reaches the collector");
 	t.strictEqual(stdout.length, 2, "console output is unaffected");
 
 	clone.info("clone record");
 	await clone.end();
 
-	t.strictEqual(calls.filter(call => call.path === "/v1/logs").length, 1, "the clone's record exports");
+	t.ok(exportedRecords(calls).includes("clone record"), "the clone's record exports");
 	t.strictEqual(exportedSpans(calls).map(span => span.name).join(","), "clone", "only the clone's span exports");
 	t.end();
 });
