@@ -1291,7 +1291,7 @@ function traceableUrl(input: string | URL): URL | undefined {
 
 // Every percent-encoding layer decoded and, as a WHATWG parser does, tab and newline dropped; each
 // char keeps the index in `text` it came from, or where its escape run starts when that is unclear.
-// Without an escape nothing moves, and `sources` is empty. Past eight layers `complete` is false.
+// Without an escape nothing moves, and `sources` is empty. From eight layers on `complete` is false.
 function decodedWithSources(text: string): { complete: boolean, decoded: string, sources: number[] } {
 	if (!text.includes("%")) {
 		return { complete: true, decoded: text, sources: [] };
