@@ -43,9 +43,7 @@ Priority order decides a tie.
    metadata, `context` and `spanName`. So is a header you allow-list that simply *is* a secret,
    because naming it is asking for it, and a query value under a name
    [Credentials in a captured value](#credentials-in-a-captured-value) does not list, because no
-   shape tells it from any other string. Until 2.5.0, a url nested in a request path that
-   [Credentials in a captured value](#credentials-in-a-captured-value) does not cut reaches
-   `url.full` as written; the [changelog](CHANGELOG.md) says what to rotate.
+   shape tells it from any other string.
 4. **Semver, read strictly, over what this README documents.** A minor only adds — an export, an
    option, a value an option accepts, a field, a span attribute — where code not using it behaves as
    before. What the README does not document — an undocumented key of a `conf`, enumerability, what
@@ -420,14 +418,13 @@ them per call site.
   that holds url userinfo — which records `REDACTED` in place of the whole of itself, through one
   layer of percent-encoding but not two.
 - **Cut from `url.full`, with everything after it and the query:** a url nested in the request
-  path — `http:` or `https:` under any layers of percent-encoding, or a path segment whose base64 or
-  base64url decoding starts with one. `https://proxy.test/fetch/https://user:pass@cb.test/x` records
-  `https://proxy.test/fetch/REDACTED`.
+  path — any `http:` or `https:` url, and any other one holding userinfo, `//user:pass@host`
+  included — raw, under any layers of percent-encoding, or base64 or base64url-encoded anywhere in
+  the path, percent-encoded inside or not. `https://proxy.test/fetch/https://user:pass@cb.test/x`
+  records `https://proxy.test/fetch/REDACTED`.
 
 That covers the shapes a credential is recognisable in, not every credential: a value that simply
-*is* a secret is exported as you sent it ([Goals](#goals) #3), and so is a nested url of any shape
-not listed above — `//user:pass@host`, another scheme, base64 not starting a segment, base64 of a
-percent-encoded url.
+*is* a secret is exported as you sent it ([Goals](#goals) #3).
 
 Never put credentials in the url; pass an `Authorization` header, and strip userinfo from a url you
 did not build. `log.fetch` mirrors the runtime: Node and browsers refuse such a url, while React
@@ -435,9 +432,10 @@ Native hands it to the platform, where iOS sends the credentials and Android sen
 you the 401. A rejection quoting the url reaches the status message as `http://REDACTED@host/x`,
 redacted from the runtime's own text.
 
-`REDACTED` does not always stand for a credential: an address glued to a host, as in `https://api.test,mail@example.com`, redacts
-too, a `location` of `https://cdn.test//logo@2x.png` records `REDACTED` whole, and a path merely
-holding `http:` is cut: `https://wiki.test/wiki/Http:_Status` records `https://wiki.test/wiki/REDACTED`.
+`REDACTED` does not always stand for a credential: an address glued to a host, as in
+`https://api.test,mail@example.com`, redacts too, a `location` of `https://cdn.test//logo@2x.png`
+records `REDACTED` whole, and a path merely holding `http:`, or `//` before an `@`, is cut:
+`https://wiki.test/wiki/Http:_Status` records `https://wiki.test/wiki/REDACTED`.
 
 Spans are queued when the response arrives and are registered with `flush()` at call time, so
 `await log.end()` delivers a `log.fetch()` you never awaited.

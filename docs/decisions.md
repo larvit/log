@@ -278,17 +278,18 @@ credentials off `log.conf` and `queue.conf`.
 
 ## A url nested in a request path is cut from where it starts
 
-2026-09-28, the maintainer: where `url.full`'s path holds a url — `http:` or `https:` in any case,
-raw or under any number of percent-encoding layers, or a path segment whose base64 or base64url
-decoding starts that way — the path is kept up to where that url's scheme, or that segment, starts
-and the rest records `REDACTED`, the query with it whatever `captureQuery` says:
-`https://proxy.test/fetch/REDACTED`. Keyed on the scheme, not on userinfo, because the nested url's
-path and query — the latter parsing as the outer url's — can hold a signature or `access_token` with
-no shape. Not keyed on `//` after it, since `https:\\u:p@host` and `https:u:p@host` parse to the same
-credentials.
-Splicing `REDACTED@` covers the literal spelling only, and replacing the whole path loses the
-endpoint README → Audience #3 reads. Valid while `url.full` exports the request path. Serves README
-→ Goals #3.
+2026-09-28, the maintainer: where `url.full`'s path holds a url — raw, under any number of
+percent-encoding layers, or base64 or base64url-encoded at any offset and alignment, percent-encoded
+inside or not — the path is kept up to where that url, or the base64 group holding its start,
+starts and the rest records `REDACTED`, the query with it whatever `captureQuery` says:
+`https://proxy.test/fetch/REDACTED`. An `http:` or `https:` url is keyed on its scheme alone,
+because its path and query — the latter parsing as the outer url's — can hold a signature or
+`access_token` with no shape; not on `//` after it, since `https:\\u:p@host` and `https:u:p@host`
+parse to the same credentials. Any other url is keyed on its userinfo — after `ftp:` or `ws(s):`,
+which parse like `https:`, or after a doubled slash — since a bare `word:` is a path's own syntax
+(`/v1/p1:batchGet`), and a doubled slash is a sloppy join. Splicing `REDACTED@` covers the literal
+spelling only, and replacing the whole path loses the endpoint README → Audience #3 reads. Valid
+while `url.full` exports the request path. Serves README → Goals #3.
 
 ## An `Authorization` over plain `http:` warns once
 

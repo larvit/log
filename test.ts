@@ -1815,7 +1815,18 @@ test("log.fetch cuts a url nested in the request path out of url.full from where
 		["https://proxy.test/b64/aHR0cHM6Ly9jYi50ZXN0L2E/Yg==/hunter2", "https://proxy.test/b64/REDACTED"],
 		["https://proxy.test/b64/aHR0cHM6Ly9jYi50ZXN0L2E_Yg/hunter2", "https://proxy.test/b64/REDACTED"],
 		["https://proxy.test/b64/aHR0cDovL2NiLnRlc3QveA%3D%3D?hunter2", "https://proxy.test/b64/REDACTED"],
+		["https://proxy.test/fetch//myuser:hunter2@cb.test/x", "https://proxy.test/fetch/REDACTED"],
+		["https://proxy.test/fetch/%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx", "https://proxy.test/fetch/%2FREDACTED"],
+		["https://proxy.test/fetch/ftp://myuser:hunter2@cb.test/x", "https://proxy.test/fetch/REDACTED"],
+		["https://proxy.test/fetch/wss:myuser:hunter2@cb.test/x", "https://proxy.test/fetch/REDACTED"],
+		["https://proxy.test/url=aHR0cHM6Ly9teXVzZXI6aHVudGVyMkBjYi50ZXN0L3g", "https://proxy.test/url=REDACTED"],
+		["https://proxy.test/b64/dT1odHRwczovL215dXNlcjpodW50ZXIyQGNiLnRlc3QveA", "https://proxy.test/b64/REDACTED"],
+		["https://proxy.test/b64/aHR0cHMlM0ElMkYlMkZteXVzZXIlM0FodW50ZXIyJTQwY2IudGVzdCUyRng", "https://proxy.test/b64/REDACTED"],
+		["https://proxy.test/b64/Ly9teXVzZXI6aHVudGVyMkBjYi50ZXN0L3g", "https://proxy.test/b64/REDACTED"],
 		["https://api.test/docs/http-guide/aHR0?q=hi", "https://api.test/docs/http-guide/aHR0?q=hi"],
+		["https://api.test/v1/projects/p1:batchGet", "https://api.test/v1/projects/p1:batchGet"],
+		["https://api.test/v1/news:list", "https://api.test/v1/news:list"],
+		["https://cdn.test/assets//logo.png", "https://cdn.test/assets//logo.png"],
 	];
 
 	for (const [input, expected] of cases) {

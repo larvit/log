@@ -1330,29 +1330,54 @@ function decodedWithSources(text: string): { complete: boolean, decoded: string,
 	return { complete: !changed, decoded: text, sources };
 }
 
-// Every case of `h` encodes to a base64 head of `a` or `S`, and eight chars decode to `https:`.
-function startsBase64Url(text: string): boolean {
-	if (text[0] !== "a" && text[0] !== "S") {
-		return false;
+// A nested url starts at an http(s) scheme, or at userinfo after another special scheme or a
+// doubled slash. The group capturing it is a suffix of the match.
+const NESTED_URL = /(https?:)|(?:^|[^\w+.-])((?:ftp|wss?):[\\/]*[^\s/\\?#]*@)|[\\/]([\\/][^\s/\\?#]*@)/gi;
+
+// Base64 decodes to noise, where a match counts only in printable ASCII.
+function nestedUrlIndex(text: string, printable: boolean): number | undefined {
+	for (const match of text.matchAll(NESTED_URL)) {
+		const url = match[1] ?? match[2] ?? match[3];
+
+		if (!printable || /^[!-~]+$/.test(url)) {
+			return match.index + match[0].length - url.length;
+		}
 	}
+}
 
-	const head = text.slice(0, 8).replace(/-/g, "+").replace(/_/g, "/");
+// Every base64 or base64url run, decoded at each of its four alignments, then percent-decoded.
+function base64NestedUrlStart(text: string): number | undefined {
+	for (const run of text.matchAll(/[\w+/-]{8,}/g)) {
+		let start: number | undefined;
 
-	return /^[\w+/]{8}$/.test(head) && /^https?:/i.test(atob(head));
+		for (let alignment = 0; alignment < 4; alignment++) {
+			const chars = run[0].slice(alignment, alignment + (Math.floor((run[0].length - alignment) / 4) * 4));
+			const { decoded, sources } = decodedWithSources(atob(chars.replace(/-/g, "+").replace(/_/g, "/")));
+			const found = nestedUrlIndex(decoded, true);
+
+			if (found !== undefined) {
+				start = Math.min(start ?? Infinity, run.index + alignment + (Math.floor((sources[found] ?? found) / 3) * 4));
+			}
+		}
+
+		if (start !== undefined) {
+			return start;
+		}
+	}
 }
 
 function nestedUrlStart(path: string): number | undefined {
 	const { complete, decoded, sources } = decodedWithSources(path);
-	// An escape left undecoded may still spell a scheme, so it cuts too.
-	const scheme = (complete ? /https?:/i : /https?:|%/i).exec(decoded)?.index ?? decoded.length;
+	// An escape left undecoded may still spell a url, so it cuts too.
+	const starts = [nestedUrlIndex(decoded, false), base64NestedUrlStart(decoded), complete ? undefined : decoded.indexOf("%")].filter(start => start !== undefined);
 
-	for (let i = 1; i < scheme; i++) {
-		if (decoded[i - 1] === "/" && startsBase64Url(decoded.slice(i, i + 8))) {
-			return sources[i] ?? i;
-		}
+	if (starts.length === 0) {
+		return undefined;
 	}
 
-	return scheme < decoded.length ? sources[scheme] ?? scheme : undefined;
+	const start = Math.min(...starts);
+
+	return sources[start] ?? start;
 }
 
 // Every key OTel semconv's default deny-list has named, plus every S3 and GCS query-signing generation's credential keys.
