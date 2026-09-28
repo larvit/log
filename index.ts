@@ -1289,47 +1289,66 @@ function traceableUrl(input: string | URL): URL | undefined {
 	return url.protocol === "http:" || url.protocol === "https:" ? url : undefined;
 }
 
-// A WHATWG parser reads a url from `https:` on, whatever slashes follow.
-const URL_SCHEME = /https?:/i;
-const startsWithUrl = (text: string) => URL_SCHEME.exec(text)?.index === 0;
-
-// Each pass shrinks the string or leaves it as it was, so this ends.
-function fullyPercentDecoded(value: string): string {
-	for (let decoded = percentDecoded(value); decoded !== value; decoded = percentDecoded(value)) {
-		value = decoded;
+// Every percent-encoding layer decoded and, as a WHATWG parser does, tab and newline dropped; each
+// char keeps the index in `text` it came from, or where its escape run starts when that is unclear.
+// Without an escape nothing moves, and `sources` is empty.
+function decodedWithSources(text: string): { decoded: string, sources: number[] } {
+	if (!text.includes("%")) {
+		return { decoded: text, sources: [] };
 	}
 
-	return value;
+	let sources = Array.from(text, (_, i) => i);
+
+	for (let changed = true; changed;) {
+		let next = "";
+		let last = 0;
+		const nextSources: number[] = [];
+		const keep = (chars: string, source: (offset: number) => number) => {
+			next += chars;
+			for (let offset = 0; offset < chars.length; offset++) nextSources.push(sources[source(offset)]);
+		};
+
+		for (const run of text.matchAll(/(?:%[0-9A-Fa-f]{2})+/g)) {
+			const decoded = percentDecoded(run[0]);
+
+			keep(text.slice(last, run.index), offset => last + offset);
+			keep(decoded, offset => run.index + (decoded.length * 3 === run[0].length ? offset * 3 : 0));
+			last = run.index + run[0].length;
+		}
+
+		keep(text.slice(last), offset => last + offset);
+		changed = next !== text;
+		text = next;
+		sources = nextSources;
+	}
+
+	const kept = Array.from(text, (_, i) => i).filter(i => !"\t\n\r".includes(text[i]));
+
+	return { decoded: kept.map(i => text[i]).join(""), sources: kept.map(i => sources[i]) };
 }
 
-// Eight base64 chars decode to `https:`; atob needs no padding.
-function base64Head(text: string): string {
-	try {
-		return atob(text.slice(0, 8).replace(/[^\w+/-][\s\S]*/, "").replace(/-/g, "+").replace(/_/g, "/"));
-	} catch {
-		return "";
+// Every case of `h` encodes to a base64 head of `a` or `S`, and eight chars decode to `https:`.
+function startsBase64Url(text: string): boolean {
+	if (text[0] !== "a" && text[0] !== "S") {
+		return false;
 	}
+
+	const head = text.slice(0, 8).replace(/-/g, "+").replace(/_/g, "/");
+
+	return /^[\w+/]{8}$/.test(head) && /^https?:/i.test(atob(head));
 }
 
 function nestedUrlStart(path: string): number | undefined {
-	const holdsScheme = URL_SCHEME.test(fullyPercentDecoded(path));
+	const { decoded, sources } = decodedWithSources(path);
+	const scheme = /https?:/i.exec(decoded)?.index ?? decoded.length;
 
-	for (let i = 1; i < path.length; i++) {
-		const segmentStart = path[i - 1] === "/";
-
-		if (!holdsScheme && !segmentStart) {
-			continue;
-		}
-
-		const rest = fullyPercentDecoded(path.slice(i));
-
-		if ((holdsScheme && startsWithUrl(rest)) || (segmentStart && startsWithUrl(base64Head(rest)))) {
-			return i;
+	for (let i = 1; i < scheme; i++) {
+		if (decoded[i - 1] === "/" && startsBase64Url(decoded.slice(i, i + 8))) {
+			return sources[i] ?? i;
 		}
 	}
 
-	// Decoding the whole path can join escapes no single suffix holds; cut it all.
-	return holdsScheme ? 1 : undefined;
+	return scheme < decoded.length ? sources[scheme] ?? scheme : undefined;
 }
 
 // Every key OTel semconv's default deny-list has named, plus every S3 and GCS query-signing generation's credential keys.

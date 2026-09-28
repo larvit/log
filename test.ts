@@ -1806,6 +1806,9 @@ test("log.fetch cuts a url nested in the request path out of url.full from where
 		["https://proxy.test/fetch/https:%5C%5Cmyuser:hunter2@cb.test/x", "https://proxy.test/fetch/REDACTED"],
 		["https://proxy.test/fetch/https:myuser:hunter2@cb.test/x", "https://proxy.test/fetch/REDACTED"],
 		["https://proxy.test/fetch/https:%2F%09%2Fmyuser:hunter2@cb.test/x", "https://proxy.test/fetch/REDACTED"],
+		["https://proxy.test/fetch/h%09tt%0Aps://myuser:hunter2@cb.test/x", "https://proxy.test/fetch/REDACTED"],
+		["https://proxy.test/fetch%2FaHR0cHM6Ly9jYi50ZXN0L2E_Yg/hunter2", "https://proxy.test/fetch%2FREDACTED"],
+		["https://wiki.test/wiki/Http:_Status", "https://wiki.test/wiki/REDACTED"],
 		["https://proxy.test/b64/aHR0cHM6Ly9jYi50ZXN0L2E/Yg==/hunter2", "https://proxy.test/b64/REDACTED"],
 		["https://proxy.test/b64/aHR0cHM6Ly9jYi50ZXN0L2E_Yg/hunter2", "https://proxy.test/b64/REDACTED"],
 		["https://proxy.test/b64/aHR0cDovL2NiLnRlc3QveA%3D%3D?hunter2", "https://proxy.test/b64/REDACTED"],
@@ -1821,7 +1824,7 @@ test("log.fetch cuts a url nested in the request path out of url.full from where
 
 		const urlFull = clientSpan(calls).attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue;
 
-		t.strictEqual(urlFull, expected, input);
+		t.strictEqual(urlFull, expected, input.slice(0, 80));
 	}
 
 	t.end();

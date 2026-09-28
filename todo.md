@@ -9,9 +9,9 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 ### Security
 
 - [ ] **Cut a credentialed url of any other shape out of a request path too.** 2.5.0 cuts from
-  `http:` or `https:`, so `/fetch//u:p@cb.test/x`, `/fetch/ftp://u:p@host/x`, a base64 segment
-  behind a prefix (`/url=aHR0…`) or after an encoded slash (`/fetch%2FaHR0…`), and base64 of a
-  percent-encoded url still put their credentials in `url.full`.
+  `http:` or `https:`, so `/fetch//u:p@cb.test/x`, `/fetch/ftp://u:p@host/x`, base64 behind a
+  prefix (`/url=aHR0…`) and base64 of a percent-encoded url still put their credentials in `url.full`. Drop Goals #3's "until 2.5.0"
+  clause and the matching lines in README → Credentials in a captured value and the CHANGELOG.
 - [ ] **Redact `access_token`, `api_key`, `apikey`, `key` and `token` in a captured query.**
   RFC 6750 §2.3 defines `access_token` as a way to send a bearer token, so with `captureQuery` on
   `log.fetch("https://graph.test/me?access_token=…")` exports a live one. Add the names to README
