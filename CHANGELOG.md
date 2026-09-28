@@ -82,7 +82,7 @@
   `log.fetch("myapp:user:pass@host/x")` exported `nulluser:pass@host/x` and a `data:` url exported
   its whole payload. **If you have passed credentials or private data in such a url, rotate them**:
   search your tracing backend for spans whose `url.full` starts with `null` or matches
-  `^https?://[^/]*https?:`, which finds a `blob:` url's `https://example.comhttps://example.com/uuid`.
+  `https?://[^/]*https?:.*`, which finds a `blob:` url's `https://example.comhttps://example.com/uuid`.
   `log.fetch` first exported `url.full` in v2.3.0, so no older span carries it.
 - Credentials in `otlpHttpBaseURI` no longer reach `stderr`, and basic auth works. `fetch` rejects
   a `user:pass@` url outright on Node and in browsers, and that rejection quoted the whole url —
