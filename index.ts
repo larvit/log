@@ -1407,14 +1407,26 @@ const INHERITED_BY: { [K in keyof LogConf]-?: readonly Derivation[] } = {
 	traceparent: [],
 };
 
+function sameOrigin(uri: string, other: string | undefined): boolean {
+	try {
+		return other !== undefined && new URL(uri).origin === new URL(other).origin;
+	} catch {
+		return false;
+	}
+}
+
 // The keys of the OTLP spelling `conf` does not use, so inheriting never puts a queue beside an
-// endpoint it was not built from.
-function otlpKeysNotToInherit(conf: LogSettings): (keyof LogConf)[] {
+// endpoint it was not built from, nor a source's headers beside another origin, as fetch's redirects.
+function otlpKeysNotToInherit(conf: LogSettings, sourceConf: LogConf): (keyof LogConf)[] {
 	if (conf.otlpQueue) {
 		return [...OTLP_TRANSPORT_KEYS];
 	}
 
-	return OTLP_TRANSPORT_KEYS.some(key => conf[key] !== undefined) ? ["otlpQueue"] : [];
+	if (!OTLP_TRANSPORT_KEYS.some(key => conf[key] !== undefined)) {
+		return [];
+	}
+
+	return conf.otlpHttpBaseURI === undefined || sameOrigin(conf.otlpHttpBaseURI, sourceConf.otlpHttpBaseURI) ? ["otlpQueue"] : ["otlpAdditionalHeaders", "otlpQueue"];
 }
 
 // Queues a Log built from its otlp* shorthand and wrote into conf beside it, so a child, a clone or a
@@ -1495,7 +1507,7 @@ function inheritSettings(conf: LogSettings, source: { conf: LogConf, context?: M
 		conf.context = { ...source.context, ...conf.context };
 	}
 
-	const skip = new Set(otlpKeysNotToInherit(conf));
+	const skip = new Set(otlpKeysNotToInherit(conf, source.conf));
 
 	if (conf.format === undefined && conf.entryFormatter === undefined && !formatFunctions.has(conf)) {
 		const formatFunction = sourceFormatFunction(source.conf);
