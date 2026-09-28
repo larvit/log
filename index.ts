@@ -1360,7 +1360,7 @@ function nestedUrlIndex(text: string, printable: boolean): number | undefined {
 	}
 
 	for (let i = 1; i < text.length; i++) {
-		if (/^[\\/]{2}$/.test(text.slice(i - 1, i + 1)) && userinfoAt(i + 1)) {
+		if (/[\\/]/.test(text[i - 1]) && /[\\/]/.test(text[i]) && userinfoAt(i + 1)) {
 			doubledSlash = i;
 			break;
 		}
