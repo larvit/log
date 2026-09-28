@@ -1516,6 +1516,8 @@ test("end({ error }) marks the span failed", async t => {
 	// Scheme-relative: Node cannot parse one without a base and quotes it back as given.
 	await new Log(conf).end({ error: new TypeError("Failed to parse URL from //myuser:hunter2@api.test/x") });
 	await new Log(conf).end({ error: new DOMException("aborted", "AbortError") });
+	await new Log(conf).end({ error: new TypeError("Request cannot be constructed from a URL that includes credentials: https://myuser:hunter2@api.test/x?page=2&Access_Token=s3cr3t&next=https%3A%2F%2Fu%3Ahunter2%40cb.test#top, then http://api.test/y?%6Bey=s3cr3t") });
+	await new Log(conf).end({ error: new TypeError("Request cannot be constructed from a URL that includes credentials: https://myuser:hunter2@proxy.test/fetch/https%3A%2F%2Fcb.test%2Fx%3Fsig%3Ds3cr3t?a=1 failed") });
 
 	t.deepEqual(exportedSpan(0).status, { code: 2, message: "refused" }, "status is ERROR with the error message");
 	t.strictEqual(attr(exportedSpan(0), "error.type"), "ECONNREFUSED", "error.type is the error's code when it has one");
@@ -1532,6 +1534,8 @@ test("end({ error }) marks the span failed", async t => {
 	t.deepEqual(exportedSpan(7).status, { code: 2, message: "GET https://api.test/mail@example.com?to=a@b failed" }, "an @ outside the userinfo position is left alone");
 	t.deepEqual(exportedSpan(8).status, { code: 2, message: "Failed to parse URL from //REDACTED@api.test/x" }, "userinfo is redacted from a scheme-relative url too");
 	t.strictEqual(attr(exportedSpan(9), "error.type"), "AbortError", "a numeric code is skipped for the error name");
+	t.deepEqual(exportedSpan(10).status, { code: 2, message: "Request cannot be constructed from a URL that includes credentials: https://REDACTED@api.test/x?page=2&Access_Token=REDACTED&next=REDACTED#top, then http://api.test/y?%6Bey=REDACTED" }, "a listed query key's value and a credentialed query value are redacted in place");
+	t.deepEqual(exportedSpan(11).status, { code: 2, message: "Request cannot be constructed from a URL that includes credentials: https://REDACTED@proxy.test/fetch/REDACTED failed" }, "a url nested in the quoted url's path is cut with its query");
 	t.end();
 });
 
@@ -1905,7 +1909,7 @@ test("log.fetch keeps a url's credentials off the exported span", async t => {
 	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 	let rejection = "";
 
-	await log.fetch("http://myuser:hunter2@127.0.0.1:45231/x").catch((err: Error) => { rejection = err.message; });
+	await log.fetch("http://myuser:hunter2@127.0.0.1:45231/x?access_token=s3cr3t").catch((err: Error) => { rejection = err.message; });
 	await log.end();
 
 	const span = clientSpan(calls);
@@ -1915,10 +1919,11 @@ test("log.fetch keeps a url's credentials off the exported span", async t => {
 	t.ok(rejection.includes("hunter2"), "the runtime's own rejection, credentials and all, reaches the caller");
 	t.ok(!JSON.stringify(calls).includes("hunter2"), "the password reaches nothing the collector is sent");
 	t.ok(!JSON.stringify(calls).includes("myuser"), "the username reaches nothing the collector is sent");
+	t.ok(!JSON.stringify(calls).includes("s3cr3t"), "the access_token reaches nothing the collector is sent");
 	t.strictEqual(urlFull, "http://127.0.0.1:45231/x", "url.full keeps the url without the userinfo");
 	t.strictEqual(span.status.code, 2, "the span is ERROR");
 	// The wording around it differs between Node and the browser; the redaction does not.
-	t.ok(span.status.message.includes("http://REDACTED@127.0.0.1:45231/x"), "the runtime's own message survives with the userinfo redacted");
+	t.ok(span.status.message.includes("http://REDACTED@127.0.0.1:45231/x?access_token=REDACTED"), "the runtime's own message survives with the userinfo redacted");
 	t.end();
 });
 
