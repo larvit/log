@@ -8,11 +8,6 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ### Security
 
-- [ ] **Leave `storage` out of a stringified `Queue`.** `Queue.toJSON` returns its `conf`, `storage`
-  included, so a browser app on `storage: localStorage` that stringifies `log.conf` writes the
-  origin's whole localStorage — session tokens and the queue's buffered records — wherever that
-  line goes; on Node a storage adapter holding a circular client still makes the stringify throw.
-  Drop Goals #3's "until 2.5.0" clause for it. Decided 2026-09-28.
 - [ ] **Keep a parent's `otlpAdditionalHeaders` off a child or clone that names its own
   `otlpHttpBaseURI`.** It inherits the headers, so `new Log({ parentLog, otlpHttpBaseURI: other })`
   sends the parent's bearer token to `other`, a host it was never issued for. Shipped in v2.3.0.

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- **A `Queue`'s `storage` no longer reaches a stringified `log.conf` or `queue.conf`.** `storage` is
+  non-enumerable on `queue.conf`, so a `localStorage` given as one stays out of `JSON.stringify` and
+  of a spread; the v2.4.0 entry says what to rotate. A queue built from `{ ...queue.conf }` has no
+  `storage` — pass it explicitly.
+
 ## v2.4.0
 
 An export queue that batches, retries and can hold records and spans across an app restart;
