@@ -1350,6 +1350,20 @@ test("otlpQueue and the otlp* options are two spellings of one endpoint; inherit
 	t.end();
 });
 
+test("JSON.stringify of a conf holding a Queue carries the queue's conf, even with a batch pending", async t => {
+	stubFetch();
+
+	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {}, stdout: () => {} });
+
+	log.info("pending");
+
+	const stringified: unknown = JSON.parse(JSON.stringify(log.conf));
+
+	t.deepEqual(stringified, JSON.parse(JSON.stringify({ ...log.conf, otlpQueue: log.conf.otlpQueue instanceof Queue ? log.conf.otlpQueue.conf : undefined })), "the queue stringifies as its conf, none of its working state");
+	await log.end();
+	t.end();
+});
+
 test("a custom OtlpQueue receives every record and span, and end() flushes it", async t => {
 	const payloads: OtlpPayload[] = [];
 	let flushes = 0;
