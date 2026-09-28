@@ -234,7 +234,7 @@ instance nests under the parent instead. A malformed header is ignored and a fre
 an untrusted header is safe to pass.
 
 An unsampled header (flags `00`) is honoured: the instance and its children export no spans, and
-`log.traceparent()` and `log.fetch` pass `00` on; `log.sampled` tells which. Log records still
+`log.traceparent()` and `log.fetch` pass `00` on; `log.sampled` is `false`. Log records still
 export.
 
 ## Queue exports
@@ -349,7 +349,7 @@ instead. `entryFormatter` is deprecated the same way: pass the function as `form
 | `spanName` | `string` | `"unnamed-span"` | The instance's span name. Inherited from `parentLog` when set there. |
 | `stderr` | `(msg: string) => void` | `console.error` | Sink for `error` and `warn`. |
 | `stdout` | `(msg: string) => void` | `console.log` | Sink for the other levels. |
-| `traceparent` | `string` | none | Incoming W3C `traceparent` to nest under; its sampled flag drops spans, not log records. Ignored when malformed or when `parentLog` is set. |
+| `traceparent` | `string` | none | Incoming W3C `traceparent` to nest under; an unsampled one (`00`) drops spans, not log records. Ignored when malformed or when `parentLog` is set. |
 
 ## Output formats
 
