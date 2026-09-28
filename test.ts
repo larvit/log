@@ -1932,6 +1932,75 @@ test("log.fetch with an invalid header rejects but never hangs end()", async t =
 	t.end();
 });
 
+test("log.fetch under a clock whose now() is fractional or throws never hangs flush() or end()", async t => {
+	const { calls } = stubFetch();
+	const timers = { clearTimeout: (timer?: TimerHandle) => clearTimeout(timer), setTimeout: (callback: () => void, delayMs: number) => setTimeout(callback, delayMs) };
+	const fractional = new Log({ clock: { ...timers, now: () => 1758150000000.3 }, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {}, stdout: () => {} });
+
+	fractional.info("record");
+	await fractional.fetch("https://api.test/x");
+	await fractional.end();
+	t.ok(clientSpan(calls).startTimeUnixNano.startsWith("1758150000000300"), "a fraction of a millisecond is kept");
+	t.deepEqual(exportedRecords(calls), ["record"], "and the record is exported");
+
+	let broken = false;
+	const brokenNow = () => {
+		if (broken) throw new Error("clock broke");
+
+		return Date.now();
+	};
+	const throwing = new Log({ clock: { ...timers, now: brokenNow }, stderr: () => {} });
+
+	broken = true;
+	t.strictEqual(await throwing.fetch("https://api.test/x").then(() => "resolved", () => "rejected"), "rejected", "a throwing now() rejects the fetch");
+	await throwing.flush();
+	t.ok(true, "and flush() still resolves");
+	t.end();
+});
+
+test("Queue under a clock whose setTimeout throws still runs the round a mid-round flush() joins", async t => {
+	let broken = false;
+	let released = false;
+	const clock = {
+		clearTimeout: (timer?: TimerHandle) => clearTimeout(timer),
+		now: () => Date.now(),
+		setTimeout: (callback: () => void, delayMs: number) => {
+			if (broken) throw new Error("clock broke");
+
+			return setTimeout(callback, delayMs);
+		},
+	};
+	const { calls } = stubFetch(async () => {
+		await waitFor(() => released);
+
+		return response();
+	});
+	const log = new Log({ otlpQueue: new Queue({ batchDelayMs: 600000, clock, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {} }), stderr: () => {}, stdout: () => {} });
+
+	log.info("lost");
+	broken = true;
+
+	const failed = log.flush().then(() => "resolved", () => "rejected");
+	const joined = log.flush().then(() => "resolved", () => "rejected");
+
+	t.strictEqual(await failed, "rejected", "the round the throw breaks rejects");
+	t.strictEqual(await joined, "resolved", "the flush() that joined it runs a round of its own");
+
+	broken = false;
+	log.info("second");
+	const round = log.flush();
+
+	await waitFor(() => calls.length === 1);
+	log.info("third");
+	const next = log.flush();
+
+	released = true;
+	await round;
+	await next;
+	t.deepEqual(exportedRecords(calls), ["second", "third"], "and a later mid-round flush() queues a round again");
+	t.end();
+});
+
 test("log.fetch throws when the log is already ended", async t => {
 	const log = new Log({ stderr: () => {} });
 

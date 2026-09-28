@@ -1,6 +1,6 @@
 // --- Types and the default clock -------------------------------------------
 
-// The library's one source of time; now() returns integer epoch milliseconds.
+// The library's one source of time; now() returns epoch milliseconds.
 export type Clock = {
 	clearTimeout: (timer?: TimerHandle) => void;
 	now: () => number;
@@ -369,7 +369,8 @@ function payloadKind(payload: OtlpPayload): OtlpKind {
 
 function getNsTimestamp(msTimestamp: number): string {
 	const seconds = Math.floor(msTimestamp / 1000);
-	const nanos = (msTimestamp % 1000) * 1000000;
+	// A performance.now()-based clock hands back fractions finer than a nanosecond.
+	const nanos = Math.round((msTimestamp % 1000) * 1000000);
 
 	const totalNanos = (BigInt(seconds) * BigInt(1000000000)) + BigInt(nanos);
 
@@ -752,11 +753,15 @@ class ExportScheduler {
 			return this.running;
 		}
 
-		this.pending ??= this.running.then(() => {
+		// On either outcome: a callback skipped on rejection would leave pending set, and every later
+		// joiner handed that rejection with no round queued.
+		const next = () => {
 			this.pending = undefined;
 
 			return this.flush();
-		});
+		};
+
+		this.pending ??= this.running.then(next, next);
 
 		return this.pending;
 	}
@@ -1642,9 +1647,7 @@ function exportSpan(log: Pick<Log, "conf" | "sampled">, span: OtlpSpan, attribut
 
 // --- log.fetch -------------------------------------------------------------
 
-async function tracedFetch(log: Pick<Log, "conf" | "context" | "sampled" | "span">, url: URL, init: RequestInit | undefined, settle: () => void): Promise<Response> {
-	// childSpan can't throw; everything that can (e.g. `new Headers` on a bad name) is inside the
-	// try, so finally always settles the tracked promise and flush() can never hang on this fetch.
+async function tracedFetch(log: Pick<Log, "conf" | "context" | "sampled" | "span">, url: URL, init: RequestInit | undefined): Promise<Response> {
 	const span = childSpan(log, url.host, SPAN_KIND_CLIENT);
 	const attributes: Metadata = { ...log.context };
 
@@ -1698,12 +1701,7 @@ async function tracedFetch(log: Pick<Log, "conf" | "context" | "sampled" | "span
 		throw err;
 	} finally {
 		span.endTimeUnixNano = getNsTimestamp(log.conf.clock.now());
-		// settle() must run even if the queue throws, else flush() hangs on this fetch.
-		try {
-			exportSpan(log, span, attributes);
-		} finally {
-			settle();
-		}
+		exportSpan(log, span, attributes);
 	}
 }
 
@@ -1790,13 +1788,13 @@ export class Log implements LogInt {
 			return globalThis.fetch(input, init);
 		}
 
-		// Register the whole operation synchronously, so a fire-and-forget log.fetch() is still
-		// delivered by a later await log.flush().
-		let settle!: () => void;
+		// Registered synchronously, so a later await log.flush() delivers a fire-and-forget log.fetch(),
+		// and settled whatever tracedFetch throws, so it cannot hang.
+		const traced = tracedFetch(this, url, init);
 
-		this.track(new Promise<void>(resolve => { settle = resolve; }));
+		this.track(traced.then(() => undefined, () => undefined));
 
-		return tracedFetch(this, url, init, settle);
+		return traced;
 	}
 
 	public enabled(logLevel: LogLevel): boolean {

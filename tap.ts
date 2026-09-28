@@ -102,13 +102,14 @@ const t: Assertions = {
 	},
 };
 
-function rejectAfterTimeout(): Promise<never> {
-	return new Promise((_resolve, reject) => {
-		const timer = setTimeout(() => reject(new Error(`timed out after ${TEST_TIMEOUT_MS}ms`)), TEST_TIMEOUT_MS);
-
-		// Don't let a pending timeout keep the Node process alive once the tests are done.
-		(timer as { unref?: () => void }).unref?.();
+// Referenced, so a hung test keeps Node alive until it fails; an unref'd one let Node exit 0 mid-run.
+function rejectAfterTimeout(): { cancel: () => void, timedOut: Promise<never> } {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const timedOut = new Promise<never>((_resolve, reject) => {
+		timer = setTimeout(() => reject(new Error(`timed out after ${TEST_TIMEOUT_MS}ms`)), TEST_TIMEOUT_MS);
 	});
+
+	return { cancel: () => clearTimeout(timer), timedOut };
 }
 
 async function run(): Promise<void> {
@@ -119,12 +120,15 @@ async function run(): Promise<void> {
 	for (const { cb, name } of tests) {
 		const savedFetch = globalThis.fetch;
 
+		const { cancel, timedOut } = rejectAfterTimeout();
+
 		print(`# ${name}`);
 		try {
-			await Promise.race([cb(t), rejectAfterTimeout()]);
+			await Promise.race([cb(t), timedOut]);
 		} catch (err) {
 			assert(false, `${name} threw`, String(err));
 		} finally {
+			cancel();
 			globalThis.fetch = savedFetch;
 		}
 	}
