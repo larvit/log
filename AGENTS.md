@@ -34,6 +34,7 @@ In [docs/decisions.md](docs/decisions.md):
 - The default `Queue` lives in `conf.otlpQueue`
 - A v2.3.0 copy's child loses a function formatter
 - The comprehension baseline
+- A stringified `Queue` carries its `conf` only
 
 ## Working here
 

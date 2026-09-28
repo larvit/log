@@ -259,3 +259,12 @@ depth 1 — 6/10 overall; Navigation 7, Locality 5.25, Shape 6, Self-sufficiency
 four-seat run at the same depth may not score lower. Comprehension work ships in the release it
 is found in, ahead of that release's other items. Serves README → Goals #8. Valid until a later
 run at or above 7.0 replaces the baseline.
+
+## A stringified `Queue` carries its `conf` only
+
+2026-09-28, the maintainer: `JSON.stringify` of a `Queue`, and so of `log.conf`, carries the
+queue's `conf` and none of its working state — items, timers, scheduler — which is what made it
+circular. Credentials in that `conf` stringify as written, as `log.conf`'s own `otlp*` keys beside
+it already do: README → Goals #3 stops at what this library emits, and redacting in a `toJSON`
+would be a second spelling of 3.0.0's item keeping credentials off `conf`. Serves README → Goals
+#3. Valid until 3.0.0 keeps credentials off `log.conf` and `queue.conf`.
