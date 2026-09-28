@@ -1823,6 +1823,7 @@ test("log.fetch cuts a url nested in the request path out of url.full from where
 		["https://proxy.test/b64/dT1odHRwczovL215dXNlcjpodW50ZXIyQGNiLnRlc3QveA", "https://proxy.test/b64/REDACTED"],
 		["https://proxy.test/b64/aHR0cHMlM0ElMkYlMkZteXVzZXIlM0FodW50ZXIyJTQwY2IudGVzdCUyRng", "https://proxy.test/b64/REDACTED"],
 		["https://proxy.test/b64/Ly9teXVzZXI6aHVudGVyMkBjYi50ZXN0L3g", "https://proxy.test/b64/REDACTED"],
+		["https://proxy.test/fetch/Ly91c2VyOnMzY3JldEBkYi5leGFtcGxlLmNvbQ/oYEC5m", "https://proxy.test/fetch/REDACTED"],
 		["https://api.test/docs/http-guide/aHR0?q=hi", "https://api.test/docs/http-guide/aHR0?q=hi"],
 		["https://api.test/v1/projects/p1:batchGet", "https://api.test/v1/projects/p1:batchGet"],
 		["https://api.test/v1/news:list", "https://api.test/v1/news:list"],
