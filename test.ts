@@ -1521,7 +1521,7 @@ test("end({ error }) marks the span failed", async t => {
 	await new Log(conf).end({ error: new Error(`Failed: ${["https://a.test/?x=1", "https://b.test/?token=s3cr3t", "//c.test/?key=s3cr3t"]}`) });
 	await new Log(conf).end({ error: new Error("GET https://a.test/?redirect=//h.test&api_key=s3cr3t&q=v//w&token=s3cr3t&next=https://h.test/x?sig=s3cr3t&back=https://u:hunter2@h.test/x&key=s3cr3t&https://t.test/x?token=s3cr3t&https://u:hunter2@t.test/x?token=s3cr3t failed") });
 	await new Log(conf).end({ error: new Error("https://a.test/?" + "u=//a?".repeat(5000) + "token=s3cr3t") });
-	await new Log(conf).end({ error: new TypeError("GET https://a`b.test/x?q=a`b&token=s3cr3t?more#/cb?access_token=s3cr3t failed") });
+	await new Log(conf).end({ error: new TypeError("GET https://a`b.test/x?q=a`b&token=s3cr3t?more&a=\"<b>\"&api_key=s3cr3t#/cb?id_token=s3cr3t failed") });
 
 	t.deepEqual(exportedSpan(0).status, { code: 2, message: "refused" }, "status is ERROR with the error message");
 	t.strictEqual(attr(exportedSpan(0), "error.type"), "ECONNREFUSED", "error.type is the error's code when it has one");
@@ -1538,12 +1538,12 @@ test("end({ error }) marks the span failed", async t => {
 	t.deepEqual(exportedSpan(7).status, { code: 2, message: "GET https://api.test/mail@example.com?to=a@b failed" }, "an @ outside the userinfo position is left alone");
 	t.deepEqual(exportedSpan(8).status, { code: 2, message: "Failed to parse URL from //REDACTED@api.test/x?access_token=REDACTED" }, "a scheme-relative url is redacted too");
 	t.strictEqual(attr(exportedSpan(9), "error.type"), "AbortError", "a numeric code is skipped for the error name");
-	t.deepEqual(exportedSpan(10).status, { code: 2, message: "Request cannot be constructed from a URL that includes credentials: https://REDACTED@api.test/x?page=2&Access_Token=REDACTED&next=REDACTED#top, then http://api.test/y?%6Bey=REDACTED" }, "a listed query key's value and a credentialed query value are redacted in place");
+	t.deepEqual(exportedSpan(10).status, { code: 2, message: "Request cannot be constructed from a URL that includes credentials: https://REDACTED@api.test/x?page=2&Access_Token=REDACTED&next=REDACTED#REDACTED, then http://api.test/y?%6Bey=REDACTED" }, "a listed query key's value and a credentialed query value are redacted in place");
 	t.deepEqual(exportedSpan(11).status, { code: 2, message: "Request cannot be constructed from a URL that includes credentials: https://REDACTED@proxy.test/fetch/REDACTED failed" }, "a url nested in the quoted url's path is cut with its query");
 	t.deepEqual(exportedSpan(12).status, { code: 2, message: "Failed: https://a.test/?x=1,https://b.test/?token=REDACTED" }, "a url glued to the one before it is redacted inside its value, a listed value taking the rest");
 	t.deepEqual(exportedSpan(13).status, { code: 2, message: "GET https://a.test/?redirect=//h.test&api_key=REDACTED&q=v//w&token=REDACTED&next=https://h.test/x?sig=REDACTED&back=REDACTED&key=REDACTED&https://t.test/x?token=REDACTED&REDACTED=REDACTED failed" }, "a // in a query value neither ends the query nor escapes redaction");
 	t.ok(!exportedSpan(14).status.message.includes("s3cr3t"), "a url nested thousands deep in query values ends the span and is redacted");
-	t.deepEqual(exportedSpan(15).status, { code: 2, message: "GET https://a`b.test/x?q=a`b&token=REDACTED#/cb?access_token=REDACTED failed" }, "a backtick, a ? in a query value and a fragment route's query leave the url whole");
+	t.deepEqual(exportedSpan(15).status, { code: 2, message: "GET https://a`b.test/x?q=a`b&token=REDACTED&a=\"<b>\"&api_key=REDACTED#REDACTED failed" }, "a backtick, a quote, a bracket and a ? in a query value leave the url whole, and a fragment records REDACTED");
 	t.end();
 });
 
