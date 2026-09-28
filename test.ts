@@ -1361,6 +1361,15 @@ test("JSON.stringify of a conf holding a Queue carries the queue's conf, even wi
 
 	t.deepEqual(stringified, JSON.parse(JSON.stringify({ ...log.conf, otlpQueue: log.conf.otlpQueue instanceof Queue ? log.conf.otlpQueue.conf : undefined })), "the queue stringifies as its conf, none of its working state");
 	await log.end();
+
+	const storage = Object.assign(fakeStorage(false), { sessionToken: "s3cr3t" });
+	const stored = new Log({ otlpQueue: new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", storage }), stderr: () => {}, stdout: () => {} });
+
+	Object.assign(storage, { self: storage });
+	t.notOk(JSON.stringify(stored.conf).includes("s3cr3t"), "what a storage holds stays out, and a circular one no longer throws");
+	t.notOk(stored.conf.otlpQueue instanceof Queue && JSON.stringify(stored.conf.otlpQueue.conf).includes("s3cr3t"), "so does queue.conf's own stringify");
+	t.ok(stored.conf.otlpQueue instanceof Queue && stored.conf.otlpQueue.conf.storage === storage, "the live conf keeps its storage");
+	await stored.end();
 	t.end();
 });
 

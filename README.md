@@ -44,8 +44,7 @@ Priority order decides a tie.
    because naming it is asking for it, and a query value under a name
    [Credentials in a captured value](#credentials-in-a-captured-value) does not list, because no
    shape tells it from any other string. Until 2.5.0 a url nested in a request path still reaches
-   `url.full` as written, and `JSON.stringify` of `log.conf` or `queue.conf` writes out a
-   `localStorage` given as `storage`; the [changelog](CHANGELOG.md) says what to rotate.
+   `url.full` as written; the [changelog](CHANGELOG.md) says what to rotate.
 4. **Semver, read strictly, over what this README documents.** A minor only adds — an export, an
    option, a value an option accepts, a field, a span attribute — where code not using it behaves as
    before. What the README does not document — an undocumented key of a `conf`, enumerability, what

@@ -267,9 +267,9 @@ run at or above 7.0 replaces the baseline.
 
 2026-09-28, the maintainer: `JSON.stringify` of a `Queue`, and so of `log.conf`, carries the queue's
 `conf` and none of its working state — items, timers, scheduler — which is what made it circular.
-`storage` is left out too, from 2.5.0: what it holds reaches nothing but the queue it restores, and
-a browser's `localStorage` holds the origin's session tokens. That is data the app never handed this
-library as configuration, and `toJSON` is the only route by which the library writes it out; a
+From 2.5.0 `storage` is non-enumerable on `queue.conf`, so neither a stringify nor a spread carries
+it: what it holds reaches nothing but the queue it restores, and a browser's `localStorage` holds
+the origin's session tokens. That is data the app never handed this library as configuration; a
 credential in `conf` is one the app wrote there itself. Credentials in that `conf` stringify as
 written, as `log.conf`'s own `otlp*` keys beside a queue built from them already do: README → Goals
 #3 stops at what this library emits, and redacting in a `toJSON` would be a second spelling of

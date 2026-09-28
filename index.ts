@@ -1042,6 +1042,9 @@ export class Queue implements OtlpQueue {
 			retryDelayMs: conf.retryDelayMs ?? 1000,
 		};
 
+		// A browser's localStorage holds the origin's session tokens, so no stringify or spread may carry it.
+		Object.defineProperty(this.conf, "storage", { configurable: true, enumerable: false, value: conf.storage, writable: true });
+
 		// Validate eagerly: a malformed endpoint or clock fails here, not as an unhandled rejection mid-log.
 		const { clock } = this.conf;
 
