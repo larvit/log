@@ -1849,7 +1849,7 @@ test("log.fetch cuts a url nested in the request path out of url.full from where
 	t.end();
 });
 
-test("log.fetch cuts a long path holding many scheme candidates in linear time", async t => {
+test("log.fetch cuts a long path holding many scheme candidates within 250 ms", async t => {
 	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 
 	stubFetch();
