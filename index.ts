@@ -1339,7 +1339,8 @@ const earliest = (starts: (number | undefined)[]) => {
 // An http(s) url starts at its scheme; any other needs non-empty userinfo after `ftp:`, `ws(s):` or
 // a doubled slash. Base64 decodes to noise, which userinfo must not run across: printable ASCII only.
 function nestedUrlIndex(text: string, printable: boolean): number | undefined {
-	const outsideUserinfo = printable ? /[^!-~]|[#/?\\]/ : /[\s#/?\\]/;
+	// A parser percent-encodes a space in userinfo, so it stays inside.
+	const outsideUserinfo = printable ? /[^ -~]|[#/?\\]/ : /[#/?\\]/;
 	// One pass from the end, so a path of many candidates stays linear.
 	const reachesAt: boolean[] = [];
 

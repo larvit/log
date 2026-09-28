@@ -287,7 +287,10 @@ because its path and query — the latter parsing as the outer url's — can hol
 `access_token` with no shape; not on `//` after it, since `https:\\u:p@host` and `https:u:p@host`
 parse to the same credentials. Any other url is keyed on non-empty userinfo — after `ftp:` or
 `ws(s):`, which parse like `https:`, or after a doubled slash — since a bare `word:` is a path's own
-syntax (`/v1/p1:batchGet`), and a doubled slash is a sloppy join. Splicing `REDACTED@` covers the literal
+syntax (`/v1/p1:batchGet`), and a doubled slash is a sloppy join. Base64 is decoded one layer
+deep, the layer a callback parameter carries; a url base64-encoded twice is exported as written,
+since each further layer multiplies what every traced call pays (README → Goals #7) for a shape no
+proxy is known to produce. Splicing `REDACTED@` covers the literal
 spelling only, and replacing the whole path loses the endpoint README → Audience #3 reads. Valid
 while `url.full` exports the request path. Serves README → Goals #3.
 
