@@ -183,7 +183,7 @@ async function myRequestHandler(req, res) {
 ```
 
 A child inherits every option it does not set itself, `spanName` included; `traceparent` never, and
-the OTLP options as [Queue exports](#queue-exports) says. Setting `context` on a child replaces the
+the OTLP options as [Options](#options) says. Setting `context` on a child replaces the
 parent's rather than merging, hence the spread above. The `service.name` context key becomes the
 OTLP resource's service name (default `"unnamed-service"`) rather than a per-entry attribute. A
 child's log entries attach to the parent's span; the child's own span holds its timing and is
@@ -346,7 +346,7 @@ instead. `entryFormatter` is deprecated the same way: pass the function as `form
 | `entryFormatter` | `EntryFormatter` | none | Deprecated, removed in 3.0.0: pass the function as `format`. Wins over a `"text"`/`"json"` `format`; two different formatters, one per spelling, throw. On `log.conf` it reads the formatter in use, and writing it swaps it. |
 | `format` | `"text" \| "json" \| EntryFormatter` | `"text"` | Console output format, or a formatter of your own. Use the entry's `msTimestamp` rather than `new Date()` so console and OTLP timestamps of one entry match. `log.conf.format` never holds a function before 3.0.0; `log.conf.entryFormatter` reads the formatter in use. Writing `"text"` or `"json"` to `log.conf.format` takes effect from the next line, unless a function formatter is set, which wins. |
 | `logLevel` | `LogLevel \| "none"` | `"info"` | Minimum level to output. Any other value is kept as written, logs at `"info"` and warns once per `stderr` sink and value. |
-| `otlpAdditionalHeaders` | `Record<string, string>` | none | Shorthand: the same option on the default `Queue`, see [Queue exports](#queue-exports). Not inherited by a child or clone whose `otlpHttpBaseURI` is another origin. |
+| `otlpAdditionalHeaders` | `Record<string, string>` | none | Shorthand: the same option on the default `Queue`, see [Queue exports](#queue-exports). Not inherited by a child or clone whose `otlpHttpBaseURI` has another origin (scheme, host and port) than its source's. |
 | `otlpHttpBaseURI` | `string` | none | Shorthand for `otlpQueue: new Queue({ otlpHttpBaseURI, otlpProtocol, otlpAdditionalHeaders })`. `user:pass@` in it authenticates, see [Queue exports](#queue-exports). |
 | `otlpProtocol` | `"http/json" \| "http/protobuf"` | `"http/json"` | Shorthand: the same option on the default `Queue`. |
 | `otlpQueue` | `OtlpQueue` | none | The [export queue](#queue-exports). Cannot be combined with the three shorthands above; on an instance given them, `log.conf.otlpQueue` reads back the queue they built. Inherited by children and clones; one that sets a shorthand instead gets a queue of its own. |

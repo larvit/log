@@ -4,8 +4,9 @@
 
 ### Security
 
-- **A child or clone sending to another origin no longer inherits `otlpAdditionalHeaders`.** Since
-  v2.3.0, `new Log({ parentLog, otlpHttpBaseURI: other })` sent the parent's headers, a bearer token
+- **A child or clone sending to another origin than its source's no longer inherits
+  `otlpAdditionalHeaders`.** Since v1.4.0 for a child and v2.2.0 for a clone,
+  `new Log({ parentLog, otlpHttpBaseURI: other })` sent the parent's headers, a bearer token
   included, to `other`; rotate any token that may have reached such a host. Set the headers on the
   child where that host should get them.
 - **A `Queue`'s `storage` no longer reaches a stringified `log.conf` or `queue.conf`.** `storage` is

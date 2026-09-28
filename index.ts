@@ -1407,16 +1407,16 @@ const INHERITED_BY: { [K in keyof LogConf]-?: readonly Derivation[] } = {
 	traceparent: [],
 };
 
-function sameOrigin(uri: string, other: string | undefined): boolean {
+function sameOrigin(uri: string, other: string): boolean {
 	try {
-		return other !== undefined && new URL(uri).origin === new URL(other).origin;
+		return new URL(uri).origin === new URL(other).origin;
 	} catch {
 		return false;
 	}
 }
 
-// The keys of the OTLP spelling `conf` does not use, so inheriting never puts a queue beside an
-// endpoint it was not built from, nor a source's headers beside another origin, as fetch's redirects.
+// The OTLP keys a derivation must not take: a queue beside an endpoint it was not built from, or
+// headers beside an origin other than their endpoint's, where fetch drops them on a redirect too.
 function otlpKeysNotToInherit(conf: LogSettings, sourceConf: LogConf): (keyof LogConf)[] {
 	if (conf.otlpQueue) {
 		return [...OTLP_TRANSPORT_KEYS];
@@ -1426,7 +1426,11 @@ function otlpKeysNotToInherit(conf: LogSettings, sourceConf: LogConf): (keyof Lo
 		return [];
 	}
 
-	return conf.otlpHttpBaseURI === undefined || sameOrigin(conf.otlpHttpBaseURI, sourceConf.otlpHttpBaseURI) ? ["otlpQueue"] : ["otlpAdditionalHeaders", "otlpQueue"];
+	if (conf.otlpHttpBaseURI === undefined || sourceConf.otlpHttpBaseURI === undefined || sameOrigin(conf.otlpHttpBaseURI, sourceConf.otlpHttpBaseURI)) {
+		return ["otlpQueue"];
+	}
+
+	return ["otlpAdditionalHeaders", "otlpQueue"];
 }
 
 // Queues a Log built from its otlp* shorthand and wrote into conf beside it, so a child, a clone or a
