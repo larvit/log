@@ -1403,8 +1403,8 @@ function nestedUrlStart(path: string): number | undefined {
 	return sources[start] ?? start;
 }
 
-// Every key OTel semconv's default deny-list has named, plus every S3 and GCS query-signing generation's credential keys.
-const SENSITIVE_QUERY_KEYS = new Set(["awsaccesskeyid", "googleaccessid", "sig", "signature", "x-amz-credential", "x-amz-security-token", "x-amz-signature", "x-goog-credential", "x-goog-signature"]);
+// Every key OTel semconv's default deny-list has named, every S3 and GCS query-signing generation's credential keys, and the names a bearer token or API key travels under.
+const SENSITIVE_QUERY_KEYS = new Set(["access_token", "api_key", "apikey", "awsaccesskeyid", "googleaccessid", "key", "sig", "signature", "token", "x-amz-credential", "x-amz-security-token", "x-amz-signature", "x-goog-credential", "x-goog-signature"]);
 
 // `url.origin` omits userinfo, which is what keeps the outer url's credentials off the span.
 function buildUrlFull(url: URL, captureQuery: boolean): string {

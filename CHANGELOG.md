@@ -4,6 +4,10 @@
 
 ### Security
 
+- **`captureQuery` redacts the value of a query key named `access_token`, `api_key`, `apikey`, `key`
+  or `token`, in any casing.** Since v2.3.0, `log.fetch("https://api.test/me?access_token=…")` with
+  `captureQuery` on exported the token in `url.full`; rotate any bearer token or API key sent in a
+  query under one of these names.
 - **`log.fetch` cuts a url nested in the request path out of `url.full`.** Cut from where it
   starts, and the query with it: any `http:` or `https:` url, and any other one holding userinfo,
   `//user:pass@host` included, whether raw, percent-encoded any number of times, or base64-encoded

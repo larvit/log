@@ -413,10 +413,11 @@ them per call site.
 ### Credentials in a captured value
 
 - **Redacted, whatever you list them for:** the headers `authorization`, `proxy-authorization`,
-  `cookie` and `set-cookie`, and the value of a query key named, in any casing, `awsaccesskeyid`,
-  `googleaccessid`, `sig`, `signature`, `x-amz-credential`, `x-amz-security-token`,
-  `x-amz-signature`, `x-goog-credential` or `x-goog-signature` — a presigned S3-compatible or GCS
-  url, whichever signing generation made it, and an Azure SAS url.
+  `cookie` and `set-cookie`, and the value of a query key named, in any casing, `access_token`,
+  `api_key`, `apikey`, `awsaccesskeyid`, `googleaccessid`, `key`, `sig`, `signature`, `token`,
+  `x-amz-credential`, `x-amz-security-token`, `x-amz-signature`, `x-goog-credential` or
+  `x-goog-signature` — a bearer token or API key sent in the query, a presigned S3-compatible or
+  GCS url, whichever signing generation made it, and an Azure SAS url.
 - **Redacted wherever it appears:** any other captured header value, or kept query key or value,
   that holds url userinfo — which records `REDACTED` in place of the whole of itself, through one
   layer of percent-encoding but not two.
