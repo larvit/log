@@ -194,8 +194,9 @@ exported by `end()`.
 `end()` closes the span, queues it and flushes the [export queue](#queue-exports); a span that is
 never ended is never sent. `end({ error })` also marks the span failed: status `ERROR` with the
 error's message, and an `error.type` attribute from its string `code`, else `name`, else `"_OTHER"`; a `null` or `undefined`
-error is a plain `end()`. Userinfo in a url the message quotes becomes `REDACTED`; nothing else in
-the message is, so keep a token out of an error message. A logged `log.error()` never fails the
+error is a plain `end()`. A url the message quotes is redacted, see
+[Credentials in a captured value](#credentials-in-a-captured-value); keep a token outside a url out
+of an error message. A logged `log.error()` never fails the
 span; a recovered error is not a failed operation. `await` it to make one delivery attempt before the
 process exits (a short-lived script); fire-and-forget is fine in a long-running process. Against a
 dead collector `await end()` returns after that attempt, within about 3 s plus however long any
@@ -433,8 +434,8 @@ That covers the shapes a credential is recognisable in, not every credential: a 
 Never put credentials in the url; pass an `Authorization` header, and strip userinfo from a url you
 did not build. `log.fetch` mirrors the runtime: Node and browsers refuse such a url, while React
 Native hands it to the platform, where iOS sends the credentials and Android sends none, leaving
-you the 401. A rejection quoting the url reaches the status message redacted in the runtime's own
-text, as `url.full` is with `captureQuery` on and its fragment read as a query:
+you the 401. A url a status message quotes, in such a rejection or an `end({ error })` message, is
+redacted in place as `url.full` is with `captureQuery` on, and a fragment's pairs too:
 `http://REDACTED@host/x?access_token=REDACTED`.
 
 `REDACTED` does not always stand for a credential: a `?key=` lookup or a `?token=` pagination
