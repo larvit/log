@@ -32,6 +32,7 @@ In [docs/decisions.md](docs/decisions.md):
 - An unsampled `traceparent` drops the span, never the log records
 - An empty `logLevel` logs at `info` and warns
 - The default `Queue` lives in `conf.otlpQueue`
+- A v2.3.0 copy's child loses a function formatter
 - The comprehension baseline
 
 ## Working here

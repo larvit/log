@@ -6,13 +6,6 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ## 2.4.0
 
-- [ ] **Keep a consumer's function formatter on a child built by a library's own v2.3.0 copy.** A
-  library following README → Accept a logger in your library with `new Log({ parentLog: log })`
-  under v2.3.0 copies `Object.keys(parentLog.conf)`, and `conf.entryFormatter` is non-enumerable
-  since this release, so its child logs default text when the consumer passes `format: fn` or
-  `entryFormatter: fn`. Goals #4 lets enumerability change in a minor; whether that covers a
-  formatter lost across copies is unweighed. Making the alias enumerable reopens what spreading
-  `log.conf` folds.
 - [ ] **Let a consumer upgrading from 2.2.0 close the allow-listed-header and opaque-url searches in
   one sentence.** The path-leak advisory already lets them. `log.fetch`, both allow-lists and
   `captureQuery` all shipped in v2.3.0, so those two exposures have the same floor and neither

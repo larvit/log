@@ -244,6 +244,15 @@ rejected beside any shorthand, even an identical one. It leaves `JSON.stringify(
 circular, so `todo.md`'s item fixes that on the `Queue`, which stays readable on `conf`. Serves
 README → Goals #6. Valid until 3.0.0 clears the shorthand from `conf`.
 
+## A v2.3.0 copy's child loses a function formatter
+
+2026-09-28, the maintainer: a child built by a library's own v2.3.0 copy under a 2.4.0 parent logs
+default text when the parent has a function formatter, because v2.3.0 copies
+`Object.keys(parentLog.conf)` and `conf.entryFormatter` is non-enumerable from 2.4.0. Accepted:
+README → Goals #4 lets enumerability change in a minor, and making the alias enumerable again
+hands it back to a spread of `log.conf` as an option the caller never wrote. Valid until 3.0.0
+removes `entryFormatter`.
+
 ## The comprehension baseline
 
 2026-09-27, the maintainer: the comprehension baseline is the 2026-09-27 four-seat panel at
