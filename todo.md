@@ -18,7 +18,7 @@ mechanism, that is evidence of the problem, never the prescribed repair.
   sends the parent's bearer token to `other`, a host it was never issued for. Shipped in v2.3.0.
 
 - [ ] **Cut a url nested in the request path out of `url.full` from its scheme on, in every
-  percent-encoding, userinfo or not.**
+  percent-encoding or base64, userinfo or not.**
   `buildUrlFull` is `url.origin + url.pathname` and redacts only the query, so
   `log.fetch("https://proxy.test/fetch/https://user:pass@cb.test/x")` exports that password with no
   capture option involved, and a nested signed query exports its signature. It should record
@@ -26,13 +26,13 @@ mechanism, that is evidence of the problem, never the prescribed repair.
   the 2.4.0 CHANGELOG carries it as an open exposure with a rotation advisory. Decided 2026-09-28.
 - [ ] **Redact `access_token`, `api_key`, `apikey`, `key` and `token` in a captured query.**
   RFC 6750 §2.3 defines `access_token` as a way to send a bearer token, so with `captureQuery` on
-  `log.fetch("https://graph.test/me?access_token=…")` exports a live one. README → Credentials in a
-  captured value lists the names. Live since 2.3.0, so the
-  CHANGELOG owes a rotation advisory. Decided 2026-09-28.
-- [ ] **Warn once per `report` sink when an `Authorization`, either spelling, goes over plain
-  `http:` to a non-loopback host.** Now that they are really sent, anything on the network path can read them (CWE-319). The
-  request still goes: an in-cluster `http://otel-collector…svc.cluster.local:4318` is deliberate.
+  `log.fetch("https://graph.test/me?access_token=…")` exports a live one. Add the names to README
+  → Credentials in a captured value. Live since 2.3.0, so the CHANGELOG owes a rotation advisory.
   Decided 2026-09-28.
+- [ ] **Warn once per `report` sink when an `Authorization`, either spelling, goes over plain
+  `http:` to a non-loopback host.** Now that they are really sent, anything on the network path can
+  read them (CWE-319). The request still goes: an in-cluster
+  `http://otel-collector…svc.cluster.local:4318` is deliberate. Decided 2026-09-28.
 
 ### Everything else
 

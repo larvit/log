@@ -36,7 +36,7 @@ In [docs/decisions.md](docs/decisions.md):
 - The comprehension baseline
 - A stringified `Queue` carries its `conf`, less `storage` from 2.5.0
 - A url nested in a request path is cut from where it starts
-- Basic credentials over plain `http:` warn once
+- An `Authorization` over plain `http:` warns once
 - `resolveFormatter` is exported
 - Both credential spellings stay, and their combination warns
 
