@@ -6,12 +6,6 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ## 2.4.0
 
-- [ ] **Let a consumer upgrading from 2.2.0 close the allow-listed-header and opaque-url searches in
-  one sentence.** The path-leak advisory already lets them. `log.fetch`, both allow-lists and
-  `captureQuery` all shipped in v2.3.0, so those two exposures have the same floor and neither
-  advisory says so. The opaque-url advisory has a second gap: it sends the reader to search for a
-  `url.full` starting with `null`, but the repo's own 2026-09-19 decision records a second broken
-  spelling, `https://example.comhttps://example.com/uuid`, which that search never finds.
 - [ ] **Export log records whatever the incoming `sampled` flag says; only the span obeys it.** Per
   `docs/decisions.md`'s 2026-09-25 entry. `log()` returns before the enqueue whenever `sampled` is
   false.

@@ -41,7 +41,8 @@
   **Rotate any credential you named one of those four headers for, or put in a url you captured in
   a header or a query string**: search each header you allow-listed, under
   `http.request.header.*` and `http.response.header.*`, for those four names, and search those same
-  attributes and `url.full` for `@`, `%40` or `%2540`.
+  attributes and `url.full` for `@`, `%40` or `%2540`. `log.fetch`, both allow-lists and
+  `captureQuery` first shipped in v2.3.0, so no older span carries any of them.
 - With `captureQuery` on, a presigned SigV4 url — S3 or any S3-compatible store — exported its
   `X-Amz-Signature`, the access key id in `X-Amz-Credential` and the session token in
   `X-Amz-Security-Token` in `url.full`; a GCS url exported the service account's email in
@@ -79,7 +80,9 @@
   whatever the url did: written without `//`, a url parses to an opaque path, so
   `log.fetch("myapp:user:pass@host/x")` exported `nulluser:pass@host/x` and a `data:` url exported
   its whole payload. **If you have passed credentials or private data in such a url, rotate them**:
-  search your tracing backend for spans whose `url.full` starts with `null`.
+  search your tracing backend for spans whose `url.full` starts with `null`, or repeats its origin
+  with no `/` between, as a `blob:` url's did: `https://example.comhttps://example.com/uuid`.
+  `log.fetch` first exported `url.full` in v2.3.0, so no older span carries it.
 - Credentials in `otlpHttpBaseURI` no longer reach `stderr`, and basic auth works. `fetch` rejects
   a `user:pass@` url outright on Node and in browsers, and that rejection quoted the whole url —
   credentials included — into the error line of every failed export. `user:pass@` is now sent as an
