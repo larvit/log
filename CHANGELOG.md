@@ -34,6 +34,12 @@
   a `url.full` query key or value shows before `(?i)%(25)*40`. A query value holding a host, then
   whitespace, then an address, as `?q=see+https://a.test+or+mail+bob@x.test` does, now records
   `REDACTED`, so a dashboard grouping on such a `url.full` sees it change.
+- **`captureQuery` redacts url userinfo holding `=` in a url written as a bare query key.** Since
+  v2.3.0, `?https://a@b=pw@evil.test` exported `pw` in `url.full`, as did
+  `?https://dXNlcg==:pw@evil.test`, base64 padding in the username: a pair splits at its first
+  `=`, so the value was tested apart from the url in its key. Both now record `REDACTED=REDACTED`;
+  rotate any password a `url.full` query value shows before `(?i)%(25)*40` where its key is a url
+  with no path.
 - **`captureQuery` redacts the value of a query key named `access_token`, `api_key`, `apikey`, `key`
   or `token`, in any casing.** Since v2.3.0, `log.fetch("https://api.test/me?access_token=…")` with
   `captureQuery` on exported the token in `url.full`; search `url.full` for one of these names

@@ -430,7 +430,8 @@ them per call site.
 - **Redacted wherever it appears:** any other captured header value, or kept query key or value,
   that holds url userinfo — which records `REDACTED` in place of the whole of itself, through one
   layer of percent-encoding, and in a query key or value even where the userinfo holds a space
-  (`+`, `%20`).
+  (`+`, `%20`). A url written as a bare query key whose userinfo runs past the `=` redacts both:
+  `?https://a@b=pw@host` records `REDACTED=REDACTED`.
 - **Cut from `url.full`, with everything after it and the query:** a url nested in the request
   path — any `http:` or `https:` url, and any other one holding userinfo, `//user:pass@host`
   included — raw, under any layers of percent-encoding, or base64 or base64url-encoded anywhere in
