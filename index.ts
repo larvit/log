@@ -1294,15 +1294,16 @@ function redactQueryPart(part: string, depth: number): string {
 	return url.href;
 }
 
-// A url in a key is read with its value too, as a server taking `?<url>` reads it.
+const SCHEME_LED = /^[a-z][a-z\d+.-]*:/i;
+
+// A key opening a url is read with its value too, as a server taking `?<url>` reads it: an `=` in its
+// password ends the key.
 function redactQueryPair(key: string, value: string, depth: number): [string, string] {
 	if (SENSITIVE_QUERY_KEYS.has(key.toLowerCase())) {
 		return [key, "REDACTED"];
 	}
 
-	const keyUrl = parsedUrl(key);
-
-	if (keyUrl === undefined) {
+	if (!SCHEME_LED.test(key)) {
 		return [key, redactQueryPart(value, depth)];
 	}
 
@@ -1316,10 +1317,10 @@ function redactQueryPair(key: string, value: string, depth: number): [string, st
 }
 
 // A url a text quotes runs from its scheme to the next whitespace, less the punctuation closing it
-// where only that parses, and a run holding nothing to redact splits where a comma glues on another.
+// where only that parses; a run a comma glues another url onto is read piece by piece, then whole.
 const QUOTED_URL = /\b(?:ftp|https?|wss?):\S*|[a-z][a-z\d+.-]*:\/\/\S*/gi;
 const GLUED_URL = /,(?=(?:ftp|https?|wss?):|[a-z][a-z\d+.-]*:\/\/)/i;
-const CLOSING_PUNCTUATION = /[!"'),.:;>?\]}]+$/;
+const CLOSING_PUNCTUATION = /[^\w/]+$/;
 
 // `undefined` where nothing is redacted.
 function redactedQuotedUrl(quoted: string): string | undefined {
@@ -1348,7 +1349,12 @@ function redactedQuotedUrl(quoted: string): string | undefined {
 }
 
 function redactQuotedUrls(text: string): string {
-	return text.replace(QUOTED_URL, quoted => redactedQuotedUrl(quoted) ?? quoted.split(GLUED_URL).map(glued => redactedQuotedUrl(glued) ?? glued).join(","));
+	return text.replace(QUOTED_URL, quoted => {
+		const pieces = quoted.split(GLUED_URL);
+		const read = pieces.length === 1 ? quoted : pieces.map(piece => redactedQuotedUrl(piece) ?? piece).join(",");
+
+		return redactedQuotedUrl(read) ?? read;
+	});
 }
 
 function redactHeaderCredential(name: string, value: string): string {
