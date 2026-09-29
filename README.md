@@ -425,7 +425,7 @@ them per call site.
   `?next=https://t.test/x?token=…` records `next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3DREDACTED`.
 - **Redacted wherever it appears:** any other captured header value, or kept query key or value,
   that holds url userinfo — which records `REDACTED` in place of the whole of itself, through one
-  layer of percent-encoding but not two.
+  layer of percent-encoding, and in a query key or value past whitespace.
 - **Cut from `url.full`, with everything after it and the query:** a url nested in the request
   path — any `http:` or `https:` url, and any other one holding userinfo, `//user:pass@host`
   included — raw, under any layers of percent-encoding, or base64 or base64url-encoded anywhere in
@@ -443,8 +443,8 @@ redacted in place as `url.full` is with `captureQuery` on, and its fragment reco
 `http://REDACTED@host/x?access_token=REDACTED`.
 
 `REDACTED` does not always stand for a credential: a `?key=` lookup or a `?token=` pagination
-cursor records it, an address after a host, as in `https://api.test,mail@example.com`, redacts
-too, a `location` of `https://cdn.test//logo@2x.png`
+cursor records it, an address after a host, as in `https://api.test,mail@example.com` or a query
+value's `https://api.test mail@example.com`, redacts too, a `location` of `https://cdn.test//logo@2x.png`
 records `REDACTED` whole, and a path holding `http:`, or `//` then a name holding `@`, is cut —
 `https://wiki.test/wiki/Http:_Status` records `https://wiki.test/wiki/REDACTED` — and so, rarely,
 is a random id whose base64 decoding spells one.

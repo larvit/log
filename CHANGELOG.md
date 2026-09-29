@@ -22,13 +22,13 @@
 - **`captureQuery` redacts a listed query key's value in a url nested in a query key or value.**
   Since v2.3.0, `log.fetch("https://proxy.test/?https://t.test/x?token=…")` with `captureQuery` on
   exported the token in `url.full`, and so did `?next=https://t.test/x?token=…`; search `url.full`
-  for `%3F` or `%26` then a name listed above, followed by `=` or `%3D` and anything but
-  `REDACTED`, and rotate what it finds.
-- **Url userinfo holding whitespace is redacted in a kept query key or value and a captured
-  header.** Since v2.3.0, `?next=https://my+user:pass@cb.test/x` with `captureQuery` on exported
-  `pass` in `url.full`, and so did a captured header holding `https://my user:pass@cb.test/x`;
-  rotate any password a `url.full` shows before a `%40` after a `+` or a `%0` escape, or a header
-  attribute shows before an `@` after a space or tab.
+  for `%3F` or `%26` then a name the first bullet lists, followed by `=` or `%3D` and anything but
+  `REDACTED`, and rotate what it finds; a presigned SigV4 url only while unexpired, as v2.4.0 says.
+- **`captureQuery` redacts url userinfo holding whitespace in a kept query key or value.** Since
+  v2.3.0, `?next=https://my+user:pass@cb.test/x` exported `pass` in `url.full`; rotate any password
+  a `url.full` shows before a `%40` after a `+` or any percent-escape. A query value holding a host,
+  then whitespace, then an address, as `?q=see+https://a.test+or+mail+bob@x.test` does, now records
+  `REDACTED`, so a dashboard grouping on such a `url.full` sees it change.
 - **`captureQuery` redacts the value of a query key named `access_token`, `api_key`, `apikey`, `key`
   or `token`, in any casing.** Since v2.3.0, `log.fetch("https://api.test/me?access_token=…")` with
   `captureQuery` on exported the token in `url.full`; search `url.full` for one of these names
