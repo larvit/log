@@ -447,7 +447,9 @@ cursor records it, an address after a host, as in `https://api.test,mail@example
 value's `https://api.test mail@example.com`, redacts too, a `location` of `https://cdn.test//logo@2x.png`
 records `REDACTED` whole, and a path holding `http:`, or `//` then a name holding `@`, is cut —
 `https://wiki.test/wiki/Http:_Status` records `https://wiki.test/wiki/REDACTED` — and so, rarely,
-is a random id whose base64 decoding spells one.
+is a random id whose base64 decoding spells one. A percent-encoded url is cut too, credential or
+not, from a query key or value that also holds a raw `//`, and from the host of a url a status
+message quotes.
 
 Spans are queued when the response arrives and are registered with `flush()` at call time, so
 `await log.end()` delivers a `log.fetch()` you never awaited.
