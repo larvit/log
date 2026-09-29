@@ -10,7 +10,8 @@
   the `log.fetch` span's status, and as the `end({ error })` status of a span you forwarded that
   rejection to; only the userinfo was redacted. Now a listed query key's value records `REDACTED`,
   so does a fragment, and a url nested in the path is cut:
-  `https://REDACTED@h.test/x?access_token=REDACTED`. Any `end({ error })` message quoting a url is
+  `https://REDACTED@h.test/x?access_token=REDACTED`, and a url in its percent-encoded host, as in
+  `https://h+https%3A%2F%2F…`, is cut. Any `end({ error })` message quoting a url is
   redacted the same way, so a `?key=` lookup or a `?token=` cursor in one records `REDACTED` and a
   dashboard grouping on status messages sees it change. Search status messages with the regex
   `(?i)(access_token|api_key|apikey|awsaccesskeyid|googleaccessid|key|sig|signature|token|x-amz-credential|x-amz-security-token|x-amz-signature|x-goog-credential|x-goog-signature)(=|%(25)*3d)`
@@ -22,11 +23,10 @@
   Since v2.3.0, `log.fetch("https://proxy.test/?https://t.test/x?token=…")` with `captureQuery` on
   exported the token in `url.full`, and so did `?next=https://t.test/x?token=…`, a url nested
   in that one, under any number of percent-encoding layers per level, and one whose own `?`, `=`
-  or `&` is percent-encoded, as in `?redirect=https://app.test/cb%3Fstate%3D1%26token%3D…`. Any
-  encoded url in a key or value that also holds a raw `//`, as in `?q=see//x+https%253A%252F%252F…`,
-  is cut from where it starts, credential or not, and so is one in the percent-encoded host of a
-  url a status message quotes, as in `https://h+https%3A%2F%2F…`, so a dashboard grouping on such
-  a `url.full` or status message sees it change. Search `url.full` with the first bullet's
+  or `&` is percent-encoded, as in `?redirect=https://app.test/cb%3Fstate%3D1%26token%3D…`. An
+  encoded url before a raw `//` in a key or value, or in the host after it, as in
+  `?q=see//x+https%253A%252F%252F…`, is cut from where it starts, credential or not, so a
+  dashboard grouping on such a `url.full` sees it change. Search `url.full` with the first bullet's
   regex, `%(25)*(3f|26)` inserted after its `(?i)`, for a match followed by anything but
   `REDACTED`, and rotate what it finds; a presigned SigV4 url only while unexpired, as v2.4.0 says.
 - **`captureQuery` redacts url userinfo holding whitespace in a kept query key or value.** Since
