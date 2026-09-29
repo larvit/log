@@ -21,9 +21,9 @@
   `URL` normalises it, a redacted pair percent-encoded. Search status messages with the regex
   `(?i)(access_token|api_key|apikey|awsaccesskeyid|googleaccessid|key|sig|signature|token|x-amz-credential|x-amz-security-token|x-amz-signature|x-goog-credential|x-goog-signature)(=|%(25)*3d)`
   for a match followed by anything but `REDACTED`, and rotate what it finds.
-- **Userinfo is redacted where the runtime's `URL` parses it, in `\\` and slashless spellings
-  too.** Since v2.3.0, a captured `location` of `https:\\u:pw@h` or `http:u:pw@h` exported `pw`, and so did a
-  kept query value such as `?next=https://my+user:pw@cb.test/x`; since v2.4.0 so did a status
+- **Userinfo is redacted where the runtime's `URL` parses it, in `\\` and slashless spellings too.**
+  Since v2.3.0, a captured `location` of `https:\\u:pw@h` or `http:u:pw@h` exported `pw`, and so did
+  a kept query value such as `?next=https://my+user:pw@cb.test/x`; since v2.4.0 so did a status
   message quoting `https:\\u:pw@h` or `http:u:pw@h`. Search captured header values, status messages
   and `url.full` with `(?i)(https?:|([\\/]|%(25)*(2F|5C)){2})\S*(@|%(25)*40)` and rotate any
   password a match holds; a match reading `REDACTED` before its `@` holds none.
