@@ -20,6 +20,9 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ### Everything else
 
+- [ ] **Test an open url authority with one regex, in `userinfoCrossesAssign` as in
+  `pairsUserinfoCrosses`.** The first still lets a `\` through the authority, so `?https://a\b=pw@x`
+  records `REDACTED=REDACTED` where a parser reads `pw@x` as path.
 - [ ] **Make README → Goals #3's `http:user:pass@host` example true of a request path, or pick one
   it is.** The goal says such a url is exported as written, and the nested-url cut removes it from
   `url.full`'s path, as the decision "A url nested in a request path is cut from where it starts"
