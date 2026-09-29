@@ -1308,39 +1308,47 @@ function redactQueryPair(key: string, value: string, depth: number): [string, st
 
 	const joined = `${key}=${value}`;
 
-	if (depth > MAX_URL_DEPTH || holdsUserinfo(keyUrl) || redactQueryPart(joined, depth) !== joined) {
+	if (depth > MAX_URL_DEPTH || redactQueryPart(key, depth) !== key || redactQueryPart(joined, depth) !== joined) {
 		return ["REDACTED", "REDACTED"];
 	}
 
 	return [key, redactQueryPart(value, depth)];
 }
 
-// A url a text quotes runs from its scheme to the next whitespace.
+// A url a text quotes runs from its scheme to the next whitespace, less the punctuation closing it
+// where only that parses, and a run holding nothing to redact splits where a comma glues on another.
 const QUOTED_URL = /\b(?:ftp|https?|wss?):\S*|[a-z][a-z\d+.-]*:\/\/\S*/gi;
+const GLUED_URL = /,(?=(?:ftp|https?|wss?):|[a-z][a-z\d+.-]*:\/\/)/i;
+const CLOSING_PUNCTUATION = /[!"'),.:;>?\]}]+$/;
+
+// `undefined` where nothing is redacted.
+function redactedQuotedUrl(quoted: string): string | undefined {
+	const whole = parsedUrl(quoted);
+	const closing = whole === undefined ? CLOSING_PUNCTUATION.exec(quoted)?.[0] ?? "" : "";
+	const url = whole ?? parsedUrl(quoted.slice(0, quoted.length - closing.length));
+
+	if (url === undefined) {
+		return undefined;
+	}
+
+	const search = redactedSearch(url, 0);
+
+	if (!holdsUserinfo(url) && search === undefined) {
+		return undefined;
+	}
+
+	if (holdsUserinfo(url)) {
+		url.username = "REDACTED";
+		url.password = "";
+	}
+
+	url.search = search ?? url.search;
+
+	return url.href + closing;
+}
 
 function redactQuotedUrls(text: string): string {
-	return text.replace(QUOTED_URL, quoted => {
-		const url = parsedUrl(quoted);
-
-		if (url === undefined) {
-			return quoted;
-		}
-
-		const search = redactedSearch(url, 0);
-
-		if (!holdsUserinfo(url) && search === undefined) {
-			return quoted;
-		}
-
-		if (holdsUserinfo(url)) {
-			url.username = "REDACTED";
-			url.password = "";
-		}
-
-		url.search = search ?? url.search;
-
-		return url.href;
-	});
+	return text.replace(QUOTED_URL, quoted => redactedQuotedUrl(quoted) ?? quoted.split(GLUED_URL).map(glued => redactedQuotedUrl(glued) ?? glued).join(","));
 }
 
 function redactHeaderCredential(name: string, value: string): string {

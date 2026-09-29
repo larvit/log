@@ -421,7 +421,7 @@ them per call site.
   where that finds a credential both record `REDACTED`: `?https://t.test/x?token=…` and
   `?https://a@b=pw@host` record `REDACTED=REDACTED`. Past eight levels, one records `REDACTED`.
 - **A url in a captured header value or a status message**, from its scheme to the next whitespace,
-  that the runtime's `URL` parses: userinfo or a listed key makes a header value record `REDACTED`
+  or short of the punctuation closing it, that the runtime's `URL` parses: userinfo or a listed key makes a header value record `REDACTED`
   whole, and in a status message, from a rejection or an `end({ error })` message, records
   `REDACTED` in place: `http://REDACTED@host/x?access_token=REDACTED`.
 

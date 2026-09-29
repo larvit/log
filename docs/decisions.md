@@ -101,10 +101,10 @@ telemetry for urls nobody traces over the network: the timing and status of thos
 right, their `url.full` (`nulluser:pass@host/x`, `https://example.comhttps://example.com/uuid`)
 was not. Valid while `url.full` is built from `origin` + `pathname`.
 
-## `log.fetch` passes url userinfo through, and `spanFailure` redacts it
+## `log.fetch` passes url userinfo through, and `failureMessage` redacts it
 
 2026-09-20: a `log.fetch` url carrying userinfo reaches the runtime's `fetch` untouched, and
-`spanFailure` redacts the userinfo out of any url the error message quotes. It sits there, not
+`failureMessage` redacts the userinfo out of any url the error message quotes. It sits there, not
 at the `log.fetch` call site, because the same rejection reaches a second span through
 `end({ error })` — the handler pattern the README documents — and a caller's own `fetch`
 rejection arrives by that route too; one redaction where an error becomes a span status covers
@@ -133,13 +133,13 @@ a url written as a bare key reaches `url.full` the same way its value would — 
 credentialed url arrives by every one of those routes and separate rules would disagree the way
 the two allow-lists used to: `authorization`, `proxy-authorization`, `cookie` and `set-cookie` go by
 name, and everything else goes by whether a url in the value holds a credential. Redacting
-rather than rejecting the allow-list entry is what a minor allows — README → Goals #4 deprecates a breaking change in a 2.x minor first, and the leak is
-open now — and it matches the stance `SENSITIVE_QUERY_KEYS` already took. `REDACTED` over
+rather than rejecting the allow-list entry is what a minor allows — README → Goals #4
+deprecates a breaking change in a 2.x minor first, and the leak is open now — and it matches the stance `SENSITIVE_QUERY_KEYS` already took. `REDACTED` over
 dropping the attribute keeps the telemetry reader's "was the header there?", which is what an
-allow-list is for once the value is gone. `spanFailure` keeps splicing `REDACTED@` into the url
-instead, because there the surrounding text is a message a human reads and the encoding is the
-runtime's own; a captured value's encoding is the caller's, so rewriting inside it would report
-something they never sent. The four names are the ones whose value is a credential by definition
+allow-list is for once the value is gone. A status message keeps its text
+instead, each url in it rebuilt from its parse with the credential `REDACTED`, because there the
+surrounding text is a message a human reads; a captured header's encoding is the caller's, so
+rewriting inside it would report something they never sent. The four names are the ones whose value is a credential by definition
 (RFC 9110 authentication, RFC 6265 cookies). What this does not reach, and the README says so, is
 a header whose value simply is a secret — `x-api-key`, a signed token — which no shape
 distinguishes from any other string. Valid while an allow-list names header names, not patterns.
@@ -295,14 +295,16 @@ only from a source with no endpoint or one of the same origin, the line fetch dr
 drops `Authorization`; a new path on the same collector keeps working. Serves README → Goals #3's
 headline, "a credential never leaves", on the wire.
 
-## Only whitespace ends a url a status message quotes
+## A quoted url runs to whitespace, less closing punctuation only where it fails to parse
 
-2026-09-29, declined in review: a url found in a status message or a captured header value runs to the next whitespace, so a
-redacted last value or fragment takes a closing quote, bracket or comma with it. A runtime or
-wrapper quotes the url as written, where `"`, `<`, `>` and a backtick can be the url's own, and
-stopping at one let the listed key after it through; a raw tab or newline in the url, which a parser
-drops, ends it there too. Readability of the text around the url gives way to README → Goals #3 over
-Audience #3. Valid while status messages are redacted in place.
+2026-09-29, declined in review, amended the same day: a url found in a status message or a captured
+header value runs to the next whitespace, so a redacted last value takes a closing quote, bracket
+or comma with it. A runtime or wrapper quotes the url as written, where `"`, `<`, `>` and a
+backtick can be the url's own, and stopping at one let the listed key after it through. Only where
+that run fails to parse is its trailing punctuation dropped, and only where it holds nothing to
+redact does it split at a comma glued to another scheme, as a stringified array of urls is: the
+runtime parses each of those urls, so Goals #3 covers them. Readability of the text around the url
+gives way to README → Goals #3 over Audience #3. Valid while a status message keeps its text.
 
 ## Redaction narrows to Goals #3 in a minor
 

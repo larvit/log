@@ -17,7 +17,8 @@
   rejection to; only the userinfo was redacted. Now a listed query key's value records `REDACTED`:
   `https://REDACTED@h.test/x?access_token=REDACTED`. Any `end({ error })` message quoting a url is
   redacted the same way, so a `?key=` lookup or a `?token=` cursor in one records `REDACTED` and a
-  dashboard grouping on status messages sees it change. Search status messages with the regex
+  dashboard grouping on status messages sees it change; a url redacted there is rebuilt from its
+  parse, so its other query pairs come back percent-encoded. Search status messages with the regex
   `(?i)(access_token|api_key|apikey|awsaccesskeyid|googleaccessid|key|sig|signature|token|x-amz-credential|x-amz-security-token|x-amz-signature|x-goog-credential|x-goog-signature)(=|%(25)*3d)`
   for a match followed by anything but `REDACTED`, and rotate what it finds.
 - **Userinfo is redacted wherever the runtime's `URL` parses it, however the url spells it.** Since
