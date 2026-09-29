@@ -422,8 +422,8 @@ them per call site.
   `?https://a@b=pw@host` and `?https://u:p=w@host` record `REDACTED=REDACTED`. Past eight levels,
   one records `REDACTED`.
 - **A url in a captured header value or a status message**, from its scheme to the next whitespace,
-  or short of trailing characters other than a letter, digit, `_` or `/`, and each url a comma
-  glues on, that the runtime's `URL` parses: userinfo or a listed key makes a header value record
+  or short of trailing characters other than an ASCII letter, digit, `_` or `/`, and each url a
+  comma glues on, that the runtime's `URL` parses: userinfo or a listed key makes a header value record
   `REDACTED` whole, and in a status message, from a rejection or an `end({ error })` message,
   records `REDACTED` in place: `http://REDACTED@host/x?access_token=REDACTED`.
 
