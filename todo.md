@@ -8,6 +8,13 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ### Security
 
+- [ ] **Redact only what the runtime's `URL` parses as userinfo, and the listed query keys and
+  header names.** README → Goals #3 now draws the line there. Replace the regex userinfo match, the
+  `=` and `&` crossing rules, the eight decode layers, base64 detection and the request-path cut
+  with a parse of each url exported — `url.full`, a quoted url in a status message, a captured
+  header value, and a query value that parses as a url once decoded, at every level. Rewrite the
+  unreleased CHANGELOG entries and README → Credentials in a captured value to match, and delete
+  the decision entries whose premise was the old goal's "a url written other than plainly".
 - [ ] **Weigh redacting the query keys `access-token`, `accesstoken`, `api-key`, `auth_token`,
   `client_secret`, `id_token`, `password`, `refresh_token`, `secret` and `subscription-key` too,
   and add those that carry a credential.** With `captureQuery` on, `url.full` exports each one's
@@ -20,23 +27,6 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ### Everything else
 
-- [ ] **Test an open url authority with one regex, in `userinfoCrossesAssign` as in
-  `pairsUserinfoCrosses`.** The first still lets a `\` through the authority, so `?https://a\b=pw@x`
-  records `REDACTED=REDACTED` where a parser reads `pw@x` as path.
-- [ ] **Make README → Goals #3's `http:user:pass@host` example true of a request path, or pick one
-  it is.** The goal says such a url is exported as written, and the nested-url cut removes it from
-  `url.full`'s path, as the decision "A url nested in a request path is cut from where it starts"
-  says it should; one of the two claims moves.
-- [ ] **Give README → Credentials in a captured value one bullet per redaction rule.** The status
-  message rule sits inside the "Never put credentials in the url" advice, "`REDACTED` does not
-  always stand for a credential" is one run-on sentence of four cases, "Spans are queued…"
-  belongs under `log.fetch` in depth, and "through one layer of percent-encoding" undersells a query
-  value's userinfo rule, which redacts one encoded twice.
-- [ ] **Stop decoding base64 in a request path, so every base64 value exports intact.**
-  README → Goals #3 leaves a url base64-encoded into a path to the caller; today a random id whose
-  decoding spells `http:` or `//x@` is cut. Drop the base64 half of the nested-url cut, its tests,
-  and its lines in README → Credentials in a captured value, the CHANGELOG entry and the decision
-  entry, and say in the CHANGELOG that base64 in a path is exported as written.
 - [ ] **Export `resolveFormatter`, so `conf.format` fully replaces the `conf.entryFormatter` alias
   3.0.0 removes.** The alias hands back a callable `EntryFormatter`; 3.0.0's `format` hands back
   `"text" | "json" | EntryFormatter`, and the mapping between them is the unexported `formatterOf`.
