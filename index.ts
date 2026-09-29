@@ -1474,11 +1474,12 @@ function redactEncodedPair(key: string, value: string, depth: number): [string, 
 // url written as a bare key can run on into the value.
 const userinfoCrossesAssign = (key: string, value: string) => /[\\/]{2}[^/?#]*$/.test(key) && [value, percentDecoded(value)].some(form => /^[^/?#]*@/.test(form));
 
-// The pairs a url's userinfo runs across `&` through, raw or once decoded, each recording `REDACTED=REDACTED`.
+// The pairs a url's userinfo runs across `&` through, raw or once decoded; decoded, only a url in
+// a key opens one, so an encoded `redirect_uri` origin keeps the pairs after it.
 function pairsUserinfoCrosses(pairs: string[]): Set<number> {
 	const crossed = new Set<number>();
 
-	for (const form of [(pair: string) => pair, formDecoded]) {
+	for (const [form, opens] of [[(pair: string) => pair, /[\\/]{2}[^/?#]*$/], [formDecoded, /^[^=]*[\\/]{2}[^/?#]*$/]] as const) {
 		let openAt: number | undefined;
 
 		pairs.map(form).forEach((pair, index) => {
@@ -1486,10 +1487,13 @@ function pairsUserinfoCrosses(pairs: string[]): Set<number> {
 				for (let spanned = openAt; spanned <= index; spanned++) {
 					crossed.add(spanned);
 				}
+
+				// Still open for a later `@`, from here, so a run of `@` pairs stays linear.
+				openAt = index;
 			}
 
 			if (/[\\/?#]/.test(pair)) {
-				openAt = /[\\/]{2}[^/?#]*$/.test(pair) ? index : undefined;
+				openAt = opens.test(pair) ? index : undefined;
 			}
 		});
 	}

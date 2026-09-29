@@ -377,3 +377,12 @@ would stop its whole redaction. Serves README → Goals #3. Valid while the path
 read as the server receiving the pair reads them, one decode deep; escaped deeper, they are that
 url's path text, redacted by no key. Serves README → Goals #3, and a deeper spelling is one it
 leaves to the caller. Valid while Goals #3 exempts a url written other than plainly.
+
+## A url's userinfo crosses `&` from a key once decoded, from anywhere raw
+
+2026-09-29, the implementer: in a captured query, userinfo running across `&` redacts every pair it
+spans when the url opens it raw anywhere in a pair, or once decoded only from a pair's key, as
+`?https%3A%2F%2Fu&x=pw%40evil.test` does. An encoded url in a value, such as an OAuth
+`redirect_uri=https%3A%2F%2Flocalhost%3A3000`, is a whole value to the server that decodes it, and
+opening there would redact `scope`, `state` and `login_hint` after it. Serves README → Goals #3,
+which leaves a url written other than plainly to the caller. Valid while Goals #3 exempts it.

@@ -36,12 +36,11 @@
   `REDACTED`, so a dashboard grouping on such a `url.full` sees it change.
 - **`captureQuery` redacts url userinfo that runs across a `&`, or follows `\\` in place of `//`, in
   a query.** Since v2.3.0, `?https://u&x=pw@evil.test` exported `pw` in `url.full` as `x`'s value,
-  and `?https:\\a:pw@b` exported `pw`, as did a status message quoting `https:\\user:pass@host`.
-  Every pair such userinfo spans records `REDACTED=REDACTED`, so does `b=mail@x.test` in
-  `?a=//cdn.test&b=mail@x.test`, and a dashboard grouping on such a `url.full` sees it change.
-  Search `url.full` with
-  `(?i)%(25)*(2F|5C)%(25)*(2F|5C)([^%]|%(2[0-24-9a-e]|3[0-9a-e]|[014-9a-f][0-9a-f]))*%(25)*40`,
-  and status messages with `\\\\[^/?#\s]*@`, and rotate any password a match holds.
+  and `?https:\\a:pw@b` exported `pw`, as did, since v2.4.0, a status message quoting
+  `https:\\user:pass@host` or `?https%3A%2F%2Fu&x=pw%40evil.test`. Every pair such userinfo spans
+  records `REDACTED=REDACTED`, so does `b=mail@x.test` in `?a=//cdn.test&b=mail@x.test`, and a
+  dashboard grouping on such a `url.full` sees it change. Search `url.full` and status messages
+  with `(?i)([\\/]|%(25)*(2F|5C)){2}\S*(@|%(25)*40)` and rotate any password a match holds.
 - **`captureQuery` redacts url userinfo holding `=` in a url written as a bare query key.** Since
   v2.3.0, `?https://a@b=pw@evil.test` exported `pw` in `url.full`, as did
   `?https://dXNlcg==:pw@evil.test`, base64 padding in the username: a pair splits at its first

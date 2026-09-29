@@ -46,6 +46,7 @@ In [docs/decisions.md](docs/decisions.md):
 - Redacting a nested url may cost 3^8 passes
 - An encoded url beside a raw one is cut from where it starts
 - A raw nested url's escaped delimiters are read after one decode
+- A url's userinfo crosses `&` from a key once decoded, from anywhere raw
 
 ## Working here
 
