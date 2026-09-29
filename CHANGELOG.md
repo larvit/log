@@ -34,14 +34,19 @@
   a `url.full` query key or value shows before `(?i)%(25)*40`. A query value holding a host, then
   whitespace, then an address, as `?q=see+https://a.test+or+mail+bob@x.test` does, now records
   `REDACTED`, so a dashboard grouping on such a `url.full` sees it change.
-- **`captureQuery` redacts url userinfo that runs across a `&`, or follows `\\` in place of `//`, in
-  a query.** Since v2.3.0, `?https://u&x=pw@evil.test` exported `pw` in `url.full` as `x`'s value,
-  and `?https:\\a:pw@b` exported `pw`, as did, since v2.4.0, a status message quoting
-  `https:\\user:pass@host` or `?https%3A%2F%2Fu&x=pw%40evil.test`. Every pair such userinfo spans
-  records `REDACTED=REDACTED`, so does `b=mail@x.test` in `?a=//cdn.test&b=mail@x.test`, and a
+- **`captureQuery` redacts url userinfo that runs across a `&`, or follows `//` with either slash
+  written `\`, in a query.** Since v2.3.0, `?https://u&x=pw@evil.test` exported `pw` in `url.full`
+  as `x`'s value, and `?https:\\a:pw@b` exported `pw`. Every pair from the url's to the `@`'s
+  records `REDACTED=REDACTED`, keys included, credential or not: a raw
+  `?redirect_uri=https://app.test&scope=openid&login_hint=bob@x.test` loses all three, so a
   dashboard grouping on such a `url.full` sees it change. Search `url.full` with
-  `(?i)\?.*%(25)*(2F|5C)%(25)*(2F|5C).*%(25)*40`, and status messages with
-  `(?i)([\\/]|%(25)*(2F|5C)){2}\S*(@|%(25)*40)`, and rotate any password a match holds.
+  `(?i)\?.*%(25)*(2F|5C)%(25)*(2F|5C).*%(25)*40` and rotate any password a match holds.
+- **Url userinfo after `//` with either slash written `\` is redacted in a captured header value and
+  a span's status message.** Since v2.3.0, a captured `location` of `https:\\u:pw@h` exported `pw`,
+  and since v2.4.0 so did a status message quoting `https:\\user:pass@host`, or
+  `?https%3A%2F%2Fu&x=pw%40evil.test` whatever `captureQuery` says. Search captured header values
+  and status messages with `(?i)([\\/]|%(25)*(2F|5C)){2}\S*(@|%(25)*40)` and rotate any password a
+  match holds; a match reading `REDACTED` before its `@` holds none.
 - **`captureQuery` redacts url userinfo holding `=` in a url written as a bare query key.** Since
   v2.3.0, `?https://a@b=pw@evil.test` exported `pw` in `url.full`, as did
   `?https://dXNlcg==:pw@evil.test`, base64 padding in the username: a pair splits at its first
