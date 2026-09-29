@@ -1579,11 +1579,10 @@ function buildUrlFull(url: URL, captureQuery: boolean): string {
 	for (const pair of url.search.slice(1).split("&").filter(Boolean)) {
 		const [rawKey, rawValue = ""] = pair.split(/=([^]*)/, 2);
 
-		for (const [key, value] of new URLSearchParams(`&${pair}`)) {
-			const redacted: [string, string] = userinfoCrossesAssign(rawKey, rawValue) ? ["REDACTED", "REDACTED"] : redactQueryPair(key, value, 1);
+		const [[key, value]] = new URLSearchParams(`&${pair}`);
+		const redacted: [string, string] = userinfoCrossesAssign(rawKey, rawValue) ? ["REDACTED", "REDACTED"] : redactQueryPair(key, value, 1);
 
-			kept.append(...redacted);
-		}
+		kept.append(...redacted);
 	}
 
 	return `${base}?${kept.toString()}`;
