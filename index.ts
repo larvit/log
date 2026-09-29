@@ -1250,12 +1250,9 @@ const SENSITIVE_HEADER_NAMES = new Set(["authorization", "cookie", "proxy-author
 // Past it a query part that parses as a url records `REDACTED`, before the stack runs out.
 const MAX_URL_DEPTH = 8;
 
-// A url without a host has no userinfo.
 function parsedUrl(text: string): URL | undefined {
 	try {
-		const url = new URL(text);
-
-		return url.host === "" ? undefined : url;
+		return new URL(text);
 	} catch {
 		return undefined;
 	}
@@ -1317,25 +1314,24 @@ function redactQueryPair(key: string, value: string, depth: number): [string, st
 	return [key, redactQueryPart(value, depth)];
 }
 
-// A url a text quotes runs from its scheme to the next whitespace, less the punctuation closing it
-// where only that parses; a run a comma glues another url onto is read piece by piece, then whole.
-const QUOTED_URL = /\b(?:ftp|https?|wss?):\S*|[a-z][a-z\d+.-]*:\/\/\S*/gi;
-const GLUED_URL = /,(?=(?:ftp|https?|wss?):|[a-z][a-z\d+.-]*:\/\/)/i;
+// Each scheme in a run of text starts a url, read to the run's end, else short of its trailing
+// punctuation, else up to its first delimiter; past 16 in one run, the rest records `REDACTED`.
+const MAX_QUOTED_URLS = 16;
 
 // `undefined` where nothing is redacted.
 function redactedQuotedUrl(quoted: string): string | undefined {
-	const whole = parsedUrl(quoted);
 	let end = quoted.length;
 
 	// A loop, where `/[^\w/]+$/` retries from every char of a long run.
-	while (whole === undefined && end > 0 && /[^\w/]/.test(quoted[end - 1])) {
+	while (end > 0 && /[^\w/]/.test(quoted[end - 1])) {
 		end--;
 	}
 
-	const closing = quoted.slice(end);
-	const url = whole ?? parsedUrl(quoted.slice(0, end));
+	const delimiter = quoted.search(/["'(),;<>[\]`{|}]/);
+	const read = [quoted.length, end, delimiter].filter(at => at > 0).find(at => parsedUrl(quoted.slice(0, at)) !== undefined);
+	const url = read === undefined ? undefined : parsedUrl(quoted.slice(0, read));
 
-	if (url === undefined) {
+	if (read === undefined || url === undefined) {
 		return undefined;
 	}
 
@@ -1352,15 +1348,38 @@ function redactedQuotedUrl(quoted: string): string | undefined {
 
 	url.search = search ?? url.search;
 
-	return url.href + closing;
+	return url.href + quoted.slice(read);
 }
 
 function redactQuotedUrls(text: string): string {
-	return text.replace(QUOTED_URL, quoted => {
-		const pieces = quoted.split(GLUED_URL);
-		const read = pieces.length === 1 ? quoted : pieces.map(piece => redactedQuotedUrl(piece) ?? piece).join(",");
+	return text.replace(/\S+/g, run => {
+		// Neither userinfo nor a query without one of these.
+		if (!/[?@]/.test(run)) {
+			return run;
+		}
 
-		return redactedQuotedUrl(read) ?? read;
+		// Runs of scheme chars, one match each, so a long one costs one pass.
+		const schemes = /[a-z\d+.-]+:?/gi;
+		let started = 0;
+
+		for (let match = schemes.exec(run); match !== null; match = schemes.exec(run)) {
+			if (!/^[a-z].*:$/i.test(match[0])) {
+				continue;
+			}
+
+			if (++started > MAX_QUOTED_URLS) {
+				return run.slice(0, match.index) + "REDACTED";
+			}
+
+			const redacted = redactedQuotedUrl(run.slice(match.index));
+
+			if (redacted !== undefined) {
+				run = run.slice(0, match.index) + redacted;
+				schemes.lastIndex = match.index + match[0].length;
+			}
+		}
+
+		return run;
 	});
 }
 
