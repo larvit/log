@@ -42,6 +42,7 @@ In [docs/decisions.md](docs/decisions.md):
 - Inherited `otlpAdditionalHeaders` follow the endpoint's origin
 - Only whitespace ends a url a status message quotes
 - A nested url spelled with whitespace in its `//` is the caller's
+- Redacting a url nested in a query key may cost 2^8 passes
 
 ## Working here
 
