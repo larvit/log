@@ -1384,13 +1384,10 @@ function failureMessage(error: unknown, url?: URL): string {
 		}
 	}
 
-	const redacted = redactedWholeUrl(message);
+	// The known url first: Firefox's `Window.fetch: <url> …` parses whole, its quoted userinfo in the path.
+	const quoted = url === undefined ? message : message.split(url.href).join(redactedWholeUrl(url.href) ?? url.href);
 
-	if (redacted !== undefined || url === undefined) {
-		return redacted ?? message;
-	}
-
-	return message.split(url.href).join(redactedWholeUrl(url.href) ?? url.href);
+	return redactedWholeUrl(quoted) ?? quoted;
 }
 
 // --- Warnings written once per stderr sink ---------------------------------
