@@ -40,7 +40,6 @@ In [docs/decisions.md](docs/decisions.md):
 - Both credential spellings stay, and their combination warns
 - Inherited `otlpAdditionalHeaders` follow the endpoint's origin
 - A header value or status message is redacted only where it is a url whole
-- Redaction narrows to Goals #3 in a minor
 
 ## Working here
 
