@@ -44,7 +44,9 @@ Priority order decides a tie.
    because naming it is asking for it, and a query value under a name
    [Credentials in a captured value](#credentials-in-a-captured-value) does not list, because no
    shape tells it from any other string. So is a url you base64-encode into a request path: a
-   base64 value always exports intact, and keeping a credential out of one is yours.
+   base64 value always exports intact, and keeping a credential out of one is yours. So is a url
+   written other than plainly, `http://` or `https://` then a well-formed rest: a malformed one, or
+   a legal but unusual spelling such as `http:user:pass@host`, is exported as written.
 4. **Semver, read strictly, over what this README documents.** A minor only adds — an export, an
    option, a value an option accepts, a field, a span attribute — where code not using it behaves as
    before. What the README does not document — an undocumented key of a `conf`, enumerability, what
