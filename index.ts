@@ -1456,12 +1456,15 @@ function redactEncodedPair(key: string, value: string, depth: number): [string, 
 		return [keyLayers === undefined ? key : "REDACTED", "REDACTED"];
 	}
 
+	// Decoded to the key's layer, a value's own url can lose its shape, so it is redacted at its own too.
+	// eslint-disable-next-line @typescript-eslint/no-use-before-define
+	const ownValueRedacted = keyLayers !== undefined && redactQueryPair("", value, depth + 1)[1] !== value;
 	const decoded = [key, value].map(part => Array.from({ length: layers }).reduce<string>(decodedPart => formDecoded(decodedPart), part));
 	// eslint-disable-next-line @typescript-eslint/no-use-before-define
 	const redacted = redactQueryPair(decoded[0], decoded[1], depth + 1);
 	const encoded = (part: string) => Array.from({ length: layers }).reduce<string>(encodedPart => encodeURIComponent(encodedPart), part);
 
-	return [redacted[0] === decoded[0] ? key : encoded(redacted[0]), redacted[1] === decoded[1] ? value : encoded(redacted[1])];
+	return [redacted[0] === decoded[0] ? key : encoded(redacted[0]), ownValueRedacted ? "REDACTED" : redacted[1] === decoded[1] ? value : encoded(redacted[1])];
 }
 
 // buildUrlFull's cut and query rule, spliced into each url the text quotes, and a fragment records
