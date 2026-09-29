@@ -15,15 +15,15 @@
   dashboard grouping on status messages sees it change. Search status messages for `access_token`,
   `api_key`, `apikey`, `awsaccesskeyid`, `googleaccessid`, `key`, `sig`, `signature`, `token`,
   `x-amz-credential`, `x-amz-security-token`, `x-amz-signature`, `x-goog-credential` or
-  `x-goog-signature`, in any casing, followed by `=` and anything but `REDACTED`, and rotate what
-  it finds. A url nested in the path shows its userinfo as `%40` or `%2540` and its query as `%3F`
+  `x-goog-signature`, in any casing, followed by `=`, `%3D` or `%253D` and anything but `REDACTED`,
+  and rotate what it finds. A url nested in the path shows its userinfo as `%40` or `%2540` and its query as `%3F`
   or `%253F`, upper or lower case, and a base64-encoded one as `aHR0c`, `h0dH` or `odHRw`, or
   `SFRUU`, `hUVF` or `IVFR`; rotate any token such a hit holds.
 - **`captureQuery` redacts a listed query key's value in a url nested in a query key or value.**
   Since v2.3.0, `log.fetch("https://proxy.test/?https://t.test/x?token=…")` with `captureQuery` on
-  exported the token in `url.full`, and so did `?next=https://t.test/x?token=…`; search `url.full`
-  for `%3F` or `%26` then a name the first bullet lists, followed by `=` or `%3D` and anything but
-  `REDACTED`, and rotate what it finds; a presigned SigV4 url only while unexpired, as v2.4.0 says.
+  exported the token in `url.full`, and so did `?next=https://t.test/x?token=…` and a url nested
+  in that one, percent-encoded once more; search `url.full` for `%3F`, `%26`, `%253F` or `%2526`
+  then a name the first bullet lists, followed by `=`, `%3D` or `%253D` and anything but `REDACTED`, and rotate what it finds; a presigned SigV4 url only while unexpired, as v2.4.0 says.
 - **`captureQuery` redacts url userinfo holding whitespace in a kept query key or value.** Since
   v2.3.0, `?next=https://my+user:pass@cb.test/x` exported `pass` in `url.full`; rotate any password
   a `url.full` query key or value shows before a `%40` or `%2540`. A query value holding a host,

@@ -1415,11 +1415,27 @@ const redactQueryCredential = (text: string) => !mayHoldUserinfo(text) ? text : 
 // A parser drops a tab or newline, so a nested url's `to%09ken` is sent as `token`.
 const redactQueryValue = (key: string, value: string) => SENSITIVE_QUERY_KEYS.has(key.replace(/[\t\n\r]/g, "").toLowerCase()) ? "REDACTED" : redactQueryCredential(value);
 
+const formDecoded = (text: string) => percentDecoded(text.replace(/\+/g, " "));
+
 // buildUrlFull's cut and query rule, spliced into each url the text quotes, and a fragment records
-// `REDACTED`. A url nested in a query pair is redacted inside that pair, so the outer query runs past
-// it; eight urls deep, a pair still holding one records `REDACTED`, before the stack runs out.
+// `REDACTED`. A url nested in a query pair, raw or once percent-encoded, is redacted inside that pair,
+// so the outer query runs past it; eight urls deep, a pair still holding one records `REDACTED`,
+// before the stack runs out.
 function redactQuotedUrls(text: string, depth = 0): string {
 	const redactPair = (whole: string) => {
+		const [decodedKey, decodedValue = ""] = whole.split(/=([^]*)/, 2).map(formDecoded);
+
+		if (!whole.includes("//") && [decodedKey, decodedValue].some(part => part.includes("//"))) {
+			if (depth >= 8) {
+				return "REDACTED";
+			}
+
+			// eslint-disable-next-line @typescript-eslint/no-use-before-define
+			const [redactedKey, redactedValue] = redactQueryPair(decodedKey, decodedValue, depth + 1);
+
+			return redactedKey === decodedKey && redactedValue === decodedValue ? whole : encodeURIComponent(redactedKey) + (whole.includes("=") ? "=" + encodeURIComponent(redactedValue) : "");
+		}
+
 		const found = !whole.includes("//") ? whole : depth < 8 ? redactQuotedUrls(whole, depth + 1) : "REDACTED";
 		const assignAt = found.indexOf("=");
 		const key = assignAt < 0 ? found : found.slice(0, assignAt);
@@ -1444,13 +1460,13 @@ function redactQuotedUrls(text: string, depth = 0): string {
 
 // A url nested in the key owns the value: its last query key names it, so key and value are
 // redacted as one text.
-function redactQueryPair(key: string, value: string): [string, string] {
+function redactQueryPair(key: string, value: string, depth = 1): [string, string] {
 	if (!key.includes("//")) {
-		return [redactQueryCredential(key), redactQueryValue(key, value.includes("//") ? redactQuotedUrls(value, 1) : value)];
+		return [redactQueryCredential(key), redactQueryValue(key, value.includes("//") ? redactQuotedUrls(value, depth) : value)];
 	}
 
-	const redactedKey = redactQuotedUrls(key, 1);
-	const redactedPair = redactQuotedUrls(`${key}=${value}`, 1);
+	const redactedKey = redactQuotedUrls(key, depth);
+	const redactedPair = redactQuotedUrls(`${key}=${value}`, depth);
 
 	return [redactQueryCredential(redactedKey), redactedPair.startsWith(`${redactedKey}=`) ? redactQueryCredential(redactedPair.slice(redactedKey.length + 1)) : "REDACTED"];
 }
