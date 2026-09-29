@@ -431,11 +431,10 @@ them per call site.
 - **Redacted wherever it appears:** any other captured header value, or kept query key or value,
   that holds url userinfo, after `//` with either slash also written `\` — which records
   `REDACTED` in place of the whole of itself, through one layer of percent-encoding, and in a
-  query key or value even where the userinfo holds a space (`+`, `%20`). A url written as a bare
-  query key whose userinfo runs past the `=` takes the value with it: `?https://a@b=pw@host`
-  records `REDACTED=REDACTED`, and userinfo running past a `&` takes every pair it spans, raw, or
-  from a url in a key once decoded: `?https://u&x=pw@host` records
-  `REDACTED=REDACTED&REDACTED=REDACTED`.
+  query key or value even where the userinfo holds a space (`+`, `%20`). Userinfo running past a
+  query's `=` or `&` takes every key and value it spans, from a url written raw anywhere, or once
+  decoded in a key: `?https://a@b=pw@host` records `REDACTED=REDACTED`, and `?https://u&x=pw@host`
+  records `REDACTED=REDACTED&REDACTED=REDACTED`.
 - **Cut from `url.full`, with everything after it and the query:** a url nested in the request
   path — any `http:` or `https:` url, and any other one holding userinfo, `//user:pass@host`
   included — raw, under any layers of percent-encoding, or base64 or base64url-encoded anywhere in
@@ -451,8 +450,8 @@ redacted in place as `url.full` is with `captureQuery` on, and its fragment reco
 
 `REDACTED` does not always stand for a credential: a `?key=` lookup or a `?token=` pagination
 cursor records it, an address after a host, as in `https://api.test,mail@example.com` or a query
-value's `https://api.test mail@example.com`, or every pair from a raw url's host to a later `@`,
-keys included, as all three in `?redirect_uri=https://app.test&scope=openid&login_hint=bob@x.test`,
+value's `https://api.test mail@example.com`, or every pair from a raw url's host to a later `@`
+through pairs holding no `/`, `?` or `#`, keys included, as all three in `?redirect_uri=https://app.test&scope=openid&login_hint=bob@x.test`,
 or a Windows share path holding `@`, redacts too, a `location` of
 `https://cdn.test//logo@2x.png` records `REDACTED` whole, and a path holding `http:`, or `//`
 then a name holding `@`, is cut — `https://wiki.test/wiki/Http:_Status` records

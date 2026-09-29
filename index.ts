@@ -1241,8 +1241,8 @@ export class Queue implements OtlpQueue {
 
 // --- Credentials on a span -------------------------------------------------
 
-// The `:` is optional and captured, so a scheme-relative `//user:pass@host` — what a runtime
-// hands back for a url it could not parse — matches too. A parser reads `\` as `/` there.
+// Scheme-relative too: a runtime quotes a url it could not parse as `//user:pass@host`. A parser
+// reads `\` as `/` there.
 const URL_USERINFO = /(:?[\\/]{2})[^/?#\s]*@/g;
 const redactUserinfo = (text: string) => text.replace(URL_USERINFO, "$1REDACTED@");
 const holdsUserinfo = (text: string) => redactUserinfo(text) !== text;
@@ -1474,8 +1474,6 @@ function redactEncodedPair(key: string, value: string, depth: number): [string, 
 // url written as a bare key can run on into the value.
 const userinfoCrossesAssign = (key: string, value: string) => /[\\/]{2}[^/?#]*$/.test(key) && [value, percentDecoded(value)].some(form => /^[^/?#]*@/.test(form));
 
-// The pairs a url's userinfo runs across `&` through, raw or once decoded; decoded, only a url in
-// a key opens one, so an encoded `redirect_uri` origin keeps the pairs after it.
 function pairsUserinfoCrosses(pairs: string[]): Set<number> {
 	const opensAuthority = (text: string) => /[\\/]{2}[^\\/?#]*$/.test(text);
 	const opensFromKey = (pair: string) => {
