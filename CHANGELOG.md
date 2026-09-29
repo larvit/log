@@ -13,15 +13,15 @@
   - a url the runtime cannot parse, such as a scheme-relative `//user:pass@host`.
 
   Before upgrading, find where 2.5.0 exports what v2.4.0 hid: a status message holding `REDACTED@`
-  on a span you forwarded a rejection to with `end({ error })`; a captured header other than
-  `authorization`, `cookie`, `proxy-authorization` and `set-cookie` that recorded exactly
-  `REDACTED`; and a `url.full` query value recording exactly `REDACTED` under a key README →
-  Credentials in a captured value does not list. Each hit is a call site 2.5.0 exports in the clear
-  unless the runtime's `URL` parses its original value whole. Keep credentials out of those values:
-  strip them before they reach `log.fetch` or `end({ error })`, and drop a response header you
-  cannot control from `captureResponseHeaders`. A url nested in the request path stays in `url.full`
-  as written, as in v2.4.0, and will not be fixed: Goals #3 does not cover it, so v2.4.0's rotation
-  advice for it stands; keep credentials out of a url you nest in a path.
+  on a span you ended with `end({ error })`; a captured header other than `authorization`, `cookie`,
+  `proxy-authorization` and `set-cookie` that recorded exactly `REDACTED`; and a `url.full` query
+  value recording exactly `REDACTED` under a key README → Credentials in a captured value does not
+  list. Each hit is a call site 2.5.0 exports in the clear unless the runtime's `URL` parses its
+  original value whole. Keep credentials out of those values: strip them before they reach
+  `log.fetch` or `end({ error })`, and drop a response header you cannot control from
+  `captureResponseHeaders`. A url nested in the request path stays in `url.full` as written, as in
+  v2.4.0, and will not be fixed: Goals #3 does not cover it, so v2.4.0's rotation advice for it
+  stands; keep credentials out of a url you nest in a path.
 - **`log.fetch` redacts the url it fetched in its span's status message as `url.full`'s query is
   with `captureQuery` on, whatever `captureQuery` says.** Since v2.4.0,
   `log.fetch("https://u:p@h.test/x?access_token=…")` on Node or in a browser exported the token in
