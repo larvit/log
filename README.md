@@ -47,7 +47,7 @@ Priority order decides a tie.
    base64 value always exports intact, and keeping a credential out of one is yours. So is a url
    written other than plainly, `http://` or `https://` then a well-formed rest: a malformed one, or
    a legal but unusual spelling such as `http:user:pass@host` or `https:\\host`, is exported as
-   written, its userinfo after a slash written `\` aside.
+   written, except that userinfo after a `\` slash records `REDACTED`.
 4. **Semver, read strictly, over what this README documents.** A minor only adds — an export, an
    option, a value an option accepts, a field, a span attribute — where code not using it behaves as
    before. What the README does not document — an undocumented key of a `conf`, enumerability, what
@@ -451,9 +451,9 @@ redacted in place as `url.full` is with `captureQuery` on, and its fragment reco
 
 `REDACTED` does not always stand for a credential: a `?key=` lookup or a `?token=` pagination
 cursor records it, an address after a host, as in `https://api.test,mail@example.com` or a query
-value's `https://api.test mail@example.com`, or a pair after one ending in a host, as
-`b=mail@x.test` in `?a=//cdn.test&b=mail@x.test`, or a Windows share path holding `@`, redacts
-too, a `location` of
+value's `https://api.test mail@example.com`, or every pair from a raw url's host to a later `@`,
+keys included, as all three in `?redirect_uri=https://app.test&scope=openid&login_hint=bob@x.test`,
+or a Windows share path holding `@`, redacts too, a `location` of
 `https://cdn.test//logo@2x.png` records `REDACTED` whole, and a path holding `http:`, or `//`
 then a name holding `@`, is cut — `https://wiki.test/wiki/Http:_Status` records
 `https://wiki.test/wiki/REDACTED` — and so, rarely, is a random id whose base64 decoding spells
