@@ -347,3 +347,10 @@ caller, and chasing every parser-equivalent spelling has no end. In a query key 
 holding whitespace stays redacted, because there `+` or `%20` in a plainly written url decodes to
 it; a captured header's raw space is the caller's, so a bot `user-agent` naming a host and an
 address exports intact. Valid while Goals #3 exempts a url written other than plainly.
+
+## Redacting a url nested in a query key may cost 2^8 passes
+
+2026-09-29, declined in review: a url nested in a query key is redacted twice per level, its key
+alone and then with its value, so a chain of eight such keys costs 256 passes over the url. The
+depth cap bounds it, only a url the caller built reaches it, and README → Goals #3 outranks
+Goals #7. Valid while the depth cap stays at eight.
