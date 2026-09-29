@@ -105,21 +105,21 @@ was not. Valid while `url.full` is built from `origin` + `pathname`.
 
 2026-09-20, amended 2026-09-29: a `log.fetch` url carrying userinfo reaches the runtime's `fetch`
 untouched, and its span's status replaces that url, as the runtime quotes it back, with its redacted
-form. A rejection forwarded to `end({ error })` is read by the whole-value entry below. Turning the
-userinfo into an `Authorization: Basic` header, as `otlpHttpBaseURI` does with the same spelling, is
-what README → Goals forbids of `log.fetch`: "never a request the platform would not have made, and
-never a success the platform would have refused". The two spellings differ because the queue's
-endpoint is this library's own request to make, where `log.fetch`'s is the caller's, so the same
-string means "authenticate me" in one and "mirror what my runtime does with this" in the other.
-React Native does put them on the wire, on one of its two platforms: `whatwg-fetch` hands the url to
-`XMLHttpRequest.open` untouched and sets no header, iOS keeps the userinfo through `[RCTConvert
-NSURL:]` and runs `NSURLSession` with no challenge delegate, so the system answers
-`WWW-Authenticate` with the credentials, while Android passes the string to
-`Request.Builder().url()` and OkHttp derives no `Authorization` from it — leaving the caller a 401,
-and writing the userinfo out only in a plain-`http:` proxy's request line. Same at `v0.74.0` and
-today's `main`. Mirroring keeps that the platform's behaviour. It ships in a minor on the precedent
-of the entry above, being the security fix itself. Valid while `log.fetch` is a drop-in for the
-runtime's `fetch`.
+form. A rejection forwarded to `end({ error })` is read by "A header value or status message is
+redacted only where it is a url whole". Turning the userinfo into an `Authorization: Basic` header,
+as `otlpHttpBaseURI` does with the same spelling, is what README → Goals forbids of `log.fetch`:
+"never a request the platform would not have made, and never a success the platform would have
+refused". The two spellings differ because the queue's endpoint is this library's own request to
+make, where `log.fetch`'s is the caller's, so the same string means "authenticate me" in one and
+"mirror what my runtime does with this" in the other. React Native does put them on the wire, on one
+of its two platforms: `whatwg-fetch` hands the url to `XMLHttpRequest.open` untouched and sets no
+header, iOS keeps the userinfo through `[RCTConvert NSURL:]` and runs `NSURLSession` with no
+challenge delegate, so the system answers `WWW-Authenticate` with the credentials, while Android
+passes the string to `Request.Builder().url()` and OkHttp derives no `Authorization` from it —
+leaving the caller a 401, and writing the userinfo out only in a plain-`http:` proxy's request line.
+Same at `v0.74.0` and today's `main`. Mirroring keeps that the platform's behaviour. It ships in a
+minor on the precedent of the entry above, being the security fix itself. Valid while `log.fetch` is
+a drop-in for the runtime's `fetch`.
 
 ## A captured value holding a credential records `REDACTED`
 

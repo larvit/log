@@ -4,13 +4,21 @@
 
 ### Security
 
-- **Redaction covers a value the runtime's `URL` parses whole, and nothing else.** A header value or
-  status message holding a url among text the runtime's `URL` cannot parse whole, as a rejection you
-  forward to `end({ error })` usually does, a url percent-encoded into a header value, a query value
-  percent-encoded twice, and a url the runtime cannot parse are exported as written, where v2.4.0
-  recorded `REDACTED` or `REDACTED@`; a url nested in the request path still is, as in v2.4.0. Keep
-  credentials out of such values, or strip them before the value reaches `log.fetch` or `end({ error
-  })`.
+- **2.5.0 exports some values v2.4.0 redacted.** Redaction now covers what the runtime's `URL`
+  parses, read on a whole value (README → Goals #3). These go out as written:
+  - a url among other text in a header value or status message, its userinfo included, a `log.fetch`
+    rejection you forward to `end({ error })` among them;
+  - a url percent-encoded into a header value;
+  - a query value holding a url percent-encoded twice in the request url;
+  - a url the runtime cannot parse, such as a scheme-relative `//user:pass@host`.
+
+  Before upgrading, search status messages and `http.request.header.*` and `http.response.header.*`
+  for `REDACTED@`: a hit in a value that is not a url whole marks a call site 2.5.0 exports in the
+  clear. Keep credentials out of those values: strip them before they reach `log.fetch` or
+  `end({ error })`, and drop a response header you cannot control from `captureResponseHeaders`. A
+  url nested in the request path stays in `url.full` as written, as in v2.4.0, and Goals #3 no
+  longer covers it, so v2.4.0's rotation advice for it stands; keep credentials out of a url you
+  nest in a path.
 - **`log.fetch` redacts the url it fetched in its span's status message as `url.full`'s query is
   with `captureQuery` on, whatever `captureQuery` says.** Since v2.4.0,
   `log.fetch("https://u:p@h.test/x?access_token=…")` on Node or in a browser exported the token in
@@ -26,15 +34,17 @@
   `url.full` with `(?i)(https?:|([\\/]|%(25)*(2F|5C)){2})\S*(@|%(25)*40)` and rotate any password a
   match holds; a match reading `REDACTED` before its `@` holds none.
 - **`captureQuery` redacts a url a query key or value holds once decoded, at every level.** Its
-  userinfo records `REDACTED` in place of the whole part, and a listed key's value `REDACTED` in
-  place: since v2.3.0, `?next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3D…` with `captureQuery` on exported
-  the token in `url.full`, and now records `next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3DREDACTED`. A
-  url in a key is read with its value too, as a proxy taking `?<url>` reads it, and where that finds
-  a credential both record `REDACTED`: `?https://t.test/x?token=…`, and
-  `?https://a@b=pw@evil.test`, whose userinfo runs across the `=`. Search `url.full` with the
-  status-message regex above, `%(25)*(3f|26)` inserted after its `(?i)`, and with
-  `(?i)(^|[?&])[^&=]*%(25)*2F%(25)*2F[^&=]*=[^&]*%(25)*40` for a match followed by anything but
-  `REDACTED`, and rotate what it finds; a presigned SigV4 url only while unexpired, as v2.4.0 says.
+  userinfo records `REDACTED` in place of the whole key or value, and a listed key's value
+  `REDACTED` in place: since v2.3.0, `?next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3D…` with
+  `captureQuery` on exported the token in `url.full`, and now records
+  `next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3DREDACTED`. A url in a key is read with its value too, as
+  a proxy taking `?<url>` reads it, and where that finds a credential both record `REDACTED`:
+  `?https://t.test/x?token=…`, and `?https://a@b=pw@evil.test`, whose userinfo runs across the `=`.
+  Search `url.full` with
+  `(?i)%(25)*(3f|26)(access_token|api_key|apikey|awsaccesskeyid|googleaccessid|key|sig|signature|token|x-amz-credential|x-amz-security-token|x-amz-signature|x-goog-credential|x-goog-signature)(=|%(25)*3d)`,
+  and with `(?i)(^|[?&])[^&=]*%(25)*2F%(25)*2F[^&=]*=[^&]*%(25)*40` for a match followed by anything
+  but `REDACTED`, and rotate what it finds; a presigned SigV4 url only while unexpired, as v2.4.0
+  says.
 - **`captureQuery` redacts the value of a query key named `access_token`, `api_key`, `apikey`, `key`
   or `token`, in any casing.** Since v2.3.0, `log.fetch("https://api.test/me?access_token=…")` with
   `captureQuery` on exported the token in `url.full`; search `url.full` for one of these names
