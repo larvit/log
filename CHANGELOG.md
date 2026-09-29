@@ -26,7 +26,7 @@
   `REDACTED`, and rotate what it finds; a presigned SigV4 url only while unexpired, as v2.4.0 says.
 - **`captureQuery` redacts url userinfo holding whitespace in a kept query key or value.** Since
   v2.3.0, `?next=https://my+user:pass@cb.test/x` exported `pass` in `url.full`; rotate any password
-  a `url.full` query value shows before a `%40`. A query value holding a host,
+  a `url.full` query key or value shows before a `%40` or `%2540`. A query value holding a host,
   then whitespace, then an address, as `?q=see+https://a.test+or+mail+bob@x.test` does, now records
   `REDACTED`, so a dashboard grouping on such a `url.full` sees it change.
 - **`captureQuery` redacts the value of a query key named `access_token`, `api_key`, `apikey`, `key`
