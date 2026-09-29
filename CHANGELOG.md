@@ -5,13 +5,14 @@
 ### Security
 
 - **Redaction covers a value the runtime's `URL` parses whole, and nothing else.** A header value or
-  status message holding a url among other text, a rejection you forward to `end({ error })`
-  included, a url percent-encoded into a header value, a query value percent-encoded twice, and a
-  url the runtime cannot parse are exported as written, where v2.4.0 recorded `REDACTED` or
-  `REDACTED@`; a url nested in the request path still is, as in v2.4.0. Keep credentials out of such
-  values, or strip them before the value reaches `log.fetch` or `end({ error })`.
-- **`log.fetch` redacts the url it fetched in its span's status message as `url.full` is with
-  `captureQuery` on, whatever `captureQuery` says.** Since v2.4.0,
+  status message holding a url among text the runtime's `URL` cannot parse whole, as a rejection you
+  forward to `end({ error })` usually does, a url percent-encoded into a header value, a query value
+  percent-encoded twice, and a url the runtime cannot parse are exported as written, where v2.4.0
+  recorded `REDACTED` or `REDACTED@`; a url nested in the request path still is, as in v2.4.0. Keep
+  credentials out of such values, or strip them before the value reaches `log.fetch` or `end({ error
+  })`.
+- **`log.fetch` redacts the url it fetched in its span's status message as `url.full`'s query is
+  with `captureQuery` on, whatever `captureQuery` says.** Since v2.4.0,
   `log.fetch("https://u:p@h.test/x?access_token=…")` on Node or in a browser exported the token in
   the rejection the runtime quotes the url into; only the userinfo was redacted. Now it records
   `https://REDACTED@h.test/x?access_token=REDACTED`. An `end({ error })` message that is a url is
