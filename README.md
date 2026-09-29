@@ -421,9 +421,10 @@ them per call site.
   `x-amz-credential`, `x-amz-security-token`, `x-amz-signature`, `x-goog-credential` or
   `x-goog-signature` — a bearer token or API key sent in the query, a presigned S3-compatible or
   GCS url, whichever signing generation made it, and an Azure SAS url. A url nested in a kept
-  query key or value, raw or percent-encoded once per level, has its own such keys redacted, at
-  every level: `?next=https://t.test/x?token=…` records
-  `next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3DREDACTED`.
+  query key or value, raw or under any number of percent-encoding layers, has its own such keys
+  redacted, at every level: `?next=https://t.test/x?token=…` records
+  `next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3DREDACTED`. One an earlier `//` in the same value
+  precedes is cut from where it starts: `?q=see//x+https%253A%252F%252F…` records `q=see%2F%2Fx+REDACTED`.
 - **Redacted wherever it appears:** any other captured header value, or kept query key or value,
   that holds url userinfo — which records `REDACTED` in place of the whole of itself, through one
   layer of percent-encoding, and in a query key or value even where the userinfo holds a space (`+`, `%20`).
