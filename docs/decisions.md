@@ -340,13 +340,19 @@ Audience #3. Valid while status messages are redacted in place.
 
 ## A nested url spelled with whitespace in its `//` is the caller's
 
-2026-09-29, declined in review: a url nested in a query key or value has its listed keys redacted
-only where it opens plainly, `http://`, `https://` or `//`; `http:/%09/a/?token=…` exports as
-written, though a parser drops the tab. That is the spelling README → Goals #3 leaves to the
-caller, and chasing every parser-equivalent spelling has no end. In a query key or value, userinfo
-holding whitespace stays redacted, because there `+` or `%20` in a plainly written url decodes to
-it; a captured header's raw space is the caller's, so a bot `user-agent` naming a host and an
-address exports intact. Valid while Goals #3 exempts a url written other than plainly.
+2026-09-29, declined in review: a raw url nested in a query key or value is found by its opening
+`http://`, `https://` or `//`, so alone in its part `http:/%09/a/?token=…` exports as written,
+though a parser drops the tab. That is the spelling README → Goals #3 leaves to the caller, and
+chasing every parser-equivalent spelling has no end. Valid while Goals #3 exempts a url written
+other than plainly.
+
+## A captured header's whitespace ends userinfo
+
+2026-09-29, declined in review: in a query key or value, userinfo holding whitespace stays
+redacted, because there `+` or `%20` in a plainly written url decodes to it; a captured header's
+raw space is the caller's, so a bot `user-agent` naming a host and an address exports intact.
+Serves README → Goals #3, whose "a url written other than plainly" covers a raw space. Valid while
+Goals #3 exempts a url written other than plainly.
 
 ## Redacting a nested url may cost 3^8 passes
 

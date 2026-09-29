@@ -37,9 +37,11 @@
 - **`captureQuery` redacts url userinfo holding `=` in a url written as a bare query key.** Since
   v2.3.0, `?https://a@b=pw@evil.test` exported `pw` in `url.full`, as did
   `?https://dXNlcg==:pw@evil.test`, base64 padding in the username: a pair splits at its first
-  `=`, so the value was tested apart from the url in its key. Both now record `REDACTED=REDACTED`;
-  rotate any password a `url.full` query value shows before `(?i)%(25)*40` where its key is a url
-  with no path.
+  `=`, so the value was tested apart from the url in its key. Both now record `REDACTED=REDACTED`,
+  and so does a pair such as `?https://api.test=user@mail.test`, which a url parser reads as
+  userinfo too, so a dashboard grouping on such a `url.full` sees it change. Search `url.full` with
+  `(?i)(^|[?&])(REDACTED|[^&=]*%2F%2F([^&=%]|%(2[0-24-9a-e]|3[0-9a-e]|[014-9a-f][0-9a-f]))*)=[^&]*%40`
+  and rotate any password a match holds.
 - **`captureQuery` redacts the value of a query key named `access_token`, `api_key`, `apikey`, `key`
   or `token`, in any casing.** Since v2.3.0, `log.fetch("https://api.test/me?access_token=…")` with
   `captureQuery` on exported the token in `url.full`; search `url.full` for one of these names
