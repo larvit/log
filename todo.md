@@ -8,10 +8,6 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ### Security
 
-- [ ] **Redact url userinfo that crosses a `&`, or follows `\\` in place of `//`, in a url nested in a
-  query.** With `captureQuery` on, `?https://u&x=pw@evil.test` splits into two pairs and exports
-  `pw` as `x`'s value, and `?https:\\a:pw@b` exports `pw`: userinfo is only matched after `//` and
-  within one pair.
 - [ ] **Weigh redacting the query keys `access-token`, `accesstoken`, `api-key`, `auth_token`,
   `client_secret`, `id_token`, `password`, `refresh_token`, `secret` and `subscription-key` too,
   and add those that carry a credential.** With `captureQuery` on, `url.full` exports each one's

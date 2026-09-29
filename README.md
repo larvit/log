@@ -45,8 +45,9 @@ Priority order decides a tie.
    [Credentials in a captured value](#credentials-in-a-captured-value) does not list, because no
    shape tells it from any other string. So is a url you base64-encode into a request path: a
    base64 value always exports intact, and keeping a credential out of one is yours. So is a url
-   written other than plainly, `http://` or `https://` then a well-formed rest: a malformed one, or
-   a legal but unusual spelling such as `http:user:pass@host`, is exported as written.
+   written other than plainly, `http://` or `https://`, either slash also written `\`, then a
+   well-formed rest: a malformed one, or a legal but unusual spelling such as
+   `http:user:pass@host`, is exported as written.
 4. **Semver, read strictly, over what this README documents.** A minor only adds — an export, an
    option, a value an option accepts, a field, a span attribute — where code not using it behaves as
    before. What the README does not document — an undocumented key of a `conf`, enumerability, what
@@ -428,10 +429,11 @@ them per call site.
   `?q=https%253A%252F%252F…+see//x` records `q=REDACTED`, and `?q=see//x+https%253A%252F%252F…`
   records `q=see%2F%2Fx+REDACTED`.
 - **Redacted wherever it appears:** any other captured header value, or kept query key or value,
-  that holds url userinfo — which records `REDACTED` in place of the whole of itself, through one
-  layer of percent-encoding, and in a query key or value even where the userinfo holds a space
-  (`+`, `%20`). A url written as a bare query key whose userinfo runs past the `=` takes the value
-  with it: `?https://a@b=pw@host` records `REDACTED=REDACTED`.
+  that holds url userinfo, after `//` or `\\` — which records `REDACTED` in place of the whole of
+  itself, through one layer of percent-encoding, and in a query key or value even where the
+  userinfo holds a space (`+`, `%20`). A url written as a bare query key whose userinfo runs past the `=` takes the value
+  with it: `?https://a@b=pw@host` records `REDACTED=REDACTED`, and userinfo running past a `&`
+  takes every pair it spans: `?https://u&x=pw@host` records `REDACTED=REDACTED&REDACTED=REDACTED`.
 - **Cut from `url.full`, with everything after it and the query:** a url nested in the request
   path — any `http:` or `https:` url, and any other one holding userinfo, `//user:pass@host`
   included — raw, under any layers of percent-encoding, or base64 or base64url-encoded anywhere in
@@ -447,7 +449,8 @@ redacted in place as `url.full` is with `captureQuery` on, and its fragment reco
 
 `REDACTED` does not always stand for a credential: a `?key=` lookup or a `?token=` pagination
 cursor records it, an address after a host, as in `https://api.test,mail@example.com` or a query
-value's `https://api.test mail@example.com`, redacts too, a `location` of
+value's `https://api.test mail@example.com`, or a pair after one ending in a host, as
+`b=mail@x.test` in `?a=//cdn.test&b=mail@x.test`, redacts too, a `location` of
 `https://cdn.test//logo@2x.png` records `REDACTED` whole, and a path holding `http:`, or `//`
 then a name holding `@`, is cut — `https://wiki.test/wiki/Http:_Status` records
 `https://wiki.test/wiki/REDACTED` — and so, rarely, is a random id whose base64 decoding spells
