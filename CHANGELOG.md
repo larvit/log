@@ -9,14 +9,13 @@
   on Node or in a browser exported the token in the rejection the runtime quotes the url into: as
   the `log.fetch` span's status, and as the `end({ error })` status of a span you forwarded that
   rejection to; only the userinfo was redacted. Now a listed query key's value records `REDACTED`,
-  so does a fragment, and a url nested in the path is cut:
-  `https://REDACTED@h.test/x?access_token=REDACTED`, and a url in its percent-encoded host, as in
-  `https://h+https%3A%2F%2F…`, is cut. Any `end({ error })` message quoting a url is
+  so does a fragment, and a url nested in the path, or percent-encoded in the host as in
+  `https://h+https%3A%2F%2F…`, is cut: `https://REDACTED@h.test/x?access_token=REDACTED`. Any `end({ error })` message quoting a url is
   redacted the same way, so a `?key=` lookup or a `?token=` cursor in one records `REDACTED` and a
   dashboard grouping on status messages sees it change. Search status messages with the regex
   `(?i)(access_token|api_key|apikey|awsaccesskeyid|googleaccessid|key|sig|signature|token|x-amz-credential|x-amz-security-token|x-amz-signature|x-goog-credential|x-goog-signature)(=|%(25)*3d)`
   for a match followed by anything but `REDACTED`, and rotate what it finds. A url nested in the
-  path shows its userinfo as `(?i)%(25)*40` and its query as `(?i)%(25)*3f`, and a base64-encoded
+  path or host shows its userinfo as `(?i)%(25)*40` and its query as `(?i)%(25)*3f`, and a base64-encoded
   one as `aHR0c`, `h0dH` or `odHRw`, or `SFRUU`, `hUVF` or `IVFR`; rotate any token such a hit
   holds.
 - **`captureQuery` redacts a listed query key's value in a url nested in a query key or value.**
@@ -24,7 +23,7 @@
   exported the token in `url.full`, and so did `?next=https://t.test/x?token=…`, a url nested
   in that one, under any number of percent-encoding layers per level, and one whose own `?`, `=`
   or `&` is percent-encoded, as in `?redirect=https://app.test/cb%3Fstate%3D1%26token%3D…`. An
-  encoded url before a raw `//` in a key or value, or in the host after it, as in
+  encoded url before a raw `//` in a key or value, or in the host right after that `//`, as in
   `?q=see//x+https%253A%252F%252F…`, is cut from where it starts, credential or not, so a
   dashboard grouping on such a `url.full` sees it change. Search `url.full` with the first bullet's
   regex, `%(25)*(3f|26)` inserted after its `(?i)`, for a match followed by anything but
