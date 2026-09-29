@@ -1477,12 +1477,20 @@ const userinfoCrossesAssign = (key: string, value: string) => /[\\/]{2}[^/?#]*$/
 // The pairs a url's userinfo runs across `&` through, raw or once decoded; decoded, only a url in
 // a key opens one, so an encoded `redirect_uri` origin keeps the pairs after it.
 function pairsUserinfoCrosses(pairs: string[]): Set<number> {
+	const opensAuthority = (text: string) => /[\\/]{2}[^/?#]*$/.test(text);
+	const opensFromKey = (pair: string) => {
+		const [key, value = ""] = pair.split(/=([^]*)/, 2).map(formDecoded);
+
+		return opensAuthority(key) && !/[\\/?#]/.test(value);
+	};
 	const crossed = new Set<number>();
 
-	for (const [form, opens] of [[(pair: string) => pair, /[\\/]{2}[^/?#]*$/], [formDecoded, /^[^=]*[\\/]{2}[^/?#]*$/]] as const) {
+	for (const [form, opens] of [[(pair: string) => pair, opensAuthority], [formDecoded, opensFromKey]] as const) {
 		let openAt: number | undefined;
 
-		pairs.map(form).forEach((pair, index) => {
+		pairs.forEach((rawPair, index) => {
+			const pair = form(rawPair);
+
 			if (openAt !== undefined && [pair, percentDecoded(pair)].some(text => /^[^/?#]*@/.test(text))) {
 				for (let spanned = openAt; spanned <= index; spanned++) {
 					crossed.add(spanned);
@@ -1493,7 +1501,7 @@ function pairsUserinfoCrosses(pairs: string[]): Set<number> {
 			}
 
 			if (/[\\/?#]/.test(pair)) {
-				openAt = opens.test(pair) ? index : undefined;
+				openAt = opens(rawPair) ? index : undefined;
 			}
 		});
 	}
