@@ -121,14 +121,8 @@ so the system answers `WWW-Authenticate` with the credentials, while Android pas
 to `Request.Builder().url()` and OkHttp derives no `Authorization` from it — leaving the caller
 a 401, and writing the userinfo out only in a plain-`http:` proxy's request line. Same at
 `v0.74.0` and today's `main`. Mirroring keeps that the platform's behaviour. It ships in a
-minor on the precedent of the entry above, being the security fix itself. Matching runs from
-`//` with the scheme optional, because a url a runtime could not parse comes back without one
-— Node answers `fetch("//user:pass@host/x")` with "Failed to parse URL from //user:pass@host/x".
-What it costs is over-redaction, always the safe direction: it matches to the last `@` before a
-`/?#`, so a url with an address glued to it loses its host (`https://api.test,mail@example.com`),
-and an `@` in a path after a doubled slash redacts as though it were userinfo. A bare
-`user:pass@host` with no slashes at all stays unredacted. Valid while `log.fetch` is a drop-in
-for the runtime's `fetch` and a runtime quotes the url with its authority slashes.
+minor on the precedent of the entry above, being the security fix itself. Valid while `log.fetch`
+is a drop-in for the runtime's `fetch`.
 
 ## A captured value holding a credential records `REDACTED`
 
@@ -138,13 +132,8 @@ captured header values and for the query values `captureQuery` keeps — and for
 a url written as a bare key reaches `url.full` the same way its value would — because the same
 credentialed url arrives by every one of those routes and separate rules would disagree the way
 the two allow-lists used to: `authorization`, `proxy-authorization`, `cookie` and `set-cookie` go by
-name, and everything else goes by whether the value holds url userinfo raw or once decoded — a
-nested url is normally percent-encoded, which hides the `//` and `@` from `URL_USERINFO`. The
-decode runs escape-run by escape-run rather than over the whole string, because
-`decodeURIComponent` throws on the first invalid escape: a stray `%` anywhere in a header, which
-a WHATWG url permits, would otherwise take the decoded test out for the credential encoded
-correctly beside it. Redacting rather than rejecting the allow-list entry is what a minor
-allows — README → Goals #4 deprecates a breaking change in a 2.x minor first, and the leak is
+name, and everything else goes by whether a url in the value holds a credential. Redacting
+rather than rejecting the allow-list entry is what a minor allows — README → Goals #4 deprecates a breaking change in a 2.x minor first, and the leak is
 open now — and it matches the stance `SENSITIVE_QUERY_KEYS` already took. `REDACTED` over
 dropping the attribute keeps the telemetry reader's "was the header there?", which is what an
 allow-list is for once the value is gone. `spanFailure` keeps splicing `REDACTED@` into the url
@@ -153,12 +142,7 @@ runtime's own; a captured value's encoding is the caller's, so rewriting inside 
 something they never sent. The four names are the ones whose value is a credential by definition
 (RFC 9110 authentication, RFC 6265 cookies). What this does not reach, and the README says so, is
 a header whose value simply is a secret — `x-api-key`, a signed token — which no shape
-distinguishes from any other string. Over-redaction stays the safe direction, as the entry above
-has it, but the cost is higher here than in a status message: the reader loses the whole
-attribute, so a `location` of `https://cdn.test//logo@2x.png` records `REDACTED`. Weighed against
-README → Audience #3 and taken, because Goals ranks the credential above the reader, and the
-README says it so that reader is not left guessing. Valid while an allow-list names header names,
-not patterns.
+distinguishes from any other string. Valid while an allow-list names header names, not patterns.
 
 ## Every rule on credentials in a span sits in one source section
 
@@ -279,24 +263,6 @@ written, as `log.conf`'s own `otlp*` keys beside a queue built from them already
 3.0.0's item keeping credentials off `conf`. Serves README → Goals #3. Valid until 3.0.0 keeps
 credentials off `log.conf` and `queue.conf`.
 
-## A url nested in a request path is cut from where it starts
-
-2026-09-28, the maintainer: where `url.full`'s path holds a url — raw, under any number of
-percent-encoding layers, or base64 or base64url-encoded at any offset and alignment, percent-encoded
-inside or not — the path is kept up to where that url, or the base64 group holding its start,
-starts and the rest records `REDACTED`, the query with it whatever `captureQuery` says:
-`https://proxy.test/fetch/REDACTED`. An `http:` or `https:` url is keyed on its scheme alone,
-because its path and query — the latter parsing as the outer url's — can hold a signature or
-`access_token` with no shape; not on `//` after it, since `https:\\u:p@host` and `https:u:p@host`
-parse to the same credentials. Any other url is keyed on non-empty userinfo — after `ftp:` or
-`ws(s):`, which parse like `https:`, or after a doubled slash — since a bare `word:` is a path's own
-syntax (`/v1/p1:batchGet`), and a doubled slash is a sloppy join. Base64 is decoded one layer
-deep, the layer a callback parameter carries; a url base64-encoded twice is exported as written,
-since each further layer multiplies what every traced call pays (README → Goals #7) for a shape no
-proxy is known to produce. Splicing `REDACTED@` covers the literal
-spelling only, and replacing the whole path loses the endpoint README → Audience #3 reads. Valid
-while `url.full` exports the request path. Serves README → Goals #3.
-
 ## An `Authorization` over plain `http:` warns once
 
 2026-09-28, the maintainer: an `http:` `otlpHttpBaseURI` naming a host other than `localhost`,
@@ -331,59 +297,17 @@ headline, "a credential never leaves", on the wire.
 
 ## Only whitespace ends a url a status message quotes
 
-2026-09-29, declined in review: a url found in a status message runs to the next whitespace, so a
+2026-09-29, declined in review: a url found in a status message or a captured header value runs to the next whitespace, so a
 redacted last value or fragment takes a closing quote, bracket or comma with it. A runtime or
 wrapper quotes the url as written, where `"`, `<`, `>` and a backtick can be the url's own, and
 stopping at one let the listed key after it through; a raw tab or newline in the url, which a parser
 drops, ends it there too. Readability of the text around the url gives way to README → Goals #3 over
 Audience #3. Valid while status messages are redacted in place.
 
-## A nested url spelled with whitespace in its `//` is the caller's
+## Redaction narrows to Goals #3 in a minor
 
-2026-09-29, declined in review: a raw url nested in a query key or value is found by its opening
-`http://`, `https://` or `//`, so alone in its part `http:/%09/a/?token=…` exports as written,
-though a parser drops the tab. That is the spelling README → Goals #3 leaves to the caller, and
-chasing every parser-equivalent spelling has no end. Valid while Goals #3 exempts a url written
-other than plainly.
-
-## A captured header's whitespace ends userinfo
-
-2026-09-29, declined in review: in a query key or value, userinfo holding whitespace stays
-redacted, because there `+` or `%20` in a plainly written url decodes to it; a captured header's
-raw space is the caller's, so a bot `user-agent` naming a host and an address exports intact.
-Serves README → Goals #3, whose "a url written other than plainly" covers a raw space. Valid while
-Goals #3 exempts a url written other than plainly.
-
-## Redacting a nested url may cost 3^8 passes
-
-2026-09-29, declined in review: a level may be redacted three times — a url in a query key alone
-and then with its value, and a pair holding a raw url once more as a server decodes it — so a chain
-of eight such levels costs up to 3^8 passes over the url; a crafted 120 KB one measured 4,000 and
-13 s. The depth cap bounds it, and README → Goals #3 outranks Goals #7. Valid while the depth cap
-stays at eight.
-
-## An encoded url beside a raw one is cut from where it starts
-
-2026-09-29, the implementer: where a url a status message quotes, or a query key or value holding
-a raw `//`, also holds a percent-encoded url before that `//` or in the host after it, as
-`?q=see//x+https%253A%252F%252Ft.test%252Fx%253Ftoken%253D…` does, the encoded url is cut from
-where it starts, as the path rule cuts one: the raw url's regex reads such text as its host, or not
-at all, so its query has no key to redact by. Userinfo is never searched, since a cut inside it
-would stop its whole redaction. Serves README → Goals #3. Valid while the path rule cuts.
-
-## A raw nested url's escaped delimiters are read after one decode
-
-2026-09-29, the implementer: a raw url in a query key or value has its escaped `?`, `=` or `&`
-read as the server receiving the pair reads them, one decode deep; escaped deeper, they are that
-url's path text, redacted by no key. Serves README → Goals #3, and a deeper spelling is one it
-leaves to the caller. Valid while Goals #3 exempts a url written other than plainly.
-
-## A url's userinfo crosses `&` from a key once decoded, from anywhere raw
-
-2026-09-29, the implementer: in a query, userinfo running across `&` redacts every pair it spans
-when the url opens it raw anywhere in a pair, or once decoded only from a pair's key, as
-`?https%3A%2F%2Fu&x=pw%40evil.test` does: a url written as the whole query, `?<url>`, is what a
-proxy reads back decoded, and it sits in the first key. An encoded url in a value, such as an OAuth
-`redirect_uri=https%3A%2F%2Flocalhost%3A3000`, is one whole value to the server that splits the
-query at `&` before decoding, and opening there would redact `scope`, `state` and `login_hint`
-after it. Serves README → Goals #3. Valid while a query value is split out before it is decoded.
+2026-09-29, the implementer: 2.5.0 redacts what the runtime's `URL` parses as userinfo and the
+listed keys, so a captured header value's percent-encoded url and a status message's scheme-relative
+`//user:pass@host`, which v2.4.0 documented redacting, export as written. Goals #3 draws that line
+and outranks #4; the CHANGELOG's `### Security` names the change so a consumer relying on it acts.
+Valid while Goals #3 reads as drawn on 2026-09-29.

@@ -394,7 +394,7 @@ Span attributes follow the OpenTelemetry HTTP semantic conventions:
 | Attribute | Value |
 |---|---|
 | `http.request.method` | Request method, `GET` when unset |
-| `url.full` | The URL without the outer userinfo. Query string dropped unless `captureQuery`, where a credentialed key or value records `REDACTED`. A url nested in the path, and everything after it, the query included, records `REDACTED` |
+| `url.full` | The URL without the outer userinfo. Query string dropped unless `captureQuery`, where a credentialed key or value records `REDACTED` |
 | `url.scheme`, `server.address`, `server.port` | From the URL; port only when explicit |
 | `http.request.header.<name>` | Headers listed in `captureRequestHeaders` |
 | `http.response.status_code` | Response status |
@@ -413,43 +413,26 @@ them per call site.
   `api_key`, `apikey`, `awsaccesskeyid`, `googleaccessid`, `key`, `sig`, `signature`, `token`,
   `x-amz-credential`, `x-amz-security-token`, `x-amz-signature`, `x-goog-credential` or
   `x-goog-signature` — a bearer token or API key sent in the query, a presigned S3-compatible or
-  GCS url, whichever signing generation made it, and an Azure SAS url. A url nested in a kept
-  query key or value, raw or under any number of percent-encoding layers, has its own such keys
-  redacted, at every level: `?next=https://t.test/x?token=…` records
-  `next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3DREDACTED`. An encoded one before a raw `//` in the same
-  key or value, or in the host right after that `//`, is cut from where it starts:
-  `?q=https%253A%252F%252F…+see//x` records `q=REDACTED`, and `?q=see//x+https%253A%252F%252F…`
-  records `q=see%2F%2Fx+REDACTED`.
-- **Redacted wherever it appears:** any other captured header value, or kept query key or value,
-  that holds url userinfo, after `//` with either slash also written `\` — which records
-  `REDACTED` in place of the whole of itself, through one layer of percent-encoding, and in a
-  query key or value even where the userinfo holds a space (`+`, `%20`). Userinfo running past a
-  query's `=` or `&` takes every key and value it spans, from a url written raw anywhere, or once
-  decoded in a key: `?https://a@b=pw@host` records `REDACTED=REDACTED`, and `?https://u&x=pw@host`
-  records `REDACTED=REDACTED&REDACTED=REDACTED`.
-- **Cut from `url.full`, with everything after it and the query:** a url nested in the request
-  path — any `http:` or `https:` url, and any other one holding userinfo, `//user:pass@host`
-  included — raw, under any layers of percent-encoding, or base64 or base64url-encoded anywhere in
-  the path, percent-encoded inside or not. `https://proxy.test/fetch/https://user:pass@cb.test/x`
-  records `https://proxy.test/fetch/REDACTED`.
+  GCS url, whichever signing generation made it, and an Azure SAS url.
+- **A url in a kept query key or value**, once decoded, that the runtime's `URL` parses: its
+  userinfo makes the key or value record `REDACTED` whole, and its own listed keys are redacted, at
+  every level: `?next=https://t.test/x?token=…` records
+  `next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3DREDACTED`. A url in a key is read with its value too, and
+  where that finds a credential both record `REDACTED`: `?https://t.test/x?token=…` and
+  `?https://a@b=pw@host` record `REDACTED=REDACTED`. Past eight levels, one records `REDACTED`.
+- **A url in a captured header value or a status message**, from its scheme to the next whitespace,
+  that the runtime's `URL` parses: userinfo or a listed key makes a header value record `REDACTED`
+  whole, and in a status message, from a rejection or an `end({ error })` message, records
+  `REDACTED` in place: `http://REDACTED@host/x?access_token=REDACTED`.
 
 Never put credentials in the url; pass an `Authorization` header, and strip userinfo from a url you
 did not build. `log.fetch` mirrors the runtime: Node and browsers refuse such a url, while React
 Native hands it to the platform, where iOS sends the credentials and Android sends none, leaving
-you the 401. A url a status message quotes, in such a rejection or an `end({ error })` message, is
-redacted in place as `url.full` is with `captureQuery` on, and its fragment records `REDACTED`:
-`http://REDACTED@host/x?access_token=REDACTED`.
+you the 401.
 
 `REDACTED` does not always stand for a credential: a `?key=` lookup or a `?token=` pagination
-cursor records it, an address after a host, as in `https://api.test,mail@example.com` or a query
-value's `https://api.test mail@example.com`, or every pair from a raw url's host to a later `@`
-through pairs holding no `/`, `?` or `#`, keys included, as all three in `?redirect_uri=https://app.test&scope=openid&login_hint=bob@x.test`,
-or a Windows share path holding `@`, redacts too, a `location` of
-`https://cdn.test//logo@2x.png` records `REDACTED` whole, and a path holding `http:`, or `//`
-then a name holding `@`, is cut — `https://wiki.test/wiki/Http:_Status` records
-`https://wiki.test/wiki/REDACTED` — and so, rarely, is a random id whose base64 decoding spells
-one. A percent-encoded url is cut too, credential or not, before a raw `//` in a query key or
-value, or in the host right after that `//`, and from the host of a url a status message quotes.
+cursor records it, and so does an address the runtime reads as userinfo, as in
+`https://api.test,mail@example.com`.
 
 Spans are queued when the response arrives and are registered with `flush()` at call time, so
 `await log.end()` delivers a `log.fetch()` you never awaited.

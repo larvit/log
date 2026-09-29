@@ -8,13 +8,6 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ### Security
 
-- [ ] **Redact only what the runtime's `URL` parses as userinfo, and the listed query keys and
-  header names.** README → Goals #3 now draws the line there. Replace the regex userinfo match, the
-  `=` and `&` crossing rules, the eight decode layers, base64 detection and the request-path cut
-  with a parse of each url exported — `url.full`, a quoted url in a status message, a captured
-  header value, and a query value that parses as a url once decoded, at every level. Rewrite the
-  unreleased CHANGELOG entries and README → Credentials in a captured value to match, and delete
-  the decision entries whose premise was the old goal's "a url written other than plainly".
 - [ ] **Weigh redacting the query keys `access-token`, `accesstoken`, `api-key`, `auth_token`,
   `client_secret`, `id_token`, `password`, `refresh_token`, `secret` and `subscription-key` too,
   and add those that carry a credential.** With `captureQuery` on, `url.full` exports each one's
