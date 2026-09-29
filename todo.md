@@ -32,8 +32,9 @@ mechanism, that is evidence of the problem, never the prescribed repair.
   says it should; one of the two claims moves.
 - [ ] **Give README → Credentials in a captured value one bullet per redaction rule.** The status
   message rule sits inside the "Never put credentials in the url" advice, "`REDACTED` does not
-  always stand for a credential" is one run-on sentence of four cases, and "Spans are queued…"
-  belongs under `log.fetch` in depth.
+  always stand for a credential" is one run-on sentence of four cases, "Spans are queued…"
+  belongs under `log.fetch` in depth, and "through one layer of percent-encoding" undersells a query
+  value's userinfo rule, which redacts one encoded twice.
 - [ ] **Stop decoding base64 in a request path, so every base64 value exports intact.**
   README → Goals #3 leaves a url base64-encoded into a path to the caller; today a random id whose
   decoding spells `http:` or `//x@` is cut. Drop the base64 half of the nested-url cut, its tests,
