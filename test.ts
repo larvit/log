@@ -1788,7 +1788,7 @@ test("log.fetch captureQuery keeps the query but redacts known-sensitive keys an
 	const { calls } = stubFetch();
 	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 
-	await log.fetch("https://api.test/x?q=hi&Signature=abc&Signature=def&next=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&deep=https%253A%252F%252Fmyuser%253Ahunter2%2540cb.test%252Fx&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAEXAMPLE%2F20260923%2Feu-north-1%2Fs3%2Faws4_request&X-Amz-Security-Token=FwoGZXIvYXdz&X-Amz-Signature=8b1c9f&X-Goog-Credential=svc%40proj.iam.gserviceaccount.com%2F20260923%2Fauto%2Fstorage%2Fgoog4_request&GoogleAccessId=svc%40proj.iam.gserviceaccount.com&access_token=ya29tok&API_KEY=k1api&apikey=k2api&key=k3api&Token=k4tok&keyword=kept&https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fz");
+	await log.fetch("https://api.test/x?q=hi&Signature=abc&Signature=def&next=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&deep=https%253A%252F%252Fmyuser%253Ahunter2%2540cb.test%252Fx&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAEXAMPLE%2F20260923%2Feu-north-1%2Fs3%2Faws4_request&X-Amz-Security-Token=FwoGZXIvYXdz&X-Amz-Signature=8b1c9f&X-Goog-Credential=svc%40proj.iam.gserviceaccount.com%2F20260923%2Fauto%2Fstorage%2Fgoog4_request&GoogleAccessId=svc%40proj.iam.gserviceaccount.com&access_token=ya29tok&API_KEY=k1api&apikey=k2api&key=k3api&Token=k4tok&keyword=kept&https://t.test/x?token=k5tok&then=https://t.test/y?sig=k6sig&https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fz");
 	await log.end();
 
 	const urlFull = clientSpan(calls).attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue;
@@ -1808,6 +1808,9 @@ test("log.fetch captureQuery keeps the query but redacts known-sensitive keys an
 	for (const key of tokens) t.ok(urlFull.includes(`&${key}=REDACTED`), `${key} records REDACTED`);
 	t.ok(!/ya29tok|k1api|k2api|k3api|k4tok/.test(urlFull), "no token value is leaked");
 	t.ok(urlFull.includes("keyword=kept"), "a key merely starting with a listed name is kept");
+	t.ok(urlFull.includes("&https%3A%2F%2Ft.test%2Fx%3Ftoken=REDACTED&"), "a url nested in a query key has its listed key redacted");
+	t.ok(urlFull.includes("&then=https%3A%2F%2Ft.test%2Fy%3Fsig%3DREDACTED&"), "a url nested in a query value has its listed key redacted");
+	t.ok(!/k5tok|k6sig/.test(urlFull), "no nested token value is leaked");
 	t.end();
 });
 

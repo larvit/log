@@ -420,7 +420,9 @@ them per call site.
   `api_key`, `apikey`, `awsaccesskeyid`, `googleaccessid`, `key`, `sig`, `signature`, `token`,
   `x-amz-credential`, `x-amz-security-token`, `x-amz-signature`, `x-goog-credential` or
   `x-goog-signature` — a bearer token or API key sent in the query, a presigned S3-compatible or
-  GCS url, whichever signing generation made it, and an Azure SAS url.
+  GCS url, whichever signing generation made it, and an Azure SAS url. A url nested in a kept
+  query key or value, through one layer of percent-encoding, has its own such keys redacted:
+  `?next=https://t.test/x?token=…` records `next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3DREDACTED`.
 - **Redacted wherever it appears:** any other captured header value, or kept query key or value,
   that holds url userinfo — which records `REDACTED` in place of the whole of itself, through one
   layer of percent-encoding but not two.
