@@ -105,16 +105,16 @@ was not. Valid while `url.full` is built from `origin` + `pathname`.
 
 2026-09-20, amended 2026-09-29: a `log.fetch` url carrying userinfo reaches the runtime's `fetch`
 untouched, and its span's status replaces that url, as the runtime quotes it back, with its redacted
-form. A rejection forwarded to `end({ error })` is free text there and exported as written, per the
-whole-value entry below. Turning the userinfo into an `Authorization: Basic` header, as
-`otlpHttpBaseURI` does with the same spelling, is what README → Goals forbids of `log.fetch`: "never
-a request the platform would not have made, and never a success the platform would have refused".
-The two spellings differ because the queue's endpoint is this library's own request to make, where
-`log.fetch`'s is the caller's, so the same string means "authenticate me" in one and "mirror what my
-runtime does with this" in the other. React Native does put them on the wire, on one of its two
-platforms: `whatwg-fetch` hands the url to `XMLHttpRequest.open` untouched and sets no header, iOS
-keeps the userinfo through `[RCTConvert NSURL:]` and runs `NSURLSession` with no challenge delegate,
-so the system answers `WWW-Authenticate` with the credentials, while Android passes the string to
+form. A rejection forwarded to `end({ error })` is read by the whole-value entry below. Turning the
+userinfo into an `Authorization: Basic` header, as `otlpHttpBaseURI` does with the same spelling, is
+what README → Goals forbids of `log.fetch`: "never a request the platform would not have made, and
+never a success the platform would have refused". The two spellings differ because the queue's
+endpoint is this library's own request to make, where `log.fetch`'s is the caller's, so the same
+string means "authenticate me" in one and "mirror what my runtime does with this" in the other.
+React Native does put them on the wire, on one of its two platforms: `whatwg-fetch` hands the url to
+`XMLHttpRequest.open` untouched and sets no header, iOS keeps the userinfo through `[RCTConvert
+NSURL:]` and runs `NSURLSession` with no challenge delegate, so the system answers
+`WWW-Authenticate` with the credentials, while Android passes the string to
 `Request.Builder().url()` and OkHttp derives no `Authorization` from it — leaving the caller a 401,
 and writing the userinfo out only in a plain-`http:` proxy's request line. Same at `v0.74.0` and
 today's `main`. Mirroring keeps that the platform's behaviour. It ships in a minor on the precedent
@@ -129,15 +129,15 @@ header values and for the query values `captureQuery` keeps — and for a query 
 written as a bare key reaches `url.full` the same way its value would — because the same
 credentialed url arrives by every one of those routes and separate rules would disagree the way the
 two allow-lists used to: `authorization`, `proxy-authorization`, `cookie` and `set-cookie` go by
-name, and everything else goes by whether a url in the value holds a credential. Redacting rather
-than rejecting the allow-list entry is what a minor allows — README → Goals #4 deprecates a breaking
-change in a 2.x minor first, and the leak is open now — and it matches the stance
-`SENSITIVE_QUERY_KEYS` already took. `REDACTED` over dropping the attribute keeps the telemetry
-reader's "was the header there?", which is what an allow-list is for once the value is gone. The
-four names are the ones whose value is a credential by definition (RFC 9110 authentication, RFC 6265
-cookies). What this does not reach, and the README says so, is a header whose value simply is a
-secret — `x-api-key`, a signed token — which no shape distinguishes from any other string. Valid
-while an allow-list names header names, not patterns.
+name, and everything else goes by whether the value, parsed whole as a url, holds a credential.
+Redacting rather than rejecting the allow-list entry is what a minor allows — README → Goals #4
+deprecates a breaking change in a 2.x minor first, and the leak is open now — and it matches the
+stance `SENSITIVE_QUERY_KEYS` already took. `REDACTED` over dropping the attribute keeps the
+telemetry reader's "was the header there?", which is what an allow-list is for once the value is
+gone. The four names are the ones whose value is a credential by definition (RFC 9110
+authentication, RFC 6265 cookies). What this does not reach, and the README says so, is a header
+whose value simply is a secret — `x-api-key`, a signed token — which no shape distinguishes from any
+other string. Valid while an allow-list names header names, not patterns.
 
 ## Every rule on credentials in a span sits in one source section
 
