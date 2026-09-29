@@ -40,7 +40,7 @@
   `=`, so the value was tested apart from the url in its key. Both now record `REDACTED=REDACTED`,
   and so does a pair such as `?https://api.test=user@mail.test`, which a url parser reads as
   userinfo too, so a dashboard grouping on such a `url.full` sees it change. Search `url.full` with
-  `(?i)(^|[?&])(REDACTED|[^&=]*%2F%2F([^&=%]|%(2[0-24-9a-e]|3[0-9a-e]|[014-9a-f][0-9a-f]))*)=[^&]*%40`
+  `(?i)(^|[?&])(REDACTED|[^&=]*%(25)*2F%(25)*2F([^&=%]|%(2[0-24-9a-e]|3[0-9a-e]|[014-9a-f][0-9a-f]))*)=[^&]*%(25)*40`
   and rotate any password a match holds.
 - **`captureQuery` redacts the value of a query key named `access_token`, `api_key`, `apikey`, `key`
   or `token`, in any casing.** Since v2.3.0, `log.fetch("https://api.test/me?access_token=…")` with
