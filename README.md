@@ -191,7 +191,8 @@ never ended is never sent. `end({ error })` also marks the span failed: status `
 error's message, and an `error.type` attribute from its string `code`, else `name`, else `"_OTHER"`; a `null` or `undefined`
 error is a plain `end()`. A message that is a url is redacted, see
 [Credentials in a captured value](#credentials-in-a-captured-value); keep credentials out of any
-other error message. A logged `log.error()` never fails the
+other error message. A `log.fetch` rejection quotes its url among text, so forwarding one exports
+that url as written: replace its message first, or keep credentials out of the url. A logged `log.error()` never fails the
 span; a recovered error is not a failed operation. `await` it to make one delivery attempt before the
 process exits (a short-lived script); fire-and-forget is fine in a long-running process. Against a
 dead collector `await end()` returns after that attempt, within about 3 s plus however long any
@@ -394,7 +395,7 @@ Span attributes follow the OpenTelemetry HTTP semantic conventions:
 | Attribute | Value |
 |---|---|
 | `http.request.method` | Request method, `GET` when unset |
-| `url.full` | The URL without the outer userinfo. Query string dropped unless `captureQuery`, where a credentialed key or value records `REDACTED` |
+| `url.full` | The URL without the outer userinfo; a url nested in the path is exported as written. Query string dropped unless `captureQuery`, redacted as [Credentials in a captured value](#credentials-in-a-captured-value) says |
 | `url.scheme`, `server.address`, `server.port` | From the URL; port only when explicit |
 | `http.request.header.<name>` | Headers listed in `captureRequestHeaders` |
 | `http.response.status_code` | Response status |
@@ -402,7 +403,8 @@ Span attributes follow the OpenTelemetry HTTP semantic conventions:
 | `error.type` | On a thrown error: its `code`, a numeric one as digits (an abort records `"20"`), else `name`, else `"fetch_error"` |
 
 A 4xx/5xx response marks the span errored; a thrown error does too, with its message as the status
-message. The response or error reaches the caller unchanged. Bodies are never captured.
+message, the fetched url in it redacted as
+[Credentials in a captured value](#credentials-in-a-captured-value) says. The response or error reaches the caller unchanged. Bodies are never captured.
 `captureQuery` and the header allow-lists are read at call time from the instance; `clone()` to vary
 them per call site.
 
@@ -419,13 +421,14 @@ them per call site.
   every level: `?next=https://t.test/x?token=…` records
   `next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3DREDACTED`. A url in a key is read with its value too, and
   where that finds a credential both record `REDACTED`: `?https://t.test/x?token=…`,
-  `?https://a@b=pw@host` and `?https://u:p=w@host` record `REDACTED=REDACTED`. Past eight levels,
-  one records `REDACTED`.
+  `?https://a@b=pw@host` and `?https://u:p=w@host` record `REDACTED=REDACTED`. A key or value nested
+  deeper than eight levels records `REDACTED` whole.
 - **A captured header value or a status message that the runtime's `URL` parses whole:** userinfo or
-  a listed key makes a header value record `REDACTED` whole, and a status message record it in
-  place: `http://REDACTED@host/x?access_token=REDACTED`. In its own span's status, `log.fetch` also
-  redacts the url it fetched wherever the runtime's rejection quotes it. Text the runtime's `URL`
-  cannot parse whole is exported as written.
+  a listed key, at every level as above, makes a header value record `REDACTED` whole, and a status
+  message record `REDACTED` in place: `http://REDACTED@host/x?access_token=REDACTED`. In its own
+  span's status, `log.fetch` also redacts the url it fetched wherever the runtime's rejection quotes
+  it. Text the runtime's `URL` cannot parse whole is exported as written, a relative `location:
+  /cb?token=…` included, since it needs a base.
 
 Never put credentials in the url; pass an `Authorization` header, and strip userinfo from a url you
 did not build. `log.fetch` mirrors the runtime: Node and browsers refuse such a url, while React
