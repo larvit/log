@@ -1471,12 +1471,13 @@ function redactQuotedUrls(text: string, depth = 0): string {
 	const quotedUrl = depth === 0 ? /((?:\bhttps?:)?\/\/[^\s/?#]*)([^\s?#]*)(\?[^\s#]*)?(#\S*)?/gi : /((?:\bhttps?:)?\/\/[^/?#]*)([^?#]*)(\?[^#]*)?(#[^]*)?/gi;
 
 	return text.replace(quotedUrl, (_, head: string, path: string, query = "", fragment = "") => {
-		// An authority cannot hold a url, so one found there is cut as one in the path is.
-		const [scheme, authority] = head.split(/(?<=\/\/)/, 2);
-		const nestedStart = nestedUrlStart(authority + path);
+		// A host cannot hold a url, so one found there is cut as one in the path is; userinfo is
+		// redactUserinfo's, whole.
+		const [, scheme, userinfo, host] = /^(.*?\/\/)(.*@)?(.*)$/s.exec(head) ?? [];
+		const nestedStart = nestedUrlStart(host + path);
 
 		if (nestedStart !== undefined) {
-			return scheme + (authority + path).slice(0, nestedStart) + "REDACTED";
+			return scheme + (userinfo ?? "") + (host + path).slice(0, nestedStart) + "REDACTED";
 		}
 
 		return head + path + (query && "?" + query.slice(1).replace(/[^&]+/g, redactPair)) + (fragment && "#REDACTED");
