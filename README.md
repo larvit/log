@@ -425,7 +425,7 @@ them per call site.
   `?next=https://t.test/x?token=…` records `next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3DREDACTED`.
 - **Redacted wherever it appears:** any other captured header value, or kept query key or value,
   that holds url userinfo — which records `REDACTED` in place of the whole of itself, through one
-  layer of percent-encoding, and in a query key or value past whitespace.
+  layer of percent-encoding, and in a query key or value even where the userinfo holds a space (`+`, `%20`).
 - **Cut from `url.full`, with everything after it and the query:** a url nested in the request
   path — any `http:` or `https:` url, and any other one holding userinfo, `//user:pass@host`
   included — raw, under any layers of percent-encoding, or base64 or base64url-encoded anywhere in
