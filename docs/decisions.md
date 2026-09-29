@@ -348,11 +348,12 @@ holding whitespace stays redacted, because there `+` or `%20` in a plainly writt
 it; a captured header's raw space is the caller's, so a bot `user-agent` naming a host and an
 address exports intact. Valid while Goals #3 exempts a url written other than plainly.
 
-## Redacting a url nested in a query key may cost 2^8 passes
+## Redacting a nested url may cost 3^8 passes
 
-2026-09-29, declined in review: a url nested in a query key is redacted twice per level, its key
-alone and then with its value, so a chain of eight such keys costs 256 passes over the url. The
-depth cap bounds it, and README → Goals #3 outranks Goals #7. Valid while the depth cap stays at eight.
+2026-09-29, declined in review: a level may be redacted three times — a url in a query key alone
+and then with its value, and a pair holding a raw url once more as a server decodes it — so a chain
+of eight such levels costs about 4,000 passes over the url: 13 s for a crafted 120 KB one. The depth
+cap bounds it, and README → Goals #3 outranks Goals #7. Valid while the depth cap stays at eight.
 
 ## An encoded url beside a raw one is cut from where it starts
 
@@ -362,4 +363,6 @@ a raw `//`, also holds a percent-encoded url before that `//` or in the host aft
 starts, as the path rule cuts one: the raw url's regex reads such text as its host, or not at all,
 so its query has no key to redact by. A host is searched only where it holds an escape, so
 `envoy-http:10000` stays a host, and userinfo never is, since a cut inside it would stop its whole
-redaction. Serves README → Goals #3. Valid while the path rule cuts.
+redaction. A raw url's escaped `?`, `=` or `&` is read after one decode, as the server
+receiving the pair reads it; escaped deeper, it is that url's path text. Serves README → Goals #3.
+Valid while the path rule cuts.

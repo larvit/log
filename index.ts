@@ -1483,7 +1483,7 @@ function redactQuotedUrls(text: string, depth = 0): string {
 		const key = assignAt < 0 ? found : found.slice(0, assignAt);
 		const redacted = redactQueryCredential(key) + (assignAt < 0 ? "" : "=" + redactQueryValue(percentDecoded(key), found.slice(assignAt + 1)));
 
-		if (!whole.includes("//") || depth >= 8) {
+		if (!whole.includes("//")) {
 			return redacted;
 		}
 
@@ -1509,8 +1509,8 @@ function redactQuotedUrls(text: string, depth = 0): string {
 	}
 
 	return text.replace(quotedUrl, (_, head: string, path: string, query = "", fragment = "") => {
-		// A host holding an escape holds no name, so it is searched for a url as the path is; userinfo
-		// is redactUserinfo's, whole.
+		// A host holding an escape is searched for a url as the path is, so `envoy-http:10000` stays a
+		// host; userinfo is redactUserinfo's, whole.
 		const hostAt = Math.max(head.indexOf("//") + 2, head.lastIndexOf("@") + 1);
 		const searchedAt = head.includes("%", hostAt) ? hostAt : head.length;
 		const nestedStart = nestedUrlStart(head.slice(searchedAt) + path);
