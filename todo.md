@@ -8,12 +8,6 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ### Security
 
-- [ ] **Redact a listed key in a url nested in a query pair however many layers encode it, and
-  beside a raw `//` in the same pair.** A pair is decoded once per nesting level, so with
-  `captureQuery` on, `?next=https%253A%252F%252Ft.test%252Fx%253Ftoken%253DSECRET` exports
-  `token%253DSECRET` in `url.full` and in a status message, where userinfo in the same place records
-  `REDACTED`; and a status message quoting `?q=see//x+https%3A%2F%2Ft.test%2Fx%3Ftoken%3DSECRET`
-  exports it too, where `url.full` redacts it.
 - [ ] **Weigh redacting the query keys `access-token`, `accesstoken`, `api-key`, `auth_token`,
   `client_secret`, `id_token`, `password`, `refresh_token`, `secret` and `subscription-key` too,
   and add those that carry a credential.** With `captureQuery` on, `url.full` exports each one's
