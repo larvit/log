@@ -334,15 +334,16 @@ headline, "a credential never leaves", on the wire.
 2026-09-29, declined in review: a url found in a status message runs to the next whitespace, so a
 redacted last value or fragment takes a closing quote, bracket or comma with it. A runtime or
 wrapper quotes the url as written, where `"`, `<`, `>` and a backtick can be the url's own, and
-stopping at one let the listed key after it through. Readability of the text around the url gives
-way to README → Goals #3 over Audience #3. Valid while status messages are redacted in place.
+stopping at one let the listed key after it through; a raw tab or newline in the url, which a parser
+drops, ends it there too. Readability of the text around the url gives way to README → Goals #3 over
+Audience #3. Valid while status messages are redacted in place.
 
 ## A nested url spelled with whitespace in its `//` is the caller's
 
 2026-09-29, declined in review: a url nested in a query key or value has its listed keys redacted
 only where it opens plainly, `http://`, `https://` or `//`; `http:/%09/a/?token=…` exports as
 written, though a parser drops the tab. That is the spelling README → Goals #3 leaves to the
-caller, and chasing every parser-equivalent spelling has no end. So is a raw tab or newline in a url
-a status message quotes, which ends the url there. Userinfo holding whitespace stays
-redacted, because a whitespace-free match costs nothing there. Valid while Goals #3 exempts a url
-written other than plainly.
+caller, and chasing every parser-equivalent spelling has no end. In a query key or value, userinfo
+holding whitespace stays redacted, because there `+` or `%20` in a plainly written url decodes to
+it; a captured header's raw space is the caller's, so a bot `user-agent` naming a host and an
+address exports intact. Valid while Goals #3 exempts a url written other than plainly.

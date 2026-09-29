@@ -1265,10 +1265,7 @@ function redactCredential(value: string): string {
 		return value;
 	}
 
-	// A parser encodes a space in userinfo and drops a tab or newline, so neither ends it.
-	const unspaced = (text: string) => text.replace(/\s/g, "");
-
-	return holdsUserinfo(unspaced(value)) || holdsUserinfo(unspaced(percentDecoded(value))) ? "REDACTED" : value;
+	return holdsUserinfo(value) || holdsUserinfo(percentDecoded(value)) ? "REDACTED" : value;
 }
 
 // Header names carrying a credential by definition: RFC 9110 authentication, RFC 6265 cookies.
@@ -1410,7 +1407,11 @@ function nestedUrlStart(path: string): number | undefined {
 const SENSITIVE_QUERY_KEYS = new Set(["access_token", "api_key", "apikey", "awsaccesskeyid", "googleaccessid", "key", "sig", "signature", "token", "x-amz-credential", "x-amz-security-token", "x-amz-signature", "x-goog-credential", "x-goog-signature"]);
 
 // A parser drops a tab or newline, so a nested url's `to%09ken` is sent as `token`.
-const redactQueryValue = (key: string, value: string) => SENSITIVE_QUERY_KEYS.has(key.replace(/[\t\n\r]/g, "").toLowerCase()) ? "REDACTED" : redactCredential(value);
+// A decoded query component holds the space `+` or `%20` spelled, and a parser encodes a space in
+// userinfo and drops a tab or newline, so none of them ends userinfo there.
+const redactQueryCredential = (text: string) => redactCredential(text.replace(/\s/g, "")) === "REDACTED" ? "REDACTED" : text;
+
+const redactQueryValue = (key: string, value: string) => SENSITIVE_QUERY_KEYS.has(key.replace(/[\t\n\r]/g, "").toLowerCase()) ? "REDACTED" : redactQueryCredential(value);
 
 // buildUrlFull's cut and query rule, spliced into each url the text quotes, and a fragment records
 // `REDACTED`. A url nested in a query pair is redacted inside that pair, so the outer query runs past
@@ -1421,7 +1422,7 @@ function redactQuotedUrls(text: string, depth = 0): string {
 		const assignAt = found.indexOf("=");
 		const key = assignAt < 0 ? found : found.slice(0, assignAt);
 
-		return redactCredential(key) + (assignAt < 0 ? "" : "=" + redactQueryValue(percentDecoded(key), found.slice(assignAt + 1)));
+		return redactQueryCredential(key) + (assignAt < 0 ? "" : "=" + redactQueryValue(percentDecoded(key), found.slice(assignAt + 1)));
 	};
 
 	// Only whitespace ends a url a runtime quotes as written, so a raw `"` or `<` stays inside it;
@@ -1443,13 +1444,13 @@ function redactQuotedUrls(text: string, depth = 0): string {
 // redacted as one text.
 function redactQueryPair(key: string, value: string): [string, string] {
 	if (!key.includes("//")) {
-		return [redactCredential(key), redactQueryValue(key, value.includes("//") ? redactQuotedUrls(value, 1) : value)];
+		return [redactQueryCredential(key), redactQueryValue(key, value.includes("//") ? redactQuotedUrls(value, 1) : value)];
 	}
 
 	const redactedKey = redactQuotedUrls(key, 1);
 	const redactedPair = redactQuotedUrls(`${key}=${value}`, 1);
 
-	return [redactCredential(redactedKey), redactedPair.startsWith(`${redactedKey}=`) ? redactCredential(redactedPair.slice(redactedKey.length + 1)) : "REDACTED"];
+	return [redactQueryCredential(redactedKey), redactedPair.startsWith(`${redactedKey}=`) ? redactQueryCredential(redactedPair.slice(redactedKey.length + 1)) : "REDACTED"];
 }
 
 // `url.origin` omits userinfo, which is what keeps the outer url's credentials off the span.
