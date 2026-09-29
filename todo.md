@@ -8,20 +8,10 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ### Security
 
-- [ ] **Redact a listed query key in a status-message url a hand-built message quotes past a
-  space.** `end({ error: new Error("GET https://a.test/?q=hello world&token=SECRET failed") })`
-  exports `token=SECRET`: the url match stops at whitespace, where `url.full` for that url would
-  redact it. A runtime quotes the serialized url, which holds no space, so only a message the
-  caller built reaches it.
 - [ ] **Redact a listed key in a url nested in a captured query key.** With `captureQuery` on,
   `log.fetch("https://proxy.test/?https://t.test/x?token=SECRET")` exports `token=SECRET` in
   `url.full`: `URLSearchParams` reads `https://t.test/x?token` as the key, which no rule lists.
   A span's status message already redacts it.
-- [ ] **Redact the userinfo of a url a status message quotes when it holds a raw `/`, `?` or
-  `#`.** Such a url fails to parse, and the runtime quotes it as written:
-  `fetch("https://user:pa/ss@h.test/")` rejects with `Failed to parse URL from
-  https://user:pa/ss@h.test/`, and a span's status message exports the password, since the userinfo
-  match stops at the `/`.
 - [ ] **Weigh redacting the query keys `access-token`, `accesstoken`, `api-key`, `auth_token`,
   `client_secret`, `id_token`, `password`, `refresh_token`, `secret` and `subscription-key` too,
   and add those that carry a credential.** With `captureQuery` on, `url.full` exports each one's
