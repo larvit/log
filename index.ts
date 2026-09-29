@@ -1259,9 +1259,11 @@ function percentDecoded(value: string): string {
 	});
 }
 
+// URL_USERINFO cannot match without an `@`, and `%40` is the only escape that decodes to one.
+const mayHoldUserinfo = (text: string) => text.includes("@") || text.includes("%40");
+
 function redactCredential(value: string): string {
-	// URL_USERINFO cannot match without an `@`, and `%40` is the only escape that decodes to one.
-	if (!value.includes("@") && !value.includes("%40")) {
+	if (!mayHoldUserinfo(value)) {
 		return value;
 	}
 
@@ -1408,7 +1410,7 @@ const SENSITIVE_QUERY_KEYS = new Set(["access_token", "api_key", "apikey", "awsa
 
 // A decoded query component holds the space `+` or `%20` spelled, and a parser encodes a space in
 // userinfo and drops a tab or newline, so none of them ends userinfo there.
-const redactQueryCredential = (text: string) => !text.includes("@") && !text.includes("%40") ? text : [text, percentDecoded(text)].some(form => holdsUserinfo(form.replace(/\s/g, ""))) ? "REDACTED" : text;
+const redactQueryCredential = (text: string) => !mayHoldUserinfo(text) ? text : [text, percentDecoded(text)].some(form => holdsUserinfo(form.replace(/\s/g, ""))) ? "REDACTED" : text;
 
 // A parser drops a tab or newline, so a nested url's `to%09ken` is sent as `token`.
 const redactQueryValue = (key: string, value: string) => SENSITIVE_QUERY_KEYS.has(key.replace(/[\t\n\r]/g, "").toLowerCase()) ? "REDACTED" : redactQueryCredential(value);
