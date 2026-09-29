@@ -1417,35 +1417,51 @@ const redactQueryValue = (key: string, value: string) => SENSITIVE_QUERY_KEYS.ha
 
 const formDecoded = (text: string) => percentDecoded(text.replace(/\+/g, " "));
 
-// A pair spelling no `//` is decoded a layer at a time until one does, that layer is redacted, and a
-// part it changes is encoded back as many times; `undefined` where no layer spells one. Eight urls or
-// layers deep, a pair still holding one records `REDACTED`, before the stack runs out.
-function redactEncodedPair(key: string, value: string, depth: number): [string, string] | undefined {
-	let decoded = [key, value];
+// The form-decoding layers until a text spells `//`: `undefined` where none does, `Infinity` where
+// it is still percent-encoded after eight.
+function layersToUrl(text: string): number | undefined {
+	for (let layers = 1; layers <= 8; layers++) {
+		const decoded = formDecoded(text);
 
-	for (let layers = 1; layers <= 8 && !decoded.some(part => part.includes("//")); layers++) {
-		const next = decoded.map(formDecoded);
-
-		if (next.every((part, i) => part === decoded[i])) {
+		if (decoded === text) {
 			return undefined;
 		}
 
-		decoded = next;
+		text = decoded;
 
-		if (decoded.some(part => part.includes("//"))) {
-			if (depth >= 8) {
-				return ["REDACTED", "REDACTED"];
-			}
-
-			// eslint-disable-next-line @typescript-eslint/no-use-before-define
-			const redacted = redactQueryPair(decoded[0], decoded[1], depth + 1);
-			const encoded = (part: string) => Array.from({ length: layers }).reduce<string>(encodedPart => encodeURIComponent(encodedPart), part);
-
-			return [redacted[0] === decoded[0] ? key : encoded(redacted[0]), redacted[1] === decoded[1] ? value : encoded(redacted[1])];
+		if (text.includes("//")) {
+			return layers;
 		}
 	}
 
-	return decoded.some(part => part.includes("%")) ? ["REDACTED", "REDACTED"] : undefined;
+	return formDecoded(text) === text ? undefined : Infinity;
+}
+
+// A pair is decoded to the layer where its key spells `//`, else its value, that layer is redacted,
+// and a part it changes is encoded back as many times; `undefined` where neither part is decoded.
+// Eight urls deep, a pair still holding one records `REDACTED`, before the stack runs out.
+function redactEncodedPair(key: string, value: string, depth: number): [string, string] | undefined {
+	if (key.includes("//")) {
+		return undefined;
+	}
+
+	const keyLayers = layersToUrl(key);
+	const layers = keyLayers ?? (value.includes("//") ? undefined : layersToUrl(value));
+
+	if (layers === undefined) {
+		return undefined;
+	}
+
+	if (layers === Infinity || depth >= 8) {
+		return [keyLayers === undefined ? key : "REDACTED", "REDACTED"];
+	}
+
+	const decoded = [key, value].map(part => Array.from({ length: layers }).reduce<string>(decodedPart => formDecoded(decodedPart), part));
+	// eslint-disable-next-line @typescript-eslint/no-use-before-define
+	const redacted = redactQueryPair(decoded[0], decoded[1], depth + 1);
+	const encoded = (part: string) => Array.from({ length: layers }).reduce<string>(encodedPart => encodeURIComponent(encodedPart), part);
+
+	return [redacted[0] === decoded[0] ? key : encoded(redacted[0]), redacted[1] === decoded[1] ? value : encoded(redacted[1])];
 }
 
 // buildUrlFull's cut and query rule, spliced into each url the text quotes, and a fragment records
@@ -1453,7 +1469,7 @@ function redactEncodedPair(key: string, value: string, depth: number): [string, 
 function redactQuotedUrls(text: string, depth = 0): string {
 	const redactPair = (whole: string) => {
 		const [rawKey, rawValue = ""] = whole.split(/=([^]*)/, 2);
-		const encodedPair = whole.includes("//") ? undefined : redactEncodedPair(rawKey, rawValue, depth);
+		const encodedPair = redactEncodedPair(rawKey, rawValue, depth);
 
 		if (encodedPair !== undefined) {
 			return encodedPair[0] + (whole.includes("=") ? "=" + encodedPair[1] : "");
@@ -1469,6 +1485,14 @@ function redactQuotedUrls(text: string, depth = 0): string {
 	// Only whitespace ends a url a runtime quotes as written, so a raw `"` or `<` stays inside it;
 	// nested, in a decoded query pair, a space is the url's own.
 	const quotedUrl = depth === 0 ? /((?:\bhttps?:)?\/\/[^\s/?#]*)([^\s?#]*)(\?[^\s#]*)?(#\S*)?/gi : /((?:\bhttps?:)?\/\/[^/?#]*)([^?#]*)(\?[^#]*)?(#[^]*)?/gi;
+
+	// Nested, the first url runs to the end, and what precedes it is decoded for one as a path is.
+	const firstUrl = depth === 0 ? -1 : text.search(quotedUrl);
+	const precedingStart = firstUrl < 0 ? undefined : nestedUrlStart(text.slice(0, firstUrl));
+
+	if (precedingStart !== undefined) {
+		return text.slice(0, precedingStart) + "REDACTED";
+	}
 
 	return text.replace(quotedUrl, (_, head: string, path: string, query = "", fragment = "") => {
 		// A host cannot hold a url, so one found there is cut as one in the path is; userinfo is
@@ -1487,7 +1511,7 @@ function redactQuotedUrls(text: string, depth = 0): string {
 // A url nested in the key owns the value: its last query key names it, so key and value are
 // redacted as one text.
 function redactQueryPair(key: string, value: string, depth: number): [string, string] {
-	const encodedPair = key.includes("//") || value.includes("//") ? undefined : redactEncodedPair(key, value, depth);
+	const encodedPair = redactEncodedPair(key, value, depth);
 
 	if (encodedPair !== undefined) {
 		return encodedPair;
