@@ -1417,6 +1417,9 @@ const redactQueryValue = (key: string, value: string) => SENSITIVE_QUERY_KEYS.ha
 
 const formDecoded = (text: string) => percentDecoded(text.replace(/\+/g, " "));
 
+// encodeURIComponent throws on a lone surrogate, which a message's raw text can hold.
+const encodedComponent = (text: string) => encodeURIComponent(text.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDFFF]/g, char => char.length === 2 ? char : "\uFFFD"));
+
 // The form-decoding layers until a text spells `//`: `undefined` where none does, `Infinity` where
 // it is still percent-encoded after eight.
 function layersToUrl(text: string): number | undefined {
@@ -1462,7 +1465,7 @@ function redactEncodedPair(key: string, value: string, depth: number): [string, 
 	const decoded = [key, value].map(part => Array.from({ length: layers }).reduce<string>(decodedPart => formDecoded(decodedPart), part));
 	// eslint-disable-next-line @typescript-eslint/no-use-before-define
 	const redacted = redactQueryPair(decoded[0], decoded[1], depth + 1);
-	const encoded = (part: string) => Array.from({ length: layers }).reduce<string>(encodedPart => encodeURIComponent(encodedPart), part);
+	const encoded = (part: string) => Array.from({ length: layers }).reduce<string>(encodedPart => encodedComponent(encodedPart), part);
 
 	return [redacted[0] === decoded[0] ? key : encoded(redacted[0]), ownValueRedacted ? "REDACTED" : redacted[1] === decoded[1] ? value : encoded(redacted[1])];
 }
@@ -1493,7 +1496,7 @@ function redactQuotedUrls(text: string, depth = 0): string {
 		// eslint-disable-next-line @typescript-eslint/no-use-before-define
 		const [decodedKey, decodedValue] = decoded[0] === redactedKey && decoded[1] === redactedValue ? decoded : redactQueryPair(decoded[0], decoded[1], depth + 1);
 
-		return (decodedKey === decoded[0] ? redactedKey : encodeURIComponent(decodedKey)) + (redacted.includes("=") ? "=" + (decodedValue === decoded[1] ? redactedValue : encodeURIComponent(decodedValue)) : "");
+		return (decodedKey === decoded[0] ? redactedKey : encodedComponent(decodedKey)) + (redacted.includes("=") ? "=" + (decodedValue === decoded[1] ? redactedValue : encodedComponent(decodedValue)) : "");
 	};
 
 	// Only whitespace ends a url a runtime quotes as written, so a raw `"` or `<` stays inside it;
