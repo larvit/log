@@ -42,7 +42,7 @@
   dashboard grouping on such a `url.full` sees it change. Search `url.full` with
   `(?i)\?.*%(25)*(2F|5C)%(25)*(2F|5C).*%(25)*40` and rotate any password a match holds.
 - **Url userinfo after `//` with either slash written `\` is redacted in a captured header value and
-  a span's status message.** Since v2.3.0, a captured `location` of `https:\\u:pw@h` exported `pw`,
+  a span's status message, and so is userinfo crossing a `&` in a status message.** Since v2.3.0, a captured `location` of `https:\\u:pw@h` exported `pw`,
   and since v2.4.0 so did a status message quoting `https:\\user:pass@host`, or
   `?https%3A%2F%2Fu&x=pw%40evil.test` whatever `captureQuery` says. Search captured header values
   and status messages with `(?i)([\\/]|%(25)*(2F|5C)){2}\S*(@|%(25)*40)` and rotate any password a
