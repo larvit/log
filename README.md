@@ -426,7 +426,7 @@ them per call site.
   digit, `_` or `/`, else up to its first `"'(),;<>[]{}|` or backtick. Where the runtime's `URL`
   parses it, userinfo or a listed key makes a header value record `REDACTED` whole, and in a status
   message, from a rejection or an `end({ error })` message, records `REDACTED` in place:
-  `http://REDACTED@host/x?access_token=REDACTED`. Past 16 schemes in one run, the rest records
+  `http://REDACTED@host/x?access_token=REDACTED`. Past 16 starts in one run, the rest records
   `REDACTED`.
 
 Never put credentials in the url; pass an `Authorization` header, and strip userinfo from a url you

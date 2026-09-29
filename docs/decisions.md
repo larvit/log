@@ -299,13 +299,13 @@ headline, "a credential never leaves", on the wire.
 
 2026-09-29, declined in review, amended the same day: in a status message or a captured header
 value, every scheme in a run of non-whitespace starts a url, read to the run's end, else short of
-its trailing punctuation, else up to its first delimiter, left to right over the text as redacted
-so far. A runtime or wrapper quotes the url as written, where `"`, `<`, `>` and a backtick can be
-the url's own, and stopping at one first let the listed key after it through; a url glued to
-another, in a path, a JSON string or a `link` header, is one the runtime parses, so Goals #3 covers
-it. Past 16 schemes in one run the rest records `REDACTED`, keeping a crafted run linear under
-Goals #7. Readability of the text around the url gives way to README → Goals #3 over Audience #3.
-Valid while a status message keeps its text.
+its trailing punctuation, else up to its first delimiter, left to right over the text as redacted so
+far. A runtime or wrapper quotes the url as written, where `"`, `<`, `>` and a backtick can be the
+url's own, and stopping at one first let the listed key after it through; a url glued to another, in
+a path, a JSON string or a `link` header, is one the runtime parses, so Goals #3 covers it. A
+special scheme ending a longer one is read from both; past 16 starts in one run the rest records
+`REDACTED`, keeping a crafted run linear under Goals #7. Readability of the text around the url
+gives way to README → Goals #3 over Audience #3. Valid while a status message keeps its text.
 
 ## Redaction narrows to Goals #3 in a minor
 

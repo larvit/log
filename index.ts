@@ -1402,25 +1402,30 @@ function redactQuotedUrls(text: string): string {
 		let started = 0;
 
 		for (let match = schemes.exec(run); match !== null; match = schemes.exec(run)) {
-			// A scheme starts at a letter, so one glued to a digit, or to an escape such as `%22`, still
-			// counts; a special one ending the token wins, as `%3Chttps:` holds.
-			const special = /(?:ftp|https?|wss?):$/i.exec(match[0]);
-			const start = match.index + (special?.index ?? match[0].search(/[a-z]/i));
+			const letterAt = match[0].search(/[a-z]/i);
 
-			if (start < match.index || !match[0].endsWith(":")) {
+			if (letterAt < 0 || !match[0].endsWith(":")) {
 				continue;
 			}
 
-			if (++started > MAX_QUOTED_URLS) {
-				return run.slice(0, start) + "REDACTED";
+			// From the first letter, so a scheme glued to a digit or an escape such as `%22` still counts,
+			// and from a special scheme ending the token too, as `%3Chttps:` holds; a rewrite keeps its
+			// scheme's length, so the second start stays put.
+			const specialAt = /(?:ftp|https?|wss?):$/i.exec(match[0])?.index ?? letterAt;
+
+			for (const start of new Set([match.index + letterAt, match.index + specialAt])) {
+				if (++started > MAX_QUOTED_URLS) {
+					return run.slice(0, start) + "REDACTED";
+				}
+
+				const redacted = redactedQuotedUrl(run.slice(start), partsRead);
+
+				if (redacted !== undefined) {
+					run = run.slice(0, start) + redacted;
+				}
 			}
 
-			const redacted = redactedQuotedUrl(run.slice(start), partsRead);
-
-			if (redacted !== undefined) {
-				run = run.slice(0, start) + redacted;
-				schemes.lastIndex = match.index + match[0].length;
-			}
+			schemes.lastIndex = match.index + match[0].length;
 		}
 
 		return run;
