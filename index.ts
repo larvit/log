@@ -1472,7 +1472,7 @@ function redactEncodedPair(key: string, value: string, depth: number): [string, 
 
 // A pair is split at its first `=`, and a parser at an authority's last `@`, so the userinfo of a
 // url written as a bare key can run on into the value.
-const userinfoCrossesAssign = (key: string, value: string) => /\/\/[^/?#]*$/.test(key) && /^[^/?#]*@/.test(value);
+const userinfoCrossesAssign = (key: string, value: string) => [key, percentDecoded(key)].some(form => /\/\/[^/?#]*$/.test(form)) && [value, percentDecoded(value)].some(form => /^[^/?#]*@/.test(form));
 
 // buildUrlFull's cut and query rule, spliced into each url the text quotes, and a fragment records
 // `REDACTED`. A url nested in a query pair is redacted inside that pair, so the outer query runs past it.
