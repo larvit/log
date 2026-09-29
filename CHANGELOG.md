@@ -20,11 +20,13 @@
   holds.
 - **`captureQuery` redacts a listed query key's value in a url nested in a query key or value.**
   Since v2.3.0, `log.fetch("https://proxy.test/?https://t.test/x?token=…")` with `captureQuery` on
-  exported the token in `url.full`, and so did `?next=https://t.test/x?token=…` and a url nested
-  in that one, under any number of percent-encoding layers per level. An encoded one in a key or
-  value that also holds a raw `//`, as in `?q=see//x+https%253A%252F%252F…`, is cut from where it
-  starts, and so is a url in the host of a url a status message quotes, so a dashboard grouping on
-  such a `url.full` or status message sees it change. Search `url.full` with the first bullet's
+  exported the token in `url.full`, and so did `?next=https://t.test/x?token=…`, a url nested
+  in that one, under any number of percent-encoding layers per level, and one whose own `?`, `=`
+  or `&` is percent-encoded, as in `?redirect=https://app.test/cb%3Fstate%3D1%26token%3D…`. Any
+  encoded url in a key or value that also holds a raw `//`, as in `?q=see//x+https%253A%252F%252F…`,
+  is cut from where it starts, credential or not, and so is one in the percent-encoded host of a
+  url a status message quotes, as in `https://h+https%3A%2F%2F…`, so a dashboard grouping on such
+  a `url.full` or status message sees it change. Search `url.full` with the first bullet's
   regex, `%(25)*(3f|26)` inserted after its `(?i)`, for a match followed by anything but
   `REDACTED`, and rotate what it finds; a presigned SigV4 url only while unexpired, as v2.4.0 says.
 - **`captureQuery` redacts url userinfo holding whitespace in a kept query key or value.** Since
