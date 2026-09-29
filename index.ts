@@ -1433,7 +1433,7 @@ function redactQuotedUrls(text: string, depth = 0): string {
 			// eslint-disable-next-line @typescript-eslint/no-use-before-define
 			const [redactedKey, redactedValue] = redactQueryPair(decodedKey, decodedValue, depth + 1);
 
-			return redactedKey === decodedKey && redactedValue === decodedValue ? whole : encodeURIComponent(redactedKey) + (whole.includes("=") ? "=" + encodeURIComponent(redactedValue) : "");
+			return redactedKey === decodedKey && (!whole.includes("=") || redactedValue === decodedValue) ? whole : encodeURIComponent(redactedKey) + (whole.includes("=") ? "=" + encodeURIComponent(redactedValue) : "");
 		}
 
 		const found = !whole.includes("//") ? whole : depth < 8 ? redactQuotedUrls(whole, depth + 1) : "REDACTED";
@@ -1460,7 +1460,7 @@ function redactQuotedUrls(text: string, depth = 0): string {
 
 // A url nested in the key owns the value: its last query key names it, so key and value are
 // redacted as one text.
-function redactQueryPair(key: string, value: string, depth = 1): [string, string] {
+function redactQueryPair(key: string, value: string, depth: number): [string, string] {
 	if (!key.includes("//")) {
 		return [redactQueryCredential(key), redactQueryValue(key, value.includes("//") ? redactQuotedUrls(value, depth) : value)];
 	}
@@ -1489,7 +1489,7 @@ function buildUrlFull(url: URL, captureQuery: boolean): string {
 	const kept = new URLSearchParams();
 
 	for (const [key, value] of new URLSearchParams(url.search)) {
-		kept.append(...redactQueryPair(key, value));
+		kept.append(...redactQueryPair(key, value, 1));
 	}
 
 	return `${base}?${kept.toString()}`;
