@@ -1488,7 +1488,7 @@ function pairsUserinfoCrosses(pairs: string[]): Set<number> {
 				}
 			}
 
-			if (/[/?#]/.test(pair)) {
+			if (/[\\/?#]/.test(pair)) {
 				openAt = /[\\/]{2}[^/?#]*$/.test(pair) ? index : undefined;
 			}
 		});
