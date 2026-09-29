@@ -8,12 +8,12 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ### Security
 
-- [ ] **Redact a listed key in a percent-encoded url nested in a query pair, at every level.**
-  `log.fetch("https://u:p@h.test/?next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3DSECRET")` on Node puts
-  `token%3DSECRET` in the span's status message, where `url.full` records `REDACTED`; and with
-  `captureQuery` on, `url.full` exports `token%253DSECRET` from a url nested two deep in the
-  standard encoding, `?next=https%3A%2F%2Ft.test%2Fx%3Fnext2%3Dhttps%253A%252F%252Fu.test%252F%253Ftoken%253DSECRET`.
-  A pair is not decoded before it is searched for a nested url.
+- [ ] **Redact a listed key in a url nested in a query pair however many layers encode it, and
+  beside a raw `//` in the same pair.** A pair is decoded once per nesting level, so with
+  `captureQuery` on, `?next=https%253A%252F%252Ft.test%252Fx%253Ftoken%253DSECRET` exports
+  `token%253DSECRET` in `url.full` and in a status message, where userinfo in the same place records
+  `REDACTED`; and a status message quoting `?q=see//x+https%3A%2F%2Ft.test%2Fx%3Ftoken%3DSECRET`
+  exports it too, where `url.full` redacts it.
 - [ ] **Weigh redacting the query keys `access-token`, `accesstoken`, `api-key`, `auth_token`,
   `client_secret`, `id_token`, `password`, `refresh_token`, `secret` and `subscription-key` too,
   and add those that carry a credential.** With `captureQuery` on, `url.full` exports each one's
