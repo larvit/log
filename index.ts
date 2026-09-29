@@ -1241,40 +1241,113 @@ export class Queue implements OtlpQueue {
 
 // --- Credentials on a span -------------------------------------------------
 
-// Scheme-relative too: a runtime quotes a url it could not parse as `//user:pass@host`. A parser
-// reads `\` as `/` there.
-const URL_USERINFO = /(:?[\\/]{2})[^/?#\s]*@/g;
-const redactUserinfo = (text: string) => text.replace(URL_USERINFO, "$1REDACTED@");
-const holdsUserinfo = (text: string) => redactUserinfo(text) !== text;
-
-// Run by run, never the whole string: decodeURIComponent throws on the first invalid escape.
-function percentDecoded(value: string): string {
-	return value.replace(/(?:%[0-9A-Fa-f]{2})+/g, run => {
-		try {
-			return decodeURIComponent(run);
-		} catch {
-			// Only ASCII spells a url delimiter, so keep a non-UTF-8 run's ASCII and leave the rest.
-			return run.replace(/%([0-9A-Fa-f]{2})/g, (escape, hex: string) => parseInt(hex, 16) < 0x80 ? String.fromCharCode(parseInt(hex, 16)) : escape);
-		}
-	});
-}
-
-// URL_USERINFO cannot match without an `@`, and `%40` is the only escape that decodes to one.
-const mayHoldUserinfo = (text: string) => text.includes("@") || text.includes("%40");
-
-function redactCredential(value: string): string {
-	if (!mayHoldUserinfo(value)) {
-		return value;
-	}
-
-	return holdsUserinfo(value) || holdsUserinfo(percentDecoded(value)) ? "REDACTED" : value;
-}
+// Every key OTel semconv's default deny-list has named, every S3 and GCS query-signing generation's credential keys, and the names a bearer token or API key travels under.
+const SENSITIVE_QUERY_KEYS = new Set(["access_token", "api_key", "apikey", "awsaccesskeyid", "googleaccessid", "key", "sig", "signature", "token", "x-amz-credential", "x-amz-security-token", "x-amz-signature", "x-goog-credential", "x-goog-signature"]);
 
 // Header names carrying a credential by definition: RFC 9110 authentication, RFC 6265 cookies.
 const SENSITIVE_HEADER_NAMES = new Set(["authorization", "cookie", "proxy-authorization", "set-cookie"]);
 
+// Past it a query part that parses as a url records `REDACTED`, before the stack runs out.
+const MAX_URL_DEPTH = 8;
+
+// A url without a host has no userinfo.
+function parsedUrl(text: string): URL | undefined {
+	try {
+		const url = new URL(text);
+
+		return url.host === "" ? undefined : url;
+	} catch {
+		return undefined;
+	}
+}
+
+const holdsUserinfo = (url: URL) => url.username !== "" || url.password !== "";
+
+// `undefined` where no pair changes.
+function redactedSearch(url: URL, depth: number): string | undefined {
+	const pairs = [...url.searchParams];
+	// eslint-disable-next-line @typescript-eslint/no-use-before-define
+	const redacted = pairs.map(([key, value]) => redactQueryPair(key, value, depth + 1));
+
+	return redacted.some(([key, value], index) => key !== pairs[index][0] || value !== pairs[index][1]) ? new URLSearchParams(redacted).toString() : undefined;
+}
+
+function redactQueryPart(part: string, depth: number): string {
+	const url = parsedUrl(part);
+
+	if (url === undefined) {
+		return part;
+	}
+
+	if (depth > MAX_URL_DEPTH || holdsUserinfo(url)) {
+		return "REDACTED";
+	}
+
+	const search = redactedSearch(url, depth);
+
+	if (search === undefined) {
+		return part;
+	}
+
+	url.search = search;
+
+	return url.href;
+}
+
+// A url in a key is read with its value too, as a server taking `?<url>` reads it; where the value
+// lands in that url's query, that reading covers it.
+function redactQueryPair(key: string, value: string, depth: number): [string, string] {
+	if (SENSITIVE_QUERY_KEYS.has(key.toLowerCase())) {
+		return [key, "REDACTED"];
+	}
+
+	const keyUrl = parsedUrl(key);
+
+	if (keyUrl === undefined) {
+		return [key, redactQueryPart(value, depth)];
+	}
+
+	const joined = `${key}=${value}`;
+
+	if (depth > MAX_URL_DEPTH || holdsUserinfo(keyUrl) || redactQueryPart(joined, depth) !== joined) {
+		return ["REDACTED", "REDACTED"];
+	}
+
+	const valueInQuery = keyUrl.hash === "" && (keyUrl.search !== "" || key.endsWith("?"));
+
+	return [key, valueInQuery ? value : redactQueryPart(value, depth)];
+}
+
+// A url a text quotes runs from its scheme to the next whitespace.
+const QUOTED_URL = /\b(?:ftp|https?|wss?):\S*|[a-z][a-z\d+.-]*:\/\/\S*/gi;
+
+function redactQuotedUrls(text: string): string {
+	return text.replace(QUOTED_URL, quoted => {
+		const url = parsedUrl(quoted);
+
+		if (url === undefined) {
+			return quoted;
+		}
+
+		const search = redactedSearch(url, 0);
+
+		if (!holdsUserinfo(url) && search === undefined) {
+			return quoted;
+		}
+
+		if (holdsUserinfo(url)) {
+			url.username = "REDACTED";
+			url.password = "";
+		}
+
+		url.search = search ?? url.search;
+
+		return url.href;
+	});
+}
+
 function redactHeaderCredential(name: string, value: string): string {
-	return SENSITIVE_HEADER_NAMES.has(name.toLowerCase()) ? "REDACTED" : redactCredential(value);
+	return SENSITIVE_HEADER_NAMES.has(name.toLowerCase()) || redactQuotedUrls(value) !== value ? "REDACTED" : value;
 }
 
 // The URL log.fetch traces: a scheme written without "//" parses to an opaque path, where
@@ -1291,339 +1364,11 @@ function traceableUrl(input: string | URL): URL | undefined {
 	return url.protocol === "http:" || url.protocol === "https:" ? url : undefined;
 }
 
-// Every percent-encoding layer decoded, each dropping tab, CR and LF as a WHATWG parser does; every
-// char keeps the index in `text` it came from, or where its escape run starts when that is unclear.
-// Without an escape nothing moves, and `sources` is empty. From eight layers on `complete` is false.
-function decodedWithSources(text: string): { complete: boolean, decoded: string, sources: number[] } {
-	if (!text.includes("%")) {
-		return { complete: true, decoded: text, sources: [] };
-	}
-
-	let sources = Array.from({ length: text.length }, (_, i) => i);
-	let changed = true;
-
-	for (let pass = 0; changed && pass < 8; pass++) {
-		let next = "";
-		let last = 0;
-		const nextSources: number[] = [];
-		const keep = (chars: string, source: (offset: number) => number) => {
-			for (let offset = 0; offset < chars.length; offset++) {
-				if (!"\t\n\r".includes(chars[offset])) {
-					next += chars[offset];
-					nextSources.push(sources[source(offset)]);
-				}
-			}
-		};
-
-		for (const run of text.matchAll(/(?:%[0-9A-Fa-f]{2})+/g)) {
-			const decoded = percentDecoded(run[0]);
-
-			keep(text.slice(last, run.index), offset => last + offset);
-			keep(decoded, offset => run.index + (decoded.length * 3 === run[0].length ? offset * 3 : 0));
-			last = run.index + run[0].length;
-		}
-
-		keep(text.slice(last), offset => last + offset);
-		changed = next !== text;
-		text = next;
-		sources = nextSources;
-	}
-
-	return { complete: !changed, decoded: text, sources };
-}
-
-const earliest = (starts: (number | undefined)[]) => {
-	const found = starts.filter(start => start !== undefined);
-
-	return found.length === 0 ? undefined : Math.min(...found);
-};
-
-// An http(s) url starts at its scheme; any other needs non-empty userinfo after `ftp:`, `ws(s):` or
-// a doubled slash. Base64 decodes to noise, which userinfo must not run across: printable ASCII only.
-function nestedUrlIndex(text: string, printable: boolean): number | undefined {
-	// A parser percent-encodes a space in userinfo, so it stays inside.
-	const outsideUserinfo = printable ? /[^ -~]|[#/?\\]/ : /[#/?\\]/;
-	// One pass from the end, so a path of many candidates stays linear.
-	const reachesAt: boolean[] = [];
-
-	for (let i = text.length - 1; i >= 0; i--) {
-		reachesAt[i] = text[i] === "@" || (!outsideUserinfo.test(text[i]) && reachesAt[i + 1] === true);
-	}
-
-	// A parser splits userinfo at its last `@`, so a leading one is userinfo too.
-	const userinfoAt = (i: number) => i < text.length && !outsideUserinfo.test(text[i]) && reachesAt[i + 1] === true;
-	let special: number | undefined;
-	let doubledSlash: number | undefined;
-
-	for (const match of text.matchAll(/(?:ftp|wss?):[\\/]*/gi)) {
-		if (!/[\w+.-]/.test(text[match.index - 1] ?? "") && userinfoAt(match.index + match[0].length)) {
-			special = match.index;
-			break;
-		}
-	}
-
-	for (let i = 1; i < text.length; i++) {
-		if (/[\\/]/.test(text[i - 1]) && /[\\/]/.test(text[i]) && userinfoAt(i + 1)) {
-			doubledSlash = i;
-			break;
-		}
-	}
-
-	return earliest([/https?:/i.exec(text)?.index, special, doubledSlash]);
-}
-
-// Every base64 or base64url run, decoded at each of its four alignments, then percent-decoded.
-function base64NestedUrlStart(text: string): number | undefined {
-	for (const run of text.matchAll(/[\w+/-]{8,}/g)) {
-		let start: number | undefined;
-
-		for (let alignment = 0; alignment < 4; alignment++) {
-			const chars = run[0].slice(alignment, alignment + (Math.floor((run[0].length - alignment) / 4) * 4));
-			const { decoded, sources } = decodedWithSources(atob(chars.replace(/-/g, "+").replace(/_/g, "/")));
-			const found = nestedUrlIndex(decoded, true);
-
-			if (found !== undefined) {
-				start = Math.min(start ?? Infinity, run.index + alignment + (Math.floor((sources[found] ?? found) / 3) * 4));
-			}
-		}
-
-		if (start !== undefined) {
-			return start;
-		}
-	}
-}
-
-function nestedUrlStart(path: string): number | undefined {
-	const { complete, decoded, sources } = decodedWithSources(path);
-	// An escape left undecoded may still spell a url, so it cuts too.
-	const start = earliest([nestedUrlIndex(decoded, false), base64NestedUrlStart(decoded), complete ? undefined : decoded.indexOf("%")]);
-
-	if (start === undefined) {
-		return undefined;
-	}
-
-	return sources[start] ?? start;
-}
-
-// Every key OTel semconv's default deny-list has named, every S3 and GCS query-signing generation's credential keys, and the names a bearer token or API key travels under.
-const SENSITIVE_QUERY_KEYS = new Set(["access_token", "api_key", "apikey", "awsaccesskeyid", "googleaccessid", "key", "sig", "signature", "token", "x-amz-credential", "x-amz-security-token", "x-amz-signature", "x-goog-credential", "x-goog-signature"]);
-
-// A decoded query component holds the space `+` or `%20` spelled, and a parser encodes a space in
-// userinfo and drops a tab or newline, so none of them ends userinfo there.
-const redactQueryCredential = (text: string) => !mayHoldUserinfo(text) ? text : [text, percentDecoded(text)].some(form => holdsUserinfo(form.replace(/\s/g, ""))) ? "REDACTED" : text;
-
-// A parser drops a tab or newline, so a nested url's `to%09ken` is sent as `token`.
-const redactQueryValue = (key: string, value: string) => SENSITIVE_QUERY_KEYS.has(key.replace(/[\t\n\r]/g, "").toLowerCase()) ? "REDACTED" : redactQueryCredential(value);
-
-const formDecoded = (text: string) => percentDecoded(text.replace(/\+/g, " "));
-
-// encodeURIComponent throws on a lone surrogate, which a message's raw text can hold.
-const encodedComponent = (text: string) => encodeURIComponent(text.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDFFF]/g, char => char.length === 2 ? char : "\uFFFD"));
-
-// The form-decoding layers until a text spells `//`: `undefined` where none does, `Infinity` where
-// it is still percent-encoded after eight.
-function layersToUrl(text: string): number | undefined {
-	for (let layers = 1; layers <= 8; layers++) {
-		const decoded = formDecoded(text);
-
-		if (decoded === text) {
-			return undefined;
-		}
-
-		text = decoded;
-
-		if (text.includes("//")) {
-			return layers;
-		}
-	}
-
-	return formDecoded(text) === text ? undefined : Infinity;
-}
-
-// A pair is decoded to the layer where its key spells `//`, else its value, that layer is redacted,
-// and a part it changes is encoded back as many times; `undefined` where neither part is decoded.
-// Eight urls deep, the part holding one records `REDACTED`, before the stack runs out.
-function redactEncodedPair(key: string, value: string, depth: number): [string, string] | undefined {
-	if (key.includes("//")) {
-		return undefined;
-	}
-
-	const keyLayers = layersToUrl(key);
-	const layers = keyLayers ?? (value.includes("//") ? undefined : layersToUrl(value));
-
-	if (layers === undefined) {
-		return undefined;
-	}
-
-	if (layers === Infinity || depth >= 8) {
-		return [keyLayers === undefined ? key : "REDACTED", "REDACTED"];
-	}
-
-	// Decoded to the key's layer, a value's own url can lose its shape, so it is redacted at its own too.
-	// eslint-disable-next-line @typescript-eslint/no-use-before-define
-	const ownValueRedacted = keyLayers !== undefined && redactQueryPair("", value, depth + 1)[1] !== value;
-	const decoded = [key, value].map(part => Array.from({ length: layers }).reduce<string>(decodedPart => formDecoded(decodedPart), part));
-	// eslint-disable-next-line @typescript-eslint/no-use-before-define
-	const redacted = redactQueryPair(decoded[0], decoded[1], depth + 1);
-	const encoded = (part: string) => Array.from({ length: layers }).reduce<string>(encodedPart => encodedComponent(encodedPart), part);
-
-	return [redacted[0] === decoded[0] ? key : encoded(redacted[0]), ownValueRedacted ? "REDACTED" : redacted[1] === decoded[1] ? value : encoded(redacted[1])];
-}
-
-// A pair is split at its first `=`, and a parser at an authority's last `@`, so the userinfo of a
-// url written as a bare key can run on into the value.
-const userinfoCrossesAssign = (key: string, value: string) => /[\\/]{2}[^/?#]*$/.test(key) && [value, percentDecoded(value)].some(form => /^[^/?#]*@/.test(form));
-
-function pairsUserinfoCrosses(pairs: string[]): Set<number> {
-	const opensAuthority = (text: string) => /[\\/]{2}[^\\/?#]*$/.test(text);
-	const opensFromKey = (pair: string) => {
-		const [key, value = ""] = pair.split(/=([^]*)/, 2).map(formDecoded);
-
-		return opensAuthority(key) && !/[\\/?#]/.test(value);
-	};
-	const crossed = new Set<number>();
-
-	for (const [form, opens] of [[(pair: string) => pair, opensAuthority], [formDecoded, opensFromKey]] as const) {
-		let openAt: number | undefined;
-
-		pairs.forEach((rawPair, index) => {
-			const pair = form(rawPair);
-
-			if (openAt !== undefined && [pair, percentDecoded(pair)].some(text => /^[^/?#]*@/.test(text))) {
-				for (let spanned = openAt; spanned <= index; spanned++) {
-					crossed.add(spanned);
-				}
-
-				// Still open for a later `@`, from here, so a run of `@` pairs stays linear.
-				openAt = index;
-			}
-
-			if (/[\\/?#]/.test(pair)) {
-				openAt = opens(rawPair) ? index : undefined;
-			}
-		});
-	}
-
-	return crossed;
-}
-
-// buildUrlFull's cut and query rule, spliced into each url the text quotes, and a fragment records
-// `REDACTED`. A url nested in a query pair is redacted inside that pair, so the outer query runs past it.
-function redactQuotedUrls(text: string, depth = 0): string {
-	const redactPair = (whole: string) => {
-		const [rawKey, rawValue = ""] = whole.split(/=([^]*)/, 2);
-
-		if (userinfoCrossesAssign(rawKey, rawValue) || userinfoCrossesAssign(formDecoded(rawKey), formDecoded(rawValue))) {
-			return "REDACTED=REDACTED";
-		}
-
-		const encodedPair = redactEncodedPair(rawKey, rawValue, depth);
-
-		if (encodedPair !== undefined) {
-			return encodedPair[0] + (whole.includes("=") ? "=" + encodedPair[1] : "");
-		}
-
-		const found = !whole.includes("//") ? whole : depth < 8 ? redactQuotedUrls(whole, depth + 1) : "REDACTED";
-		const assignAt = found.indexOf("=");
-		const key = assignAt < 0 ? found : found.slice(0, assignAt);
-		const redacted = redactQueryCredential(key) + (assignAt < 0 ? "" : "=" + redactQueryValue(percentDecoded(key), found.slice(assignAt + 1)));
-
-		if (!whole.includes("//")) {
-			return redacted;
-		}
-
-		// A server decodes the pair once, so an escaped `?`, `=` or `&` in its raw url is the url's own.
-		const [redactedKey, redactedValue = ""] = redacted.split(/=([^]*)/, 2);
-		const decoded = [redactedKey, redactedValue].map(formDecoded);
-		// eslint-disable-next-line @typescript-eslint/no-use-before-define
-		const [decodedKey, decodedValue] = decoded[0] === redactedKey && decoded[1] === redactedValue ? decoded : redactQueryPair(decoded[0], decoded[1], depth + 1);
-
-		return (decodedKey === decoded[0] ? redactedKey : encodedComponent(decodedKey)) + (redacted.includes("=") ? "=" + (decodedValue === decoded[1] ? redactedValue : encodedComponent(decodedValue)) : "");
-	};
-
-	// Only whitespace ends a url a runtime quotes as written, so a raw `"` or `<` stays inside it;
-	// nested, in a decoded query pair, a space is the url's own.
-	const quotedUrl = depth === 0 ? /((?:\bhttps?:)?\/\/[^\s/?#]*)([^\s?#]*)(\?[^\s#]*)?(#\S*)?/gi : /((?:\bhttps?:)?\/\/[^/?#]*)([^?#]*)(\?[^#]*)?(#[^]*)?/gi;
-
-	// Nested, the first url runs to the end, and what precedes it is decoded for one as a path is.
-	const firstUrl = depth === 0 ? -1 : text.search(quotedUrl);
-	const precedingStart = firstUrl < 0 ? undefined : nestedUrlStart(text.slice(0, firstUrl));
-
-	if (precedingStart !== undefined) {
-		return text.slice(0, precedingStart) + "REDACTED";
-	}
-
-	return text.replace(quotedUrl, (_, head: string, path: string, query = "", fragment = "") => {
-		// A host holding an escape is searched for a url as the path is, so `envoy-http:10000` stays a
-		// host; userinfo is redactUserinfo's, whole.
-		const hostAt = Math.max(head.indexOf("//") + 2, head.lastIndexOf("@") + 1);
-		const searchedAt = head.includes("%", hostAt) ? hostAt : head.length;
-		const nestedStart = nestedUrlStart(head.slice(searchedAt) + path);
-
-		if (nestedStart !== undefined) {
-			return head.slice(0, searchedAt) + (head.slice(searchedAt) + path).slice(0, nestedStart) + "REDACTED";
-		}
-
-		const pairs: string[] = query.slice(1).split("&");
-		const crossed = pairsUserinfoCrosses(pairs);
-
-		return head + path + (query && "?" + pairs.map((pair, index) => crossed.has(index) ? "REDACTED=REDACTED" : pair && redactPair(pair)).join("&")) + (fragment && "#REDACTED");
-	});
-}
-
-// A url nested in the key owns the value: its last query key names it, so key and value are
-// redacted as one text.
-function redactQueryPair(key: string, value: string, depth: number): [string, string] {
-	if (userinfoCrossesAssign(key, value)) {
-		return ["REDACTED", "REDACTED"];
-	}
-
-	const encodedPair = redactEncodedPair(key, value, depth);
-
-	if (encodedPair !== undefined) {
-		return encodedPair;
-	}
-
-	if (!key.includes("//")) {
-		return [redactQueryCredential(key), redactQueryValue(key, value.includes("//") ? redactQuotedUrls(value, depth) : value)];
-	}
-
-	const redactedKey = redactQuotedUrls(key, depth);
-	const redactedPair = redactQuotedUrls(`${key}=${value}`, depth);
-
-	return [redactQueryCredential(redactedKey), redactedPair.startsWith(`${redactedKey}=`) ? redactQueryCredential(redactedPair.slice(redactedKey.length + 1)) : "REDACTED"];
-}
-
 // `url.origin` omits userinfo, which is what keeps the outer url's credentials off the span.
 function buildUrlFull(url: URL, captureQuery: boolean): string {
-	const nestedStart = nestedUrlStart(url.pathname);
-
-	// A nested url's own query parses as this url's, so it goes with the rest.
-	if (nestedStart !== undefined) {
-		return url.origin + url.pathname.slice(0, nestedStart) + "REDACTED";
-	}
-
 	const base = url.origin + url.pathname;
 
-	if (!captureQuery || !url.search) {
-		return base;
-	}
-
-	const kept = new URLSearchParams();
-	const pairs = url.search.slice(1).split("&").filter(Boolean);
-	const crossed = pairsUserinfoCrosses(pairs);
-
-	// Tested before the decode, which could spell a `/` ending the userinfo early; `&` keeps a leading `?`.
-	for (const [index, pair] of pairs.entries()) {
-		const [rawKey, rawValue = ""] = pair.split(/=([^]*)/, 2);
-
-		const [[key, value]] = new URLSearchParams(`&${pair}`);
-		const redacted: [string, string] = crossed.has(index) || userinfoCrossesAssign(rawKey, rawValue) ? ["REDACTED", "REDACTED"] : redactQueryPair(key, value, 1);
-
-		kept.append(...redacted);
-	}
-
-	return `${base}?${kept.toString()}`;
+	return !captureQuery || !url.search ? base : `${base}?${redactedSearch(url, 0) ?? url.searchParams.toString()}`;
 }
 
 function failureMessage(error: unknown): string {
@@ -1637,7 +1382,7 @@ function failureMessage(error: unknown): string {
 		}
 	}
 
-	return redactUserinfo(redactQuotedUrls(message));
+	return redactQuotedUrls(message);
 }
 
 // --- Warnings written once per stderr sink ---------------------------------
