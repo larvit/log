@@ -295,16 +295,17 @@ only from a source with no endpoint or one of the same origin, the line fetch dr
 drops `Authorization`; a new path on the same collector keeps working. Serves README → Goals #3's
 headline, "a credential never leaves", on the wire.
 
-## A quoted url runs to whitespace, less closing punctuation only where it fails to parse
+## Each scheme in a run of text starts a url, read to whitespace first
 
-2026-09-29, declined in review, amended the same day: a url found in a status message or a captured
-header value runs to the next whitespace, so a redacted last value takes a closing quote, bracket
-or comma with it. A runtime or wrapper quotes the url as written, where `"`, `<`, `>` and a
-backtick can be the url's own, and stopping at one let the listed key after it through. Only where
-that run fails to parse is its trailing punctuation dropped, and only where it holds nothing to
-redact does it split at a comma glued to another scheme, as a stringified array of urls is: the
-runtime parses each of those urls, so Goals #3 covers them. Readability of the text around the url
-gives way to README → Goals #3 over Audience #3. Valid while a status message keeps its text.
+2026-09-29, declined in review, amended the same day: in a status message or a captured header
+value, every scheme in a run of non-whitespace starts a url, read to the run's end, else short of
+its trailing punctuation, else up to its first delimiter, left to right over the text as redacted
+so far. A runtime or wrapper quotes the url as written, where `"`, `<`, `>` and a backtick can be
+the url's own, and stopping at one first let the listed key after it through; a url glued to
+another, in a path, a JSON string or a `link` header, is one the runtime parses, so Goals #3 covers
+it. Past 16 schemes in one run the rest records `REDACTED`, keeping a crafted run linear under
+Goals #7. Readability of the text around the url gives way to README → Goals #3 over Audience #3.
+Valid while a status message keeps its text.
 
 ## Redaction narrows to Goals #3 in a minor
 
