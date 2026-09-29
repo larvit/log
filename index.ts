@@ -1409,7 +1409,8 @@ function nestedUrlStart(path: string): number | undefined {
 // Every key OTel semconv's default deny-list has named, every S3 and GCS query-signing generation's credential keys, and the names a bearer token or API key travels under.
 const SENSITIVE_QUERY_KEYS = new Set(["access_token", "api_key", "apikey", "awsaccesskeyid", "googleaccessid", "key", "sig", "signature", "token", "x-amz-credential", "x-amz-security-token", "x-amz-signature", "x-goog-credential", "x-goog-signature"]);
 
-const redactQueryValue = (key: string, value: string) => SENSITIVE_QUERY_KEYS.has(key.toLowerCase()) ? "REDACTED" : redactCredential(value);
+// A parser drops a tab or newline, so a nested url's `to%09ken` is sent as `token`.
+const redactQueryValue = (key: string, value: string) => SENSITIVE_QUERY_KEYS.has(key.replace(/[\t\n\r]/g, "").toLowerCase()) ? "REDACTED" : redactCredential(value);
 
 // buildUrlFull's cut and query rule, spliced into each url the text quotes, and a fragment records
 // `REDACTED`. A url nested in a query pair is redacted inside that pair, so the outer query runs past
