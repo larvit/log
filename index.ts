@@ -1250,7 +1250,8 @@ const SENSITIVE_HEADER_NAMES = new Set(["authorization", "cookie", "proxy-author
 // Past it a query part that parses as a url records `REDACTED`, before the stack runs out.
 const MAX_URL_DEPTH = 8;
 
-// A part's reading by depth, kept for one exported text: each scheme in a run re-reads the rest of it.
+// A part's reading by depth, kept for one exported value: a url key is read alone and with its
+// value, so a chain of them would re-read each level.
 type PartsRead = Map<string, string>;
 
 function parsedUrl(text: string): URL | undefined {
@@ -1327,55 +1328,12 @@ function redactQueryPair(key: string, value: string, depth: number, partsRead: P
 	return [key, redactQueryPart(value, depth, partsRead)];
 }
 
-// As redactedSearch, but a pair with nothing redacted keeps its spelling, so a url glued into it is
-// still found as written.
-function redactedRawSearch(url: URL, partsRead: PartsRead): string | undefined {
-	let changed = false;
-	const pieces = url.search.slice(1).split("&").map(piece => {
-		const [pair] = new URLSearchParams(`&${piece}`);
+// A value the runtime's `URL` parses whole; `undefined` where it is none or holds nothing to redact.
+function redactedWholeUrl(value: string): string | undefined {
+	const url = parsedUrl(value);
+	const search = url === undefined ? undefined : redactedSearch(url, 0, new Map());
 
-		if (pair === undefined) {
-			return piece;
-		}
-
-		const redacted = redactQueryPair(pair[0], pair[1], 1, partsRead);
-
-		if (redacted[0] === pair[0] && redacted[1] === pair[1]) {
-			return piece;
-		}
-
-		changed = true;
-
-		return new URLSearchParams([redacted]).toString();
-	});
-
-	return changed ? pieces.join("&") : undefined;
-}
-
-// Each scheme in a run of text starts a url, read to the run's end, else short of its trailing
-// punctuation, else up to its first delimiter; past 16 in one run, the rest records `REDACTED`.
-const MAX_QUOTED_URLS = 16;
-
-// `undefined` where nothing is redacted.
-function redactedQuotedUrl(quoted: string, partsRead: PartsRead): string | undefined {
-	let end = quoted.length;
-
-	// A loop, where `/[^\w/]+$/` retries from every char of a long run.
-	while (end > 0 && /[^\w/]/.test(quoted[end - 1])) {
-		end--;
-	}
-
-	const delimiter = quoted.search(/["'(),;<>[\]`{|}]/);
-	const read = [quoted.length, end, delimiter].filter(length => length > 0).find(length => parsedUrl(quoted.slice(0, length)) !== undefined);
-	const url = read === undefined ? undefined : parsedUrl(quoted.slice(0, read));
-
-	if (read === undefined || url === undefined) {
-		return undefined;
-	}
-
-	const search = redactedRawSearch(url, partsRead);
-
-	if (!holdsUserinfo(url) && search === undefined) {
+	if (url === undefined || (!holdsUserinfo(url) && search === undefined)) {
 		return undefined;
 	}
 
@@ -1386,54 +1344,11 @@ function redactedQuotedUrl(quoted: string, partsRead: PartsRead): string | undef
 
 	url.search = search ?? url.search;
 
-	return url.href + quoted.slice(read);
-}
-
-function redactQuotedUrls(text: string): string {
-	return text.replace(/\S+/g, run => {
-		// Neither userinfo nor a query without one of these.
-		if (!/[?@]/.test(run)) {
-			return run;
-		}
-
-		const partsRead: PartsRead = new Map();
-		// Runs of scheme chars, one match each, so a long one costs one pass.
-		const schemes = /[a-z\d+.-]+:?/gi;
-		let started = 0;
-
-		for (let match = schemes.exec(run); match !== null; match = schemes.exec(run)) {
-			const letterAt = match[0].search(/[a-z]/i);
-
-			if (letterAt < 0 || !match[0].endsWith(":")) {
-				continue;
-			}
-
-			// From the first letter, so a scheme glued to a digit or an escape such as `%22` still counts,
-			// and from a special scheme ending the token too, as `%3Chttps:` holds; a rewrite keeps its
-			// scheme's length, so the second start stays put.
-			const specialAt = /(?:ftp|https?|wss?):$/i.exec(match[0])?.index ?? letterAt;
-
-			for (const start of new Set([match.index + letterAt, match.index + specialAt])) {
-				if (++started > MAX_QUOTED_URLS) {
-					return run.slice(0, start) + "REDACTED";
-				}
-
-				const redacted = redactedQuotedUrl(run.slice(start), partsRead);
-
-				if (redacted !== undefined) {
-					run = run.slice(0, start) + redacted;
-				}
-			}
-
-			schemes.lastIndex = match.index + match[0].length;
-		}
-
-		return run;
-	});
+	return url.href;
 }
 
 function redactHeaderCredential(name: string, value: string): string {
-	return SENSITIVE_HEADER_NAMES.has(name.toLowerCase()) || redactQuotedUrls(value) !== value ? "REDACTED" : value;
+	return SENSITIVE_HEADER_NAMES.has(name.toLowerCase()) || redactedWholeUrl(value) !== undefined ? "REDACTED" : value;
 }
 
 // The URL log.fetch traces: a scheme written without "//" parses to an opaque path, where
@@ -1457,7 +1372,8 @@ function buildUrlFull(url: URL, captureQuery: boolean): string {
 	return !captureQuery || !url.search ? base : `${base}?${redactedSearch(url, 0, new Map()) ?? url.searchParams.toString()}`;
 }
 
-function failureMessage(error: unknown): string {
+// `url` is the one log.fetch handed the runtime, which quotes it back inside free text.
+function failureMessage(error: unknown, url?: URL): string {
 	let message = stringField(error, "message");
 
 	if (message === undefined) {
@@ -1468,7 +1384,13 @@ function failureMessage(error: unknown): string {
 		}
 	}
 
-	return redactQuotedUrls(message);
+	const redacted = redactedWholeUrl(message);
+
+	if (redacted !== undefined || url === undefined) {
+		return redacted ?? message;
+	}
+
+	return message.split(url.href).join(redactedWholeUrl(url.href) ?? url.href);
 }
 
 // --- Warnings written once per stderr sink ---------------------------------
@@ -1872,7 +1794,7 @@ async function tracedFetch(log: Pick<Log, "conf" | "context" | "sampled" | "span
 
 		return res;
 	} catch (err) {
-		span.status = { code: STATUS_CODE_ERROR, message: failureMessage(err) };
+		span.status = { code: STATUS_CODE_ERROR, message: failureMessage(err, url) };
 		// v2.3.0's documented value; semconv's rule, as end() applies it, waits for 3.0.0.
 		attributes["error.type"] = stringField(err, "code") ?? numberFieldAsString(err, "code") ?? stringField(err, "name") ?? "fetch_error";
 

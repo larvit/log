@@ -4,29 +4,26 @@
 
 ### Security
 
-- **Redaction covers what the runtime's `URL` parses, and nothing else.** A url percent-encoded
-  into a captured header value, a query value percent-encoded twice, and a url the runtime cannot
-  parse, such as a scheme-relative `//user:pass@host` a status message quotes, are exported as
-  written, where v2.4.0 recorded `REDACTED` or `//REDACTED@host`; a url nested in the request path
-  still is, as in v2.4.0. Keep credentials out of such values, or strip them before the value
-  reaches `log.fetch` or `end({ error })`.
-- **A url a span's status message quotes is redacted as `url.full` is with `captureQuery` on,
-  whatever `captureQuery` says.** Since v2.4.0, `log.fetch("https://u:p@h.test/x?access_token=…")`
-  on Node or in a browser exported the token in the rejection the runtime quotes the url into: as
-  the `log.fetch` span's status, and as the `end({ error })` status of a span you forwarded that
-  rejection to; only the userinfo was redacted. Now a listed query key's value records `REDACTED`:
-  `https://REDACTED@h.test/x?access_token=REDACTED`. Any `end({ error })` message quoting a url is
+- **Redaction covers a value the runtime's `URL` parses whole, and nothing else.** A header value or
+  status message holding a url among other text, a rejection you forward to `end({ error })`
+  included, a url percent-encoded into a header value, a query value percent-encoded twice, and a
+  url the runtime cannot parse are exported as written, where v2.4.0 recorded `REDACTED` or
+  `REDACTED@`; a url nested in the request path still is, as in v2.4.0. Keep credentials out of such
+  values, or strip them before the value reaches `log.fetch` or `end({ error })`.
+- **`log.fetch` redacts the url it fetched in its span's status message as `url.full` is with
+  `captureQuery` on, whatever `captureQuery` says.** Since v2.4.0,
+  `log.fetch("https://u:p@h.test/x?access_token=…")` on Node or in a browser exported the token in
+  the rejection the runtime quotes the url into; only the userinfo was redacted. Now it records
+  `https://REDACTED@h.test/x?access_token=REDACTED`. An `end({ error })` message that is a url is
   redacted the same way, so a `?key=` lookup or a `?token=` cursor in one records `REDACTED` and a
-  dashboard grouping on status messages sees it change; a url redacted there reads as the runtime's
-  `URL` normalises it, a redacted pair percent-encoded. Search status messages with the regex
+  dashboard grouping on status messages sees it change. Search status messages with the regex
   `(?i)(access_token|api_key|apikey|awsaccesskeyid|googleaccessid|key|sig|signature|token|x-amz-credential|x-amz-security-token|x-amz-signature|x-goog-credential|x-goog-signature)(=|%(25)*3d)`
   for a match followed by anything but `REDACTED`, and rotate what it finds.
 - **Userinfo is redacted where the runtime's `URL` parses it, in `\\` and slashless spellings too.**
   Since v2.3.0, a captured `location` of `https:\\u:pw@h` or `http:u:pw@h` exported `pw`, and so did
-  a kept query value such as `?next=https://my+user:pw@cb.test/x`; since v2.4.0 so did a status
-  message quoting `https:\\u:pw@h` or `http:u:pw@h`. Search captured header values, status messages
-  and `url.full` with `(?i)(https?:|([\\/]|%(25)*(2F|5C)){2})\S*(@|%(25)*40)` and rotate any
-  password a match holds; a match reading `REDACTED` before its `@` holds none.
+  a kept query value such as `?next=https://my+user:pw@cb.test/x`. Search captured header values and
+  `url.full` with `(?i)(https?:|([\\/]|%(25)*(2F|5C)){2})\S*(@|%(25)*40)` and rotate any password a
+  match holds; a match reading `REDACTED` before its `@` holds none.
 - **`captureQuery` redacts a url a query key or value holds once decoded, at every level.** Its
   userinfo records `REDACTED` in place of the whole part, and a listed key's value `REDACTED` in
   place: since v2.3.0, `?next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3D…` with `captureQuery` on exported

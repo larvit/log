@@ -189,9 +189,9 @@ exported by `end()`.
 `end()` closes the span, queues it and flushes the [export queue](#queue-exports); a span that is
 never ended is never sent. `end({ error })` also marks the span failed: status `ERROR` with the
 error's message, and an `error.type` attribute from its string `code`, else `name`, else `"_OTHER"`; a `null` or `undefined`
-error is a plain `end()`. A url the message quotes is redacted, see
-[Credentials in a captured value](#credentials-in-a-captured-value); keep a token outside a url out
-of an error message. A logged `log.error()` never fails the
+error is a plain `end()`. A message that is a url is redacted, see
+[Credentials in a captured value](#credentials-in-a-captured-value); keep credentials out of any
+other error message. A logged `log.error()` never fails the
 span; a recovered error is not a failed operation. `await` it to make one delivery attempt before the
 process exits (a short-lived script); fire-and-forget is fine in a long-running process. Against a
 dead collector `await end()` returns after that attempt, within about 3 s plus however long any
@@ -421,13 +421,11 @@ them per call site.
   where that finds a credential both record `REDACTED`: `?https://t.test/x?token=…`,
   `?https://a@b=pw@host` and `?https://u:p=w@host` record `REDACTED=REDACTED`. Past eight levels,
   one records `REDACTED`.
-- **A url in a captured header value or a status message**: each scheme in a run of text starts
-  one, read to the next whitespace, else short of trailing characters other than an ASCII letter,
-  digit, `_` or `/`, else up to its first `"'(),;<>[]{}|` or backtick. Where the runtime's `URL`
-  parses it, userinfo or a listed key makes a header value record `REDACTED` whole, and in a status
-  message, from a rejection or an `end({ error })` message, records `REDACTED` in place:
-  `http://REDACTED@host/x?access_token=REDACTED`. Past 16 starts in one run, the rest records
-  `REDACTED`.
+- **A captured header value or a status message that the runtime's `URL` parses whole:** userinfo or
+  a listed key makes a header value record `REDACTED` whole, and a status message record it in
+  place: `http://REDACTED@host/x?access_token=REDACTED`. In its own span's status, `log.fetch` also
+  redacts the url it fetched wherever the runtime's rejection quotes it. Any other text, a rejection
+  you forward to `end({ error })` included, is exported as written.
 
 Never put credentials in the url; pass an `Authorization` header, and strip userinfo from a url you
 did not build. `log.fetch` mirrors the runtime: Node and browsers refuse such a url, while React
