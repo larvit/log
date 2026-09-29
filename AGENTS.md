@@ -35,18 +35,12 @@ In [docs/decisions.md](docs/decisions.md):
 - A v2.3.0 copy's child loses a function formatter
 - The comprehension baseline
 - A stringified `Queue` carries its `conf`, less `storage` from 2.5.0
-- A url nested in a request path is cut from where it starts
 - An `Authorization` over plain `http:` warns once
 - `resolveFormatter` is exported
 - Both credential spellings stay, and their combination warns
 - Inherited `otlpAdditionalHeaders` follow the endpoint's origin
 - Only whitespace ends a url a status message quotes
-- A nested url spelled with whitespace in its `//` is the caller's
-- A captured header's whitespace ends userinfo
-- Redacting a nested url may cost 3^8 passes
-- An encoded url beside a raw one is cut from where it starts
-- A raw nested url's escaped delimiters are read after one decode
-- A url's userinfo crosses `&` from a key once decoded, from anywhere raw
+- Redaction narrows to Goals #3 in a minor
 
 ## Working here
 

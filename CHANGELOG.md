@@ -4,75 +4,44 @@
 
 ### Security
 
+- **Redaction covers what the runtime's `URL` parses, and nothing else.** A url percent-encoded
+  into a captured header value, a query value percent-encoded twice, and a url the runtime cannot
+  parse, such as a scheme-relative `//user:pass@host` a status message quotes, are exported as
+  written, where v2.4.0 recorded `REDACTED` or `//REDACTED@host`; a url nested in the request path
+  still is, as in v2.4.0. Keep credentials out of such values, or strip them before the value
+  reaches `log.fetch` or `end({ error })`.
 - **A url a span's status message quotes is redacted as `url.full` is with `captureQuery` on,
   whatever `captureQuery` says.** Since v2.4.0, `log.fetch("https://u:p@h.test/x?access_token=…")`
   on Node or in a browser exported the token in the rejection the runtime quotes the url into: as
   the `log.fetch` span's status, and as the `end({ error })` status of a span you forwarded that
-  rejection to; only the userinfo was redacted. Now a listed query key's value records `REDACTED`,
-  so does a fragment, and a url nested in the path, or percent-encoded in the host as in
-  `https://h+https%3A%2F%2F…`, is cut: `https://REDACTED@h.test/x?access_token=REDACTED`. Any
-  `end({ error })` message quoting a url is redacted the same way, so a `?key=` lookup or a
-  `?token=` cursor in one records `REDACTED` and a dashboard grouping on status messages sees it
-  change. Search status messages with the regex
+  rejection to; only the userinfo was redacted. Now a listed query key's value records `REDACTED`:
+  `https://REDACTED@h.test/x?access_token=REDACTED`. Any `end({ error })` message quoting a url is
+  redacted the same way, so a `?key=` lookup or a `?token=` cursor in one records `REDACTED` and a
+  dashboard grouping on status messages sees it change. Search status messages with the regex
   `(?i)(access_token|api_key|apikey|awsaccesskeyid|googleaccessid|key|sig|signature|token|x-amz-credential|x-amz-security-token|x-amz-signature|x-goog-credential|x-goog-signature)(=|%(25)*3d)`
-  for a match followed by anything but `REDACTED`, and rotate what it finds. A url nested in the
-  path or host shows its userinfo as `(?i)%(25)*40` and its query as `(?i)%(25)*3f`, and a
-  base64-encoded one as `aHR0c`, `h0dH` or `odHRw`, or `SFRUU`, `hUVF` or `IVFR`; rotate any token
-  such a hit holds.
-- **`captureQuery` redacts a listed query key's value in a url nested in a query key or value.**
-  Since v2.3.0, `log.fetch("https://proxy.test/?https://t.test/x?token=…")` with `captureQuery` on
-  exported the token in `url.full`, and so did `?next=https://t.test/x?token=…`, a url nested
-  in that one, under any number of percent-encoding layers per level, and one whose own `?`, `=`
-  or `&` is percent-encoded, as in `?redirect=https://app.test/cb%3Fstate%3D1%26token%3D…`. An
-  encoded url before a raw `//` in a key or value, or in the host right after that `//`, as in
-  `?q=see//x+https%253A%252F%252F…`, is cut from where it starts, credential or not, so a
-  dashboard grouping on such a `url.full` sees it change. Search `url.full` with the first bullet's
-  regex, `%(25)*(3f|26)` inserted after its `(?i)`, for a match followed by anything but
+  for a match followed by anything but `REDACTED`, and rotate what it finds.
+- **Userinfo is redacted wherever the runtime's `URL` parses it, however the url spells it.** Since
+  v2.3.0, a captured `location` of `https:\\u:pw@h` or `http:u:pw@h` exported `pw`, and so did a
+  kept query value such as `?next=https://my+user:pw@cb.test/x`; since v2.4.0 so did a status
+  message quoting `https:\\u:pw@h` or `http:u:pw@h`. Search captured header values, status messages
+  and `url.full` with `(?i)(https?:|([\\/]|%(25)*(2F|5C)){2})\S*(@|%(25)*40)` and rotate any
+  password a match holds; a match reading `REDACTED` before its `@` holds none.
+- **`captureQuery` redacts a url a query key or value holds once decoded, at every level.** Its
+  userinfo records `REDACTED` in place of the whole part, and a listed key's value `REDACTED` in
+  place: since v2.3.0, `?next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3D…` with `captureQuery` on exported
+  the token in `url.full`, and now records `next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3DREDACTED`. A
+  url in a key is read with its value too, as a proxy taking `?<url>` reads it, and where that finds
+  a credential both record `REDACTED`: `?https://t.test/x?token=…`, and
+  `?https://a@b=pw@evil.test`, whose userinfo runs across the `=`. Search `url.full` with the
+  status-message regex above, `%(25)*(3f|26)` inserted after its `(?i)`, and with
+  `(?i)(^|[?&])[^&=]*%(25)*2F%(25)*2F[^&=]*=[^&]*%(25)*40` for a match followed by anything but
   `REDACTED`, and rotate what it finds; a presigned SigV4 url only while unexpired, as v2.4.0 says.
-- **`captureQuery` redacts url userinfo holding whitespace in a kept query key or value.** Since
-  v2.3.0, `?next=https://my+user:pass@cb.test/x` exported `pass` in `url.full`; rotate any password
-  a `url.full` query key or value shows before `(?i)%(25)*40`. A query value holding a host, then
-  whitespace, then an address, as `?q=see+https://a.test+or+mail+bob@x.test` does, now records
-  `REDACTED`, so a dashboard grouping on such a `url.full` sees it change.
-- **`captureQuery` redacts url userinfo that runs across a `&`, or follows `//` with either slash
-  written `\`, in a query.** Since v2.3.0, `?https://u&x=pw@evil.test` exported `pw` in `url.full`
-  as `x`'s value, and `?https:\\a:pw@b` exported `pw`. Every pair from the url's to the `@`'s
-  records `REDACTED=REDACTED`, keys included, credential or not: a raw
-  `?redirect_uri=https://app.test&scope=openid&login_hint=bob@x.test` loses all three, so a
-  dashboard grouping on such a `url.full` sees it change. Search `url.full` with
-  `(?i)\?.*%(25)*(2F|5C)%(25)*(2F|5C).*%(25)*40` and rotate any password a match holds.
-- **Url userinfo after `//` with either slash written `\` is redacted in a captured header value and
-  a span's status message, and so is userinfo crossing a `&` in a status message.** Since v2.3.0, a captured `location` of `https:\\u:pw@h` exported `pw`,
-  and since v2.4.0 so did a status message quoting `https:\\user:pass@host`, or
-  `?https%3A%2F%2Fu&x=pw%40evil.test` whatever `captureQuery` says. Search captured header values
-  and status messages with `(?i)([\\/]|%(25)*(2F|5C)){2}\S*(@|%(25)*40)` and rotate any password a
-  match holds; a match reading `REDACTED` before its `@` holds none.
-- **`captureQuery` redacts url userinfo holding `=` in a url written as a bare query key.** Since
-  v2.3.0, `?https://a@b=pw@evil.test` exported `pw` in `url.full`, as did
-  `?https://dXNlcg==:pw@evil.test`, base64 padding in the username: a pair splits at its first
-  `=`, so the value was tested apart from the url in its key. Both now record `REDACTED=REDACTED`,
-  and so does a pair such as `?https://api.test=user@mail.test`, which a url parser reads as
-  userinfo too, so a dashboard grouping on such a `url.full` sees it change. Search `url.full` with
-  `(?i)(^|[?&])(REDACTED|[^&=]*%(25)*2F%(25)*2F([^&=%]|%(2[0-24-9a-e]|3[0-9a-e]|[014-9a-f][0-9a-f]))*)=[^&]*%(25)*40`
-  and rotate any password a match holds.
 - **`captureQuery` redacts the value of a query key named `access_token`, `api_key`, `apikey`, `key`
   or `token`, in any casing.** Since v2.3.0, `log.fetch("https://api.test/me?access_token=…")` with
   `captureQuery` on exported the token in `url.full`; search `url.full` for one of these names
   followed by `=` and anything but `REDACTED`, and rotate what it finds. A value that is no secret,
   such as a `key` lookup or a `token` pagination cursor, records `REDACTED` too, so a dashboard
   grouping on such a `url.full` sees it change.
-- **`log.fetch` cuts a url nested in the request path out of `url.full`.** Cut from where it
-  starts, and the query with it: any `http:` or `https:` url, and any other one holding userinfo,
-  `//user:pass@host` included, whether raw, percent-encoded any number of times, or base64-encoded
-  anywhere in the path. `https://proxy.test/fetch/https://user:pass@cb.test/x` records
-  `https://proxy.test/fetch/REDACTED`. A path merely containing `http:` or `https:`, as
-  `/wiki/Http:_Status` does, or `//` then a name holding `@`, as `//logo@2x.png` does, is cut too,
-  as is, rarely, a random id whose base64 decoding spells one, so a dashboard grouping on such a
-  `url.full` sees it change. The v2.4.0 rotation advisory holds for spans exported before this
-  release. Base64 of an `http:` or `https:` url is found by searching for `aHR0c`, `h0dH` and
-  `odHRw`, or `SFRUU`, `hUVF` and `IVFR` for an upper-case scheme; no search finds a mixed-case one
-  or base64 of any other shape, so rotate any credential you passed base64-encoded in a request
-  path.
 - **A child or clone sending to another origin than its source's no longer inherits
   `otlpAdditionalHeaders`.** Since v1.4.0 for a child and v2.2.0 for a clone,
   `new Log({ parentLog, otlpHttpBaseURI: other })` sent the parent's headers, a bearer token
