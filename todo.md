@@ -8,6 +8,10 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ### Security
 
+- [ ] **Redact url userinfo holding `=` in a url written as a bare query key.** A pair is split at
+  its first `=`, so with `captureQuery` on, `?https://a@b=pw@evil.com` exports `pw` in `url.full`
+  and in a status message, and `?https://dXNlcg==:pw@evil.com`, base64 padding in the username,
+  exports it in `url.full`: the value is tested for userinfo alone, apart from the `//` in its key.
 - [ ] **Weigh redacting the query keys `access-token`, `accesstoken`, `api-key`, `auth_token`,
   `client_secret`, `id_token`, `password`, `refresh_token`, `secret` and `subscription-key` too,
   and add those that carry a credential.** With `captureQuery` on, `url.full` exports each one's
