@@ -1522,7 +1522,7 @@ test("end({ error }) marks the span failed", async t => {
 	await new Log(conf).end({ error: new Error("GET https://a.test/?redirect=//h.test&api_key=s3cr3t&q=v//w&token=s3cr3t&next=https://h.test/x?sig=s3cr3t&back=https://u:hunter2@h.test/x&key=s3cr3t&https://t.test/x?token=s3cr3t&https://u:hunter2@t.test/x?token=s3cr3t failed") });
 	await new Log(conf).end({ error: new Error("https://a.test/?" + "u=//a?".repeat(5000) + "token=s3cr3t") });
 	await new Log(conf).end({ error: new TypeError("GET https://a`b.test/x?q=a`b&token=s3cr3t?more&a=\"<b>\"&api_key=s3cr3t#/cb?id_token=s3cr3t failed") });
-	await new Log(conf).end({ error: new TypeError("Request cannot be constructed from a URL that includes credentials: https://u:p@h.test/?next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3Ds3cr3t&deep=https%3A%2F%2Ft.test%2Fx%3Fnext2%3Dhttps%253A%252F%252Fu.test%252F%253Ftoken%253Ds3cr3t") });
+	await new Log(conf).end({ error: new TypeError("Request cannot be constructed from a URL that includes credentials: https://u:p@h.test/?next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3Ds3cr3t&deep=https%3A%2F%2Ft.test%2Fx%3Fnext2%3Dhttps%253A%252F%252Fu.test%252F%253Ftoken%253Ds3cr3t&n=https%3a%2f%2ft.test%2fx&https%3A%2F%2Ft.test%2Fx%3Ftoken%3Ds3cr3t&https%3a%2f%2ft.test%2fx%3ftoken") });
 
 	t.deepEqual(exportedSpan(0).status, { code: 2, message: "refused" }, "status is ERROR with the error message");
 	t.strictEqual(attr(exportedSpan(0), "error.type"), "ECONNREFUSED", "error.type is the error's code when it has one");
@@ -1545,7 +1545,7 @@ test("end({ error }) marks the span failed", async t => {
 	t.deepEqual(exportedSpan(13).status, { code: 2, message: "GET https://a.test/?redirect=//h.test&api_key=REDACTED&q=v//w&token=REDACTED&next=https://h.test/x?sig=REDACTED&back=REDACTED&key=REDACTED&https://t.test/x?token=REDACTED&REDACTED=REDACTED failed" }, "a // in a query value neither ends the query nor escapes redaction");
 	t.ok(!exportedSpan(14).status.message.includes("s3cr3t"), "a url nested thousands deep in query values ends the span and is redacted");
 	t.deepEqual(exportedSpan(15).status, { code: 2, message: "GET https://a`b.test/x?q=a`b&token=REDACTED&a=\"<b>\"&api_key=REDACTED#REDACTED failed" }, "a backtick, a quote, a bracket and a ? in a query value leave the url whole, and a fragment records REDACTED");
-	t.deepEqual(exportedSpan(16).status, { code: 2, message: "Request cannot be constructed from a URL that includes credentials: https://REDACTED@h.test/?next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3DREDACTED&deep=https%3A%2F%2Ft.test%2Fx%3Fnext2%3Dhttps%253A%252F%252Fu.test%252F%253Ftoken%253DREDACTED" }, "a percent-encoded url nested in a query value has its listed key redacted, at every level");
+	t.deepEqual(exportedSpan(16).status, { code: 2, message: "Request cannot be constructed from a URL that includes credentials: https://REDACTED@h.test/?next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3DREDACTED&deep=https%3A%2F%2Ft.test%2Fx%3Fnext2%3Dhttps%253A%252F%252Fu.test%252F%253Ftoken%253DREDACTED&n=https%3a%2f%2ft.test%2fx&https%3A%2F%2Ft.test%2Fx%3Ftoken%3DREDACTED&https%3a%2f%2ft.test%2fx%3ftoken" }, "a percent-encoded url nested in a query key or value has its listed key redacted, at every level, and a pair with nothing redacted keeps its spelling");
 	t.end();
 });
 
