@@ -19,6 +19,11 @@
   it finds. A url nested in the path shows its userinfo as `%40` or `%2540` and its query as `%3F`
   or `%253F`, upper or lower case, and a base64-encoded one as `aHR0c`, `h0dH` or `odHRw`, or
   `SFRUU`, `hUVF` or `IVFR`; rotate any token such a hit holds.
+- **`captureQuery` redacts a listed query key's value in a url nested in a query key or value.**
+  Since v2.3.0, `log.fetch("https://proxy.test/?https://t.test/x?token=…")` with `captureQuery` on
+  exported the token in `url.full`, and so did `?next=https://t.test/x?token=…`; search `url.full`
+  for `%3F` or `%26` then a name listed above, followed by `=` or `%3D` and anything but
+  `REDACTED`, and rotate what it finds.
 - **`captureQuery` redacts the value of a query key named `access_token`, `api_key`, `apikey`, `key`
   or `token`, in any casing.** Since v2.3.0, `log.fetch("https://api.test/me?access_token=…")` with
   `captureQuery` on exported the token in `url.full`; search `url.full` for one of these names

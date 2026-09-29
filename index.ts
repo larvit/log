@@ -1408,30 +1408,6 @@ const SENSITIVE_QUERY_KEYS = new Set(["access_token", "api_key", "apikey", "awsa
 
 const redactQueryValue = (key: string, value: string) => SENSITIVE_QUERY_KEYS.has(key.toLowerCase()) ? "REDACTED" : redactCredential(value);
 
-// `url.origin` omits userinfo, which is what keeps the outer url's credentials off the span.
-function buildUrlFull(url: URL, captureQuery: boolean): string {
-	const nestedStart = nestedUrlStart(url.pathname);
-
-	// A nested url's own query parses as this url's, so it goes with the rest.
-	if (nestedStart !== undefined) {
-		return url.origin + url.pathname.slice(0, nestedStart) + "REDACTED";
-	}
-
-	const base = url.origin + url.pathname;
-
-	if (!captureQuery || !url.search) {
-		return base;
-	}
-
-	const kept = new URLSearchParams();
-
-	for (const [key, value] of new URLSearchParams(url.search)) {
-		kept.append(redactCredential(key), redactQueryValue(key, value));
-	}
-
-	return `${base}?${kept.toString()}`;
-}
-
 // buildUrlFull's cut and query rule, spliced into each url the text quotes, and a fragment records
 // `REDACTED`. A url nested in a query pair is redacted inside that pair, so the outer query runs past
 // it; eight urls deep, a pair still holding one records `REDACTED`, before the stack runs out.
@@ -1454,6 +1430,42 @@ function redactQuotedUrls(text: string, depth = 0): string {
 
 		return head + path + (query && "?" + query.slice(1).replace(/[^&]+/g, redactPair)) + (fragment && "#REDACTED");
 	});
+}
+
+// A url nested in the key owns the value: its last query key names it, so the pair is redacted whole.
+function redactQueryPair(key: string, value: string): [string, string] {
+	if (!key.includes("//")) {
+		return [redactCredential(key), redactQueryValue(key, value.includes("//") ? redactQuotedUrls(value, 1) : value)];
+	}
+
+	const redactedKey = redactQuotedUrls(key, 1);
+	const redactedPair = redactQuotedUrls(`${key}=${value}`, 1);
+
+	return [redactCredential(redactedKey), redactedPair.startsWith(`${redactedKey}=`) ? redactCredential(redactedPair.slice(redactedKey.length + 1)) : "REDACTED"];
+}
+
+// `url.origin` omits userinfo, which is what keeps the outer url's credentials off the span.
+function buildUrlFull(url: URL, captureQuery: boolean): string {
+	const nestedStart = nestedUrlStart(url.pathname);
+
+	// A nested url's own query parses as this url's, so it goes with the rest.
+	if (nestedStart !== undefined) {
+		return url.origin + url.pathname.slice(0, nestedStart) + "REDACTED";
+	}
+
+	const base = url.origin + url.pathname;
+
+	if (!captureQuery || !url.search) {
+		return base;
+	}
+
+	const kept = new URLSearchParams();
+
+	for (const [key, value] of new URLSearchParams(url.search)) {
+		kept.append(...redactQueryPair(key, value));
+	}
+
+	return `${base}?${kept.toString()}`;
 }
 
 function failureMessage(error: unknown): string {

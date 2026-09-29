@@ -8,10 +8,9 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ### Security
 
-- [ ] **Redact a listed key in a url nested in a captured query key.** With `captureQuery` on,
-  `log.fetch("https://proxy.test/?https://t.test/x?token=SECRET")` exports `token=SECRET` in
-  `url.full`: `URLSearchParams` reads `https://t.test/x?token` as the key, which no rule lists.
-  A span's status message already redacts it.
+- [ ] **Redact a listed key in a percent-encoded url nested in a query pair a status message
+  quotes.** `log.fetch("https://u:p@h.test/?next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3DSECRET")` on
+  Node puts `token%3DSECRET` in the span's status message, where `url.full` records `REDACTED`.
 - [ ] **Weigh redacting the query keys `access-token`, `accesstoken`, `api-key`, `auth_token`,
   `client_secret`, `id_token`, `password`, `refresh_token`, `secret` and `subscription-key` too,
   and add those that carry a credential.** With `captureQuery` on, `url.full` exports each one's
