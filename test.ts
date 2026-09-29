@@ -1788,7 +1788,7 @@ test("log.fetch captureQuery keeps the query but redacts known-sensitive keys an
 	const { calls } = stubFetch();
 	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 
-	await log.fetch("https://api.test/x?q=hi&Signature=abc&Signature=def&next=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&deep=https%253A%252F%252Fmyuser%253Ahunter2%2540cb.test%252Fx&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAEXAMPLE%2F20260923%2Feu-north-1%2Fs3%2Faws4_request&X-Amz-Security-Token=FwoGZXIvYXdz&X-Amz-Signature=8b1c9f&X-Goog-Credential=svc%40proj.iam.gserviceaccount.com%2F20260923%2Fauto%2Fstorage%2Fgoog4_request&GoogleAccessId=svc%40proj.iam.gserviceaccount.com&access_token=ya29tok&API_KEY=k1api&apikey=k2api&key=k3api&Token=k4tok&keyword=kept&https://t.test/x?token=k5tok&then=https://t.test/y?sig=k6sig&https://t.test/a+b?token=k7tok&then2=https://t.test/a%20b?sig=k8sig&n2=https://my+user:pw9@cb.test/x&https://my%20user:pw9@cb.test/y=1&n4=http://a/?to%09ken=k9tok&n3=https://b.test/?m=https://c.test/k/https:/%09d%26q=a%0Ab&https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fz");
+	await log.fetch("https://api.test/x?q=hi&Signature=abc&Signature=def&next=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&deep=https%253A%252F%252Fmyuser%253Ahunter2%2540cb.test%252Fx&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAEXAMPLE%2F20260923%2Feu-north-1%2Fs3%2Faws4_request&X-Amz-Security-Token=FwoGZXIvYXdz&X-Amz-Signature=8b1c9f&X-Goog-Credential=svc%40proj.iam.gserviceaccount.com%2F20260923%2Fauto%2Fstorage%2Fgoog4_request&GoogleAccessId=svc%40proj.iam.gserviceaccount.com&access_token=ya29tok&API_KEY=k1api&apikey=k2api&key=k3api&Token=k4tok&keyword=kept&https://t.test/x?token=k5tok&then=https://t.test/y?sig=k6sig&https://t.test/a+b?token=k7tok&then2=https://t.test/a%20b?sig=k8sig&n2=https://my+user:pw9@cb.test/x&https://my%20user:pw9@cb.test/y=1&n4=http://a/?to%09ken=k9tok&n5=https%253A%252F%252Fmy%2520user%253Apw9%2540cb.test%252Fx&n3=https://b.test/?m=https://c.test/k/https:/%09d%26q=a%0Ab&https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fz");
 	await log.end();
 
 	const urlFull = clientSpan(calls).attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue;
@@ -1815,6 +1815,7 @@ test("log.fetch captureQuery keeps the query but redacts known-sensitive keys an
 	t.ok(!/k5tok|k6sig|k7tok|k8sig/.test(urlFull), "no nested token value is leaked");
 	t.ok(urlFull.includes("&n2=REDACTED&REDACTED=1&"), "userinfo holding a space is redacted in a value and in a key");
 	t.ok(urlFull.includes("&n4=http%3A%2F%2Fa%2F%3Fto%09ken%3DREDACTED&"), "a tab in a nested listed key does not hide it");
+	t.ok(urlFull.includes("&n5=REDACTED&"), "so is one encoded twice, its space included");
 	t.ok(!urlFull.includes("pw9"), "the spaced userinfo's password is not leaked");
 	t.ok(urlFull.includes("&n3=https%3A%2F%2Fb.test%2F%3Fm%3Dhttps%3A%2F%2Fc.test%2Fk%2FREDACTED%26q%3Da%0Ab&"), "whitespace past a cut stays as sent");
 	t.end();
