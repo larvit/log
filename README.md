@@ -432,9 +432,6 @@ them per call site.
   the path, percent-encoded inside or not. `https://proxy.test/fetch/https://user:pass@cb.test/x`
   records `https://proxy.test/fetch/REDACTED`.
 
-That covers the shapes a credential is recognisable in, not every credential: a value that simply
-*is* a secret is exported as you sent it ([Goals](#goals) #3).
-
 Never put credentials in the url; pass an `Authorization` header, and strip userinfo from a url you
 did not build. `log.fetch` mirrors the runtime: Node and browsers refuse such a url, while React
 Native hands it to the platform, where iOS sends the credentials and Android sends none, leaving
