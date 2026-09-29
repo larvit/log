@@ -1242,8 +1242,8 @@ export class Queue implements OtlpQueue {
 // --- Credentials on a span -------------------------------------------------
 
 // The `:` is optional and captured, so a scheme-relative `//user:pass@host` — what a runtime
-// hands back for a url it could not parse — matches too.
-const URL_USERINFO = /(:?\/\/)[^/?#\s]*@/g;
+// hands back for a url it could not parse — matches too. A parser reads `\` as `/` there.
+const URL_USERINFO = /(:?[\\/]{2})[^/?#\s]*@/g;
 const redactUserinfo = (text: string) => text.replace(URL_USERINFO, "$1REDACTED@");
 const holdsUserinfo = (text: string) => redactUserinfo(text) !== text;
 
@@ -1472,7 +1472,30 @@ function redactEncodedPair(key: string, value: string, depth: number): [string, 
 
 // A pair is split at its first `=`, and a parser at an authority's last `@`, so the userinfo of a
 // url written as a bare key can run on into the value.
-const userinfoCrossesAssign = (key: string, value: string) => /\/\/[^/?#]*$/.test(key) && [value, percentDecoded(value)].some(form => /^[^/?#]*@/.test(form));
+const userinfoCrossesAssign = (key: string, value: string) => /[\\/]{2}[^/?#]*$/.test(key) && [value, percentDecoded(value)].some(form => /^[^/?#]*@/.test(form));
+
+// The pairs a url's userinfo runs across `&` through, raw or once decoded, each recording `REDACTED=REDACTED`.
+function pairsUserinfoCrosses(pairs: string[]): Set<number> {
+	const crossed = new Set<number>();
+
+	for (const form of [(pair: string) => pair, formDecoded]) {
+		let openAt: number | undefined;
+
+		pairs.map(form).forEach((pair, index) => {
+			if (openAt !== undefined && [pair, percentDecoded(pair)].some(text => /^[^/?#]*@/.test(text))) {
+				for (let spanned = openAt; spanned <= index; spanned++) {
+					crossed.add(spanned);
+				}
+			}
+
+			if (/[/?#]/.test(pair)) {
+				openAt = /[\\/]{2}[^/?#]*$/.test(pair) ? index : undefined;
+			}
+		});
+	}
+
+	return crossed;
+}
 
 // buildUrlFull's cut and query rule, spliced into each url the text quotes, and a fragment records
 // `REDACTED`. A url nested in a query pair is redacted inside that pair, so the outer query runs past it.
@@ -1531,7 +1554,10 @@ function redactQuotedUrls(text: string, depth = 0): string {
 			return head.slice(0, searchedAt) + (head.slice(searchedAt) + path).slice(0, nestedStart) + "REDACTED";
 		}
 
-		return head + path + (query && "?" + query.slice(1).replace(/[^&]+/g, redactPair)) + (fragment && "#REDACTED");
+		const pairs: string[] = query.slice(1).split("&");
+		const crossed = pairsUserinfoCrosses(pairs);
+
+		return head + path + (query && "?" + pairs.map((pair, index) => crossed.has(index) ? "REDACTED=REDACTED" : pair && redactPair(pair)).join("&")) + (fragment && "#REDACTED");
 	});
 }
 
@@ -1574,13 +1600,15 @@ function buildUrlFull(url: URL, captureQuery: boolean): string {
 	}
 
 	const kept = new URLSearchParams();
+	const pairs = url.search.slice(1).split("&").filter(Boolean);
+	const crossed = pairsUserinfoCrosses(pairs);
 
 	// Tested before the decode, which could spell a `/` ending the userinfo early; `&` keeps a leading `?`.
-	for (const pair of url.search.slice(1).split("&").filter(Boolean)) {
+	for (const [index, pair] of pairs.entries()) {
 		const [rawKey, rawValue = ""] = pair.split(/=([^]*)/, 2);
 
 		const [[key, value]] = new URLSearchParams(`&${pair}`);
-		const redacted: [string, string] = userinfoCrossesAssign(rawKey, rawValue) ? ["REDACTED", "REDACTED"] : redactQueryPair(key, value, 1);
+		const redacted: [string, string] = crossed.has(index) || userinfoCrossesAssign(rawKey, rawValue) ? ["REDACTED", "REDACTED"] : redactQueryPair(key, value, 1);
 
 		kept.append(...redacted);
 	}
