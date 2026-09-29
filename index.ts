@@ -1432,14 +1432,28 @@ function redactQuotedUrls(text: string, depth = 0): string {
 	});
 }
 
-// A url nested in the key owns the value: its last query key names it, so the pair is redacted whole.
+// URLSearchParams decodes a space into a nested url, where redactQuotedUrls would end the url, so
+// each whitespace or NUL char stands in as NUL and is restored in order.
+function redactNestedUrls(text: string): string {
+	const masked: string[] = [];
+	const redacted = redactQuotedUrls(text.replace(/[\s\0]/g, char => {
+		masked.push(char);
+
+		return "\0";
+	}), 1);
+
+	return redacted.replace(/\0/g, () => masked.shift() ?? "");
+}
+
+// A url nested in the key owns the value: its last query key names it, so key and value are
+// redacted as one text.
 function redactQueryPair(key: string, value: string): [string, string] {
 	if (!key.includes("//")) {
-		return [redactCredential(key), redactQueryValue(key, value.includes("//") ? redactQuotedUrls(value, 1) : value)];
+		return [redactCredential(key), redactQueryValue(key, value.includes("//") ? redactNestedUrls(value) : value)];
 	}
 
-	const redactedKey = redactQuotedUrls(key, 1);
-	const redactedPair = redactQuotedUrls(`${key}=${value}`, 1);
+	const redactedKey = redactNestedUrls(key);
+	const redactedPair = redactNestedUrls(`${key}=${value}`);
 
 	return [redactCredential(redactedKey), redactedPair.startsWith(`${redactedKey}=`) ? redactCredential(redactedPair.slice(redactedKey.length + 1)) : "REDACTED"];
 }
