@@ -47,7 +47,7 @@ Priority order decides a tie.
    base64 value always exports intact, and keeping a credential out of one is yours. So is a url
    written other than plainly, `http://` or `https://` then a well-formed rest: a malformed one, or
    a legal but unusual spelling such as `http:user:pass@host` or `https:\\host`, is exported as
-   written, its userinfo after `\\` aside.
+   written, its userinfo after a slash written `\` aside.
 4. **Semver, read strictly, over what this README documents.** A minor only adds — an export, an
    option, a value an option accepts, a field, a span attribute — where code not using it behaves as
    before. What the README does not document — an undocumented key of a `conf`, enumerability, what
