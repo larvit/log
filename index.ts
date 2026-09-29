@@ -1470,11 +1470,20 @@ function redactEncodedPair(key: string, value: string, depth: number): [string, 
 	return [redacted[0] === decoded[0] ? key : encoded(redacted[0]), ownValueRedacted ? "REDACTED" : redacted[1] === decoded[1] ? value : encoded(redacted[1])];
 }
 
+// A pair is split at its first `=`, and a parser at an authority's last `@`, so the userinfo of a
+// url written as a bare key can run on into the value.
+const userinfoCrossesAssign = (key: string, value: string) => [key, percentDecoded(key)].some(form => /\/\/[^/?#]*$/.test(form.replace(/\s/g, ""))) && [value, percentDecoded(value)].some(form => /^[^/?#]*@/.test(form.replace(/\s/g, "")));
+
 // buildUrlFull's cut and query rule, spliced into each url the text quotes, and a fragment records
 // `REDACTED`. A url nested in a query pair is redacted inside that pair, so the outer query runs past it.
 function redactQuotedUrls(text: string, depth = 0): string {
 	const redactPair = (whole: string) => {
 		const [rawKey, rawValue = ""] = whole.split(/=([^]*)/, 2);
+
+		if (userinfoCrossesAssign(rawKey, rawValue)) {
+			return "REDACTED=REDACTED";
+		}
+
 		const encodedPair = redactEncodedPair(rawKey, rawValue, depth);
 
 		if (encodedPair !== undefined) {
@@ -1529,6 +1538,10 @@ function redactQuotedUrls(text: string, depth = 0): string {
 // A url nested in the key owns the value: its last query key names it, so key and value are
 // redacted as one text.
 function redactQueryPair(key: string, value: string, depth: number): [string, string] {
+	if (userinfoCrossesAssign(key, value)) {
+		return ["REDACTED", "REDACTED"];
+	}
+
 	const encodedPair = redactEncodedPair(key, value, depth);
 
 	if (encodedPair !== undefined) {
