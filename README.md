@@ -418,14 +418,14 @@ them per call site.
   userinfo makes the key or value record `REDACTED` whole, and its own listed keys are redacted, at
   every level: `?next=https://t.test/x?token=…` records
   `next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3DREDACTED`. A url in a key is read with its value too, and
-  where that finds a credential both record `REDACTED`: `?https://t.test/x?token=…` and
+  where that finds a credential both record `REDACTED`: `?https://t.test/x?token=…`,
   `?https://a@b=pw@host` and `?https://u:p=w@host` record `REDACTED=REDACTED`. Past eight levels,
   one records `REDACTED`.
 - **A url in a captured header value or a status message**, from its scheme to the next whitespace,
   or short of trailing characters other than a letter, digit, `_` or `/`, and each url a comma
-  glues on, that the runtime's `URL` parses: userinfo or a listed key makes a header value record `REDACTED`
-  whole, and in a status message, from a rejection or an `end({ error })` message, records
-  `REDACTED` in place: `http://REDACTED@host/x?access_token=REDACTED`.
+  glues on, that the runtime's `URL` parses: userinfo or a listed key makes a header value record
+  `REDACTED` whole, and in a status message, from a rejection or an `end({ error })` message,
+  records `REDACTED` in place: `http://REDACTED@host/x?access_token=REDACTED`.
 
 Never put credentials in the url; pass an `Authorization` header, and strip userinfo from a url you
 did not build. `log.fetch` mirrors the runtime: Node and browsers refuse such a url, while React
