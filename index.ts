@@ -1250,6 +1250,9 @@ const SENSITIVE_HEADER_NAMES = new Set(["authorization", "cookie", "proxy-author
 // Past it a query part that parses as a url records `REDACTED`, before the stack runs out.
 const MAX_URL_DEPTH = 8;
 
+// A part's reading by depth, kept for one exported text: each scheme in a run re-reads the rest of it.
+type PartsRead = Map<string, string>;
+
 function parsedUrl(text: string): URL | undefined {
 	try {
 		return new URL(text);
@@ -1261,15 +1264,25 @@ function parsedUrl(text: string): URL | undefined {
 const holdsUserinfo = (url: URL) => url.username !== "" || url.password !== "";
 
 // `undefined` where no pair changes.
-function redactedSearch(url: URL, depth: number): string | undefined {
+function redactedSearch(url: URL, depth: number, partsRead: PartsRead): string | undefined {
 	const pairs = [...url.searchParams];
 	// eslint-disable-next-line @typescript-eslint/no-use-before-define
-	const redacted = pairs.map(([key, value]) => redactQueryPair(key, value, depth + 1));
+	const redacted = pairs.map(([key, value]) => redactQueryPair(key, value, depth + 1, partsRead));
 
 	return redacted.some(([key, value], index) => key !== pairs[index][0] || value !== pairs[index][1]) ? new URLSearchParams(redacted).toString() : undefined;
 }
 
-function redactQueryPart(part: string, depth: number): string {
+function redactQueryPart(part: string, depth: number, partsRead: PartsRead): string {
+	const readKey = `${depth} ${part}`;
+	// eslint-disable-next-line @typescript-eslint/no-use-before-define
+	const read = partsRead.get(readKey) ?? readQueryPart(part, depth, partsRead);
+
+	partsRead.set(readKey, read);
+
+	return read;
+}
+
+function readQueryPart(part: string, depth: number, partsRead: PartsRead): string {
 	const url = parsedUrl(part);
 
 	if (url === undefined) {
@@ -1280,7 +1293,7 @@ function redactQueryPart(part: string, depth: number): string {
 		return "REDACTED";
 	}
 
-	const search = redactedSearch(url, depth);
+	const search = redactedSearch(url, depth, partsRead);
 
 	if (search === undefined) {
 		return part;
@@ -1296,27 +1309,27 @@ const SCHEME_LED = /^[\0- ]*[a-z][a-z\d+.-]*:/i;
 
 // A key opening a url is read with its value too, as a server taking `?<url>` reads it: an `=` in its
 // password ends the key.
-function redactQueryPair(key: string, value: string, depth: number): [string, string] {
+function redactQueryPair(key: string, value: string, depth: number, partsRead: PartsRead): [string, string] {
 	if (SENSITIVE_QUERY_KEYS.has(key.toLowerCase())) {
 		return [key, "REDACTED"];
 	}
 
 	if (!SCHEME_LED.test(key.replace(/[\t\n\r]/g, ""))) {
-		return [key, redactQueryPart(value, depth)];
+		return [key, redactQueryPart(value, depth, partsRead)];
 	}
 
 	const joined = `${key}=${value}`;
 
-	if (depth > MAX_URL_DEPTH || redactQueryPart(key, depth) !== key || redactQueryPart(joined, depth) !== joined) {
+	if (depth > MAX_URL_DEPTH || redactQueryPart(key, depth, partsRead) !== key || redactQueryPart(joined, depth, partsRead) !== joined) {
 		return ["REDACTED", "REDACTED"];
 	}
 
-	return [key, redactQueryPart(value, depth)];
+	return [key, redactQueryPart(value, depth, partsRead)];
 }
 
 // As redactedSearch, but a pair with nothing redacted keeps its spelling, so a url glued into it is
 // still found as written.
-function redactedRawSearch(url: URL): string | undefined {
+function redactedRawSearch(url: URL, partsRead: PartsRead): string | undefined {
 	let changed = false;
 	const pieces = url.search.slice(1).split("&").map(piece => {
 		const [pair] = new URLSearchParams(`&${piece}`);
@@ -1325,7 +1338,7 @@ function redactedRawSearch(url: URL): string | undefined {
 			return piece;
 		}
 
-		const redacted = redactQueryPair(pair[0], pair[1], 1);
+		const redacted = redactQueryPair(pair[0], pair[1], 1, partsRead);
 
 		if (redacted[0] === pair[0] && redacted[1] === pair[1]) {
 			return piece;
@@ -1344,7 +1357,7 @@ function redactedRawSearch(url: URL): string | undefined {
 const MAX_QUOTED_URLS = 16;
 
 // `undefined` where nothing is redacted.
-function redactedQuotedUrl(quoted: string): string | undefined {
+function redactedQuotedUrl(quoted: string, partsRead: PartsRead): string | undefined {
 	let end = quoted.length;
 
 	// A loop, where `/[^\w/]+$/` retries from every char of a long run.
@@ -1360,7 +1373,7 @@ function redactedQuotedUrl(quoted: string): string | undefined {
 		return undefined;
 	}
 
-	const search = redactedRawSearch(url);
+	const search = redactedRawSearch(url, partsRead);
 
 	if (!holdsUserinfo(url) && search === undefined) {
 		return undefined;
@@ -1383,13 +1396,16 @@ function redactQuotedUrls(text: string): string {
 			return run;
 		}
 
+		const partsRead: PartsRead = new Map();
 		// Runs of scheme chars, one match each, so a long one costs one pass.
 		const schemes = /[a-z\d+.-]+:?/gi;
 		let started = 0;
 
 		for (let match = schemes.exec(run); match !== null; match = schemes.exec(run)) {
-			// A scheme starts at a letter, so one glued to a digit, or to an escape such as `%22`, still counts.
-			const start = match.index + match[0].search(/[a-z]/i);
+			// A scheme starts at a letter, so one glued to a digit, or to an escape such as `%22`, still
+			// counts; a special one ending the token wins, as `%3Chttps:` holds.
+			const special = /(?:ftp|https?|wss?):$/i.exec(match[0]);
+			const start = match.index + (special?.index ?? match[0].search(/[a-z]/i));
 
 			if (start < match.index || !match[0].endsWith(":")) {
 				continue;
@@ -1399,7 +1415,7 @@ function redactQuotedUrls(text: string): string {
 				return run.slice(0, start) + "REDACTED";
 			}
 
-			const redacted = redactedQuotedUrl(run.slice(start));
+			const redacted = redactedQuotedUrl(run.slice(start), partsRead);
 
 			if (redacted !== undefined) {
 				run = run.slice(0, start) + redacted;
@@ -1433,7 +1449,7 @@ function traceableUrl(input: string | URL): URL | undefined {
 function buildUrlFull(url: URL, captureQuery: boolean): string {
 	const base = url.origin + url.pathname;
 
-	return !captureQuery || !url.search ? base : `${base}?${redactedSearch(url, 0) ?? url.searchParams.toString()}`;
+	return !captureQuery || !url.search ? base : `${base}?${redactedSearch(url, 0, new Map()) ?? url.searchParams.toString()}`;
 }
 
 function failureMessage(error: unknown): string {
