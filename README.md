@@ -424,8 +424,8 @@ them per call site.
 - **A captured header value or a status message that the runtime's `URL` parses whole:** userinfo or
   a listed key makes a header value record `REDACTED` whole, and a status message record it in
   place: `http://REDACTED@host/x?access_token=REDACTED`. In its own span's status, `log.fetch` also
-  redacts the url it fetched wherever the runtime's rejection quotes it. Any other text, a rejection
-  you forward to `end({ error })` included, is exported as written.
+  redacts the url it fetched wherever the runtime's rejection quotes it. Text the runtime's `URL`
+  cannot parse whole is exported as written.
 
 Never put credentials in the url; pass an `Authorization` header, and strip userinfo from a url you
 did not build. `log.fetch` mirrors the runtime: Node and browsers refuse such a url, while React
