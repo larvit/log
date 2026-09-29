@@ -1265,7 +1265,10 @@ function redactCredential(value: string): string {
 		return value;
 	}
 
-	return holdsUserinfo(value) || holdsUserinfo(percentDecoded(value)) ? "REDACTED" : value;
+	// A parser encodes a space in userinfo and drops a tab or newline, so neither ends it.
+	const unspaced = (text: string) => text.replace(/\s/g, "");
+
+	return holdsUserinfo(unspaced(value)) || holdsUserinfo(unspaced(percentDecoded(value))) ? "REDACTED" : value;
 }
 
 // Header names carrying a credential by definition: RFC 9110 authentication, RFC 6265 cookies.
@@ -1420,8 +1423,11 @@ function redactQuotedUrls(text: string, depth = 0): string {
 		return redactCredential(key) + (assignAt < 0 ? "" : "=" + redactQueryValue(percentDecoded(key), found.slice(assignAt + 1)));
 	};
 
-	// Only whitespace ends a url a runtime quotes as written, so a raw `"` or `<` stays inside it.
-	return text.replace(/((?:\bhttps?:)?\/\/[^\s/?#]*)([^\s?#]*)(\?[^\s#]*)?(#\S*)?/gi, (_, head: string, path: string, query = "", fragment = "") => {
+	// Only whitespace ends a url a runtime quotes as written, so a raw `"` or `<` stays inside it;
+	// nested, in a decoded query pair, a space is the url's own.
+	const quotedUrl = depth === 0 ? /((?:\bhttps?:)?\/\/[^\s/?#]*)([^\s?#]*)(\?[^\s#]*)?(#\S*)?/gi : /((?:\bhttps?:)?\/\/[^/?#]*)([^?#]*)(\?[^#]*)?(#[^]*)?/gi;
+
+	return text.replace(quotedUrl, (_, head: string, path: string, query = "", fragment = "") => {
 		const nestedStart = nestedUrlStart(path);
 
 		if (nestedStart !== undefined) {
@@ -1432,28 +1438,15 @@ function redactQuotedUrls(text: string, depth = 0): string {
 	});
 }
 
-// URLSearchParams decodes a space into a nested url, where redactQuotedUrls would end the url, so
-// each whitespace or NUL char stands in as NUL and is restored in order.
-function redactNestedUrls(text: string): string {
-	const masked: string[] = [];
-	const redacted = redactQuotedUrls(text.replace(/[\s\0]/g, char => {
-		masked.push(char);
-
-		return "\0";
-	}), 1);
-
-	return redacted.replace(/\0/g, () => masked.shift() ?? "");
-}
-
 // A url nested in the key owns the value: its last query key names it, so key and value are
 // redacted as one text.
 function redactQueryPair(key: string, value: string): [string, string] {
 	if (!key.includes("//")) {
-		return [redactCredential(key), redactQueryValue(key, value.includes("//") ? redactNestedUrls(value) : value)];
+		return [redactCredential(key), redactQueryValue(key, value.includes("//") ? redactQuotedUrls(value, 1) : value)];
 	}
 
-	const redactedKey = redactNestedUrls(key);
-	const redactedPair = redactNestedUrls(`${key}=${value}`);
+	const redactedKey = redactQuotedUrls(key, 1);
+	const redactedPair = redactQuotedUrls(`${key}=${value}`, 1);
 
 	return [redactCredential(redactedKey), redactedPair.startsWith(`${redactedKey}=`) ? redactCredential(redactedPair.slice(redactedKey.length + 1)) : "REDACTED"];
 }
