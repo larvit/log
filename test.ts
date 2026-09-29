@@ -1953,16 +1953,16 @@ test("log.fetch captures allow-listed request and response headers only, never a
 		stderr: () => {},
 	});
 
-	await log.fetch("https://api.test/h", { headers: { authorization: "Bearer hunter2", referer: "https://my user:hunter2@cb.test/x", "x-other": "ignored", "x-req": "qv" } });
+	await log.fetch("https://api.test/h", { headers: { authorization: "Bearer hunter2", referer: "https://myuser:hunter2@cb.test/x", "x-other": "ignored", "x-req": "MyBot/1.0 (+https://mybot.test; ops@mybot.test)" } });
 	await log.end();
 
 	const span = clientSpan(calls);
 	const attr = (key: string) => span.attributes.find((attribute: any) => attribute.key === key)?.value.stringValue;
 
-	t.strictEqual(attr("http.request.header.x-req"), "qv", "allow-listed request header captured");
+	t.strictEqual(attr("http.request.header.x-req"), "MyBot/1.0 (+https://mybot.test; ops@mybot.test)", "allow-listed request header captured, a host then an address past a space included");
 	t.strictEqual(attr("http.request.header.x-other"), undefined, "non-listed request header not captured");
 	t.strictEqual(attr("http.request.header.authorization"), "REDACTED", "an allow-listed credential header records its presence, not its value");
-	t.strictEqual(attr("http.request.header.referer"), "REDACTED", "a captured header value holding url userinfo, a space in it included, is redacted whole");
+	t.strictEqual(attr("http.request.header.referer"), "REDACTED", "a captured header value holding url userinfo is redacted whole");
 	t.strictEqual(attr("http.response.header.x-resp"), "rv", "allow-listed response header captured");
 	t.strictEqual(attr("http.response.header.x-secret"), undefined, "non-listed response header not captured");
 	t.strictEqual(attr("http.response.header.location"), "REDACTED", "percent-encoding a credentialed url into a header does not hide it");
