@@ -40,6 +40,7 @@ In [docs/decisions.md](docs/decisions.md):
 - `resolveFormatter` is exported
 - Both credential spellings stay, and their combination warns
 - Inherited `otlpAdditionalHeaders` follow the endpoint's origin
+- Only whitespace ends a url a status message quotes
 
 ## Working here
 

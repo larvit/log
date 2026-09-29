@@ -328,3 +328,11 @@ header winning, so rejecting it sooner would spend README → Goals #4. Serves R
 only from a source with no endpoint or one of the same origin, the line fetch draws when a redirect
 drops `Authorization`; a new path on the same collector keeps working. Serves README → Goals #3's
 headline, "a credential never leaves", on the wire.
+
+## Only whitespace ends a url a status message quotes
+
+2026-09-29, declined in review: a url found in a status message runs to the next whitespace, so a
+redacted last value or fragment takes a closing quote, bracket or comma with it. A runtime or
+wrapper quotes the url as written, where `"`, `<`, `>` and a backtick can be the url's own, and
+stopping at one let the listed key after it through. Readability of the text around the url gives
+way to README → Goals #3 over Audience #3. Valid while status messages are redacted in place.
