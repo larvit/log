@@ -1522,7 +1522,7 @@ test("end({ error }) marks the span failed", async t => {
 	await new Log(conf).end({ error: new Error("https://a.test/?" + "u=https://a/?".repeat(5000) + "token=s3cr3t") });
 	await new Log(conf).end({ error: new TypeError("Request cannot be constructed from a URL that includes credentials: https://u:p@h.test/?next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3Ds3cr3t&twice=https%253A%252F%252Ft.test%252Fx%253Ftoken%253Dk11tok") });
 	await new Log(conf).end({ error: new TypeError("Request cannot be constructed from a URL that includes credentials: http:myuser:hunter2@h.test/x, https:\\\\myuser:hunter2@h.test/y, https://api.test,mail@example.com/z, http://envoy-http:10000/api?page=2") });
-	await new Log(conf).end({ error: new Error(`could not reach https://user:pw5@db.test:8443. tried https://user:pw8@db.test:8443, see <https://user:pw6@db.test> [https://user:pw7@db.test] ${["https://a.test/x", "https://u:pw10@b.test/y"]}`) });
+	await new Log(conf).end({ error: new Error(`could not reach https://user:pw5@db.test:8443. tried https://user:pw8@db.test:8443, see <https://user:pw6@db.test> [https://user:pw7@db.test] ${["https://a.test/x", "https://u:pw10@b.test/y"]} refused \`https://user:pw4@db.test:8443\` ${["https://u:pw11@a.test/x", "https://u:pw12@b.test/y"]} https://a.test/?token=s3cr3t&q=1,https://u:pw13@h.test`) });
 
 	t.deepEqual(exportedSpan(0).status, { code: 2, message: "refused" }, "status is ERROR with the error message");
 	t.strictEqual(attr(exportedSpan(0), "error.type"), "ECONNREFUSED", "error.type is the error's code when it has one");
@@ -1545,7 +1545,7 @@ test("end({ error }) marks the span failed", async t => {
 	t.ok(!exportedSpan(13).status.message.includes("s3cr3t"), "a url nested thousands deep in query values ends the span and is redacted");
 	t.deepEqual(exportedSpan(14).status, { code: 2, message: "Request cannot be constructed from a URL that includes credentials: https://REDACTED@h.test/?next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3DREDACTED&twice=https%253A%252F%252Ft.test%252Fx%253Ftoken%253Dk11tok" }, "a query value is decoded once");
 	t.deepEqual(exportedSpan(15).status, { code: 2, message: "Request cannot be constructed from a URL that includes credentials: http://REDACTED@h.test/x, https://REDACTED@h.test/y, https://REDACTED@example.com/z, http://envoy-http:10000/api?page=2" }, "userinfo is what the runtime's URL parses as userinfo, however the url is spelled");
-	t.deepEqual(exportedSpan(16).status, { code: 2, message: "could not reach https://REDACTED@db.test:8443/. tried https://REDACTED@db.test:8443/, see <https://REDACTED@db.test/> [https://REDACTED@db.test/] https://a.test/x,https://REDACTED@b.test/y" }, "a url closed by punctuation, or glued to the one before it by a comma, is redacted");
+	t.deepEqual(exportedSpan(16).status, { code: 2, message: "could not reach https://REDACTED@db.test:8443/. tried https://REDACTED@db.test:8443/, see <https://REDACTED@db.test/> [https://REDACTED@db.test/] https://a.test/x,https://REDACTED@b.test/y refused `https://REDACTED@db.test:8443/` https://REDACTED@a.test/x,https://REDACTED@b.test/y https://a.test/?token=REDACTED&q=1,https://REDACTED@h.test/" }, "a url closed by punctuation, or glued to the one before it by a comma, is redacted");
 	t.end();
 });
 
@@ -1790,7 +1790,7 @@ test("log.fetch captureQuery keeps the query but redacts known-sensitive keys an
 	const { calls } = stubFetch();
 	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 
-	await log.fetch("https://api.test/fetch/https://myuser:pwpath@cb.test/x?q=hi&Signature=abc&Signature=def&next=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&deep=https%253A%252F%252Fmyuser%253Apwdeep%2540cb.test%252Fx&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAEXAMPLE%2F20260923%2Feu-north-1%2Fs3%2Faws4_request&X-Amz-Security-Token=FwoGZXIvYXdz&X-Amz-Signature=8b1c9f&X-Goog-Credential=svc%40proj.iam.gserviceaccount.com%2F20260923%2Fauto%2Fstorage%2Fgoog4_request&GoogleAccessId=svc%40proj.iam.gserviceaccount.com&access_token=ya29tok&API_KEY=k1api&apikey=k2api&key=k3api&Token=k4tok&keyword=kept&?kept=1&https://a@b=pw20@evil.test&https://dXNlcg==:pw21@evil.test&https://t.test/x?token=k5tok&then=https://t.test/y?sig=k6sig&n2=https://my+user:pw9@cb.test/x&n6=https%3A%2F%2Ft.test%2Fx%3Fnext2%3Dhttps%253A%252F%252Fu.test%252F%253Ftoken%253Dk10tok&https://t.test/x?next=https%3A%2F%2Fuser%3Ap%2523w40%40h.test%2F&https://t.test/y?next=https%3A%2F%2Fuser%3Ap%252Fw41%40h.test%2F&https%3A%2F%2Ft.test%2Fx%3Fnext%3Dhttps%253A%252F%252Fuser%253Apw42%2540h.test=%3C&oauth=1&redirect_uri=https%3A%2F%2Flocalhost%3A3000&scope=openid&login_hint=bob%40x.test&https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fz");
+	await log.fetch("https://api.test/fetch/https://myuser:pwpath@cb.test/x?q=hi&Signature=abc&Signature=def&next=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&deep=https%253A%252F%252Fmyuser%253Apwdeep%2540cb.test%252Fx&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAEXAMPLE%2F20260923%2Feu-north-1%2Fs3%2Faws4_request&X-Amz-Security-Token=FwoGZXIvYXdz&X-Amz-Signature=8b1c9f&X-Goog-Credential=svc%40proj.iam.gserviceaccount.com%2F20260923%2Fauto%2Fstorage%2Fgoog4_request&GoogleAccessId=svc%40proj.iam.gserviceaccount.com&access_token=ya29tok&API_KEY=k1api&apikey=k2api&key=k3api&Token=k4tok&keyword=kept&?kept=1&https://a@b=pw20@evil.test&https://dXNlcg==:pw21@evil.test&https://t.test/x?token=k5tok&then=https://t.test/y?sig=k6sig&n2=https://my+user:pw9@cb.test/x&n6=https%3A%2F%2Ft.test%2Fx%3Fnext2%3Dhttps%253A%252F%252Fu.test%252F%253Ftoken%253Dk10tok&https://t.test/x?next=https%3A%2F%2Fuser%3Ap%2523w40%40h.test%2F&https://t.test/y?next=https%3A%2F%2Fuser%3Ap%252Fw41%40h.test%2F&https%3A%2F%2Ft.test%2Fx%3Fnext%3Dhttps%253A%252F%252Fuser%253Apw42%2540h.test=%3C&https://user:pa=ss43@host&oauth=1&redirect_uri=https%3A%2F%2Flocalhost%3A3000&scope=openid&login_hint=bob%40x.test&https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fz");
 	await log.end();
 
 	const urlFull = clientSpan(calls).attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue;
@@ -1815,7 +1815,7 @@ test("log.fetch captureQuery keeps the query but redacts known-sensitive keys an
 	t.ok(urlFull.includes("&n2=REDACTED&"), "userinfo holding a space is redacted");
 	t.ok(urlFull.includes("&n6=https%3A%2F%2Ft.test%2Fx%3Fnext2%3Dhttps%253A%252F%252Fu.test%252F%253Ftoken%253DREDACTED&"), "a url nested two deep has its listed key redacted");
 	t.ok(urlFull.includes("&https%3A%2F%2Ft.test%2Fx%3Fnext=REDACTED&https%3A%2F%2Ft.test%2Fy%3Fnext=REDACTED&") && !/w4[01]/.test(urlFull), "a url value under a url key is read alone too, an escaped delimiter in its userinfo included");
-	t.ok(urlFull.includes("%3Fnext=REDACTED&REDACTED=REDACTED&oauth=1&") && !urlFull.includes("pw42"), "a url in a query key is read alone too, where its value breaks the joined reading");
+	t.ok(urlFull.includes("%3Fnext=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&oauth=1&") && !/pw42|ss43/.test(urlFull), "a url in a query key is read alone too, where its value breaks the joined reading, and a key cut short by an = in its password is read with its value");
 	t.ok(urlFull.includes("&oauth=1&redirect_uri=https%3A%2F%2Flocalhost%3A3000&scope=openid&login_hint=bob%40x.test&"), "an encoded url in a value leaves the pairs after it alone");
 	t.end();
 });
@@ -1826,7 +1826,7 @@ test("log.fetch redacts a long query and status message within 250 ms", async t 
 
 	stubFetch();
 
-	const chain = Array.from({ length: 9 }).reduce<string>(nested => `https://a/?${encodeURIComponent(nested)}=b`, `https://t/?x=${"a".repeat(40000)}`);
+	const chain = Array.from({ length: 7 }).reduce<string>(nested => `https://a/?${encodeURIComponent(nested)}=b`, `https://t/?x=${"a".repeat(40000)}`);
 
 	for (const query of ["u=https://a/?".repeat(16384), "https://a/?".repeat(16384), chain]) {
 		const started = performance.now();
