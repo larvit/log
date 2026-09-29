@@ -41,6 +41,7 @@ In [docs/decisions.md](docs/decisions.md):
 - Both credential spellings stay, and their combination warns
 - Inherited `otlpAdditionalHeaders` follow the endpoint's origin
 - Only whitespace ends a url a status message quotes
+- A nested url spelled with whitespace in its `//` is the caller's
 
 ## Working here
 
