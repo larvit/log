@@ -1294,7 +1294,8 @@ function redactQueryPart(part: string, depth: number): string {
 	return url.href;
 }
 
-const SCHEME_LED = /^[a-z][a-z\d+.-]*:/i;
+// A parser drops leading C0 controls and spaces, and a tab or newline anywhere.
+const SCHEME_LED = /^[\0- ]*[a-z][a-z\d+.-]*:/i;
 
 // A key opening a url is read with its value too, as a server taking `?<url>` reads it: an `=` in its
 // password ends the key.
@@ -1303,7 +1304,7 @@ function redactQueryPair(key: string, value: string, depth: number): [string, st
 		return [key, "REDACTED"];
 	}
 
-	if (!SCHEME_LED.test(key)) {
+	if (!SCHEME_LED.test(key.replace(/[\t\n\r]/g, ""))) {
 		return [key, redactQueryPart(value, depth)];
 	}
 
@@ -1320,13 +1321,19 @@ function redactQueryPair(key: string, value: string, depth: number): [string, st
 // where only that parses; a run a comma glues another url onto is read piece by piece, then whole.
 const QUOTED_URL = /\b(?:ftp|https?|wss?):\S*|[a-z][a-z\d+.-]*:\/\/\S*/gi;
 const GLUED_URL = /,(?=(?:ftp|https?|wss?):|[a-z][a-z\d+.-]*:\/\/)/i;
-const CLOSING_PUNCTUATION = /[^\w/]+$/;
 
 // `undefined` where nothing is redacted.
 function redactedQuotedUrl(quoted: string): string | undefined {
 	const whole = parsedUrl(quoted);
-	const closing = whole === undefined ? CLOSING_PUNCTUATION.exec(quoted)?.[0] ?? "" : "";
-	const url = whole ?? parsedUrl(quoted.slice(0, quoted.length - closing.length));
+	let end = quoted.length;
+
+	// A loop, where `/[^\w/]+$/` retries from every char of a long run.
+	while (whole === undefined && end > 0 && /[^\w/]/.test(quoted[end - 1])) {
+		end--;
+	}
+
+	const closing = quoted.slice(end);
+	const url = whole ?? parsedUrl(quoted.slice(0, end));
 
 	if (url === undefined) {
 		return undefined;
