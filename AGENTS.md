@@ -39,7 +39,7 @@ In [docs/decisions.md](docs/decisions.md):
 - `resolveFormatter` is exported
 - Both credential spellings stay, and their combination warns
 - Inherited `otlpAdditionalHeaders` follow the endpoint's origin
-- A quoted url runs to whitespace, less closing punctuation only where it fails to parse
+- Each scheme in a run of text starts a url, read to whitespace first
 - Redaction narrows to Goals #3 in a minor
 
 ## Working here
