@@ -23,10 +23,12 @@
   Since v2.3.0, `log.fetch("https://proxy.test/?https://t.test/x?token=…")` with `captureQuery` on
   exported the token in `url.full`, and so did `?next=https://t.test/x?token=…`; search `url.full`
   for `%3F` or `%26` then a name listed above, followed by `=` or `%3D` and anything but
-  `REDACTED`, and rotate what it finds. Userinfo holding a space or tab, as in
-  `?next=https://my+user:pass@cb.test/x`, is now redacted in a kept query key or value and a
-  captured header too; rotate any password a `url.full` or header attribute shows before a `%40`
-  or `@` following a `+`, `%20` or `%09`.
+  `REDACTED`, and rotate what it finds.
+- **Url userinfo holding whitespace is redacted in a kept query key or value and a captured
+  header.** Since v2.3.0, `?next=https://my+user:pass@cb.test/x` with `captureQuery` on exported
+  `pass` in `url.full`, and so did a captured header holding `https://my user:pass@cb.test/x`;
+  rotate any password a `url.full` shows before a `%40` after a `+` or a `%0` escape, or a header
+  attribute shows before an `@` after a space or tab.
 - **`captureQuery` redacts the value of a query key named `access_token`, `api_key`, `apikey`, `key`
   or `token`, in any casing.** Since v2.3.0, `log.fetch("https://api.test/me?access_token=…")` with
   `captureQuery` on exported the token in `url.full`; search `url.full` for one of these names

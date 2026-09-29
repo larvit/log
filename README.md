@@ -443,7 +443,7 @@ redacted in place as `url.full` is with `captureQuery` on, and its fragment reco
 `http://REDACTED@host/x?access_token=REDACTED`.
 
 `REDACTED` does not always stand for a credential: a `?key=` lookup or a `?token=` pagination
-cursor records it, an address glued to a host, as in `https://api.test,mail@example.com`, redacts
+cursor records it, an address after a host, as in `https://api.test,mail@example.com`, redacts
 too, a `location` of `https://cdn.test//logo@2x.png`
 records `REDACTED` whole, and a path holding `http:`, or `//` then a name holding `@`, is cut —
 `https://wiki.test/wiki/Http:_Status` records `https://wiki.test/wiki/REDACTED` — and so, rarely,
