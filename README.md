@@ -192,7 +192,7 @@ error's message, and an `error.type` attribute from its string `code`, else `nam
 error is a plain `end()`. A message that is a url is redacted, see
 [Credentials in a captured value](#credentials-in-a-captured-value); keep credentials out of any
 other error message. A `log.fetch` rejection quotes its url among text, so forwarding one exports
-that url as written: replace its message first, or keep credentials out of the url. A logged `log.error()` never fails the
+that url's userinfo: replace its message first, or keep credentials out of the url. A logged `log.error()` never fails the
 span; a recovered error is not a failed operation. `await` it to make one delivery attempt before the
 process exits (a short-lived script); fire-and-forget is fine in a long-running process. Against a
 dead collector `await end()` returns after that attempt, within about 3 s plus however long any
@@ -421,7 +421,7 @@ them per call site.
   every level: `?next=https://t.test/x?token=…` records
   `next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3DREDACTED`. A url in a key is read with its value too, and
   where that finds a credential both record `REDACTED`: `?https://t.test/x?token=…`,
-  `?https://a@b=pw@host` and `?https://u:p=w@host` record `REDACTED=REDACTED`. A key or value nested
+  `?https://a@b=pw@host` and `?https://u:p=w@host` record `REDACTED=REDACTED`. A url nested
   deeper than eight levels records `REDACTED` whole.
 - **A captured header value or a status message that the runtime's `URL` parses whole:** userinfo or
   a listed key, at every level as above, makes a header value record `REDACTED` whole, and a status
