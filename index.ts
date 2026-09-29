@@ -1314,6 +1314,31 @@ function redactQueryPair(key: string, value: string, depth: number): [string, st
 	return [key, redactQueryPart(value, depth)];
 }
 
+// As redactedSearch, but a pair with nothing redacted keeps its spelling, so a url glued into it is
+// still found as written.
+function redactedRawSearch(url: URL): string | undefined {
+	let changed = false;
+	const pieces = url.search.slice(1).split("&").map(piece => {
+		const [pair] = new URLSearchParams(`&${piece}`);
+
+		if (pair === undefined) {
+			return piece;
+		}
+
+		const redacted = redactQueryPair(pair[0], pair[1], 1);
+
+		if (redacted[0] === pair[0] && redacted[1] === pair[1]) {
+			return piece;
+		}
+
+		changed = true;
+
+		return new URLSearchParams([redacted]).toString();
+	});
+
+	return changed ? pieces.join("&") : undefined;
+}
+
 // Each scheme in a run of text starts a url, read to the run's end, else short of its trailing
 // punctuation, else up to its first delimiter; past 16 in one run, the rest records `REDACTED`.
 const MAX_QUOTED_URLS = 16;
@@ -1328,14 +1353,14 @@ function redactedQuotedUrl(quoted: string): string | undefined {
 	}
 
 	const delimiter = quoted.search(/["'(),;<>[\]`{|}]/);
-	const read = [quoted.length, end, delimiter].filter(at => at > 0).find(at => parsedUrl(quoted.slice(0, at)) !== undefined);
+	const read = [quoted.length, end, delimiter].filter(length => length > 0).find(length => parsedUrl(quoted.slice(0, length)) !== undefined);
 	const url = read === undefined ? undefined : parsedUrl(quoted.slice(0, read));
 
 	if (read === undefined || url === undefined) {
 		return undefined;
 	}
 
-	const search = redactedSearch(url, 0);
+	const search = redactedRawSearch(url);
 
 	if (!holdsUserinfo(url) && search === undefined) {
 		return undefined;
