@@ -26,6 +26,14 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ### Everything else
 
+- [ ] **Make README → Goals #3's `http:user:pass@host` example true of a request path, or pick one
+  it is.** The goal says such a url is exported as written, and the nested-url cut removes it from
+  `url.full`'s path, as the decision "A url nested in a request path is cut from where it starts"
+  says it should; one of the two claims moves.
+- [ ] **Give README → Credentials in a captured value one bullet per redaction rule.** The status
+  message rule sits inside the "Never put credentials in the url" advice, "`REDACTED` does not
+  always stand for a credential" is one run-on sentence of four cases, and "Spans are queued…"
+  belongs under `log.fetch` in depth.
 - [ ] **Stop decoding base64 in a request path, so every base64 value exports intact.**
   README → Goals #3 leaves a url base64-encoded into a path to the caller; today a random id whose
   decoding spells `http:` or `//x@` is cut. Drop the base64 half of the nested-url cut, its tests,
