@@ -36,10 +36,10 @@ Priority order decides a tie.
    runtime genuinely differs the platform wins and the docs say so.
 2. **The telemetry is correct OTLP.** A span or record a backend mis-renders is a broken product.
    Approximating part of the spec is worse than omitting it.
-3. **Credentials never leave.** In a url or a captured header, that means what the runtime's `URL`
-   parses as userinfo, and the query keys and header names listed under
-   [Credentials in a captured value](#credentials-in-a-captured-value). Anything else, and text you
-   log yourself, is exported as written.
+3. **Credentials never leave.** In a url, or a captured header value or status message the runtime's
+   `URL` parses whole, that means what it parses as userinfo, and the query keys and header names
+   listed under [Credentials in a captured value](#credentials-in-a-captured-value). Anything else,
+   and text you log yourself, is exported as written.
 4. **Semver, read strictly, over what this README documents.** A minor only adds — an export, an
    option, a value an option accepts, a field, a span attribute — where code not using it behaves as
    before. What the README does not document — an undocumented key of a `conf`, enumerability, what
@@ -188,17 +188,15 @@ exported by `end()`.
 
 `end()` closes the span, queues it and flushes the [export queue](#queue-exports); a span that is
 never ended is never sent. `end({ error })` also marks the span failed: status `ERROR` with the
-error's message, and an `error.type` attribute from its string `code`, else `name`, else `"_OTHER"`; a `null` or `undefined`
-error is a plain `end()`. A message that is a url is redacted, see
+error's message, and an `error.type` attribute from its string `code`, else `name`, else `"_OTHER"`;
+a `null` or `undefined` error is a plain `end()`. A message that is a url is redacted, see
 [Credentials in a captured value](#credentials-in-a-captured-value); keep credentials out of any
-other error message. A `log.fetch` rejection quotes its url among text, so forwarding one exports
-that url's userinfo: replace its message first, or keep credentials out of the url. A logged `log.error()` never fails the
-span; a recovered error is not a failed operation. `await` it to make one delivery attempt before the
-process exits (a short-lived script); fire-and-forget is fine in a long-running process. Against a
-dead collector `await end()` returns after that attempt, within about 3 s plus however long any
-un-awaited `log.fetch()` takes to complete, and returns at once while a retry backoff is pending;
-the retry then runs only for as long as the process lives. An instance is single-use: logging and `fetch()` on an ended instance throw, `end()`
-rejects. `log.flush()` delivers what is queued without ending.
+other error message. A logged `log.error()` never fails the span. `await` it to make one delivery
+attempt before the process exits (a short-lived script); fire-and-forget is fine in a long-running
+process. Against a dead collector `await end()` returns after that attempt, within about 3 s plus
+however long any un-awaited `log.fetch()` takes to complete, and returns at once while a retry
+backoff is pending. An instance is single-use: logging and `fetch()` on an ended instance throw,
+`end()` rejects. `log.flush()` delivers what is queued without ending.
 
 `log.clone(options?)` makes an independent instance with the same settings. `context` merges per
 key; `parentLog`, `spanName` and `traceparent` are not copied, so a clone starts a new trace unless
@@ -395,16 +393,16 @@ Span attributes follow the OpenTelemetry HTTP semantic conventions:
 | Attribute | Value |
 |---|---|
 | `http.request.method` | Request method, `GET` when unset |
-| `url.full` | The URL without the outer userinfo; a url nested in the path is exported as written. Query string dropped unless `captureQuery`, redacted as [Credentials in a captured value](#credentials-in-a-captured-value) says |
+| `url.full` | The URL without the outer userinfo; keep credentials out of a url nested in the path, which is exported as written. Query string dropped unless `captureQuery`, redacted as [Credentials in a captured value](#credentials-in-a-captured-value) says |
 | `url.scheme`, `server.address`, `server.port` | From the URL; port only when explicit |
 | `http.request.header.<name>` | Headers listed in `captureRequestHeaders` |
 | `http.response.status_code` | Response status |
 | `http.response.header.<name>` | Headers listed in `captureResponseHeaders` |
 | `error.type` | On a thrown error: its `code`, a numeric one as digits (an abort records `"20"`), else `name`, else `"fetch_error"` |
 
-A 4xx/5xx response marks the span errored; a thrown error does too, with its message as the status
-message, the fetched url in it redacted as
-[Credentials in a captured value](#credentials-in-a-captured-value) says. The response or error reaches the caller unchanged. Bodies are never captured.
+A 4xx/5xx response marks the span errored; a thrown error does too, its message the status
+message, redacted as [Credentials in a captured value](#credentials-in-a-captured-value) says.
+Bodies are never captured.
 `captureQuery` and the header allow-lists are read at call time from the instance; `clone()` to vary
 them per call site.
 
@@ -414,21 +412,20 @@ them per call site.
   `cookie` and `set-cookie`, and the value of a query key named, in any casing, `access_token`,
   `api_key`, `apikey`, `awsaccesskeyid`, `googleaccessid`, `key`, `sig`, `signature`, `token`,
   `x-amz-credential`, `x-amz-security-token`, `x-amz-signature`, `x-goog-credential` or
-  `x-goog-signature` — a bearer token or API key sent in the query, a presigned S3-compatible or
-  GCS url, whichever signing generation made it, and an Azure SAS url.
-- **A url in a kept query key or value**, once decoded, that the runtime's `URL` parses: its
-  userinfo makes the key or value record `REDACTED` whole, and its own listed keys are redacted, at
-  every level: `?next=https://t.test/x?token=…` records
-  `next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3DREDACTED`. A url in a key is read with its value too, and
-  where that finds a credential both record `REDACTED`: `?https://t.test/x?token=…`,
-  `?https://a@b=pw@host` and `?https://u:p=w@host` record `REDACTED=REDACTED`. A url nested
-  deeper than eight levels records `REDACTED` whole.
+  `x-goog-signature` — bearer tokens, API keys, presigned S3 and GCS urls, and Azure SAS urls.
+- **A url in a kept query value**, once decoded, that the runtime's `URL` parses: its userinfo makes
+  the value record `REDACTED`, and its own listed keys are redacted, at every level:
+  `?next=https://t.test/x?token=…` records `next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3DREDACTED`. A url
+  in a key is read alone and with its value, and where either finds a credential both record
+  `REDACTED`: `?https://t.test/x?token=…`, `?https://a@b=pw@host` and `?https://u:p=w@host` record
+  `REDACTED=REDACTED`. A url nested deeper than eight levels records `REDACTED` whole.
 - **A captured header value or a status message that the runtime's `URL` parses whole:** userinfo or
   a listed key, at every level as above, makes a header value record `REDACTED` whole, and a status
   message record `REDACTED` in place: `http://REDACTED@host/x?access_token=REDACTED`. In its own
   span's status, `log.fetch` also redacts the url it fetched wherever the runtime's rejection quotes
-  it. Text the runtime's `URL` cannot parse whole is exported as written, a relative `location:
-  /cb?token=…` included, since it needs a base.
+  it; forwarded to `end({ error })`, that rejection exports the url's userinfo, so replace its
+  message first or keep credentials out of the url. Any other header value or status message is
+  exported as written, a relative `location: /cb?token=…` included, since it needs a base.
 
 Never put credentials in the url; pass an `Authorization` header, and strip userinfo from a url you
 did not build. `log.fetch` mirrors the runtime: Node and browsers refuse such a url, while React

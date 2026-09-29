@@ -6,8 +6,8 @@
 
 - **2.5.0 exports some values v2.4.0 redacted.** Redaction now covers what the runtime's `URL`
   parses, read on a whole value (README → Goals #3). These go out as written:
-  - a url among other text in a header value or status message, its userinfo included, a `log.fetch`
-    rejection you forward to `end({ error })` among them;
+  - a url among other text in a header value or in a status message you set with `end({ error })`,
+    its userinfo included, a forwarded `log.fetch` rejection among them;
   - a url percent-encoded into a header value;
   - a query value holding a url percent-encoded twice in the request url;
   - a url the runtime cannot parse, such as a scheme-relative `//user:pass@host`.
@@ -25,10 +25,10 @@
 - **`log.fetch` redacts the url it fetched in its span's status message as `url.full`'s query is
   with `captureQuery` on, whatever `captureQuery` says.** Since v2.4.0,
   `log.fetch("https://u:p@h.test/x?access_token=…")` on Node or in a browser exported the token in
-  the rejection the runtime quotes the url into; only the userinfo was redacted. Now it records
-  `https://REDACTED@h.test/x?access_token=REDACTED`. An `end({ error })` message that is a url is
-  redacted the same way, so a `?key=` lookup or a `?token=` cursor in one records `REDACTED` and a
-  dashboard grouping on status messages sees it change. Search status messages with the regex
+  the rejection the runtime quotes the url into; only the userinfo was redacted. Now the url in it
+  records `https://REDACTED@h.test/x?access_token=REDACTED`. An `end({ error })` message that is a
+  url is redacted the same way, so a `?key=` lookup or a `?token=` cursor in one records `REDACTED`
+  and a dashboard grouping on status messages sees it change. Search status messages with the regex
   `(?i)(access_token|api_key|apikey|awsaccesskeyid|googleaccessid|key|sig|signature|token|x-amz-credential|x-amz-security-token|x-amz-signature|x-goog-credential|x-goog-signature)(=|%(25)*3d)`
   for a match followed by anything but `REDACTED`, and rotate what it finds.
 - **Userinfo is redacted where the runtime's `URL` parses it, in `\\` and slashless spellings too.**
