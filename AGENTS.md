@@ -44,6 +44,7 @@ In [docs/decisions.md](docs/decisions.md):
 - A nested url spelled with whitespace in its `//` is the caller's
 - Redacting a nested url may cost 3^8 passes
 - An encoded url beside a raw one is cut from where it starts
+- A raw nested url's escaped delimiters are read after one decode
 
 ## Working here
 

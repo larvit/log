@@ -352,17 +352,22 @@ address exports intact. Valid while Goals #3 exempts a url written other than pl
 
 2026-09-29, declined in review: a level may be redacted three times — a url in a query key alone
 and then with its value, and a pair holding a raw url once more as a server decodes it — so a chain
-of eight such levels costs about 4,000 passes over the url: 13 s for a crafted 120 KB one. The depth
-cap bounds it, and README → Goals #3 outranks Goals #7. Valid while the depth cap stays at eight.
+of eight such levels costs up to 3^8 passes over the url; a crafted 120 KB one measured 4,000 and
+13 s. The depth cap bounds it, and README → Goals #3 outranks Goals #7. Valid while the depth cap
+stays at eight.
 
 ## An encoded url beside a raw one is cut from where it starts
 
 2026-09-29, the implementer: where a url a status message quotes, or a query key or value holding
 a raw `//`, also holds a percent-encoded url before that `//` or in the host after it, as
-`?q=see//x+https%3A%2F%2Ft.test%2Fx%3Ftoken%3D…` does, the encoded url is cut from where it
-starts, as the path rule cuts one: the raw url's regex reads such text as its host, or not at all,
-so its query has no key to redact by. A host is searched only where it holds an escape, so
-`envoy-http:10000` stays a host, and userinfo never is, since a cut inside it would stop its whole
-redaction. A raw url's escaped `?`, `=` or `&` is read after one decode, as the server
-receiving the pair reads it; escaped deeper, it is that url's path text. Serves README → Goals #3.
-Valid while the path rule cuts.
+`?q=see//x+https%253A%252F%252Ft.test%252Fx%253Ftoken%253D…` does, the encoded url is cut from
+where it starts, as the path rule cuts one: the raw url's regex reads such text as its host, or not
+at all, so its query has no key to redact by. Userinfo is never searched, since a cut inside it
+would stop its whole redaction. Serves README → Goals #3. Valid while the path rule cuts.
+
+## A raw nested url's escaped delimiters are read after one decode
+
+2026-09-29, the implementer: a raw url in a query key or value has its escaped `?`, `=` or `&`
+read as the server receiving the pair reads them, one decode deep; escaped deeper, they are that
+url's path text, redacted by no key. Serves README → Goals #3, and a deeper spelling is one it
+leaves to the caller. Valid while Goals #3 exempts a url written other than plainly.
