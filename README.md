@@ -36,18 +36,10 @@ Priority order decides a tie.
    runtime genuinely differs the platform wins and the docs say so.
 2. **The telemetry is correct OTLP.** A span or record a backend mis-renders is a broken product.
    Approximating part of the spec is worse than omitting it.
-3. **A credential never leaves.** A credential hidden inside something you hand this library to
-   *use* — a url it fetches, a header or query value it captures, the OTLP endpoint — never
-   reaches a span, a record or `stderr`, and what a `storage` holds reaches nothing but the queue
-   it restores. Text you write yourself as telemetry is exported as you wrote it: the log message,
-   metadata, `context` and `spanName`. So is a header you allow-list that simply *is* a secret,
-   because naming it is asking for it, and a query value under a name
-   [Credentials in a captured value](#credentials-in-a-captured-value) does not list, because no
-   shape tells it from any other string. So is a url you base64-encode into a request path: a
-   base64 value always exports intact, and keeping a credential out of one is yours. So is a url
-   written other than plainly, `http://` or `https://` then a well-formed rest: a malformed one, or
-   a legal but unusual spelling such as `http:user:pass@host` or `https:\\host`, is exported as
-   written, except that userinfo after a `\` slash records `REDACTED`.
+3. **Credentials never leave.** In a url or a captured header, that means what the runtime's `URL`
+   parses as userinfo, and the query keys and header names listed under
+   [Credentials in a captured value](#credentials-in-a-captured-value). Anything else, and text you
+   log yourself, is exported as written.
 4. **Semver, read strictly, over what this README documents.** A minor only adds — an export, an
    option, a value an option accepts, a field, a span attribute — where code not using it behaves as
    before. What the README does not document — an undocumented key of a `conf`, enumerability, what
