@@ -1477,7 +1477,7 @@ const userinfoCrossesAssign = (key: string, value: string) => /[\\/]{2}[^/?#]*$/
 // The pairs a url's userinfo runs across `&` through, raw or once decoded; decoded, only a url in
 // a key opens one, so an encoded `redirect_uri` origin keeps the pairs after it.
 function pairsUserinfoCrosses(pairs: string[]): Set<number> {
-	const opensAuthority = (text: string) => /[\\/]{2}[^/?#]*$/.test(text);
+	const opensAuthority = (text: string) => /[\\/]{2}[^\\/?#]*$/.test(text);
 	const opensFromKey = (pair: string) => {
 		const [key, value = ""] = pair.split(/=([^]*)/, 2).map(formDecoded);
 
