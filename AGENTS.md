@@ -23,7 +23,7 @@ In [docs/decisions.md](docs/decisions.md):
 - This library's own warnings are written once per `stderr` sink
 - `otlpHttpBaseURI` userinfo becomes an `Authorization: Basic` header
 - `log.fetch` traces only `http:` and `https:` urls
-- `log.fetch` passes url userinfo through, and `failureMessage` redacts it
+- `log.fetch` passes url userinfo through, and redacts it in its own span's status
 - A captured value holding a credential records `REDACTED`
 - Every rule on credentials in a span sits in one source section
 - `format` is the formatter's one name, `entryFormatter` its alias until 3.0.0
@@ -39,7 +39,7 @@ In [docs/decisions.md](docs/decisions.md):
 - `resolveFormatter` is exported
 - Both credential spellings stay, and their combination warns
 - Inherited `otlpAdditionalHeaders` follow the endpoint's origin
-- Each scheme in a run of text starts a url, read to whitespace first
+- A header value or status message is redacted only where it is a url whole
 - Redaction narrows to Goals #3 in a minor
 
 ## Working here

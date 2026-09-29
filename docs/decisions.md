@@ -101,48 +101,43 @@ telemetry for urls nobody traces over the network: the timing and status of thos
 right, their `url.full` (`nulluser:pass@host/x`, `https://example.comhttps://example.com/uuid`)
 was not. Valid while `url.full` is built from `origin` + `pathname`.
 
-## `log.fetch` passes url userinfo through, and `failureMessage` redacts it
+## `log.fetch` passes url userinfo through, and redacts it in its own span's status
 
-2026-09-20: a `log.fetch` url carrying userinfo reaches the runtime's `fetch` untouched, and
-`failureMessage` redacts the userinfo out of any url the error message quotes. It sits there, not
-at the `log.fetch` call site, because the same rejection reaches a second span through
-`end({ error })` — the handler pattern the README documents — and a caller's own `fetch`
-rejection arrives by that route too; one redaction where an error becomes a span status covers
-every sink, where a `url.username || url.password` test at the call site covered one. Turning
-the userinfo into an `Authorization: Basic` header, as `otlpHttpBaseURI` does with the same
-spelling, is what README → Goals forbids of `log.fetch`: "never a request the platform would
-not have made, and never a success the platform would have refused". The two spellings differ
-because the queue's endpoint is this library's own request to make, where `log.fetch`'s is the
-caller's, so the same string means "authenticate me" in one and "mirror what my runtime does
-with this" in the other. React Native does put them on the wire, on one of its two platforms:
-`whatwg-fetch` hands the url to `XMLHttpRequest.open` untouched and sets no header, iOS keeps
-the userinfo through `[RCTConvert NSURL:]` and runs `NSURLSession` with no challenge delegate,
-so the system answers `WWW-Authenticate` with the credentials, while Android passes the string
-to `Request.Builder().url()` and OkHttp derives no `Authorization` from it — leaving the caller
-a 401, and writing the userinfo out only in a plain-`http:` proxy's request line. Same at
-`v0.74.0` and today's `main`. Mirroring keeps that the platform's behaviour. It ships in a
-minor on the precedent of the entry above, being the security fix itself. Valid while `log.fetch`
-is a drop-in for the runtime's `fetch`.
+2026-09-20, amended 2026-09-29: a `log.fetch` url carrying userinfo reaches the runtime's `fetch`
+untouched, and its span's status replaces that url, as the runtime quotes it back, with its redacted
+form. A rejection forwarded to `end({ error })` is free text there and exported as written, per the
+whole-value entry below. Turning the userinfo into an `Authorization: Basic` header, as
+`otlpHttpBaseURI` does with the same spelling, is what README → Goals forbids of `log.fetch`: "never
+a request the platform would not have made, and never a success the platform would have refused".
+The two spellings differ because the queue's endpoint is this library's own request to make, where
+`log.fetch`'s is the caller's, so the same string means "authenticate me" in one and "mirror what my
+runtime does with this" in the other. React Native does put them on the wire, on one of its two
+platforms: `whatwg-fetch` hands the url to `XMLHttpRequest.open` untouched and sets no header, iOS
+keeps the userinfo through `[RCTConvert NSURL:]` and runs `NSURLSession` with no challenge delegate,
+so the system answers `WWW-Authenticate` with the credentials, while Android passes the string to
+`Request.Builder().url()` and OkHttp derives no `Authorization` from it — leaving the caller a 401,
+and writing the userinfo out only in a plain-`http:` proxy's request line. Same at `v0.74.0` and
+today's `main`. Mirroring keeps that the platform's behaviour. It ships in a minor on the precedent
+of the entry above, being the security fix itself. Valid while `log.fetch` is a drop-in for the
+runtime's `fetch`.
 
 ## A captured value holding a credential records `REDACTED`
 
 2026-09-20: a value `log.fetch` copies onto a span records `REDACTED` in place of the whole value
-where it holds a credential, per README → Goals' "a credential never leaves". One rule for
-captured header values and for the query values `captureQuery` keeps — and for a query key, since
-a url written as a bare key reaches `url.full` the same way its value would — because the same
-credentialed url arrives by every one of those routes and separate rules would disagree the way
-the two allow-lists used to: `authorization`, `proxy-authorization`, `cookie` and `set-cookie` go by
-name, and everything else goes by whether a url in the value holds a credential. Redacting
-rather than rejecting the allow-list entry is what a minor allows — README → Goals #4
-deprecates a breaking change in a 2.x minor first, and the leak is open now — and it matches the stance `SENSITIVE_QUERY_KEYS` already took. `REDACTED` over
-dropping the attribute keeps the telemetry reader's "was the header there?", which is what an
-allow-list is for once the value is gone. A status message keeps its text
-instead, each url in it rebuilt from its parse with the credential `REDACTED`, because there the
-surrounding text is a message a human reads; a captured header's encoding is the caller's, so
-rewriting inside it would report something they never sent. The four names are the ones whose value is a credential by definition
-(RFC 9110 authentication, RFC 6265 cookies). What this does not reach, and the README says so, is
-a header whose value simply is a secret — `x-api-key`, a signed token — which no shape
-distinguishes from any other string. Valid while an allow-list names header names, not patterns.
+where it holds a credential, per README → Goals' "a credential never leaves". One rule for captured
+header values and for the query values `captureQuery` keeps — and for a query key, since a url
+written as a bare key reaches `url.full` the same way its value would — because the same
+credentialed url arrives by every one of those routes and separate rules would disagree the way the
+two allow-lists used to: `authorization`, `proxy-authorization`, `cookie` and `set-cookie` go by
+name, and everything else goes by whether a url in the value holds a credential. Redacting rather
+than rejecting the allow-list entry is what a minor allows — README → Goals #4 deprecates a breaking
+change in a 2.x minor first, and the leak is open now — and it matches the stance
+`SENSITIVE_QUERY_KEYS` already took. `REDACTED` over dropping the attribute keeps the telemetry
+reader's "was the header there?", which is what an allow-list is for once the value is gone. The
+four names are the ones whose value is a credential by definition (RFC 9110 authentication, RFC 6265
+cookies). What this does not reach, and the README says so, is a header whose value simply is a
+secret — `x-api-key`, a signed token — which no shape distinguishes from any other string. Valid
+while an allow-list names header names, not patterns.
 
 ## Every rule on credentials in a span sits in one source section
 
@@ -295,17 +290,15 @@ only from a source with no endpoint or one of the same origin, the line fetch dr
 drops `Authorization`; a new path on the same collector keeps working. Serves README → Goals #3's
 headline, "a credential never leaves", on the wire.
 
-## Each scheme in a run of text starts a url, read to whitespace first
+## A header value or status message is redacted only where it is a url whole
 
-2026-09-29, declined in review, amended the same day: in a status message or a captured header
-value, every scheme in a run of non-whitespace starts a url, read to the run's end, else short of
-its trailing punctuation, else up to its first delimiter, left to right over the text as redacted so
-far. A runtime or wrapper quotes the url as written, where `"`, `<`, `>` and a backtick can be the
-url's own, and stopping at one first let the listed key after it through; a url glued to another, in
-a path, a JSON string or a `link` header, is one the runtime parses, so Goals #3 covers it. A
-special scheme ending a longer one is read from both; past 16 starts in one run the rest records
-`REDACTED`, keeping a crafted run linear under Goals #7. Readability of the text around the url
-gives way to README → Goals #3 over Audience #3. Valid while a status message keeps its text.
+2026-09-29, the maintainer: a captured header value or a span's status message is read as a url only
+where the runtime's `URL` parses the whole of it; a url among other text is exported as written. Six
+review rounds each found a new way a scanner for urls in free text missed one — a delimiter, an
+escape the rewrite wrote, a scheme ending another — so the scanner went. `log.fetch` still redacts
+the url it fetched in its own span's status, since it knows the exact string the runtime quotes
+back. Serves README → Goals #3, whose "what the runtime's `URL` parses" now reads on the whole
+value. Valid while Goals #3 reads so.
 
 ## Redaction narrows to Goals #3 in a minor
 
