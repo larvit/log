@@ -1294,8 +1294,7 @@ function redactQueryPart(part: string, depth: number): string {
 	return url.href;
 }
 
-// A url in a key is read with its value too, as a server taking `?<url>` reads it; where the value
-// lands in that url's query, that reading covers it.
+// A url in a key is read with its value too, as a server taking `?<url>` reads it.
 function redactQueryPair(key: string, value: string, depth: number): [string, string] {
 	if (SENSITIVE_QUERY_KEYS.has(key.toLowerCase())) {
 		return [key, "REDACTED"];
@@ -1313,9 +1312,7 @@ function redactQueryPair(key: string, value: string, depth: number): [string, st
 		return ["REDACTED", "REDACTED"];
 	}
 
-	const valueInQuery = keyUrl.hash === "" && (keyUrl.search !== "" || key.endsWith("?"));
-
-	return [key, valueInQuery ? value : redactQueryPart(value, depth)];
+	return [key, redactQueryPart(value, depth)];
 }
 
 // A url a text quotes runs from its scheme to the next whitespace.
