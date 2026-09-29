@@ -352,5 +352,4 @@ address exports intact. Valid while Goals #3 exempts a url written other than pl
 
 2026-09-29, declined in review: a url nested in a query key is redacted twice per level, its key
 alone and then with its value, so a chain of eight such keys costs 256 passes over the url. The
-depth cap bounds it, only a url the caller built reaches it, and README → Goals #3 outranks
-Goals #7. Valid while the depth cap stays at eight.
+depth cap bounds it, and README → Goals #3 outranks Goals #7. Valid while the depth cap stays at eight.
