@@ -1388,18 +1388,21 @@ function redactQuotedUrls(text: string): string {
 		let started = 0;
 
 		for (let match = schemes.exec(run); match !== null; match = schemes.exec(run)) {
-			if (!/^[a-z].*:$/i.test(match[0])) {
+			// A scheme starts at a letter, so one glued to a digit, or to an escape such as `%22`, still counts.
+			const start = match.index + match[0].search(/[a-z]/i);
+
+			if (start < match.index || !match[0].endsWith(":")) {
 				continue;
 			}
 
 			if (++started > MAX_QUOTED_URLS) {
-				return run.slice(0, match.index) + "REDACTED";
+				return run.slice(0, start) + "REDACTED";
 			}
 
-			const redacted = redactedQuotedUrl(run.slice(match.index));
+			const redacted = redactedQuotedUrl(run.slice(start));
 
 			if (redacted !== undefined) {
-				run = run.slice(0, match.index) + redacted;
+				run = run.slice(0, start) + redacted;
 				schemes.lastIndex = match.index + match[0].length;
 			}
 		}
