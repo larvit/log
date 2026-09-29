@@ -354,10 +354,10 @@ address exports intact. Valid while Goals #3 exempts a url written other than pl
 alone and then with its value, so a chain of eight such keys costs 256 passes over the url. The
 depth cap bounds it, and README → Goals #3 outranks Goals #7. Valid while the depth cap stays at eight.
 
-## A url in a nested url's authority is cut from where it starts
+## A url in a nested url's host is cut from where it starts
 
 2026-09-29, the implementer: where a status message's url, or a url nested in a query key or value,
-holds a url in its authority — `?q=see//x+https%3A%2F%2Ft.test%2Fx%3Ftoken%3D…` reads `//x+https…`
-as one — it is cut from where that url starts, as the path rule cuts one: an authority cannot hold a
-url, so what follows it has no shape to redact by key. Serves README → Goals #3. Valid while the
-path rule cuts.
+holds a url in its host — `?q=see//x+https%3A%2F%2Ft.test%2Fx%3Ftoken%3D…` reads `//x+https…`
+as one — it is cut from where that url starts, as the path rule cuts one: a host cannot hold a url,
+so what follows it has no shape to redact by key. Userinfo is left out of the search, since a cut
+inside it would stop its whole redaction. Serves README → Goals #3. Valid while the path rule cuts.

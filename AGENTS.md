@@ -43,7 +43,7 @@ In [docs/decisions.md](docs/decisions.md):
 - Only whitespace ends a url a status message quotes
 - A nested url spelled with whitespace in its `//` is the caller's
 - Redacting a url nested in a query key may cost 2^8 passes
-- A url in a nested url's authority is cut from where it starts
+- A url in a nested url's host is cut from where it starts
 
 ## Working here
 
