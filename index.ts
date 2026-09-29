@@ -1439,7 +1439,7 @@ function layersToUrl(text: string): number | undefined {
 
 // A pair is decoded to the layer where its key spells `//`, else its value, that layer is redacted,
 // and a part it changes is encoded back as many times; `undefined` where neither part is decoded.
-// Eight urls deep, a pair still holding one records `REDACTED`, before the stack runs out.
+// Eight urls deep, the part holding one records `REDACTED`, before the stack runs out.
 function redactEncodedPair(key: string, value: string, depth: number): [string, string] | undefined {
 	if (key.includes("//")) {
 		return undefined;
@@ -1481,8 +1481,19 @@ function redactQuotedUrls(text: string, depth = 0): string {
 		const found = !whole.includes("//") ? whole : depth < 8 ? redactQuotedUrls(whole, depth + 1) : "REDACTED";
 		const assignAt = found.indexOf("=");
 		const key = assignAt < 0 ? found : found.slice(0, assignAt);
+		const redacted = redactQueryCredential(key) + (assignAt < 0 ? "" : "=" + redactQueryValue(percentDecoded(key), found.slice(assignAt + 1)));
 
-		return redactQueryCredential(key) + (assignAt < 0 ? "" : "=" + redactQueryValue(percentDecoded(key), found.slice(assignAt + 1)));
+		if (!whole.includes("//") || depth >= 8) {
+			return redacted;
+		}
+
+		// A server decodes the pair once, so an escaped `?`, `=` or `&` in its raw url is the url's own.
+		const [redactedKey, redactedValue = ""] = redacted.split(/=([^]*)/, 2);
+		const decoded = [redactedKey, redactedValue].map(formDecoded);
+		// eslint-disable-next-line @typescript-eslint/no-use-before-define
+		const [decodedKey, decodedValue] = decoded[0] === redactedKey && decoded[1] === redactedValue ? decoded : redactQueryPair(decoded[0], decoded[1], depth + 1);
+
+		return (decodedKey === decoded[0] ? redactedKey : encodeURIComponent(decodedKey)) + (redacted.includes("=") ? "=" + (decodedValue === decoded[1] ? redactedValue : encodeURIComponent(decodedValue)) : "");
 	};
 
 	// Only whitespace ends a url a runtime quotes as written, so a raw `"` or `<` stays inside it;
@@ -1498,13 +1509,14 @@ function redactQuotedUrls(text: string, depth = 0): string {
 	}
 
 	return text.replace(quotedUrl, (_, head: string, path: string, query = "", fragment = "") => {
-		// A host cannot hold a url, so one found there is cut as one in the path is; userinfo is
-		// redactUserinfo's, whole.
-		const [, scheme, userinfo, host] = /^(.*?\/\/)(.*@)?(.*)$/s.exec(head) ?? [];
-		const nestedStart = nestedUrlStart(host + path);
+		// A host holding an escape holds no name, so it is searched for a url as the path is; userinfo
+		// is redactUserinfo's, whole.
+		const hostAt = Math.max(head.indexOf("//") + 2, head.lastIndexOf("@") + 1);
+		const searchedAt = head.includes("%", hostAt) ? hostAt : head.length;
+		const nestedStart = nestedUrlStart(head.slice(searchedAt) + path);
 
 		if (nestedStart !== undefined) {
-			return scheme + (userinfo ?? "") + (host + path).slice(0, nestedStart) + "REDACTED";
+			return head.slice(0, searchedAt) + (head.slice(searchedAt) + path).slice(0, nestedStart) + "REDACTED";
 		}
 
 		return head + path + (query && "?" + query.slice(1).replace(/[^&]+/g, redactPair)) + (fragment && "#REDACTED");

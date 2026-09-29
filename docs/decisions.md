@@ -358,7 +358,8 @@ depth cap bounds it, and README → Goals #3 outranks Goals #7. Valid while the 
 
 2026-09-29, the implementer: where a url a status message quotes, or a query key or value holding
 a raw `//`, also holds a percent-encoded url before that `//` or in the host after it, as
-`?q=see//x+https%3A%2F%2Ft.test%2Fx%3Ftoken%3D…` does, the encoded url is cut from where it starts,
-as the path rule cuts one: the raw url's regex reads such text as its host, or not at all, so its
-query has no key to redact by. Userinfo is left out of the search, since a cut inside it would stop
-its whole redaction. Serves README → Goals #3. Valid while the path rule cuts.
+`?q=see//x+https%3A%2F%2Ft.test%2Fx%3Ftoken%3D…` does, the encoded url is cut from where it
+starts, as the path rule cuts one: the raw url's regex reads such text as its host, or not at all,
+so its query has no key to redact by. A host is searched only where it holds an escape, so
+`envoy-http:10000` stays a host, and userinfo never is, since a cut inside it would stop its whole
+redaction. Serves README → Goals #3. Valid while the path rule cuts.
