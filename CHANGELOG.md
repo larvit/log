@@ -21,9 +21,9 @@
 - **`captureQuery` redacts a listed query key's value in a url nested in a query key or value.**
   Since v2.3.0, `log.fetch("https://proxy.test/?https://t.test/x?token=…")` with `captureQuery` on
   exported the token in `url.full`, and so did `?next=https://t.test/x?token=…` and a url nested
-  in that one, percent-encoded once more per level; search `url.full` for `(?i)%(25)*(3f|26)`
-  directly before a match of the first bullet's regex followed by anything but `REDACTED`, and
-  rotate what it finds; a presigned SigV4 url only while unexpired, as v2.4.0 says.
+  in that one, percent-encoded once more per level; search `url.full` with the first bullet's
+  regex, `%(25)*(3f|26)` inserted after its `(?i)`, for a match followed by anything but
+  `REDACTED`, and rotate what it finds; a presigned SigV4 url only while unexpired, as v2.4.0 says.
 - **`captureQuery` redacts url userinfo holding whitespace in a kept query key or value.** Since
   v2.3.0, `?next=https://my+user:pass@cb.test/x` exported `pass` in `url.full`; rotate any password
   a `url.full` query key or value shows before `(?i)%(25)*40`. A query value holding a host, then
