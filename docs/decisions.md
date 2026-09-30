@@ -266,9 +266,14 @@ credentials off `log.conf` and `queue.conf`.
 `127.0.0.0/8` or `::1` warns when a send carries an `Authorization`, from `user:pass@` or
 `otlpAdditionalHeaders`, and still sends. It is checked at each send, so a header set later warns
 too, and written once per sink, host and source: through the Log's `stderr` at `warn` for a queue a
-Log built, else the queue's `report`. The line names the host, never the credential. Both spellings warn, so moving the credential never silences the exposure; refusing
-would break the in-cluster `http:` collector, a deliberate and common setup. Serves README → Goals
-#3's headline, "Credentials never leave", on the wire, without spending #4.
+Log built, else the queue's `report`. The line names the host, never the credential. Both
+spellings warn, so moving the credential never silences the exposure; refusing would break the
+in-cluster `http:` collector, a deliberate and common setup. 2026-09-30, the maintainer: a `Queue`
+given `acceptPlainHttpAuthorization: true` does not warn, the opt-out for a network the consumer
+trusts; it sits on the queue alone, which owns the endpoint. Only `Authorization` is checked, as the
+redaction's header names already follow Datadog's. Serves README → Goals #3's headline,
+"Credentials never leave", on the wire, without spending #4. No expiry: the setups it serves are
+not all known.
 
 ## `resolveFormatter` is exported
 

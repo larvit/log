@@ -73,7 +73,7 @@
   credential source, naming the host.** Either spelling warns, `user:pass@` in `otlpHttpBaseURI` or
   `Authorization` in `otlpAdditionalHeaders`, set at any time; through a `Log` it is a `warn` line
   on `stderr`. The request still goes. Rotate a credential that has crossed a network you do not
-  trust; on one you do, drop the line in a `report` of your own.
+  trust; on one you do, silence it with the new `Queue` option `acceptPlainHttpAuthorization: true`.
 
 ## v2.4.0
 
