@@ -53,8 +53,9 @@
   `id_token`, `key`, `password`, `refresh_token`, `secret`, `subscription-key` and `token`, in any
   casing and with `-` and `_` ignored, so `authToken` and `api-key` too. Since v2.3.0,
   `log.fetch("https://api.test/me?access_token=…")` with `captureQuery` on exported the token in
-  `url.full`; search `url.full` for one of these names followed by `=` and anything but `REDACTED`,
-  and rotate what it finds. A value that is no secret,
+  `url.full`; search `url.full` with
+  `(?i)[?&](access[-_]?token|api[-_]?key|auth[-_]?token|client[-_]?secret|id[-_]?token|key|password|refresh[-_]?token|secret|subscription[-_]?key|token)=`
+  for a match followed by anything but `REDACTED`, and rotate what it finds. A value that is no secret,
   such as a `key` lookup or a `token` pagination cursor, records `REDACTED` too, so a dashboard
   grouping on such a `url.full` sees it change.
 - **A child or clone sending to another origin than its source's no longer inherits
