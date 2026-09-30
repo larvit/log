@@ -975,7 +975,9 @@ test("an Authorization sent over plain http: to a non-loopback host warns once p
 		await log.flush();
 	}
 
-	t.deepEqual(stderr.map(line => { const { logLevel, msg } = JSON.parse(line); return { logLevel, msg }; }), [{ logLevel: "warn", msg: warning }], "a Log-built queue warns once per stderr, at warn");
+	const { logLevel, msg } = JSON.parse(stderr[0]);
+
+	t.deepEqual({ lines: stderr.length, logLevel, msg }, { lines: 1, logLevel: "warn", msg: warning }, "a Log-built queue warns once per stderr, at warn");
 	t.strictEqual(calls.length, 12, "every request still goes");
 	t.end();
 });
