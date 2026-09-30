@@ -305,3 +305,16 @@ a url among other text, a percent-encoded url in a header, and a url the runtime
 as a scheme-relative `//user:pass@host`. Six review rounds each found a new way a scanner for urls
 in free text missed one — a delimiter, an escape the rewrite wrote, a scheme ending another — so the
 scanner went. Goals #3 draws that line and outranks #4. Valid while Goals #3 reads so.
+
+## A header name is redacted by Elastic APM's `sanitize_field_names` rule
+
+2026-09-30, the maintainer, choosing from published defaults over names guessed one by one: a
+captured header's value records `REDACTED` when its name, ignoring case, matches Elastic APM's
+default `sanitize_field_names` (`password`, `passwd`, `pwd`, `secret`, `*key`, `*token*`,
+`*session*`, `*credit*`, `*card*`, `*auth*`, `set-cookie`, `*principal*`) or is `cookie`, the
+spec's optional addition (https://github.com/elastic/apm/blob/main/specs/agents/sanitization.md).
+It is the one published cross-agent spec that requires redacting request and response headers.
+OTel redacts no header value, Datadog's tracers only in AppSec, and Datadog's eight exact names
+there miss `x-api-key` and every `x-*-token`. The name is kept, so a false hit costs the reader a
+value, never the header's presence. Serves README → Goals #3. Replaces the four RFC names in "A
+captured value holding a credential records `REDACTED`" once 2.5.0 implements it.

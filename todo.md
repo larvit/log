@@ -6,6 +6,13 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ## 2.5.0 — close the credential story
 
+- [ ] **Redact a captured header's value by Elastic APM's `sanitize_field_names` rule, `cookie`
+  included.** Today four names are hard-coded, so `x-api-key`, `x-auth-token` and
+  `x-amz-security-token` export as written. `docs/decisions.md` → "A header name is redacted by
+  Elastic APM's `sanitize_field_names` rule" holds the rule and its source; that entry and "A
+  captured value holding a credential records `REDACTED`" become one once this ships. README →
+  Credentials in a captured value lists the new rule, and CHANGELOG's `### Security` says which
+  captured headers now record `REDACTED`, so a dashboard grouping on one sees it change.
 - [ ] **Give every `docs/decisions.md` entry its maker and the goal it serves.** "A required
   `Resolved*Conf` key is added in a minor and removed in a major" and "The OTLP endpoint belongs to
   the queue" name neither, and an entry with no goal behind it is a missing goal.
