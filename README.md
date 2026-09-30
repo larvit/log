@@ -420,7 +420,7 @@ them per call site.
   `authorization`, `x-api-key` and `x-amz-security-token`. The header is kept, its value records
   `REDACTED`. A name the rule misses exports as written, `x-client-secret` and `x-db-password` among
   them, so leave such a header off `captureRequestHeaders` and `captureResponseHeaders`.
-- **The value of a query key, whatever `captureQuery` keeps,** that, in any casing and with `-` and
+- **The value of a query key among what `captureQuery` keeps** that, in any casing and with `-` and
   `_` ignored, ends in `auth`, `authentication`, `authorization`, `consumerid`, `credential`, `key`,
   `keyid`, `pass`, `passphrase`, `secret`, `sig`, `sign`, `signature`, `signed` or `token`, or in
   `passwd`, `password`, `pwd` or `pword` with an optional `1` or `2`, or is `code`,
@@ -447,8 +447,8 @@ you the 401.
 
 `REDACTED` does not always stand for a credential: a `?key=` lookup, a `?token=` pagination cursor,
 a `?code=` promo code, an `?oauth=` or `?design=` flag, and the headers `www-authenticate`,
-`x-idempotency-key` and `x-session-id` record it, and so does an address the
-runtime reads as userinfo, as in `https://api.test,mail@example.com`.
+`x-idempotency-key` and `x-session-id` record it, and so does an address the runtime reads as
+userinfo, as in `https://api.test,mail@example.com`.
 
 Spans are queued when the response arrives and are registered with `flush()` at call time, so
 `await log.end()` delivers a `log.fetch()` you never awaited.
