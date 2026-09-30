@@ -1021,7 +1021,9 @@ class OtlpSender {
 		}
 
 		if (this.plainHttpHost !== undefined && headers.has("Authorization")) {
-			this.warn(`@larvit/log: an Authorization header, from user:pass@ in otlpHttpBaseURI or from otlpAdditionalHeaders, goes over plain http: to ${this.plainHttpHost}, readable by anything on the network path; use an https: endpoint`);
+			const source = Object.keys(this.conf.otlpAdditionalHeaders ?? {}).some(name => name.toLowerCase() === "authorization") ? "otlpAdditionalHeaders" : "user:pass@ in otlpHttpBaseURI";
+
+			this.warn(`@larvit/log: an Authorization header from ${source} goes over plain http: to ${this.plainHttpHost}, readable by anything on the network path; use an https: endpoint`);
 		}
 
 		let body: string | Uint8Array<ArrayBuffer>;
