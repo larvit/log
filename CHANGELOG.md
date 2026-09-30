@@ -74,8 +74,8 @@
   `acceptPlainHttpAuthorization: true`.** Either spelling warns, `user:pass@` in `otlpHttpBaseURI` or
   `Authorization` in `otlpAdditionalHeaders`, set at any time; through a `Log` it is a `warn` line
   on `stderr`. The request still goes. Rotate a credential that has crossed a network you do not
-  trust. On one you do, a `Log` using `otlpHttpBaseURI` moves the endpoint to
-  `otlpQueue: new Queue({ otlpHttpBaseURI, acceptPlainHttpAuthorization: true })`, whose report
+  trust. On one you do, a `Log` using `otlpHttpBaseURI` moves its `otlp*` options to
+  `otlpQueue: new Queue({ acceptPlainHttpAuthorization: true, otlpHttpBaseURI })`, whose report
   lines then go to that queue's `report`, `console.error` unless you pass one.
 
 ## v2.4.0
