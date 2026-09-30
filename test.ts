@@ -920,7 +920,7 @@ test("endpoint userinfo authenticates through an Authorization header, never thr
 
 test("an Authorization sent over plain http: to a non-loopback host warns once per report sink, and still goes", async t => {
 	const { calls } = stubFetch();
-	const warning = (source: string) => `@larvit/log: an Authorization header from ${source} goes over plain http: to collector.test:4318, readable by anything on the network path; use an https: endpoint`;
+	const warning = (source: string) => `@larvit/log: an Authorization header from ${source} goes over plain http: to collector.test:4318, readable by anything on the network path; use an https: endpoint, or on a network you trust set acceptPlainHttpAuthorization: true on the Queue`;
 	const send = async (queue: Queue) => {
 		const log = new Log({ otlpQueue: queue, stderr: () => {} });
 
@@ -956,6 +956,13 @@ test("an Authorization sent over plain http: to a non-loopback host warns once p
 	await send(new Queue({ otlpHttpBaseURI: "http://u:p@127.evil.test", report: lookalike.report }));
 	t.strictEqual(lookalike.lines.length, 1, "a name starting 127. is no loopback address");
 
+	const stringly = reportSink();
+	const unset = new Queue({ otlpHttpBaseURI: "http://u:p@other.test", report: stringly.report });
+
+	await send(Reflect.construct(Queue, [{ acceptPlainHttpAuthorization: "false", otlpHttpBaseURI: "http://u:p@other.test", report: stringly.report }]));
+	t.strictEqual(stringly.lines.length, 1, "only true accepts, never a truthy string");
+	t.strictEqual(unset.conf.acceptPlainHttpAuthorization, false, "it reads back false when unset");
+
 	let unwarned = "";
 
 	try {
@@ -984,7 +991,7 @@ test("an Authorization sent over plain http: to a non-loopback host warns once p
 
 	broken.info("z");
 	t.strictEqual(await broken.flush().then(() => "", err => String(err)), "", "a stderr that throws on the warning never rejects flush()");
-	t.strictEqual(calls.length, 14, "every request still goes");
+	t.strictEqual(calls.length, 15, "every request still goes");
 	t.end();
 });
 
