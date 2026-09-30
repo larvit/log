@@ -270,8 +270,8 @@ Log built, else the queue's `report`. The line names the host, never the credent
 spellings warn, so moving the credential never silences the exposure; refusing would break the
 in-cluster `http:` collector, a deliberate and common setup. 2026-09-30, the maintainer: a `Queue`
 given `acceptPlainHttpAuthorization: true` does not warn, the opt-out for a network the consumer
-trusts; it sits on the queue alone, which owns the endpoint. Only `Authorization` is checked, as the
-redaction's header names already follow Datadog's. Serves README → Goals #3's headline,
+trusts; it sits on the queue alone, which owns the endpoint. Only `Authorization` is checked;
+other credential headers are left as they are. Serves README → Goals #3's headline,
 "Credentials never leave", on the wire, without spending #4. No expiry: the setups it serves are
 not all known.
 
