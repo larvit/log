@@ -269,7 +269,8 @@ queue is in memory only.
 Credentials go either in the endpoint as `user:pass@`, which is sent as an `Authorization: Basic`
 header, or in `otlpAdditionalHeaders` as a token of your own, which wins if you set both. Over
 plain `http:` either one is readable by anything on the network path, so use `https:` unless the
-collector is local or on a network you trust.
+collector is local or on a network you trust. Either one over `http:` to a host other than
+`localhost`, `127.0.0.0/8` or `::1` writes one `report` line naming the host, and still sends.
 
 | Option | Type | Default | |
 |---|---|---|---|
@@ -281,7 +282,7 @@ collector is local or on a network you trust.
 | `otlpAdditionalHeaders` | `Record<string, string>` | none | Extra headers on every request, e.g. `{ Authorization: "Bearer …" }`, read afresh each send so a rotated token takes effect. The queue sets `Content-Type`, and `Authorization` when the endpoint carries `user:pass@`; a name here replaces it, matched case-insensitively. A name or value the runtime rejects drops that batch with one report line naming it. `queue.conf` and `log.conf` keep the headers as you gave them, so don't log either. |
 | `otlpHttpBaseURI` | `string` | required | OTLP/HTTP endpoint, e.g. `http://127.0.0.1:4318`. Logs go to `/v1/logs`, spans to `/v1/traces` under it; a base path is kept. `user:pass@` in it becomes an `Authorization: Basic` header, percent-decoded, and never rides in the request url — percent-encode any `/ ? #` in the password, and a literal `%` as `%25`. `queue.conf` and `log.conf` keep the URI as you gave it, so don't log either. A malformed URI, or one that is not `http:`/`https:`, throws in the constructor. |
 | `otlpProtocol` | `"http/json" \| "http/protobuf"` | `"http/json"` | Wire format. Both use the same endpoint; use protobuf for collectors that reject JSON. |
-| `report` | `(msg, metadata) => void` | `console.error` | Sink for one line per failed attempt, dropped batch, drop round, partially rejected batch or storage failure. The `Log`-built queue writes through the instance's `stderr` and formatter. |
+| `report` | `(msg, metadata) => void` | `console.error` | Sink for one line per failed attempt, dropped batch, drop round, partially rejected batch or storage failure, and once for an `Authorization` over plain `http:`. The `Log`-built queue writes through the instance's `stderr` and formatter. |
 | `retryDelayMs` | `number` | `1000` | Delay before the first retry; doubles per consecutive failure, capped at 30 s. |
 | `storage` | `QueueStorage` | none | Persists the queue, see above. |
 

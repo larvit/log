@@ -624,6 +624,60 @@ function encodeOtlpProtobuf(payload: OtlpPayload): Uint8Array<ArrayBuffer> {
 	return byKind(payload, { logs: encodeOtlpLogPayload, traces: encodeOtlpSpanPayload });
 }
 
+// --- Warnings written once per sink ----------------------------------------
+
+const warned = new WeakMap<object, Set<unknown>>();
+
+// A Log-built queue's report writes to the instance's stderr, so the two share one set of warnings.
+const stderrOfReport = new WeakMap<object, object>();
+
+// Marked before the sink runs, so a sink that itself uses the deprecated spelling cannot recurse.
+function firstWarning(sink: object, key: unknown): boolean {
+	const shared = stderrOfReport.get(sink) ?? sink;
+	let keys = warned.get(shared);
+
+	if (!keys) {
+		keys = new Set();
+		warned.set(shared, keys);
+	}
+
+	if (keys.has(key)) {
+		return false;
+	}
+
+	keys.add(key);
+
+	return true;
+}
+
+function describeLogLevel(value: unknown): string {
+	// A proxy trap, getter or toJSON on the value is caller code, and may throw.
+	try {
+		if (typeof value === "string" || (Array.isArray(value) && value.every(item => typeof item === "string"))) {
+			return JSON.stringify(value);
+		}
+
+		if (value !== null && (typeof value === "object" || typeof value === "function")) {
+			// Object.prototype.toString, so a value's own toString is never called.
+			return Object.prototype.toString.call(value);
+		}
+
+		return String(value);
+	} catch {
+		return "(a value that cannot be printed)";
+	}
+}
+
+function writeStderr(conf: ResolvedLogConf, logLevel: "error" | "warn", metadata: MetadataInput | undefined, msg: string): void {
+	conf.stderr(formatterOf(conf)({ colors: conf.colors, logLevel, metadata: withoutUndefined(metadata), msTimestamp: conf.clock.now(), msg }));
+}
+
+function warnOnce(conf: ResolvedLogConf, metadata: MetadataInput | undefined, msg: string): void {
+	if (firstWarning(conf.stderr, msg)) {
+		writeStderr(conf, "warn", metadata, msg);
+	}
+}
+
 // --- OTLP export: types and queued items ----------------------------------
 
 // What Log exports through. Queue is the shipped implementation; any { enqueue, flush } will do.
@@ -906,6 +960,9 @@ class OtlpSender {
 	private readonly report: ResolvedQueueConf["report"];
 	private readonly url: string;
 
+	// Where an Authorization goes in the clear past this machine, else undefined.
+	readonly plainHttpAuthHost?: string;
+
 	constructor(conf: SenderConf, report: ResolvedQueueConf["report"]) {
 		let base: URL;
 
@@ -932,6 +989,13 @@ class OtlpSender {
 
 		if (auth) {
 			this.headers.set("Authorization", auth);
+		}
+
+		const sendsAuth = auth !== undefined || Object.keys(conf.otlpAdditionalHeaders ?? {}).some(name => name.toLowerCase() === "authorization");
+
+		// URL has already canonicalised an IPv4 host, so 127.1 reads 127.0.0.1 here.
+		if (base.protocol === "http:" && sendsAuth && !/^(localhost|127(\.\d+){3}|\[::1\])$/.test(base.hostname)) {
+			this.plainHttpAuthHost = base.host;
 		}
 	}
 
@@ -1053,6 +1117,14 @@ export class Queue implements OtlpQueue {
 		}
 
 		this.sender = new OtlpSender(this.conf, (msg, metadata) => this.report(msg, metadata));
+
+		const exposedTo = this.sender.plainHttpAuthHost;
+		const exposure = `@larvit/log: an Authorization header goes over plain http: to ${exposedTo}, readable by anything on the network path; use https:`;
+
+		if (exposedTo !== undefined && firstWarning(this.conf.report, exposure)) {
+			this.report(exposure, {});
+		}
+
 		this.ready = conf.storage ? this.load(conf.storage) : Promise.resolve();
 		this.scheduler = new ExportScheduler(this.conf, this.ready, () => this.round());
 	}
@@ -1387,56 +1459,6 @@ function failureMessage(error: unknown, url?: URL): string {
 	return redactedWholeUrl(quoted) ?? quoted;
 }
 
-// --- Warnings written once per stderr sink ---------------------------------
-
-const warned = new WeakMap<(msg: string) => void, Set<unknown>>();
-
-// Marked before the sink runs, so a sink that itself uses the deprecated spelling cannot recurse.
-function firstWarning(conf: ResolvedLogConf, key: unknown): boolean {
-	let keys = warned.get(conf.stderr);
-
-	if (!keys) {
-		keys = new Set();
-		warned.set(conf.stderr, keys);
-	}
-
-	if (keys.has(key)) {
-		return false;
-	}
-
-	keys.add(key);
-
-	return true;
-}
-
-function describeLogLevel(value: unknown): string {
-	// A proxy trap, getter or toJSON on the value is caller code, and may throw.
-	try {
-		if (typeof value === "string" || (Array.isArray(value) && value.every(item => typeof item === "string"))) {
-			return JSON.stringify(value);
-		}
-
-		if (value !== null && (typeof value === "object" || typeof value === "function")) {
-			// Object.prototype.toString, so a value's own toString is never called.
-			return Object.prototype.toString.call(value);
-		}
-
-		return String(value);
-	} catch {
-		return "(a value that cannot be printed)";
-	}
-}
-
-function writeWarning(conf: ResolvedLogConf, metadata: MetadataInput | undefined, msg: string): void {
-	conf.stderr(formatterOf(conf)({ colors: conf.colors, logLevel: "warn", metadata: withoutUndefined(metadata), msTimestamp: conf.clock.now(), msg }));
-}
-
-function warnOnce(conf: ResolvedLogConf, metadata: MetadataInput | undefined, msg: string): void {
-	if (firstWarning(conf, msg)) {
-		writeWarning(conf, metadata, msg);
-	}
-}
-
 // --- Resolving a Log's settings --------------------------------------------
 
 const OTLP_TRANSPORT_KEYS = ["otlpAdditionalHeaders", "otlpHttpBaseURI", "otlpProtocol"] as const;
@@ -1509,8 +1531,11 @@ function isDefaultQueueFor(queue: OtlpQueue, conf: LogSettings): boolean {
 		&& queue.conf.otlpAdditionalHeaders === conf.otlpAdditionalHeaders;
 }
 
-function buildDefaultQueue(conf: ResolvedLogConf, report: QueueConf["report"]): void {
+function buildDefaultQueue(conf: ResolvedLogConf): void {
 	if (!conf.otlpQueue && conf.otlpHttpBaseURI) {
+		const report = (msg: string, metadata: Metadata) => writeStderr(conf, "error", metadata, msg);
+
+		stderrOfReport.set(report, conf.stderr);
 		conf.otlpQueue = new Queue({
 			clock: conf.clock,
 			otlpAdditionalHeaders: conf.otlpAdditionalHeaders,
@@ -1650,7 +1675,7 @@ function withDefaults(conf: LogSettings): ResolvedLogConf {
 
 // Defaults come last, so none hides an inherited value; the entryFormatter check precedes them,
 // which move a function format out of conf.
-function resolveLogConf(options: LogOptions | LogLevel | "none" | undefined, report: QueueConf["report"]): { conf: ResolvedLogConf, deprecations: string[] } {
+function resolveLogConf(options: LogOptions | LogLevel | "none" | undefined): { conf: ResolvedLogConf, deprecations: string[] } {
 	const conf = confFromOptions(options);
 	const deprecations: string[] = [];
 
@@ -1672,7 +1697,7 @@ function resolveLogConf(options: LogOptions | LogLevel | "none" | undefined, rep
 
 	const resolved = withDefaults(conf);
 
-	buildDefaultQueue(resolved, report);
+	buildDefaultQueue(resolved);
 
 	return { conf: resolved, deprecations };
 }
@@ -1820,7 +1845,7 @@ export class Log implements LogInt {
 	span: OtlpSpan;
 
 	constructor(options?: LogOptions | LogLevel | "none") {
-		const { conf, deprecations } = resolveLogConf(options, (msg, metadata) => this.outputToConsole("error", msg, metadata, this.conf.clock.now()));
+		const { conf, deprecations } = resolveLogConf(options);
 
 		this.conf = conf;
 		// Own copy, so a clone/child never mutates a context object shared with another instance.
@@ -1909,8 +1934,8 @@ export class Log implements LogInt {
 
 		if (threshold === undefined) {
 			// Keyed on the raw value, so only the first call builds the message.
-			if (firstWarning(this.conf, this.conf.logLevel)) {
-				writeWarning(this.conf, undefined, `@larvit/log: logLevel ${describeLogLevel(this.conf.logLevel)} is not a level, logging at "info"; use error, warn, info, verbose, debug, silly or none`);
+			if (firstWarning(this.conf.stderr, this.conf.logLevel)) {
+				writeStderr(this.conf, "warn", undefined, `@larvit/log: logLevel ${describeLogLevel(this.conf.logLevel)} is not a level, logging at "info"; use error, warn, info, verbose, debug, silly or none`);
 			}
 
 			threshold = LogLevels.info.severityNumber;
