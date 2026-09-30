@@ -122,22 +122,26 @@ Goals #1 and #3. Valid while `log.fetch` is a drop-in for the runtime's `fetch`.
 
 ## A captured value holding a credential records `REDACTED`
 
-2026-09-20: a value `log.fetch` copies onto a span records `REDACTED` where it holds a credential: a
-header value whole, a query key or value whole where its url holds userinfo, and a listed key's
-value in place, per README → Goals #3, "Credentials never leave". One rule for captured header
-values and for the query values `captureQuery` keeps — and for a query key, since a url written as a
-bare key reaches `url.full` the same way its value would — because the same credentialed url arrives
-by every one of those routes and separate rules would disagree the way the two allow-lists used to:
-`authorization`, `proxy-authorization`, `cookie` and `set-cookie` go by name, and everything else
-goes by whether the value, parsed whole as a url, holds a credential. Redacting rather than
-rejecting the allow-list entry is what a minor allows — README → Goals #4 deprecates a breaking
-change in a 2.x minor first, and the leak is open now — and it matches the stance
-the query-key list already took. `REDACTED` over dropping the attribute keeps the telemetry
-reader's "was the header there?", which is what an allow-list is for once the value is gone. The
-four names are the ones whose value is a credential by definition (RFC 9110 authentication, RFC 6265
-cookies). What this does not reach, and the README says so, is a header whose value simply is a
-secret — `x-api-key`, a signed token — which no shape distinguishes from any other string. Valid
-while an allow-list names header names, not patterns.
+2026-09-20, header names revised 2026-09-30 by the maintainer: a value `log.fetch` copies onto a span
+records `REDACTED` where it holds a credential: a header value whole, a query key or value whole
+where its url holds userinfo, and a listed key's value in place, per README → Goals #3,
+"Credentials never leave". One rule for captured header values and for the query values
+`captureQuery` keeps — and for a query key, since a url written as a bare key reaches `url.full` the
+same way its value would — because the same credentialed url arrives by every one of those routes
+and separate rules would disagree the way the two allow-lists used to. A header goes by name where
+its name, ignoring case, matches Elastic APM's default `sanitize_field_names` (`password`,
+`passwd`, `pwd`, `secret`, `*key`, `*token*`, `*session*`, `*credit*`, `*card*`, `*auth*`,
+`set-cookie`, `*principal*`) or is `cookie`, the spec's optional addition
+(https://github.com/elastic/apm/blob/main/specs/agents/sanitization.md), and everything else goes by
+whether the value, parsed whole as a url, holds a credential. Elastic's is the one published
+cross-agent spec that requires redacting request and response headers: OTel redacts no header
+value, Datadog's tracers only in AppSec, and Datadog's eight exact names there miss `x-api-key` and
+every `x-*-token`; the four RFC 9110 and RFC 6265 names 2.3.0 hard-coded missed them too.
+Redacting rather than rejecting the allow-list entry is what a minor allows — README → Goals #4
+deprecates a breaking change in a 2.x minor first, and the leak is open now — and it matches the
+stance the query-key list already took. `REDACTED` over dropping the attribute keeps the telemetry
+reader's "was the header there?", so a false hit costs a value, never the header's presence. Valid
+while Elastic's default list is the published one.
 
 ## Every rule on credentials in a span sits in one source section
 
@@ -305,16 +309,3 @@ a url among other text, a percent-encoded url in a header, and a url the runtime
 as a scheme-relative `//user:pass@host`. Six review rounds each found a new way a scanner for urls
 in free text missed one — a delimiter, an escape the rewrite wrote, a scheme ending another — so the
 scanner went. Goals #3 draws that line and outranks #4. Valid while Goals #3 reads so.
-
-## A header name is redacted by Elastic APM's `sanitize_field_names` rule
-
-2026-09-30, the maintainer, choosing from published defaults over names guessed one by one: a
-captured header's value records `REDACTED` when its name, ignoring case, matches Elastic APM's
-default `sanitize_field_names` (`password`, `passwd`, `pwd`, `secret`, `*key`, `*token*`,
-`*session*`, `*credit*`, `*card*`, `*auth*`, `set-cookie`, `*principal*`) or is `cookie`, the
-spec's optional addition (https://github.com/elastic/apm/blob/main/specs/agents/sanitization.md).
-It is the one published cross-agent spec that requires redacting request and response headers.
-OTel redacts no header value, Datadog's tracers only in AppSec, and Datadog's eight exact names
-there miss `x-api-key` and every `x-*-token`. The name is kept, so a false hit costs the reader a
-value, never the header's presence. Serves README → Goals #3. Replaces the four RFC names in "A
-captured value holding a credential records `REDACTED`" once 2.5.0 implements it.

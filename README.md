@@ -414,8 +414,10 @@ them per call site.
 
 ### Credentials in a captured value
 
-- **Redacted, whatever you list them for:** the headers `authorization`, `proxy-authorization`,
-  `cookie` and `set-cookie`, and the value of a query key that, in any casing and with `-` and `_`
+- **Redacted, whatever you list them for:** a header whose name, in any casing, is `cookie`,
+  `passwd`, `password`, `pwd`, `secret` or `set-cookie`, ends in `key`, or holds `auth`, `card`,
+  `credit`, `principal`, `session` or `token` — Elastic APM's default `sanitize_field_names` — such
+  as `authorization`, `x-api-key` and `x-amz-security-token`; and the value of a query key that, in any casing and with `-` and `_`
   ignored, ends in `auth`, `authentication`, `authorization`, `consumerid`, `credential`, `key`,
   `keyid`, `pass`, `passphrase`, `secret`, `sig`, `sign`, `signature`, `signed` or `token`, or in
   `passwd`, `password`, `pwd` or `pword` with an optional `1` or `2`, or is `code`,

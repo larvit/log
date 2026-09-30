@@ -1983,13 +1983,13 @@ test("log.fetch redacts its url in a runtime's rejection that parses as a url wh
 test("log.fetch captures allow-listed request and response headers only, never a credential", async t => {
 	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ link: "<https://user:pwlink@cdn.test>; rel=preconnect", location: "https://idp.test/authorize?redirect_uri=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&state=a%b", "set-cookie": "sid=hunter2", "x-app": "myapp:///cb?access_token=hunter2", "x-callback": "https%3A%2F%2F%C5ke%3Apwenc%40cb.test%2Fx", "x-next": "https://api.test/page?token=hunter2", "x-resp": "rv", "x-secret": "nope" }) }) : undefined);
 	const log = new Log({
-		captureRequestHeaders: ["Authorization", "referer", "x-req"],
+		captureRequestHeaders: ["Authorization", "referer", "x-amz-security-token", "X-Api-Key", "x-keyboard", "x-req"],
 		captureResponseHeaders: ["link", "location", "set-cookie", "x-app", "x-callback", "x-next", "x-resp"],
 		otlpHttpBaseURI: "http://127.0.0.1:4318",
 		stderr: () => {},
 	});
 
-	await log.fetch("https://api.test/h", { headers: { authorization: "Bearer hunter2", referer: "https://myuser:hunter2@cb.test/x", "x-other": "ignored", "x-req": "MyBot/1.0 (+https://mybot.test; ops@mybot.test)" } });
+	await log.fetch("https://api.test/h", { headers: { authorization: "Bearer hunter2", referer: "https://myuser:hunter2@cb.test/x", "x-amz-security-token": "hunter2", "x-api-key": "hunter2", "x-keyboard": "dvorak", "x-other": "ignored", "x-req": "MyBot/1.0 (+https://mybot.test; ops@mybot.test)" } });
 	await log.end();
 
 	const span = clientSpan(calls);
@@ -1998,6 +1998,9 @@ test("log.fetch captures allow-listed request and response headers only, never a
 	t.strictEqual(attr("http.request.header.x-req"), "MyBot/1.0 (+https://mybot.test; ops@mybot.test)", "allow-listed request header captured, a host then an address past a space included");
 	t.strictEqual(attr("http.request.header.x-other"), undefined, "non-listed request header not captured");
 	t.strictEqual(attr("http.request.header.authorization"), "REDACTED", "an allow-listed credential header records its presence, not its value");
+	t.strictEqual(attr("http.request.header.x-api-key"), "REDACTED", "a header named by Elastic APM's sanitize_field_names records REDACTED, *key");
+	t.strictEqual(attr("http.request.header.x-amz-security-token"), "REDACTED", "and *token*");
+	t.strictEqual(attr("http.request.header.x-keyboard"), "dvorak", "a name holding key but not ending in it is exported as written");
 	t.strictEqual(attr("http.request.header.referer"), "REDACTED", "a captured header value holding url userinfo is redacted whole");
 	t.strictEqual(attr("http.response.header.x-resp"), "rv", "allow-listed response header captured");
 	t.strictEqual(attr("http.response.header.x-secret"), undefined, "non-listed response header not captured");
