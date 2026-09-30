@@ -27,7 +27,9 @@
   listed `x-api-key`, `x-auth-token` or `x-amz-security-token` exported its value. Now a name that,
   in any casing, is `passwd`, `password`, `pwd` or `secret`, ends in `key`, or holds `auth`, `card`,
   `credit`, `principal`, `session` or `token` records `REDACTED` too, so a dashboard grouping on
-  such a header sees it change. Rotate a credential a header named so has exported.
+  such a header sees it change, a non-secret `www-authenticate` or `x-idempotency-key` included.
+  Check `captureRequestHeaders` and `captureResponseHeaders` for such a name, and rotate what it
+  carried.
 - **`log.fetch` redacts the url it fetched in its span's status message as `url.full`'s query is
   with `captureQuery` on, whatever `captureQuery` says.** Since v2.4.0,
   `log.fetch("https://u:p@h.test/x?access_token=…")` on Node or in a browser exported the token in
