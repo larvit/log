@@ -409,10 +409,12 @@ them per call site.
 ### Credentials in a captured value
 
 - **Redacted, whatever you list them for:** the headers `authorization`, `proxy-authorization`,
-  `cookie` and `set-cookie`, and the value of a query key named, in any casing, `access_token`,
-  `api_key`, `apikey`, `awsaccesskeyid`, `googleaccessid`, `key`, `sig`, `signature`, `token`,
-  `x-amz-credential`, `x-amz-security-token`, `x-amz-signature`, `x-goog-credential` or
-  `x-goog-signature` — bearer tokens, API keys, presigned S3 and GCS urls, and Azure SAS urls.
+  `cookie` and `set-cookie`, and the value of a query key named, in any casing, `access-token`,
+  `access_token`, `accesstoken`, `api-key`, `api_key`, `apikey`, `auth_token`, `awsaccesskeyid`,
+  `client_secret`, `googleaccessid`, `id_token`, `key`, `password`, `refresh_token`, `secret`, `sig`,
+  `signature`, `subscription-key`, `token`, `x-amz-credential`, `x-amz-security-token`,
+  `x-amz-signature`, `x-goog-credential` or `x-goog-signature` — bearer and OAuth tokens, API keys,
+  passwords, presigned S3 and GCS urls, and Azure SAS urls.
 - **A url in a kept query value**, once decoded, that the runtime's `URL` parses: its userinfo makes
   the value record `REDACTED`, and its own listed keys are redacted, at every level:
   `?next=https://t.test/x?token=…` records `next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3DREDACTED`. A url

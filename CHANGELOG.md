@@ -29,7 +29,7 @@
   records `https://REDACTED@h.test/x?access_token=REDACTED`. An `end({ error })` message that is a
   url is redacted the same way, so a `?key=` lookup or a `?token=` cursor in one records `REDACTED`
   and a dashboard grouping on status messages sees it change. Search status messages with the regex
-  `(?i)(access_token|api_key|apikey|awsaccesskeyid|googleaccessid|key|sig|signature|token|x-amz-credential|x-amz-security-token|x-amz-signature|x-goog-credential|x-goog-signature)(=|%(25)*3d)`
+  `(?i)(access-token|access_token|accesstoken|api-key|api_key|apikey|auth_token|awsaccesskeyid|client_secret|googleaccessid|id_token|key|password|refresh_token|secret|sig|signature|subscription-key|token|x-amz-credential|x-amz-security-token|x-amz-signature|x-goog-credential|x-goog-signature)(=|%(25)*3d)`
   for a match followed by anything but `REDACTED`, and rotate what it finds.
 - **Userinfo is redacted where the runtime's `URL` parses it, in `\\` and slashless spellings too.**
   Since v2.3.0, a captured `location` of `https:\\u:pw@h` or `http:u:pw@h` exported `pw`, and so did
@@ -44,12 +44,14 @@
   a proxy taking `?<url>` reads it, and where that finds a credential both record `REDACTED`:
   `?https://t.test/x?token=…`, and `?https://a@b=pw@evil.test`, whose userinfo runs across the `=`.
   Search `url.full` with
-  `(?i)%(25)*(3f|26)(access_token|api_key|apikey|awsaccesskeyid|googleaccessid|key|sig|signature|token|x-amz-credential|x-amz-security-token|x-amz-signature|x-goog-credential|x-goog-signature)(=|%(25)*3d)`,
+  `(?i)%(25)*(3f|26)(access-token|access_token|accesstoken|api-key|api_key|apikey|auth_token|awsaccesskeyid|client_secret|googleaccessid|id_token|key|password|refresh_token|secret|sig|signature|subscription-key|token|x-amz-credential|x-amz-security-token|x-amz-signature|x-goog-credential|x-goog-signature)(=|%(25)*3d)`,
   and with `(?i)(^|[?&])[^&=]*%(25)*2F%(25)*2F[^&=]*=[^&]*%(25)*40` for a match followed by anything
   but `REDACTED`, and rotate what it finds; a presigned SigV4 url only while unexpired, as v2.4.0
   says.
-- **`captureQuery` redacts the value of a query key named `access_token`, `api_key`, `apikey`, `key`
-  or `token`, in any casing.** Since v2.3.0, `log.fetch("https://api.test/me?access_token=…")` with
+- **`captureQuery` redacts the value of a query key named `access-token`, `access_token`,
+  `accesstoken`, `api-key`, `api_key`, `apikey`, `auth_token`, `client_secret`, `id_token`, `key`,
+  `password`, `refresh_token`, `secret`, `subscription-key` or `token`, in any casing.** Since
+  v2.3.0, `log.fetch("https://api.test/me?access_token=…")` with
   `captureQuery` on exported the token in `url.full`; search `url.full` for one of these names
   followed by `=` and anything but `REDACTED`, and rotate what it finds. A value that is no secret,
   such as a `key` lookup or a `token` pagination cursor, records `REDACTED` too, so a dashboard
