@@ -920,7 +920,7 @@ test("endpoint userinfo authenticates through an Authorization header, never thr
 
 test("an Authorization sent over plain http: to a non-loopback host warns once per report sink, and still goes", async t => {
 	const { calls } = stubFetch();
-	const warning = "@larvit/log: an Authorization header, from user:pass@ in otlpHttpBaseURI or from otlpAdditionalHeaders, goes over plain http: to collector.test:4318, readable by anything on the network path; use an https: endpoint";
+	const warning = (source: string) => `@larvit/log: an Authorization header from ${source} goes over plain http: to collector.test:4318, readable by anything on the network path; use an https: endpoint`;
 	const send = async (queue: Queue) => {
 		const log = new Log({ otlpQueue: queue, stderr: () => {} });
 
@@ -934,13 +934,13 @@ test("an Authorization sent over plain http: to a non-loopback host warns once p
 
 	await send(new Queue({ otlpHttpBaseURI: "http://collector:s3cret@collector.test:4318", report: sink.report }));
 	await send(new Queue({ otlpHttpBaseURI: "http://collector:s3cret@collector.test:4318", report: sink.report }));
-	t.deepEqual(sink.lines, [{ msg: warning }], "userinfo warns once per sink, naming the host and never the credential");
+	t.deepEqual(sink.lines, [{ msg: warning("user:pass@ in otlpHttpBaseURI") }], "userinfo warns once per sink, naming the host and never the credential");
 
 	await send(queue);
 	t.deepEqual(header.lines, [], "no Authorization, no warning");
 	headers.authorization = "Bearer t0ken";
 	await send(queue);
-	t.deepEqual(header.lines, [{ msg: warning }], "an Authorization header set after construction warns, whatever its casing");
+	t.deepEqual(header.lines, [{ msg: warning("otlpAdditionalHeaders") }], "an Authorization header set after construction warns, whatever its casing");
 
 	const quiet = reportSink();
 
@@ -977,7 +977,7 @@ test("an Authorization sent over plain http: to a non-loopback host warns once p
 
 	const { logLevel, msg } = JSON.parse(stderr[0]);
 
-	t.deepEqual({ lines: stderr.length, logLevel, msg }, { lines: 1, logLevel: "warn", msg: warning }, "a Log-built queue warns once per stderr, at warn");
+	t.deepEqual({ lines: stderr.length, logLevel, msg }, { lines: 1, logLevel: "warn", msg: warning("user:pass@ in otlpHttpBaseURI") }, "a Log-built queue warns once per stderr, at warn");
 	t.strictEqual(calls.length, 12, "every request still goes");
 	t.end();
 });
