@@ -271,8 +271,10 @@ header, or in `otlpAdditionalHeaders` as a token of your own, which wins if you 
 plain `http:` either one is readable by anything on the network path, so use `https:` unless the
 collector is local or on a network you trust. Either one sent over `http:` to a host other than
 `localhost`, `127.0.0.0/8` or `::1` writes one `@larvit/log:` line per `report` function, host and
-credential source, naming the host, and still sends; on a network you trust, pass
-`acceptPlainHttpAuthorization: true` to the `Queue`.
+credential source, naming the host, and still sends. On a network you trust, pass
+`acceptPlainHttpAuthorization: true` to the `Queue`; a `Log` using `otlpHttpBaseURI` moves the endpoint to
+`otlpQueue: new Queue({ otlpHttpBaseURI, acceptPlainHttpAuthorization: true })`, whose report
+lines then go to that queue's `report`, `console.error` unless you pass one.
 
 | Option | Type | Default | |
 |---|---|---|---|

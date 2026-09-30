@@ -707,7 +707,7 @@ export type QueueConf = {
 	storage?: QueueStorage;
 };
 
-export type ResolvedQueueConf = QueueConf & Required<Pick<QueueConf, "batchDelayMs" | "clock" | "key" | "maxBatchBytes" | "maxItems" | "otlpProtocol" | "report" | "retryDelayMs">>;
+export type ResolvedQueueConf = QueueConf & Required<Pick<QueueConf, "acceptPlainHttpAuthorization" | "batchDelayMs" | "clock" | "key" | "maxBatchBytes" | "maxItems" | "otlpProtocol" | "report" | "retryDelayMs">>;
 
 type QueuedItem = { bytes: number, payload: OtlpPayload };
 
@@ -1024,7 +1024,7 @@ class OtlpSender {
 		if (this.plainHttpHost !== undefined && headers.has("Authorization")) {
 			const source = Object.keys(this.conf.otlpAdditionalHeaders ?? {}).some(name => name.toLowerCase() === "authorization") ? "otlpAdditionalHeaders" : "user:pass@ in otlpHttpBaseURI";
 
-			this.warn(`@larvit/log: an Authorization header from ${source} goes over plain http: to ${this.plainHttpHost}, readable by anything on the network path; use an https: endpoint`);
+			this.warn(`@larvit/log: an Authorization header from ${source} goes over plain http: to ${this.plainHttpHost}, readable by anything on the network path; use an https: endpoint, or on a network you trust set acceptPlainHttpAuthorization: true on the Queue`);
 		}
 
 		let body: string | Uint8Array<ArrayBuffer>;
@@ -1102,6 +1102,7 @@ export class Queue implements OtlpQueue {
 	constructor(conf: QueueConf) {
 		this.conf = {
 			...conf,
+			acceptPlainHttpAuthorization: conf.acceptPlainHttpAuthorization === true,
 			batchDelayMs: conf.batchDelayMs ?? 1000,
 			clock: conf.clock ?? systemClock,
 			key: conf.key ?? "@larvit/log:otlp-queue",
