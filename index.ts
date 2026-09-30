@@ -1245,7 +1245,6 @@ function queryKeyName(key: string): string {
 	return key.toLowerCase().replace(/[-_]/g, "");
 }
 
-// Every key OTel semconv's default deny-list has named, every S3 and GCS query-signing generation's credential keys, and the names a credential travels under.
 const SENSITIVE_QUERY_KEYS = new Set(["access_token", "api_key", "auth_token", "awsaccesskeyid", "client_secret", "googleaccessid", "id_token", "key", "password", "refresh_token", "secret", "sig", "signature", "subscription-key", "token", "x-amz-credential", "x-amz-security-token", "x-amz-signature", "x-goog-credential", "x-goog-signature"].map(queryKeyName));
 
 // Header names carrying a credential by definition: RFC 9110 authentication, RFC 6265 cookies.
