@@ -1241,11 +1241,11 @@ export class Queue implements OtlpQueue {
 
 // --- Credentials on a span -------------------------------------------------
 
-function queryKeyName(key: string): string {
-	return key.toLowerCase().replace(/[-_]/g, "");
-}
+const SENSITIVE_QUERY_KEY = /(auth|authentication|authorization|consumerid|credential|key|keyid|pass|passphrase|passwd|password|pwd|secret|sig|sign|signature|signed|token)$|^(code|googleaccessid|idtokenhint)$/;
 
-const SENSITIVE_QUERY_KEYS = new Set(["access_token", "api_key", "auth_token", "awsaccesskeyid", "client_secret", "googleaccessid", "id_token", "key", "password", "refresh_token", "secret", "sig", "signature", "subscription-key", "token", "x-amz-credential", "x-amz-security-token", "x-amz-signature", "x-goog-credential", "x-goog-signature"].map(queryKeyName));
+function isSensitiveQueryKey(key: string): boolean {
+	return SENSITIVE_QUERY_KEY.test(key.toLowerCase().replace(/[-_]/g, ""));
+}
 
 // Header names carrying a credential by definition: RFC 9110 authentication, RFC 6265 cookies.
 const SENSITIVE_HEADER_NAMES = new Set(["authorization", "cookie", "proxy-authorization", "set-cookie"]);
@@ -1314,12 +1314,8 @@ const SCHEME_LED = /^[\0- ]*[a-z][a-z\d+.-]*:/i;
 // A key opening a url is read with its value too, as a server taking `?<url>` reads it: an `=` in its
 // password ends the key.
 function redactQueryPair(key: string, value: string, depth: number, partsRead: PartsRead): [string, string] {
-	if (SENSITIVE_QUERY_KEYS.has(queryKeyName(key))) {
-		return [key, "REDACTED"];
-	}
-
 	if (!SCHEME_LED.test(key.replace(/[\t\n\r]/g, ""))) {
-		return [key, redactQueryPart(value, depth, partsRead)];
+		return [key, isSensitiveQueryKey(key) ? "REDACTED" : redactQueryPart(value, depth, partsRead)];
 	}
 
 	const joined = `${key}=${value}`;

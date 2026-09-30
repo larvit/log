@@ -183,30 +183,27 @@ rather than fixed: v2.3.0 shipped the member required and a minor may not narrow
 required-half entry above, and no type can say "non-enumerable". `todo.md`'s 3.0.0 item closes
 it. Valid until 3.0.0 removes `entryFormatter`.
 
-## `SENSITIVE_QUERY_KEYS` grows by name
+## A query key is redacted by Datadog's suffix rule
 
-2026-09-23: `SENSITIVE_QUERY_KEYS` grows by name, holding every key OTel semconv's default has
-named: the four up to v1.41, which name no SigV4 key, and the five since v1.42, which add the SigV4
-three and drop `AWSAccessKeyId` and `Signature`. Names, because a presigned url's credentials have
-no shape that tells them from any other opaque value, and the semconv list is a default and not a
-maximum, so more names break no spec. An access key id and a `GoogleAccessId` are identifiers, not
-secrets, and are redacted anyway: semconv redacted `AWSAccessKeyId` for years, and a reader who
-needs the key knows which bucket they fetched from. The rest of a presigned url is kept, because
-`X-Amz-Date` and `X-Amz-Expires` are what README → Audience #3 reads to explain a 403.
+2026-09-30, the maintainer, choosing from published defaults over names guessed one by one: a
+query key records `REDACTED` when, ignoring case, `-` and `_`, it ends in a term of Datadog's
+default query obfuscation (`DD_TRACE_OBFUSCATION_QUERY_STRING_REGEXP`), `key` or `credential`, or
+is one of the names a primary source documents a credential under in a url: Azure Functions'
+`code`, OIDC logout's `id_token_hint`, GCS V2's `GoogleAccessId`. The names OTel semconv's default
+lists (main on 2026-09-30: `AWSAccessKeyId`, `Signature`, `sig`, `X-Amz-Credential`,
+`X-Amz-Security-Token`, `X-Amz-Signature`, `X-Goog-Signature`) all match. Datadog's is the one
+widely deployed default built for query keys; semconv's covers signed urls only, and Elastic,
+Sentry and Django skip the query or redact every value. Semconv asks for case-sensitive matching,
+which only narrows its own list, so matching more breaks no spec.
 
-2026-09-28, the maintainer: it adds `access_token`, RFC 6750's query spelling of a bearer token, and
-`api_key`, `apikey`, `key` and `token`, the names the wild sends one under: turning `captureQuery`
-on names no parameter, so Goal #3's "naming it is asking for it" does not cover them, and a false
-hit costs the reader a value, never the key.
+A false hit such as `oauth`, `bypass` or `design` costs the reader a value, never the key, and a
+key that is a url is read as one first, so its userinfo never survives by ending in a term. The rest
+of a presigned url is kept, because `X-Amz-Date` and `X-Amz-Expires` are what README → Audience #3
+reads to explain a 403.
 
-2026-09-30, derived by the agent from that reasoning: it adds `auth_token`, `client_secret`,
-`id_token`, `password`, `refresh_token`, `secret` and `subscription-key`, OAuth's secrets, the
-wild's and Azure API Management's key, and matches a name with `-` and `_` ignored, so every
-spelling of a listed name is one name: an app developer seeing `AccessToken` redacted expects
-`authToken` to be.
-
-Serves README → Goals #3; over-redaction in a minor stands on the
-2026-09-20 captured-value entry. Valid while the deny-list names query keys, not shapes.
+Serves README → Goals #3; over-redaction in a minor stands on the 2026-09-20 captured-value entry.
+Valid while Datadog's default and semconv's list stay within these terms; re-check both before a
+release.
 
 ## An unsampled `traceparent` drops the span, never the log records
 
