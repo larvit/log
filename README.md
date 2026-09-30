@@ -38,7 +38,7 @@ Priority order decides a tie.
    Approximating part of the spec is worse than omitting it.
 3. **Credentials never leave.** In a url, or a captured header value or status message the runtime's
    `URL` parses whole, that means what it parses as userinfo, and the query keys and header names
-   listed under [Credentials in a captured value](#credentials-in-a-captured-value). Anything else,
+   matched under [Credentials in a captured value](#credentials-in-a-captured-value). Anything else,
    and text you log yourself, is exported as written.
 4. **Semver, read strictly, over what this README documents.** A minor only adds — an export, an
    option, a value an option accepts, a field, a span attribute — where code not using it behaves as
@@ -409,12 +409,13 @@ them per call site.
 ### Credentials in a captured value
 
 - **Redacted, whatever you list them for:** the headers `authorization`, `proxy-authorization`,
-  `cookie` and `set-cookie`, and the value of a query key named, in any casing and with `-` and `_`
-  ignored, `access_token`, `api_key`, `auth_token`, `awsaccesskeyid`, `client_secret`,
-  `googleaccessid`, `id_token`, `key`, `password`, `refresh_token`, `secret`, `sig`, `signature`,
-  `subscription-key`, `token`, `x-amz-credential`, `x-amz-security-token`, `x-amz-signature`,
-  `x-goog-credential` or `x-goog-signature` — so `authToken` and `api-key` too: bearer and OAuth
-  tokens, API keys, passwords, presigned S3 and GCS urls, and Azure SAS urls.
+  `cookie` and `set-cookie`, and the value of a query key that, in any casing and with `-` and `_`
+  ignored, ends in `auth`, `authentication`, `authorization`, `consumerid`, `credential`, `key`,
+  `keyid`, `pass`, `passphrase`, `passwd`, `password`, `pwd`, `secret`, `sig`, `sign`, `signature`,
+  `signed` or `token`, or is `code`, `googleaccessid` or `idtokenhint`. That is Datadog's default
+  query obfuscation, OTel semconv's list and more: `access_token`, `x-api-key`, `client_secret`,
+  Azure's `?code=` and `subscription-key`, presigned S3, GCS and Azure SAS urls. It also redacts
+  keys like `oauth` or `design`.
 - **A url in a kept query value**, once decoded, that the runtime's `URL` parses: its userinfo makes
   the value record `REDACTED`, and its own listed keys are redacted, at every level:
   `?next=https://t.test/x?token=…` records `next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3DREDACTED`. A url

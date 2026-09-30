@@ -29,7 +29,7 @@
   records `https://REDACTED@h.test/x?access_token=REDACTED`. An `end({ error })` message that is a
   url is redacted the same way, so a `?key=` lookup or a `?token=` cursor in one records `REDACTED`
   and a dashboard grouping on status messages sees it change. Search status messages with the regex
-  `(?i)(access[-_]?token|api[-_]?key|auth[-_]?token|awsaccesskeyid|client[-_]?secret|googleaccessid|id[-_]?token|key|password|refresh[-_]?token|secret|sig|signature|subscription[-_]?key|token|x[-_]?amz[-_]?credential|x[-_]?amz[-_]?security[-_]?token|x[-_]?amz[-_]?signature|x[-_]?goog[-_]?credential|x[-_]?goog[-_]?signature)(=|%(25)*3d)`
+  `(?i)[^&?\s]*(auth|authentication|authorization|consumer[-_]?id|credential|key|key[-_]?id|pass|pass[-_]?phrase|passwd|password|pwd|secret|sig|sign|signature|signed|token|code|googleaccessid|id[-_]?token[-_]?hint)(=|%(25)*3d)`
   for a match followed by anything but `REDACTED`, and rotate what it finds.
 - **Userinfo is redacted where the runtime's `URL` parses it, in `\\` and slashless spellings too.**
   Since v2.3.0, a captured `location` of `https:\\u:pw@h` or `http:u:pw@h` exported `pw`, and so did
@@ -44,20 +44,20 @@
   a proxy taking `?<url>` reads it, and where that finds a credential both record `REDACTED`:
   `?https://t.test/x?token=…`, and `?https://a@b=pw@evil.test`, whose userinfo runs across the `=`.
   Search `url.full` with
-  `(?i)%(25)*(3f|26)(access[-_]?token|api[-_]?key|auth[-_]?token|awsaccesskeyid|client[-_]?secret|googleaccessid|id[-_]?token|key|password|refresh[-_]?token|secret|sig|signature|subscription[-_]?key|token|x[-_]?amz[-_]?credential|x[-_]?amz[-_]?security[-_]?token|x[-_]?amz[-_]?signature|x[-_]?goog[-_]?credential|x[-_]?goog[-_]?signature)(=|%(25)*3d)`,
+  `(?i)%(25)*(3f|26)[^&=%]*(auth|authentication|authorization|consumer[-_]?id|credential|key|key[-_]?id|pass|pass[-_]?phrase|passwd|password|pwd|secret|sig|sign|signature|signed|token|code|googleaccessid|id[-_]?token[-_]?hint)(=|%(25)*3d)`,
   and with `(?i)(^|[?&])[^&=]*%(25)*2F%(25)*2F[^&=]*=[^&]*%(25)*40` for a match followed by anything
   but `REDACTED`, and rotate what it finds; a presigned SigV4 url only while unexpired, as v2.4.0
   says.
-- **`captureQuery` redacts the value of a query key naming a bearer or OAuth token, an API key, a
-  password or a secret.** Those are `access_token`, `api_key`, `auth_token`, `client_secret`,
-  `id_token`, `key`, `password`, `refresh_token`, `secret`, `subscription-key` and `token`, in any
-  casing and with `-` and `_` ignored, so `authToken` and `api-key` too. Since v2.3.0,
+- **`captureQuery` redacts the value of a query key that names a credential, by Datadog's default
+  rule.** A key records `REDACTED` when, in any casing and with `-` and `_` ignored, it ends in a
+  term such as `token`, `key`, `secret`, `password` or `auth`, or is `code`, `googleaccessid` or
+  `idtokenhint`; README → Credentials in a captured value lists them. Since v2.3.0,
   `log.fetch("https://api.test/me?access_token=…")` with `captureQuery` on exported the token in
   `url.full`; search `url.full` with
-  `(?i)[?&](access[-_]?token|api[-_]?key|auth[-_]?token|client[-_]?secret|id[-_]?token|key|password|refresh[-_]?token|secret|subscription[-_]?key|token)=`
-  for a match followed by anything but `REDACTED`, and rotate what it finds. A value that is no secret,
-  such as a `key` lookup or a `token` pagination cursor, records `REDACTED` too, so a dashboard
-  grouping on such a `url.full` sees it change.
+  `(?i)[?&][^&=]*(auth|authentication|authorization|consumer[-_]?id|credential|key|key[-_]?id|pass|pass[-_]?phrase|passwd|password|pwd|secret|sig|sign|signature|signed|token|code|googleaccessid|id[-_]?token[-_]?hint)=`
+  for a match followed by anything but `REDACTED`, and rotate what it finds. A value that is no
+  secret, such as a `key` lookup, a `token` pagination cursor or an `oauth` flag, records `REDACTED`
+  too, so a dashboard grouping on such a `url.full` sees it change.
 - **A child or clone sending to another origin than its source's no longer inherits
   `otlpAdditionalHeaders`.** Since v1.4.0 for a child and v2.2.0 for a clone,
   `new Log({ parentLog, otlpHttpBaseURI: other })` sent the parent's headers, a bearer token

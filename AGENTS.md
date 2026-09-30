@@ -28,7 +28,7 @@ In [docs/decisions.md](docs/decisions.md):
 - Every rule on credentials in a span sits in one source section
 - `format` is the formatter's one name, `entryFormatter` its alias until 3.0.0
 - `ResolvedLogConf` keeps `entryFormatter` required
-- `SENSITIVE_QUERY_KEYS` grows by name
+- A query key is redacted by Datadog's suffix rule
 - An unsampled `traceparent` drops the span, never the log records
 - An empty `logLevel` logs at `info` and warns
 - The default `Queue` lives in `conf.otlpQueue`
