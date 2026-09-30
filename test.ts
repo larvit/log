@@ -918,46 +918,65 @@ test("endpoint userinfo authenticates through an Authorization header, never thr
 	t.end();
 });
 
-test("an Authorization over plain http: to a non-loopback host warns once per report sink, and still sends", async t => {
+test("an Authorization sent over plain http: to a non-loopback host warns once per report sink, and still goes", async t => {
 	const { calls } = stubFetch();
-	const warning = "@larvit/log: an Authorization header goes over plain http: to collector.test:4318, readable by anything on the network path; use https:";
+	const warning = "@larvit/log: an Authorization header, from user:pass@ in otlpHttpBaseURI or from otlpAdditionalHeaders, goes over plain http: to collector.test:4318, readable by anything on the network path; use an https: endpoint";
+	const send = async (queue: Queue) => {
+		const log = new Log({ otlpQueue: queue, stderr: () => {} });
+
+		log.info("x");
+		await log.flush();
+	};
 	const sink = reportSink();
-
 	const header = reportSink();
+	const headers: Record<string, string> = {};
+	const queue = new Queue({ otlpAdditionalHeaders: headers, otlpHttpBaseURI: "http://collector.test:4318", report: header.report });
 
-	new Queue({ otlpHttpBaseURI: "http://collector:s3cret@collector.test:4318", report: sink.report });
-	new Queue({ otlpHttpBaseURI: "http://collector:s3cret@collector.test:4318", report: sink.report });
-	new Queue({ otlpAdditionalHeaders: { authorization: "Bearer t0ken" }, otlpHttpBaseURI: "http://collector.test:4318", report: header.report });
+	await send(new Queue({ otlpHttpBaseURI: "http://collector:s3cret@collector.test:4318", report: sink.report }));
+	await send(new Queue({ otlpHttpBaseURI: "http://collector:s3cret@collector.test:4318", report: sink.report }));
 	t.deepEqual(sink.lines, [{ msg: warning }], "userinfo warns once per sink, naming the host and never the credential");
-	t.deepEqual(header.lines, [{ msg: warning }], "an Authorization header warns too, whatever its casing");
+
+	await send(queue);
+	t.deepEqual(header.lines, [], "no Authorization, no warning");
+	headers.authorization = "Bearer t0ken";
+	await send(queue);
+	t.deepEqual(header.lines, [{ msg: warning }], "an Authorization header set after construction warns, whatever its casing");
 
 	const quiet = reportSink();
 
-	for (const otlpHttpBaseURI of ["https://u:p@collector.test", "http://collector.test", "http://u:p@localhost:4318", "http://u:p@127.8.9.10", "http://u:p@[::1]:4318"]) {
-		new Queue({ otlpHttpBaseURI, report: quiet.report });
+	for (const otlpHttpBaseURI of ["https://u:p@collector.test", "http://u:p@localhost:4318", "http://u:p@127.8.9.10", "http://u:p@[::1]:4318"]) {
+		await send(new Queue({ otlpHttpBaseURI, report: quiet.report }));
 	}
 
-	t.deepEqual(quiet.lines, [], "https:, no Authorization and a loopback host are silent");
+	t.deepEqual(quiet.lines, [], "https: and a loopback host are silent");
 
 	const lookalike = reportSink();
 
-	new Queue({ otlpHttpBaseURI: "http://u:p@127.evil.test", report: lookalike.report });
+	await send(new Queue({ otlpHttpBaseURI: "http://u:p@127.evil.test", report: lookalike.report }));
 	t.strictEqual(lookalike.lines.length, 1, "a name starting 127. is no loopback address");
-	t.strictEqual(thrown(() => Reflect.construct(Queue, [{ otlpHttpBaseURI: "http://u:p@collector.test", report: "not a function" }])), "", "a report that is no function still never throws from the constructor");
+
+	let unwarned = "";
+
+	try {
+		await send(Reflect.construct(Queue, [{ otlpHttpBaseURI: "http://u:p@collector.test:4318", report: "not a function" }]));
+	} catch (err) {
+		unwarned = String(err);
+	}
+
+	t.strictEqual(unwarned, "", "a report that is no function never throws");
 
 	const stderr: string[] = [];
 	const toStderr = (line: string) => { stderr.push(line); };
 
 	for (const msg of ["x", "y"]) {
-		const log = new Log({ otlpHttpBaseURI: "http://collector:s3cret@collector.test:4318", stderr: toStderr });
+		const log = new Log({ format: "json", otlpHttpBaseURI: "http://collector:s3cret@collector.test:4318", stderr: toStderr });
 
 		log.info(msg);
 		await log.flush();
 	}
 
-	t.strictEqual(stderr.length, 1, "a Log-built queue warns once per stderr");
-	t.ok(stderr[0].endsWith(warning), "through the instance's formatter");
-	t.strictEqual(calls.length, 2, "the request still goes");
+	t.deepEqual(stderr.map(line => { const { logLevel, msg } = JSON.parse(line); return { logLevel, msg }; }), [{ logLevel: "warn", msg: warning }], "a Log-built queue warns once per stderr, at warn");
+	t.strictEqual(calls.length, 12, "every request still goes");
 	t.end();
 });
 
