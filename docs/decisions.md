@@ -133,7 +133,7 @@ by every one of those routes and separate rules would disagree the way the two a
 goes by whether the value, parsed whole as a url, holds a credential. Redacting rather than
 rejecting the allow-list entry is what a minor allows — README → Goals #4 deprecates a breaking
 change in a 2.x minor first, and the leak is open now — and it matches the stance
-`SENSITIVE_QUERY_KEYS` already took. `REDACTED` over dropping the attribute keeps the telemetry
+the query-key list already took. `REDACTED` over dropping the attribute keeps the telemetry
 reader's "was the header there?", which is what an allow-list is for once the value is gone. The
 four names are the ones whose value is a credential by definition (RFC 9110 authentication, RFC 6265
 cookies). What this does not reach, and the README says so, is a header whose value simply is a
@@ -188,8 +188,7 @@ it. Valid until 3.0.0 removes `entryFormatter`.
 2026-09-30, the maintainer, choosing from published defaults over names guessed one by one: a
 query key records `REDACTED` when, ignoring case, `-` and `_`, it ends in a term of Datadog's
 default query obfuscation (`DD_TRACE_OBFUSCATION_QUERY_STRING_REGEXP` as dd-trace-py documents
-it, whose password terms take a trailing `1` or `2`), `key` or `credential`, or
-is one of the names a primary source documents a credential under in a url: Azure Functions'
+it, whose password terms take a trailing `1` or `2`), `key`, `credential` or `sig`, or is one of the names a primary source documents a credential under in a url: Azure Functions'
 `code`, OIDC logout's `id_token_hint`, GCS V2's `GoogleAccessId`. The names OTel semconv's default
 lists (main on 2026-09-30: `AWSAccessKeyId`, `Signature`, `sig`, `X-Amz-Credential`,
 `X-Amz-Security-Token`, `X-Amz-Signature`, `X-Goog-Signature`) all match. Datadog's is the one
@@ -197,14 +196,12 @@ widely deployed default built for query keys; semconv's covers signed urls only,
 Sentry and Django skip the query or redact every value. Semconv asks for case-sensitive matching,
 which only narrows its own list, so matching more breaks no spec.
 
-A false hit such as `oauth`, `bypass` or `design` costs the reader a value, never the key, and a
-key that is a url is read as one first, so its userinfo never survives by ending in a term. The rest
+A false hit such as `oauth`, `bypass` or `design` costs the reader a value, never the key. The rest
 of a presigned url is kept, because `X-Amz-Date` and `X-Amz-Expires` are what README → Audience #3
 reads to explain a 403.
 
 Serves README → Goals #3; over-redaction in a minor stands on the 2026-09-20 captured-value entry.
-Valid while Datadog's default and semconv's list stay within these terms; re-check both before a
-release.
+Valid while Datadog's default and semconv's list stay within these terms.
 
 ## An unsampled `traceparent` drops the span, never the log records
 
