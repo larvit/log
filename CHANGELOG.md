@@ -16,7 +16,7 @@
   on a span you ended with `end({ error })`; a captured header other than `authorization`, `cookie`,
   `proxy-authorization` and `set-cookie` that recorded exactly `REDACTED`; and a `url.full` query
   value recording exactly `REDACTED` under a key README → Credentials in a captured value does not
-  list. Each hit is a call site 2.5.0 exports in the clear unless the runtime's `URL` parses its
+  match. Each hit is a call site 2.5.0 exports in the clear unless the runtime's `URL` parses its
   original value whole. Keep credentials out of those values: strip them before they reach
   `log.fetch` or `end({ error })`, and drop a response header you cannot control from
   `captureResponseHeaders`. A url nested in the request path stays in `url.full` as written, as in
@@ -29,7 +29,7 @@
   records `https://REDACTED@h.test/x?access_token=REDACTED`. An `end({ error })` message that is a
   url is redacted the same way, so a `?key=` lookup or a `?token=` cursor in one records `REDACTED`
   and a dashboard grouping on status messages sees it change. Search status messages with the regex
-  `(?i)([?&]|%(25)*(3f|26))([^&=%\s]*(auth|authentication|authorization|consumer[-_]?id|credential|key|key[-_]?id|pass|pass[-_]?phrase|passwd|password|pwd|secret|sig|sign|signature|signed|token)|code|googleaccessid|id[-_]?token[-_]?hint)[-_]*(=|%(25)*3d)`
+  `(?i)([?&]|%(25)*(3f|26))[-_]*([^&=%\s]*(auth|authentication|authorization|consumer[-_]?id|credential|key|key[-_]?id|pass|pass[-_]?phrase|passwd|password|pwd|pword|secret|sig|sign|signature|signed|token)|code|googleaccessid|id[-_]?token[-_]?hint)[-_]*(=|%(25)*3d)`
   for a match followed by anything but `REDACTED`, and rotate what it finds.
 - **Userinfo is redacted where the runtime's `URL` parses it, in `\\` and slashless spellings too.**
   Since v2.3.0, a captured `location` of `https:\\u:pw@h` or `http:u:pw@h` exported `pw`, and so did
@@ -37,24 +37,24 @@
   `url.full` with `(?i)(https?:|([\\/]|%(25)*(2F|5C)){2})\S*(@|%(25)*40)` and rotate any password a
   match holds; a match reading `REDACTED` before its `@` holds none.
 - **`captureQuery` redacts a url a query key or value holds once decoded, at every level.** Its
-  userinfo records `REDACTED` in place of the whole key or value, and a listed key's value
+  userinfo records `REDACTED` in place of the whole key or value, and a matched key's value
   `REDACTED` in place: since v2.3.0, `?next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3D…` with
   `captureQuery` on exported the token in `url.full`, and now records
   `next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3DREDACTED`. A url in a key is read with its value too, as
   a proxy taking `?<url>` reads it, and where that finds a credential both record `REDACTED`:
   `?https://t.test/x?token=…`, and `?https://a@b=pw@evil.test`, whose userinfo runs across the `=`.
   Search `url.full` with
-  `(?i)%(25)*(3f|26)([^&=%]*(auth|authentication|authorization|consumer[-_]?id|credential|key|key[-_]?id|pass|pass[-_]?phrase|passwd|password|pwd|secret|sig|sign|signature|signed|token)|code|googleaccessid|id[-_]?token[-_]?hint)[-_]*(=|%(25)*3d)`,
+  `(?i)%(25)*(3f|26)[-_]*([^&=%]*(auth|authentication|authorization|consumer[-_]?id|credential|key|key[-_]?id|pass|pass[-_]?phrase|passwd|password|pwd|pword|secret|sig|sign|signature|signed|token)|code|googleaccessid|id[-_]?token[-_]?hint)[-_]*(=|%(25)*3d)`,
   and with `(?i)(^|[?&])[^&=]*%(25)*2F%(25)*2F[^&=]*=[^&]*%(25)*40` for a match followed by anything
   but `REDACTED`, and rotate what it finds; a presigned SigV4 url only while unexpired, as v2.4.0
   says.
-- **`captureQuery` redacts the value of a query key that names a credential, by Datadog's default
-  rule.** A key's value records `REDACTED` when the key, in any casing and with `-` and `_`
+- **`captureQuery` redacts the value of a query key that names a credential, by the key terms of
+  Datadog's default rule.** A key's value records `REDACTED` when the key, in any casing and with `-` and `_`
   ignored, ends in a term such as `token`, `key`, `secret`, `password` or `auth`, or is `code`,
   `googleaccessid` or `idtokenhint`; README → Credentials in a captured value lists them. Since v2.3.0,
   `log.fetch("https://api.test/me?access_token=…")` with `captureQuery` on exported the token in
   `url.full`; search `url.full` with
-  `(?i)[?&]([^&=]*(auth|authentication|authorization|consumer[-_]?id|credential|key|key[-_]?id|pass|pass[-_]?phrase|passwd|password|pwd|secret|sig|sign|signature|signed|token)|code|googleaccessid|id[-_]?token[-_]?hint)[-_]*=`
+  `(?i)[?&][-_]*([^&=]*(auth|authentication|authorization|consumer[-_]?id|credential|key|key[-_]?id|pass|pass[-_]?phrase|passwd|password|pwd|pword|secret|sig|sign|signature|signed|token)|code|googleaccessid|id[-_]?token[-_]?hint)[-_]*=`
   for a match followed by anything but `REDACTED`, and rotate what it finds; search a key with a `-`
   or `_` inside a term, such as `pass_word`, on its own. A value that is no secret, such as a `key`
   lookup, a `token` pagination cursor or an `oauth` flag, records `REDACTED` too, so a dashboard

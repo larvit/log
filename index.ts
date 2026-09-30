@@ -1241,7 +1241,7 @@ export class Queue implements OtlpQueue {
 
 // --- Credentials on a span -------------------------------------------------
 
-const SENSITIVE_QUERY_KEY = /(auth|authentication|authorization|consumerid|credential|key|keyid|pass|passphrase|passwd|password|pwd|secret|sig|sign|signature|signed|token)$|^(code|googleaccessid|idtokenhint)$/;
+const SENSITIVE_QUERY_KEY = /(auth|authentication|authorization|consumerid|credential|key|keyid|pass|passphrase|passwd|password|pwd|pword|secret|sig|sign|signature|signed|token)$|^(code|googleaccessid|idtokenhint)$/;
 
 function isSensitiveQueryKey(key: string): boolean {
 	return SENSITIVE_QUERY_KEY.test(key.toLowerCase().replace(/[-_]/g, ""));
