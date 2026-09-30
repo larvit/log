@@ -72,8 +72,8 @@
   `::1` writes one `@larvit/log: an Authorization header…` line per `report` function, host and
   credential source, naming the host.** Either spelling warns, `user:pass@` in `otlpHttpBaseURI` or
   `Authorization` in `otlpAdditionalHeaders`, set at any time; through a `Log` it is a `warn` line
-  on `stderr`. The request still goes. Rotate a credential that has crossed a network you do not trust; on one you
-  do, drop the line in a `report` of your own.
+  on `stderr`. The request still goes. Rotate a credential that has crossed a network you do not
+  trust; on one you do, drop the line in a `report` of your own.
 
 ## v2.4.0
 
