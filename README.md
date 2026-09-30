@@ -413,9 +413,9 @@ them per call site.
   ignored, ends in `auth`, `authentication`, `authorization`, `consumerid`, `credential`, `key`,
   `keyid`, `pass`, `passphrase`, `passwd`, `password`, `pwd`, `secret`, `sig`, `sign`, `signature`,
   `signed` or `token`, or is `code`, `googleaccessid` or `idtokenhint`. That is Datadog's default
-  query obfuscation, OTel semconv's list and more: `access_token`, `x-api-key`, `client_secret`,
-  Azure's `?code=` and `subscription-key`, presigned S3, GCS and Azure SAS urls. It also redacts
-  keys like `oauth` or `design`.
+  query obfuscation, OTel semconv's list and more. It covers `access_token`, `x-api-key`,
+  `client_secret`, Azure's `?code=` and `subscription-key`, and presigned S3, GCS and Azure SAS
+  urls. The key itself is kept.
 - **A url in a kept query value**, once decoded, that the runtime's `URL` parses: its userinfo makes
   the value record `REDACTED`, and its own listed keys are redacted, at every level:
   `?next=https://t.test/x?token=…` records `next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3DREDACTED`. A url
@@ -435,8 +435,8 @@ did not build. `log.fetch` mirrors the runtime: Node and browsers refuse such a 
 Native hands it to the platform, where iOS sends the credentials and Android sends none, leaving
 you the 401.
 
-`REDACTED` does not always stand for a credential: a `?key=` lookup or a `?token=` pagination
-cursor records it, and so does an address the runtime reads as userinfo, as in
+`REDACTED` does not always stand for a credential: a `?key=` lookup, a `?token=` pagination cursor,
+a `?code=` promo code and an `?oauth=` or `?design=` flag record it, and so does an address the runtime reads as userinfo, as in
 `https://api.test,mail@example.com`.
 
 Spans are queued when the response arrives and are registered with `flush()` at call time, so
