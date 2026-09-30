@@ -624,7 +624,7 @@ function encodeOtlpProtobuf(payload: OtlpPayload): Uint8Array<ArrayBuffer> {
 	return byKind(payload, { logs: encodeOtlpLogPayload, traces: encodeOtlpSpanPayload });
 }
 
-// --- Warnings written once per sink ----------------------------------------
+// --- stderr lines, and warnings written once per sink ----------------------
 
 const warned = new WeakMap<object, Set<unknown>>();
 
@@ -1119,10 +1119,14 @@ export class Queue implements OtlpQueue {
 		this.sender = new OtlpSender(this.conf, (msg, metadata) => this.report(msg, metadata));
 
 		const exposedTo = this.sender.plainHttpAuthHost;
-		const exposure = `@larvit/log: an Authorization header goes over plain http: to ${exposedTo}, readable by anything on the network path; use https:`;
 
-		if (exposedTo !== undefined && firstWarning(this.conf.report, exposure)) {
-			this.report(exposure, {});
+		if (exposedTo !== undefined) {
+			const exposure = `@larvit/log: an Authorization header goes over plain http: to ${exposedTo}, readable by anything on the network path; use https:`;
+
+			// A report that is no function throws on every call anyway, and this.report swallows it.
+			if (typeof this.conf.report !== "function" || firstWarning(this.conf.report, exposure)) {
+				this.report(exposure, {});
+			}
 		}
 
 		this.ready = conf.storage ? this.load(conf.storage) : Promise.resolve();
