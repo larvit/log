@@ -69,9 +69,11 @@
   of a spread; the v2.4.0 entry says what to rotate. A `Queue` built from `{ ...queue.conf }` has no
   `storage`; pass `storage` to it by name.
 - **An `Authorization` sent over plain `http:` to a host other than `localhost`, `127.0.0.0/8` or
-  `::1` writes one line per `report` sink, naming the host.** Either spelling warns: `user:pass@`
-  in `otlpHttpBaseURI` or `Authorization` in `otlpAdditionalHeaders`. The request still goes;
-  rotate a credential that has crossed a network you do not trust.
+  `::1` writes one `@larvit/log: an Authorization header…` line per `report` function and host,
+  naming the host.** Either spelling warns, `user:pass@` in `otlpHttpBaseURI` or `Authorization` in
+  `otlpAdditionalHeaders`, set at any time; through a `Log` it is a `warn` line on `stderr`. The
+  request still goes. Rotate a credential that has crossed a network you do not trust; on one you
+  do, drop the line in a `report` of your own.
 
 ## v2.4.0
 
