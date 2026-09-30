@@ -40,7 +40,6 @@ In [docs/decisions.md](docs/decisions.md):
 - Both credential spellings stay, and their combination warns
 - Inherited `otlpAdditionalHeaders` follow the endpoint's origin
 - A header value or status message is redacted only where it is a url whole
-- A header name is redacted by Elastic APM's `sanitize_field_names` rule
 
 ## Working here
 

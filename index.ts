@@ -1333,8 +1333,8 @@ function isSensitiveQueryKey(key: string): boolean {
 	return SENSITIVE_QUERY_KEY.test(key.toLowerCase().replace(/[-_]/g, ""));
 }
 
-// Header names carrying a credential by definition: RFC 9110 authentication, RFC 6265 cookies.
-const SENSITIVE_HEADER_NAMES = new Set(["authorization", "cookie", "proxy-authorization", "set-cookie"]);
+// Elastic APM's default `sanitize_field_names`, plus the spec's optional `cookie`.
+const SENSITIVE_HEADER_NAME = /^(cookie|passwd|password|pwd|secret|set-cookie)$|key$|auth|card|credit|principal|session|token/;
 
 // Past it a query part that parses as a url records `REDACTED`, before the stack runs out.
 const MAX_URL_DEPTH = 8;
@@ -1431,7 +1431,7 @@ function redactedWholeUrl(value: string): string | undefined {
 }
 
 function redactHeaderCredential(name: string, value: string): string {
-	return SENSITIVE_HEADER_NAMES.has(name.toLowerCase()) || redactedWholeUrl(value) !== undefined ? "REDACTED" : value;
+	return SENSITIVE_HEADER_NAME.test(name.toLowerCase()) || redactedWholeUrl(value) !== undefined ? "REDACTED" : value;
 }
 
 // The URL log.fetch traces: a scheme written without "//" parses to an opaque path, where
