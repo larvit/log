@@ -199,10 +199,11 @@ needs the key knows which bucket they fetched from. The rest of a presigned url 
 on names no parameter, so Goal #3's "naming it is asking for it" does not cover them, and a false
 hit costs the reader a value, never the key.
 
-2026-09-30, on that reasoning: it adds `access-token`, `accesstoken`, `api-key`, `auth_token`,
-`client_secret`, `id_token`, `password`, `refresh_token`, `secret` and `subscription-key`, each a
-name a credential is sent under: spellings of the names above, OAuth's secrets, and Azure API
-Management's key.
+2026-09-30, derived by the agent from that reasoning: it adds `auth_token`, `client_secret`,
+`id_token`, `password`, `refresh_token`, `secret` and `subscription-key`, OAuth's secrets, the
+wild's and Azure API Management's key, and matches a name with `-` and `_` ignored, so every
+spelling of a listed name is one name: an app developer seeing `AccessToken` redacted expects
+`authToken` to be.
 
 Serves README → Goals #3; over-redaction in a minor stands on the
 2026-09-20 captured-value entry. Valid while the deny-list names query keys, not shapes.

@@ -1241,8 +1241,12 @@ export class Queue implements OtlpQueue {
 
 // --- Credentials on a span -------------------------------------------------
 
-// Every key OTel semconv's default deny-list has named, every S3 and GCS query-signing generation's credential keys, and the names a bearer token or API key travels under.
-const SENSITIVE_QUERY_KEYS = new Set(["access-token", "access_token", "accesstoken", "api-key", "api_key", "apikey", "auth_token", "awsaccesskeyid", "client_secret", "googleaccessid", "id_token", "key", "password", "refresh_token", "secret", "sig", "signature", "subscription-key", "token", "x-amz-credential", "x-amz-security-token", "x-amz-signature", "x-goog-credential", "x-goog-signature"]);
+function queryKeyName(key: string): string {
+	return key.toLowerCase().replace(/[-_]/g, "");
+}
+
+// Every key OTel semconv's default deny-list has named, every S3 and GCS query-signing generation's credential keys, and the names a credential travels under.
+const SENSITIVE_QUERY_KEYS = new Set(["access_token", "api_key", "auth_token", "awsaccesskeyid", "client_secret", "googleaccessid", "id_token", "key", "password", "refresh_token", "secret", "sig", "signature", "subscription-key", "token", "x-amz-credential", "x-amz-security-token", "x-amz-signature", "x-goog-credential", "x-goog-signature"].map(queryKeyName));
 
 // Header names carrying a credential by definition: RFC 9110 authentication, RFC 6265 cookies.
 const SENSITIVE_HEADER_NAMES = new Set(["authorization", "cookie", "proxy-authorization", "set-cookie"]);
@@ -1311,7 +1315,7 @@ const SCHEME_LED = /^[\0- ]*[a-z][a-z\d+.-]*:/i;
 // A key opening a url is read with its value too, as a server taking `?<url>` reads it: an `=` in its
 // password ends the key.
 function redactQueryPair(key: string, value: string, depth: number, partsRead: PartsRead): [string, string] {
-	if (SENSITIVE_QUERY_KEYS.has(key.toLowerCase())) {
+	if (SENSITIVE_QUERY_KEYS.has(queryKeyName(key))) {
 		return [key, "REDACTED"];
 	}
 
