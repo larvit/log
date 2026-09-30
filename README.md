@@ -411,19 +411,19 @@ them per call site.
 - **Redacted, whatever you list them for:** the headers `authorization`, `proxy-authorization`,
   `cookie` and `set-cookie`, and the value of a query key that, in any casing and with `-` and `_`
   ignored, ends in `auth`, `authentication`, `authorization`, `consumerid`, `credential`, `key`,
-  `keyid`, `pass`, `passphrase`, `passwd`, `password`, `pwd`, `secret`, `sig`, `sign`, `signature`,
-  `signed` or `token`, or is `code`, `googleaccessid` or `idtokenhint`. That is Datadog's default
-  query obfuscation, OTel semconv's list and more. It covers `access_token`, `x-api-key`,
+  `keyid`, `pass`, `passphrase`, `passwd`, `password`, `pwd`, `pword`, `secret`, `sig`, `sign`,
+  `signature`, `signed` or `token`, or is `code`, `googleaccessid` or `idtokenhint`. That is the
+  key terms of Datadog's default query obfuscation, OTel semconv's list and more. It covers `access_token`, `x-api-key`,
   `client_secret`, Azure's `?code=` and `subscription-key`, and presigned S3, GCS and Azure SAS
   urls. The key itself is kept.
 - **A url in a kept query value**, once decoded, that the runtime's `URL` parses: its userinfo makes
-  the value record `REDACTED`, and its own listed keys are redacted, at every level:
+  the value record `REDACTED`, and its own matched keys are redacted, at every level:
   `?next=https://t.test/x?token=…` records `next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3DREDACTED`. A url
   in a key is read alone and with its value, and where either finds a credential both record
   `REDACTED`: `?https://t.test/x?token=…`, `?https://a@b=pw@host` and `?https://u:p=w@host` record
   `REDACTED=REDACTED`. A url nested deeper than eight levels records `REDACTED` whole.
 - **A captured header value or a status message that the runtime's `URL` parses whole:** userinfo or
-  a listed key, at every level as above, makes a header value record `REDACTED` whole, and a status
+  a matched key, at every level as above, makes a header value record `REDACTED` whole, and a status
   message record `REDACTED` in place: `http://REDACTED@host/x?access_token=REDACTED`. In its own
   span's status, `log.fetch` also redacts the url it fetched wherever the runtime's rejection quotes
   it; forwarded to `end({ error })`, that rejection exports the url's userinfo, so replace its
@@ -436,8 +436,8 @@ Native hands it to the platform, where iOS sends the credentials and Android sen
 you the 401.
 
 `REDACTED` does not always stand for a credential: a `?key=` lookup, a `?token=` pagination cursor,
-a `?code=` promo code and an `?oauth=` or `?design=` flag record it, and so does an address the runtime reads as userinfo, as in
-`https://api.test,mail@example.com`.
+a `?code=` promo code and an `?oauth=` or `?design=` flag record it, and so does an address the
+runtime reads as userinfo, as in `https://api.test,mail@example.com`.
 
 Spans are queued when the response arrives and are registered with `flush()` at call time, so
 `await log.end()` delivers a `log.fetch()` you never awaited.
