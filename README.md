@@ -272,9 +272,9 @@ plain `http:` either one is readable by anything on the network path, so use `ht
 collector is local or on a network you trust. Either one sent over `http:` to a host other than
 `localhost`, `127.0.0.0/8` or `::1` writes one `@larvit/log:` line per `report` function, host and
 credential source, naming the host, and still sends. On a network you trust, pass
-`acceptPlainHttpAuthorization: true` to the `Queue`; a `Log` using `otlpHttpBaseURI` moves the
-endpoint to `otlpQueue: new Queue({ otlpHttpBaseURI, acceptPlainHttpAuthorization: true })`, whose
-report lines then go to that queue's `report`, `console.error` unless you pass one.
+`acceptPlainHttpAuthorization: true` to the `Queue`; a `Log` using `otlpHttpBaseURI` moves its
+`otlp*` options to `otlpQueue: new Queue({ acceptPlainHttpAuthorization: true, otlpHttpBaseURI })`,
+whose report lines then go to that queue's `report`, `console.error` unless you pass one.
 
 | Option | Type | Default | |
 |---|---|---|---|
