@@ -68,6 +68,10 @@
   non-enumerable on `queue.conf`, so a `localStorage` given as one stays out of `JSON.stringify` and
   of a spread; the v2.4.0 entry says what to rotate. A `Queue` built from `{ ...queue.conf }` has no
   `storage`; pass `storage` to it by name.
+- **An `Authorization` sent over plain `http:` to a host other than `localhost`, `127.0.0.0/8` or
+  `::1` writes one line per `report` sink, naming the host.** Either spelling warns: `user:pass@`
+  in `otlpHttpBaseURI` or `Authorization` in `otlpAdditionalHeaders`. The request still goes;
+  rotate a credential that has crossed a network you do not trust.
 
 ## v2.4.0
 

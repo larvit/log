@@ -6,15 +6,6 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ## 2.5.0 — close the credential story
 
-### Security
-
-- [ ] **Warn once per `report` sink when an `Authorization`, either spelling, goes over plain
-  `http:` to a non-loopback host.** Now that they are really sent, anything on the network path can
-  read them (CWE-319). The request still goes: an in-cluster
-  `http://otel-collector…svc.cluster.local:4318` is deliberate. Decided 2026-09-28.
-
-### Everything else
-
 - [ ] **Export `resolveFormatter`, so `conf.format` fully replaces the `conf.entryFormatter` alias
   3.0.0 removes.** The alias hands back a callable `EntryFormatter`; 3.0.0's `format` hands back
   `"text" | "json" | EntryFormatter`, and the mapping between them is the unexported `formatterOf`.
