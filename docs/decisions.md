@@ -187,7 +187,8 @@ it. Valid until 3.0.0 removes `entryFormatter`.
 
 2026-09-30, the maintainer, choosing from published defaults over names guessed one by one: a
 query key records `REDACTED` when, ignoring case, `-` and `_`, it ends in a term of Datadog's
-default query obfuscation (`DD_TRACE_OBFUSCATION_QUERY_STRING_REGEXP`), `key` or `credential`, or
+default query obfuscation (`DD_TRACE_OBFUSCATION_QUERY_STRING_REGEXP` as dd-trace-py documents
+it, whose password terms take a trailing `1` or `2`), `key` or `credential`, or
 is one of the names a primary source documents a credential under in a url: Azure Functions'
 `code`, OIDC logout's `id_token_hint`, GCS V2's `GoogleAccessId`. The names OTel semconv's default
 lists (main on 2026-09-30: `AWSAccessKeyId`, `Signature`, `sig`, `X-Amz-Credential`,
