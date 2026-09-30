@@ -414,14 +414,17 @@ them per call site.
 
 ### Credentials in a captured value
 
-- **Redacted, whatever you list them for:** a header whose name, in any casing, is `cookie`,
-  `passwd`, `password`, `pwd`, `secret` or `set-cookie`, ends in `key`, or holds `auth`, `card`,
-  `credit`, `principal`, `session` or `token` — Elastic APM's default `sanitize_field_names` — such
-  as `authorization`, `x-api-key` and `x-amz-security-token`; and the value of a query key that, in any casing and with `-` and `_`
-  ignored, ends in `auth`, `authentication`, `authorization`, `consumerid`, `credential`, `key`,
+- **A header, whatever you list it for,** whose name, in any casing, is `cookie`, `passwd`,
+  `password`, `pwd`, `secret` or `set-cookie`, ends in `key`, or holds `auth`, `card`, `credit`,
+  `principal`, `session` or `token` — Elastic APM's default `sanitize_field_names`. It covers
+  `authorization`, `x-api-key` and `x-amz-security-token`. The header is kept, its value records
+  `REDACTED`. A name the rule misses exports as written, `x-client-secret` and `x-db-password` among
+  them, so leave such a header off `captureRequestHeaders` and `captureResponseHeaders`.
+- **The value of a query key, whatever `captureQuery` keeps,** that, in any casing and with `-` and
+  `_` ignored, ends in `auth`, `authentication`, `authorization`, `consumerid`, `credential`, `key`,
   `keyid`, `pass`, `passphrase`, `secret`, `sig`, `sign`, `signature`, `signed` or `token`, or in
   `passwd`, `password`, `pwd` or `pword` with an optional `1` or `2`, or is `code`,
-  `googleaccessid` or `idtokenhint`. It covers `access_token`, `x-api-key`, `client_secret`, Azure's
+  `googleaccessid` or `idtokenhint`. It covers `access_token`, `api_key`, `client_secret`, Azure's
   `?code=` and `subscription-key`, and presigned S3, GCS and Azure SAS urls. The key itself is kept.
 - **A url in a kept query value**, once decoded, that the runtime's `URL` parses: its userinfo makes
   the value record `REDACTED`, and its own matched keys are redacted, at every level:
@@ -443,7 +446,8 @@ Native hands it to the platform, where iOS sends the credentials and Android sen
 you the 401.
 
 `REDACTED` does not always stand for a credential: a `?key=` lookup, a `?token=` pagination cursor,
-a `?code=` promo code and an `?oauth=` or `?design=` flag record it, and so does an address the
+a `?code=` promo code, an `?oauth=` or `?design=` flag, and the headers `www-authenticate`,
+`x-idempotency-key` and `x-session-id` record it, and so does an address the
 runtime reads as userinfo, as in `https://api.test,mail@example.com`.
 
 Spans are queued when the response arrives and are registered with `flush()` at call time, so
