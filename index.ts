@@ -1209,11 +1209,14 @@ export class Queue implements OtlpQueue {
 		const { report } = this.conf;
 		const logWarning = logWarningOfReport.get(report);
 
-		if (logWarning) {
-			logWarning(msg);
-		// A report that is no function throws on every call anyway, and this.report swallows it.
-		} else if (typeof report !== "function" || firstWarning(report, msg)) {
-			this.report(msg, {});
+		try {
+			if (logWarning) {
+				logWarning(msg);
+			} else if (typeof report !== "function" || firstWarning(report, msg)) {
+				report(msg, {});
+			}
+		} catch {
+			// A sink that throws must not break the export loop.
 		}
 	}
 
