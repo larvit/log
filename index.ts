@@ -693,6 +693,7 @@ export type QueueStorage = {
 };
 
 export type QueueConf = {
+	acceptPlainHttpAuthorization?: boolean;
 	batchDelayMs?: number;
 	clock?: Clock;
 	key?: string;
@@ -950,7 +951,7 @@ function mergePayloads(payloads: OtlpPayload[]): OtlpPayload {
 }
 
 // Read live, so a rotated otlpAdditionalHeaders reaches the next send; report is the caller's guarded one.
-type SenderConf = Pick<ResolvedQueueConf, "clock" | "otlpAdditionalHeaders" | "otlpHttpBaseURI" | "otlpProtocol">;
+type SenderConf = Pick<ResolvedQueueConf, "acceptPlainHttpAuthorization" | "clock" | "otlpAdditionalHeaders" | "otlpHttpBaseURI" | "otlpProtocol">;
 
 class OtlpSender {
 	private readonly conf: SenderConf;
@@ -960,7 +961,7 @@ class OtlpSender {
 	private readonly url: string;
 	private readonly warn: (msg: string) => void;
 
-	// Where an Authorization would go in the clear past this machine, else undefined.
+	// Where an Authorization would go in the clear past this machine unaccepted, else undefined.
 	private readonly plainHttpHost?: string;
 
 	constructor(conf: SenderConf, report: ResolvedQueueConf["report"], warn: (msg: string) => void) {
@@ -993,7 +994,7 @@ class OtlpSender {
 		}
 
 		// URL has already canonicalised an IPv4 host, so 127.1 reads 127.0.0.1 here.
-		if (base.protocol === "http:" && !/^(localhost|127(\.\d+){3}|\[::1\])$/.test(base.hostname)) {
+		if (!conf.acceptPlainHttpAuthorization && base.protocol === "http:" && !/^(localhost|127(\.\d+){3}|\[::1\])$/.test(base.hostname)) {
 			this.plainHttpHost = base.host;
 		}
 	}
