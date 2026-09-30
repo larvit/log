@@ -23,15 +23,6 @@ mechanism, that is evidence of the problem, never the prescribed repair.
   server's `Access-Control-Allow-Headers`.** The header is not CORS-safelisted, so it turns a simple
   request into a preflighted one, and a server that refuses it fails a call plain `fetch` would have
   made. README → Goals already owns the preflight.
-- [ ] **Spell a redacted `url.full` the way OTel semconv asks: `https://REDACTED:REDACTED@host/x`.**
-  Today the userinfo is dropped silently, so a span can carry `url.full` showing a credential-free
-  url beside a `status.message` quoting `http://REDACTED@host/x`, and the reader is told both that
-  credentials were written and that they were not. Only React Native reaches it; Node and browsers
-  refuse the url first.
-- [ ] **Keep the auth scheme when an allow-listed `authorization` records `REDACTED`.** `Bearer
-  REDACTED` and `Basic REDACTED` tell a reader chasing a 401 whether the caller sent the wrong kind
-  of credential, and RFC 9110's `auth-scheme` is a fixed token, never the secret. Split on the first
-  space and keep the prefix only where it matches the token grammar.
 - [ ] **Report a 401 or 403 export as `OTLP export unauthorized, batch dropped`.** Working auth
   makes a wrong credential reachable for the first time, and it is the likeliest misconfiguration of
   `otlpHttpBaseURI` userinfo; today it reads as any other 4xx.
@@ -146,8 +137,79 @@ Each one is a weigh against README → Goals first: ship it, or delete the item 
   slower than the walk below roughly 500 chars, and it only pays at 60 KB, where it is 6.6× faster.
   Measured on `node:24-bookworm-slim`, AMD Ryzen 9 5950X.
 
+## 2.8.0 — the technical principles
+
+- [ ] **Let a consumer inject the randomness trace and span ids come from.** `getRandomBytes` reads
+  `globalThis.crypto`, else `Math.random`, so a test checks ids by regex and "differs" only.
+- [ ] **Let a consumer inject what `colorsFromEnv`, `traceableUrl` and `unref` read from the
+  platform.** They read `process.env`, `globalThis.location` and `globalThis.Deno`, and the suite
+  swaps `globalThis.process` and `console.error` to reach them.
+- [ ] **Reach the retry decision and a `log.fetch` span's attributes without a network call.**
+  `OtlpSender.send` holds the plain-http warning, encoding, the send and the status decision in one
+  method, and `tracedFetch` builds and redacts attributes around the live call.
+- [ ] **Build a span payload without writing to `log.span`.** `buildSpanPayload` sets
+  `span.attributes` as it builds.
+- [ ] **Resolve a `Log`'s conf in steps that each return a new value, with no cast at the end.**
+  `confFromOptions`, `inheritSettings`, `rejectQueueBesideShorthand` and `withDefaults` mutate one
+  object in an order that carries meaning, and `conf as ResolvedLogConf` hides what they miss.
+- [ ] **Keep a `Queue`'s items and their byte count in one structure.** Four writers keep `items`
+  and `bytes` in step by hand, and the size-triggered flush trusts them.
+- [ ] **Make `queue.conf` read back what the queue sends with.** A write to `otlpHttpBaseURI`,
+  `otlpProtocol` or `acceptPlainHttpAuthorization` changes nothing the sender froze, and a replaced
+  `storage` is saved to a store it was never loaded from.
+- [ ] **Warn once about a negative, zero or `NaN` numeric `QueueConf` option, and use the default.**
+  A negative `retryDelayMs` retries at once, `maxItems: 0` drops everything, a `NaN`
+  `maxBatchBytes` never flushes on size. 3.0.0 rejects them.
+- [ ] **Check each persisted or enqueued payload's shape, so one corrupt item never drops its
+  batch.** `isOtlpPayload` checks the top-level array only; `mergePayloads` then throws and every
+  valid record merged with it is lost, on the offline phone path.
+- [ ] **Give `ExportScheduler` and save coalescing named states.** `timer.retry`, `running`,
+  `pending` and `failures`, and `dirty` with `saving`, combine into states nobody named; the batch
+  timer left behind mid-round is one of them.
+- [ ] **Route a `Queue`'s warnings through one explicit seam.** `logWarningOfReport` finds a Log's
+  warner by the identity of its `report` function, and `warnOnce(conf)` and `Queue.warnOnce` are two
+  once-only rules.
+- [ ] **Build the shared parts of a span and of a payload's attributes once.** `openSpan` and
+  `childSpan` repeat the span object; both payload builders drop `service.name` and stringify
+  values.
+- [ ] **Keep an injected `clock` or `stdout` that throws from escaping a level method.** `log.fetch`
+  guards the same failure; `log.info` lets it through to the app.
+- [ ] **Collapse `entryFormatterDeprecation` and `load()` to one error channel each.** One returns a
+  warning and throws; the other throws into its own catch as a goto.
+- [ ] **Test the untested failure paths.** An unencodable payload, the 3 s send abort, `unref`'s
+  effect, the clock-shape rejection, a malformed `%` in the endpoint password, stored JSON that is
+  not a list, a throwing `removeItem`, retries on 408/429/500, `end()` twice, and a level method
+  after `end()`.
+- [ ] **Sort what carries no order.** `format`'s `"text" | "json"`, `msg`/`msTimestamp`, and
+  `server.port` after `url.scheme` in a `log.fetch` span.
+- [ ] **Weigh the level set, and where the queue's own failures go, against
+  `~/.claude/principles/logging.md`.** It names five levels where this has six, `verbose` exports in
+  `debug`'s severity band, the queue's own failures log at `error` where the app still works,
+  `error` and `warn` go to `stderr` where the principle says OTLP or stdout, and nothing turns the
+  console off beside OTLP.
+- [ ] **Weigh duplicate log records on a retried export.** A timeout or 5xx after the collector
+  accepted a batch sends it again; spans dedupe by id, records do not, and OTLP has no idempotency
+  key.
+
 ## 3.0.0 — breaking
 
+- [ ] **Spell a redacted `url.full` the way OTel semconv asks: `https://REDACTED:REDACTED@host/x`.**
+  Today the userinfo is dropped silently, so a span can carry `url.full` showing a credential-free
+  url beside a `status.message` quoting `http://REDACTED@host/x`, and the reader is told both that
+  credentials were written and that they were not. Only React Native reaches it; Node and browsers
+  refuse the url first. README → `log.fetch` in depth documents `url.full` as the url without its
+  userinfo, so per Goals #4 this waits for the major.
+- [ ] **Keep the auth scheme when an allow-listed `authorization` records `REDACTED`.** `Bearer
+  REDACTED` and `Basic REDACTED` tell a reader chasing a 401 whether the caller sent the wrong kind
+  of credential, and RFC 9110's `auth-scheme` is a fixed token, never the secret. Split on the first
+  space and keep the prefix only where it matches the token grammar. README documents the value as
+  `REDACTED`, so per Goals #4 this waits for the major.
+- [ ] **Require `msTimestamp` in `EntryFormatterConf`, and have the built-in formatters return a
+  value for an unknown level.** Today they fall back to `Date.now()`, bypassing `clock`, and
+  `msgTextFormatter` throws.
+- [ ] **Make `log.span` and `ended` read-only, and an open span carry no end time.** Anyone handed
+  a `LogInt` can rewrite what is exported, `log.ended = false` exports a span twice, and an open
+  span reads as a finished zero-length one.
 - [ ] **Export OTLP metrics as a stateless pass-through.** That is a metrics kind in `OtlpPayload`,
   batched through `Queue` and POSTed to `/v1/metrics`, with the types carrying what a valid point
   must have. It waits for the major because an `OtlpQueue` implementer receives the wider union.
@@ -174,7 +236,8 @@ Each one is a weigh against README → Goals first: ship it, or delete the item 
   after is gone.
 - [ ] **Reject a `format` string other than `"text"` or `"json"` in the constructor.**
 - [ ] **Default `colors` to `process.stdout.isTTY` when neither `NO_COLOR` nor `FORCE_COLOR` is
-  set.** The TTY detection and its tests are in commit 9706b0a.
+  set.** A browser, with no `process`, defaults to off. The TTY detection and its tests are in
+  commit 9706b0a.
 - [ ] **Attach a child's log records to its own span instead of the parent's.** OTel's rule is that
   a record carries the active span, and a child's `log.fetch` spans already nest under it. No test
   asserts the old behaviour; write one for the new rule first.

@@ -47,8 +47,9 @@ Serves README → Goals #7. Valid while a pending retry must not hold the proces
 
 ## `clock` is a supported option
 
-2026-09-18, the implementing agent: `clock` is a supported option, not a test-only seam. Serves
-README → Goals #6. Valid while a delegating clock leaves process-exit behaviour intact.
+2026-09-18, the implementing agent: `clock` is a supported option, not a test-only seam. Applies
+the technical principle "Functional core, imperative shell". Valid while a delegating clock leaves
+process-exit behaviour intact.
 
 ## A required `Resolved*Conf` key is added in a minor and removed in a major
 
