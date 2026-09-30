@@ -628,17 +628,16 @@ function encodeOtlpProtobuf(payload: OtlpPayload): Uint8Array<ArrayBuffer> {
 
 const warned = new WeakMap<object, Set<unknown>>();
 
-// A Log-built queue's report writes to the instance's stderr, so the two share one set of warnings.
-const stderrOfReport = new WeakMap<object, object>();
+// A Log-built queue warns as its Log does: at warn, once per stderr.
+const logWarningOfReport = new WeakMap<object, (msg: string) => void>();
 
 // Marked before the sink runs, so a sink that itself uses the deprecated spelling cannot recurse.
 function firstWarning(sink: object, key: unknown): boolean {
-	const shared = stderrOfReport.get(sink) ?? sink;
-	let keys = warned.get(shared);
+	let keys = warned.get(sink);
 
 	if (!keys) {
 		keys = new Set();
-		warned.set(shared, keys);
+		warned.set(sink, keys);
 	}
 
 	if (keys.has(key)) {
@@ -959,11 +958,12 @@ class OtlpSender {
 	private readonly protobuf: boolean;
 	private readonly report: ResolvedQueueConf["report"];
 	private readonly url: string;
+	private readonly warn: (msg: string) => void;
 
-	// Where an Authorization goes in the clear past this machine, else undefined.
-	readonly plainHttpAuthHost?: string;
+	// Where an Authorization would go in the clear past this machine, else undefined.
+	private readonly plainHttpHost?: string;
 
-	constructor(conf: SenderConf, report: ResolvedQueueConf["report"]) {
+	constructor(conf: SenderConf, report: ResolvedQueueConf["report"], warn: (msg: string) => void) {
 		let base: URL;
 
 		try {
@@ -984,6 +984,7 @@ class OtlpSender {
 		this.conf = conf;
 		this.protobuf = conf.otlpProtocol === "http/protobuf";
 		this.report = report;
+		this.warn = warn;
 		this.url = `${base.protocol}//${base.host}${base.pathname.replace(/\/$/, "")}`;
 		this.headers = new Headers({ "Content-Type": this.protobuf ? "application/x-protobuf" : "application/json" });
 
@@ -991,11 +992,9 @@ class OtlpSender {
 			this.headers.set("Authorization", auth);
 		}
 
-		const sendsAuth = auth !== undefined || Object.keys(conf.otlpAdditionalHeaders ?? {}).some(name => name.toLowerCase() === "authorization");
-
 		// URL has already canonicalised an IPv4 host, so 127.1 reads 127.0.0.1 here.
-		if (base.protocol === "http:" && sendsAuth && !/^(localhost|127(\.\d+){3}|\[::1\])$/.test(base.hostname)) {
-			this.plainHttpAuthHost = base.host;
+		if (base.protocol === "http:" && !/^(localhost|127(\.\d+){3}|\[::1\])$/.test(base.hostname)) {
+			this.plainHttpHost = base.host;
 		}
 	}
 
@@ -1019,6 +1018,10 @@ class OtlpSender {
 
 		if (failure) {
 			return { message: failure, reportAs: "OTLP export headers invalid, batch dropped", retry: false };
+		}
+
+		if (this.plainHttpHost !== undefined && headers.has("Authorization")) {
+			this.warn(`@larvit/log: an Authorization header, from user:pass@ in otlpHttpBaseURI or from otlpAdditionalHeaders, goes over plain http: to ${this.plainHttpHost}, readable by anything on the network path; use an https: endpoint`);
 		}
 
 		let body: string | Uint8Array<ArrayBuffer>;
@@ -1116,19 +1119,7 @@ export class Queue implements OtlpQueue {
 			throw new Error("clock must be { now, setTimeout, clearTimeout }");
 		}
 
-		this.sender = new OtlpSender(this.conf, (msg, metadata) => this.report(msg, metadata));
-
-		const exposedTo = this.sender.plainHttpAuthHost;
-
-		if (exposedTo !== undefined) {
-			const exposure = `@larvit/log: an Authorization header goes over plain http: to ${exposedTo}, readable by anything on the network path; use https:`;
-
-			// A report that is no function throws on every call anyway, and this.report swallows it.
-			if (typeof this.conf.report !== "function" || firstWarning(this.conf.report, exposure)) {
-				this.report(exposure, {});
-			}
-		}
-
+		this.sender = new OtlpSender(this.conf, (msg, metadata) => this.report(msg, metadata), msg => this.warnOnce(msg));
 		this.ready = conf.storage ? this.load(conf.storage) : Promise.resolve();
 		this.scheduler = new ExportScheduler(this.conf, this.ready, () => this.round());
 	}
@@ -1210,6 +1201,18 @@ export class Queue implements OtlpQueue {
 		this.bytes -= bytes;
 
 		return batch;
+	}
+
+	private warnOnce(msg: string): void {
+		const { report } = this.conf;
+		const logWarning = logWarningOfReport.get(report);
+
+		if (logWarning) {
+			logWarning(msg);
+		// A report that is no function throws on every call anyway, and this.report swallows it.
+		} else if (typeof report !== "function" || firstWarning(report, msg)) {
+			this.report(msg, {});
+		}
 	}
 
 	private report(msg: string, metadata: Metadata): void {
@@ -1539,7 +1542,7 @@ function buildDefaultQueue(conf: ResolvedLogConf): void {
 	if (!conf.otlpQueue && conf.otlpHttpBaseURI) {
 		const report = (msg: string, metadata: Metadata) => writeStderr(conf, "error", metadata, msg);
 
-		stderrOfReport.set(report, conf.stderr);
+		logWarningOfReport.set(report, msg => warnOnce(conf, undefined, msg));
 		conf.otlpQueue = new Queue({
 			clock: conf.clock,
 			otlpAdditionalHeaders: conf.otlpAdditionalHeaders,
