@@ -411,9 +411,10 @@ them per call site.
 - **Redacted, whatever you list them for:** the headers `authorization`, `proxy-authorization`,
   `cookie` and `set-cookie`, and the value of a query key that, in any casing and with `-` and `_`
   ignored, ends in `auth`, `authentication`, `authorization`, `consumerid`, `credential`, `key`,
-  `keyid`, `pass`, `passphrase`, `passwd`, `password`, `pwd`, `pword`, `secret`, `sig`, `sign`,
-  `signature`, `signed` or `token`, or is `code`, `googleaccessid` or `idtokenhint`. That is the
-  key terms of Datadog's default query obfuscation, OTel semconv's list and more. It covers `access_token`, `x-api-key`,
+  `keyid`, `pass`, `passphrase`, `secret`, `sig`, `sign`, `signature`, `signed` or `token`, or in
+  `passwd`, `password`, `pwd` or `pword` with an optional `1` or `2`, or is `code`,
+  `googleaccessid` or `idtokenhint`. Those are the key terms of Datadog's default query
+  obfuscation, OTel semconv's list and more. It covers `access_token`, `x-api-key`,
   `client_secret`, Azure's `?code=` and `subscription-key`, and presigned S3, GCS and Azure SAS
   urls. The key itself is kept.
 - **A url in a kept query value**, once decoded, that the runtime's `URL` parses: its userinfo makes
