@@ -923,9 +923,13 @@ test("an Authorization over plain http: to a non-loopback host warns once per re
 	const warning = "@larvit/log: an Authorization header goes over plain http: to collector.test:4318, readable by anything on the network path; use https:";
 	const sink = reportSink();
 
+	const header = reportSink();
+
 	new Queue({ otlpHttpBaseURI: "http://collector:s3cret@collector.test:4318", report: sink.report });
-	new Queue({ otlpAdditionalHeaders: { authorization: "Bearer t0ken" }, otlpHttpBaseURI: "http://collector.test:4318", report: sink.report });
-	t.deepEqual(sink.lines, [{ msg: warning }], "either spelling warns, naming the host and never the credential, once per sink");
+	new Queue({ otlpHttpBaseURI: "http://collector:s3cret@collector.test:4318", report: sink.report });
+	new Queue({ otlpAdditionalHeaders: { authorization: "Bearer t0ken" }, otlpHttpBaseURI: "http://collector.test:4318", report: header.report });
+	t.deepEqual(sink.lines, [{ msg: warning }], "userinfo warns once per sink, naming the host and never the credential");
+	t.deepEqual(header.lines, [{ msg: warning }], "an Authorization header warns too, whatever its casing");
 
 	const quiet = reportSink();
 
