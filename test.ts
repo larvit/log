@@ -978,7 +978,12 @@ test("an Authorization sent over plain http: to a non-loopback host warns once p
 	const { logLevel, msg } = JSON.parse(stderr[0]);
 
 	t.deepEqual({ lines: stderr.length, logLevel, msg }, { lines: 1, logLevel: "warn", msg: warning("user:pass@ in otlpHttpBaseURI") }, "a Log-built queue warns once per stderr, at warn");
-	t.strictEqual(calls.length, 12, "every request still goes");
+
+	const broken = new Log({ otlpHttpBaseURI: "http://collector:s3cret@collector.test:4318", stderr: () => { throw new Error("stderr closed"); } });
+
+	broken.info("z");
+	t.strictEqual(await broken.flush().then(() => "", err => String(err)), "", "a stderr that throws on the warning never rejects flush()");
+	t.strictEqual(calls.length, 13, "every request still goes");
 	t.end();
 });
 
