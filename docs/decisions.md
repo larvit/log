@@ -263,9 +263,10 @@ credentials off `log.conf` and `queue.conf`.
 ## An `Authorization` over plain `http:` warns once
 
 2026-09-28, the maintainer: an `http:` `otlpHttpBaseURI` naming a host other than `localhost`,
-`127.0.0.0/8` or `::1` writes one warning per `report` sink when it carries `user:pass@` or
-`otlpAdditionalHeaders` sets `Authorization`, and still sends. The line names the host, never the
-credential. Both spellings warn, so moving the credential never silences the exposure; refusing
+`127.0.0.0/8` or `::1` warns when a send carries an `Authorization`, from `user:pass@` or
+`otlpAdditionalHeaders`, and still sends. It is checked at each send, so a header set later warns
+too, and written once per sink, host and source: through the Log's `stderr` at `warn` for a queue a
+Log built, else the queue's `report`. The line names the host, never the credential. Both spellings warn, so moving the credential never silences the exposure; refusing
 would break the in-cluster `http:` collector, a deliberate and common setup. Serves README → Goals
 #3's headline, "Credentials never leave", on the wire, without spending #4.
 
