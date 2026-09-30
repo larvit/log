@@ -6,9 +6,6 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ## 2.5.0 — close the credential story
 
-- [ ] **Give every `docs/decisions.md` entry its maker and the goal it serves.** "A required
-  `Resolved*Conf` key is added in a minor and removed in a major" and "The OTLP endpoint belongs to
-  the queue" name neither, and an entry with no goal behind it is a missing goal.
 - [ ] **Export `resolveFormatter`, so `conf.format` fully replaces the `conf.entryFormatter` alias
   3.0.0 removes.** The alias hands back a callable `EntryFormatter`; 3.0.0's `format` hands back
   `"text" | "json" | EntryFormatter`, and the mapping between them is the unexported `formatterOf`.
