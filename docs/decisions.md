@@ -53,8 +53,7 @@ leaves process-exit behaviour intact.
 2026-09-18: adding a key to `ResolvedLogConf`/`ResolvedQueueConf`'s required half ships in a
 minor; removing one, or making it optional, waits for a major, because a consumer reading that
 key stops compiling. They are output types describing what the library produces; a consumer
-hand-building one is writing a test double, not running existing code. Precedent: `colors` did
-the same.
+hand-building one is writing a test double, not running existing code.
 
 ## This library's own warnings are written once per `stderr` sink
 
@@ -65,8 +64,8 @@ keeps a test independent of run order. A `warnOnce` message is literal: anything
 breaks the once-only rule. An unknown `logLevel` is keyed on its raw value, so only the first
 `enabled` call builds its text. Every such line opens with `@larvit/log: `, part of that literal,
 so an app developer can tell which dependency emitted one about code they may not own. A
-`Queue`'s `report` lines carry no prefix: they report that developer's own setup, not this
-library's own API. Valid while this library writes its own warnings to a `stderr` sink.
+`Queue`'s failure lines through `report` carry no prefix, since they report that developer's own
+setup; its plain-`http:` `Authorization` warning is a warning, and keeps it. Valid while this library writes its own warnings to a `stderr` sink.
 
 ## `otlpHttpBaseURI` userinfo becomes an `Authorization: Basic` header
 
