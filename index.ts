@@ -1242,7 +1242,7 @@ export class Queue implements OtlpQueue {
 // --- Credentials on a span -------------------------------------------------
 
 // Every key OTel semconv's default deny-list has named, every S3 and GCS query-signing generation's credential keys, and the names a bearer token or API key travels under.
-const SENSITIVE_QUERY_KEYS = new Set(["access_token", "api_key", "apikey", "awsaccesskeyid", "googleaccessid", "key", "sig", "signature", "token", "x-amz-credential", "x-amz-security-token", "x-amz-signature", "x-goog-credential", "x-goog-signature"]);
+const SENSITIVE_QUERY_KEYS = new Set(["access-token", "access_token", "accesstoken", "api-key", "api_key", "apikey", "auth_token", "awsaccesskeyid", "client_secret", "googleaccessid", "id_token", "key", "password", "refresh_token", "secret", "sig", "signature", "subscription-key", "token", "x-amz-credential", "x-amz-security-token", "x-amz-signature", "x-goog-credential", "x-goog-signature"]);
 
 // Header names carrying a credential by definition: RFC 9110 authentication, RFC 6265 cookies.
 const SENSITIVE_HEADER_NAMES = new Set(["authorization", "cookie", "proxy-authorization", "set-cookie"]);
