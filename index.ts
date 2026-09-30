@@ -1314,17 +1314,15 @@ const SCHEME_LED = /^[\0- ]*[a-z][a-z\d+.-]*:/i;
 // A key opening a url is read with its value too, as a server taking `?<url>` reads it: an `=` in its
 // password ends the key.
 function redactQueryPair(key: string, value: string, depth: number, partsRead: PartsRead): [string, string] {
-	if (!SCHEME_LED.test(key.replace(/[\t\n\r]/g, ""))) {
-		return [key, isSensitiveQueryKey(key) ? "REDACTED" : redactQueryPart(value, depth, partsRead)];
+	if (SCHEME_LED.test(key.replace(/[\t\n\r]/g, ""))) {
+		const joined = `${key}=${value}`;
+
+		if (depth > MAX_URL_DEPTH || redactQueryPart(key, depth, partsRead) !== key || redactQueryPart(joined, depth, partsRead) !== joined) {
+			return ["REDACTED", "REDACTED"];
+		}
 	}
 
-	const joined = `${key}=${value}`;
-
-	if (depth > MAX_URL_DEPTH || redactQueryPart(key, depth, partsRead) !== key || redactQueryPart(joined, depth, partsRead) !== joined) {
-		return ["REDACTED", "REDACTED"];
-	}
-
-	return [key, redactQueryPart(value, depth, partsRead)];
+	return [key, isSensitiveQueryKey(key) ? "REDACTED" : redactQueryPart(value, depth, partsRead)];
 }
 
 // A value the runtime's `URL` parses whole; `undefined` where it is none or holds nothing to redact.
