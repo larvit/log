@@ -943,6 +943,7 @@ test("an Authorization over plain http: to a non-loopback host warns once per re
 
 	new Queue({ otlpHttpBaseURI: "http://u:p@127.evil.test", report: lookalike.report });
 	t.strictEqual(lookalike.lines.length, 1, "a name starting 127. is no loopback address");
+	t.strictEqual(thrown(() => Reflect.construct(Queue, [{ otlpHttpBaseURI: "http://u:p@collector.test", report: "not a function" }])), "", "a report that is no function still never throws from the constructor");
 
 	const stderr: string[] = [];
 	const toStderr = (line: string) => { stderr.push(line); };
