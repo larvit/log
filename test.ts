@@ -948,7 +948,8 @@ test("an Authorization sent over plain http: to a non-loopback host warns once p
 		await send(new Queue({ otlpHttpBaseURI, report: quiet.report }));
 	}
 
-	t.deepEqual(quiet.lines, [], "https: and a loopback host are silent");
+	await send(new Queue({ acceptPlainHttpAuthorization: true, otlpHttpBaseURI: "http://u:p@collector.test:4318", report: quiet.report }));
+	t.deepEqual(quiet.lines, [], "https:, a loopback host and acceptPlainHttpAuthorization are silent");
 
 	const lookalike = reportSink();
 
@@ -983,7 +984,7 @@ test("an Authorization sent over plain http: to a non-loopback host warns once p
 
 	broken.info("z");
 	t.strictEqual(await broken.flush().then(() => "", err => String(err)), "", "a stderr that throws on the warning never rejects flush()");
-	t.strictEqual(calls.length, 13, "every request still goes");
+	t.strictEqual(calls.length, 14, "every request still goes");
 	t.end();
 });
 
