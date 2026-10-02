@@ -58,11 +58,11 @@
 | 32 | 2.7.0 |  | **Propagate `tracestate`.** | 4 | 5 | 3 | 5 | 2 | 9.8 |
 | 41 | 2.8.0 | principle | **Warn once about a negative, zero or `NaN` numeric `QueueConf` option, and use the default.** | 2 | 2 | 5 | 6 | 5 | 16.5 |
 | 42 | 2.8.0 | defect | **Check each persisted or enqueued payload's shape, so one corrupt item never drops its batch.** | 3 | 3 | 6 | 4 | 1 | 16.2 |
-| 51 | 2.8.0 | principle | **Weigh duplicate log records on a retried export.** | 3 | 4 | 4 | 6 | 2 | 14.8 |
+| 51 | 2.8.0 | principle | **Keep a retried export from duplicating log records, or record in `docs/decisions.md` why duplicates stand.** | 3 | 4 | 4 | 6 | 2 | 14.8 |
 | 40 | 2.8.0 | principle | **Make `queue.conf` read back what the queue sends with.** | 3 | 4 | 4 | 6 | 5 | 13.0 |
 | 46 | 2.8.0 | principle | **Keep an injected `clock` or `stdout` that throws from escaping a level method.** | 2 | 2 | 4 | 5 | 5 | 13.0 |
 | 48 | 2.8.0 | principle | **Test the untested failure paths.** | 1 | 4 | 3 | 4 | 2, 8 | 11.2 |
-| 50 | 2.8.0 | principle | **Weigh the level set, and where the queue's own failures go, against `~/.claude/principles/logging.md`.** | 2 | 2 | 3 | 4 | 5 | 9.5 |
+| 50 | 2.8.0 | principle | **Match the level set and where the queue's own failures go to `~/.claude/principles/logging.md`, or record why not.** | 2 | 2 | 3 | 4 | 5 | 9.5 |
 | 34 | 2.8.0 | principle | **Let a consumer inject the randomness trace and span ids come from.** | 2 | 2 | 2 | 6 | 8 | 8.1 |
 | 35 | 2.8.0 | principle | **Let a consumer inject what `colorsFromEnv`, `traceableUrl` and `unref` read from the platform.** | 3 | 4 | 2 | 6 | 8 | 6.6 |
 | 37 | 2.8.0 | principle | **Build a span payload without writing to `log.span`.** | 2 | 2 | 1 | 6 | 8 | 6.1 |
@@ -121,7 +121,7 @@ into a rejection.
 Landing it drops README → `log.fetch` in depth's "Until 2.5.0, a `Request`" sentence. `fetch(url,
 request)` is valid and TypeScript accepts it, but `{ ...init, headers }` copies own properties only,
 and a `Request`'s are prototype getters: `log.fetch(url, new Request(url, { method: "POST", body
-}))` sends a GET with no body. A `Request` as the *input* is 2.6.0's item.
+}))` sends a GET with no body. A `Request` as the *input* is item 19.
 
 ### 12. Let a consumer inject the `fetch` the OTLP queue sends with.
 
@@ -146,7 +146,7 @@ exports' "A retry timer never keeps…" covers every timer.
 
 ### 6. Warn once per `report` sink when `otlpHttpBaseURI` carries `user:pass@` and `otlpAdditionalHeaders` sets `Authorization`.
 
-The two can disagree, and v2.4.0 documents the header winning. Decided 2026-09-28.
+The two can disagree, and v2.4.0 documents the header winning.
 
 ### 8. Keep a restored batch through the `maxItems` trim, so the retry promised for it holds.
 
@@ -163,7 +163,7 @@ queue without it, and a process that dies then loses the batch its storage exist
 ### 1. Export `resolveFormatter`, so `conf.format` fully replaces the `conf.entryFormatter` alias 3.0.0 removes.
 
 The alias hands back a callable `EntryFormatter`; 3.0.0's `format` hands back `"text" | "json" |
-EntryFormatter`, and the mapping between them is the unexported `formatterOf`. Decided 2026-09-28.
+EntryFormatter`, and the mapping between them is the unexported `formatterOf`.
 
 ### 5. Report a 401 or 403 export as `OTLP export unauthorized, batch dropped`.
 
@@ -213,14 +213,13 @@ URL`, so a TypeScript consumer cannot reach it.
 
 ### 17. Warn once when an instance with `otlpQueue` set or inherited leaves `spanName` unset.
 
-3.0.0 rejects it in the constructor — the only 3.0.0 break that starts throwing with no warning
-planned ahead of it.
+Item 77 makes the constructor reject it in 3.0.0, and this warning is that break's only notice.
 
 ### 25. Publish the artifact the gate tested.
 
 `push.yaml` builds and tests `index.js` inside the container; `publish.yaml` builds a second one on
 the runner and publishes that, so the thing consumers install is never the thing CI proved. Build
-once, upload, publish that. Pinning the base images above is the other half of the same problem.
+once, upload, publish that. Item 13, pinning the base images, is the other half of the same problem.
 
 ### 26. Check the footprint budget in CI, so the numbers in README → Footprint fail a build instead of going stale.
 
@@ -264,8 +263,7 @@ ordering, the `ot` vendor key — are where the cost sits.
 ### 41. Warn once about a negative, zero or `NaN` numeric `QueueConf` option, and use the default.
 
 A negative `retryDelayMs` retries at once, `maxItems: 0` drops everything, a `NaN` `maxBatchBytes`
-never flushes on size. 3.0.0 rejects them. Principle: Validate data and build DTOs as early as
-possible.
+never flushes on size. Principle: Validate data and build DTOs as early as possible.
 
 ### 42. Check each persisted or enqueued payload's shape, so one corrupt item never drops its batch.
 
@@ -273,7 +271,7 @@ possible.
 merged with it is lost, on the offline phone path. Principle: Validate data and build DTOs as early
 as possible.
 
-### 51. Weigh duplicate log records on a retried export.
+### 51. Keep a retried export from duplicating log records, or record in `docs/decisions.md` why duplicates stand.
 
 A timeout or 5xx after the collector accepted a batch sends it again; spans dedupe by id, records do
 not, and OTLP has no idempotency key. Principle: Idempotent data writing.
@@ -282,7 +280,7 @@ not, and OTLP has no idempotency key. Principle: Idempotent data writing.
 
 A write to `otlpHttpBaseURI`, `otlpProtocol` or `acceptPlainHttpAuthorization` changes nothing the
 sender froze, and a replaced `storage` is saved to a store it was never loaded from. Principle:
-Don't Repeat Yourself: two spellings that can disagree.
+Don't Repeat Yourself (two spellings that can disagree).
 
 ### 46. Keep an injected `clock` or `stdout` that throws from escaping a level method.
 
@@ -296,12 +294,12 @@ An unencodable payload, the 3 s send abort, `unref`'s effect, the clock-shape re
 408/429/500, `end()` twice, and a level method after `end()`. Principle: Most, if not all, code
 should have automated tests.
 
-### 50. Weigh the level set, and where the queue's own failures go, against `~/.claude/principles/logging.md`.
+### 50. Match the level set and where the queue's own failures go to `~/.claude/principles/logging.md`, or record why not.
 
 It names five levels where this has six, `verbose` exports in `debug`'s severity band, the queue's
 own failures log at `error` where the app still works, `error` and `warn` go to `stderr` where the
 principle says OTLP or stdout, and nothing turns the console off beside OTLP. Principle:
-`~/.claude/principles/logging.md`.
+`~/.claude/principles/logging.md`, levels and where each goes.
 
 ### 34. Let a consumer inject the randomness trace and span ids come from.
 
@@ -441,7 +439,7 @@ against the 10 KB budget before deciding.
 
 ### 76. Reject `user:pass@` in `otlpHttpBaseURI` beside an `Authorization` in `otlpAdditionalHeaders`, in the constructor.
 
-2.5.0 warns first.
+Item 6 warns first, in 2.5.0.
 
 ### 70. Stop a child inheriting `spanName`.
 
