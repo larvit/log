@@ -24,65 +24,25 @@ browsers and React Native. No OpenTelemetry SDK, no dependencies.
 [Trace outgoing HTTP](#trace-outgoing-http) · [Join an incoming trace](#join-an-incoming-trace) ·
 [Queue exports](#queue-exports) · [Accept a logger in your library](#accept-a-logger-in-your-library) ·
 [Options](#options) ·
-[Output formats](#output-formats) · [`log.fetch` in depth](#logfetch-in-depth) · [Exports](#exports) ·
+[Output formats](#output-formats) · [`log.fetch` in depth](#logfetch-in-depth) · [Footprint](#footprint) ·
+[Exports](#exports) ·
 [Development](#development) · [Changelog](CHANGELOG.md)
 
 ## Goals
 
-Priority order decides a tie.
+In priority order; the earlier goal wins a tie.
 
-1. **Runs everywhere.** Node, Bun, Deno, browsers and React Native, on the common JS surface.
-   *Runs* identically; behaves identically too wherever that costs no other goal, and where a
-   runtime genuinely differs the platform wins and the docs say so.
-2. **The telemetry is correct OTLP.** A span or record a backend mis-renders is a broken product.
-   Approximating part of the spec is worse than omitting it.
-3. **Credentials never leave.** In a url, or a captured header value or status message the runtime's
-   `URL` parses whole, that means what it parses as userinfo, and the query keys and header names
-   matched under [Credentials in a captured value](#credentials-in-a-captured-value). Anything else,
-   and text you log yourself, is exported as written.
-4. **Semver, read strictly, over what this README documents.** A minor only adds — an export, an
-   option, a value an option accepts, a field, a span attribute — where code not using it behaves as
-   before. What the README does not document — an undocumented key of a `conf`, enumerability, what
-   a spread or `JSON.stringify` of one carries — may change in a minor. A break, anything below, is
-   deprecated in a minor first and lands in the next major with a `MIGRATION.md` entry; a feature
-   whose right shape breaks waits for that major, never shipping early in a worse one. Only a major
-   changes:
-   - each documented option, read back under its own name, and each documented instance field;
-   - each span attribute and value this README documents, on `log.span` and on the wire;
-   - the `format: "json"` output;
-   - a default;
-   - a supported runtime;
-   - what a key of a type you read (`log.conf`, `queue.conf`, `LogInt.conf`, anything handed back)
-     can hold: widening it, even where the option behind it accepts more;
-   - what a type you pass accepts: narrowing it;
-   - the keys a type you implement is handed or must provide: removing one it is handed, widening
-     what one holds, or adding to what it must provide.
-5. **A very easy API.** `log.info("msg", { key })` is the whole one-line path. Nobody learns OTLP
-   to log.
+1. **Runs everywhere.** Node, Bun, Deno, browsers and React Native.
+   1. **Behaves the same everywhere,** except where a runtime genuinely differs: then the platform
+      wins and the docs say so.
+2. **Correct OTLP, or none at all.**
+3. **Credentials never leave.**
+4. **Semver, read strictly.**
+5. **A very easy API.** Nobody learns OTLP to log.
 6. **Composable.** Instances nest, inherit, and attach to an upstream trace.
-7. **Low footprint.** Measured on this repo's container image: ≤10 KB gzipped, ≤50 ns for a call
-   below `logLevel`, ≤2 µs for a console call, ≤10 µs with OTLP configured, ≤1 KB per instance,
-   ≤1.5 KB per queued record, ≤1.5 MiB for a full 1000-item queue. Nothing this library schedules
-   keeps a Node or Deno process alive past the work the app asked for; until 2.5.0 a pending batch
-   timer holds it for up to `batchDelayMs`.
-8. **A maintainer can hold it.** Simulated readers, junior to architect, rate how well they
-   understand the source; the target is 7.0/10, and no change lowers the score.
-
-**`log.fetch` mirrors the runtime's `fetch`.** It accepts what that `fetch` accepts, and the
-response, the rejection and the promise you see are exactly what it produced. What it adds is
-outbound trace context and a span, and never a success the platform would have refused. The request
-differs from yours only by `traceparent`, which is not CORS-safelisted, so a cross-origin call is
-preflighted and needs the server to allow that header. An option it cannot apply, such as an
-invalid header name to capture, warns once and is skipped, never changing the call.
-
-**Metrics travel, they do not accumulate.** Any OTLP metric shape — gauge, delta or cumulative sum,
-histogram — may be handed over already aggregated, and this library encodes, batches and delivers
-it; the types say what a valid point must carry. Keeping a running total, a stable
-`startTimeUnixNano` and bucket boundaries that match across a series is the caller's, so
-instruments, temporality conversion and periodic collection stay out. Not implemented yet.
-
-**What earns a place here:** it fits the budget above, it can be implemented to the spec and kept
-there, and it stays off the one-line path.
+7. **Low footprint.**
+   1. **Never holds a process open** past the work the app asked for.
+8. **A maintainer can hold it.**
 
 ## Audience
 
@@ -100,12 +60,29 @@ queue survives app restarts through a `storage` adapter, and a full one holds ab
 current Chromium. React Native is supported from 0.74, where Hermes gained `TextEncoder` and
 `btoa`. Deno and Bun meet the rule and are not in CI.
 
-**Rely on** what Goals #4 says only a major may change.
+**Rely on** what this README documents, under semver read strictly ([Goals #4](#goals)). A minor
+only adds — an export, an option, a value an option accepts, a field, a span attribute — where code
+not using it behaves as before. A break is deprecated in a minor first and lands in the next major
+with a `MIGRATION.md` entry; a feature whose right shape breaks waits for that major, never shipping
+early in a worse one. Only a major changes:
 
-**Do not rely on** the text output line, which is written for people to read — parse
-`format: "json"` instead. Nor on delivery: the export queue is best-effort, it keeps what `storage`
-accepted and drops the oldest past `maxItems`, keeping a batch it has promised to retry, because
-telemetry is not payload data. A major stops being maintained when the next one ships.
+- each documented option, read back under its own name, and each documented instance field;
+- each span attribute and value this README documents, on `log.span` and on the wire;
+- the `format: "json"` output;
+- a default;
+- a supported runtime;
+- what a key of a type you read (`log.conf`, `queue.conf`, `LogInt.conf`, anything handed back)
+  can hold: widening it, even where the option behind it accepts more;
+- what a type you pass accepts: narrowing it;
+- the keys a type you implement is handed or must provide: removing one it is handed, widening
+  what one holds, or adding to what it must provide.
+
+**Do not rely on** what the README does not document — an undocumented key of a `conf`,
+enumerability, what a spread or `JSON.stringify` of one carries — which may change in a minor. Nor
+on the text output line, which is written for people to read — parse `format: "json"` instead. Nor
+on delivery: the export queue is best-effort, it keeps what `storage` accepted and drops the oldest
+past `maxItems`, keeping a batch it has promised to retry, because telemetry is not payload data. A
+major stops being maintained when the next one ships.
 
 ## Install
 
@@ -202,7 +179,7 @@ backoff is pending. An instance is single-use: logging and `fetch()` on an ended
 key; `parentLog`, `spanName` and `traceparent` are not copied, so a clone starts a new trace unless
 you pass `parentLog` or `traceparent`; any other option you pass wins. Copy settings with `clone()`, never a spread
 of `log.conf`, which carries `parentLog` and `traceparent` and whose shape a minor may change
-([Goals #4](#goals)).
+([Audience](#audience)).
 
 ## Trace outgoing HTTP
 
@@ -388,6 +365,14 @@ keeps it native. Levels map to OTLP severity through the exported `LogLevels` ta
 
 ## `log.fetch` in depth
 
+**`log.fetch` mirrors the runtime's `fetch`** ([Goals #1.1 and #5](#goals)). It accepts what that
+`fetch` accepts, and the response, the rejection and the promise you see are exactly what it
+produced. What it adds is outbound trace context and a span, and never a success the platform would
+have refused. The request differs from yours only by `traceparent`, which is not CORS-safelisted,
+so a cross-origin call is preflighted and needs the server to allow that header. An option it
+cannot apply, such as an invalid header name to capture, warns once and is skipped, never changing
+the call.
+
 Input is a `string` or `URL`; a `Request` is not supported. Only a URL that resolves to `http:` or
 `https:` is traced — a relative one resolves against the page, so it is untraced where there is no
 page, as on a server, and where the page is not `http:`/`https:`, as under a `file:` or app-scheme
@@ -413,6 +398,10 @@ Bodies are never captured.
 them per call site.
 
 ### Credentials in a captured value
+
+A credential ([Goals #3](#goals)) is what the runtime's `URL` parses as userinfo — in a url, or in a
+captured header value or status message it parses whole — and the header names and query keys
+matched below. Anything else, and text you log yourself, is exported as written.
 
 - **A header, whatever you list it for,** whose name, in any casing, is `cookie`, `passwd`,
   `password`, `pwd`, `secret` or `set-cookie`, ends in `key`, or holds `auth`, `card`, `credit`,
@@ -452,6 +441,12 @@ userinfo, as in `https://api.test,mail@example.com`.
 
 Spans are queued when the response arrives and are registered with `flush()` at call time, so
 `await log.end()` delivers a `log.fetch()` you never awaited.
+
+## Footprint
+
+Budgets for [Goals #7](#goals), measured on this repo's container image: ≤10 KB gzipped, ≤50 ns for
+a call below `logLevel`, ≤2 µs for a console call, ≤10 µs with OTLP configured, ≤1 KB per instance,
+≤1.5 KB per queued record, ≤1.5 MiB for a full 1000-item queue.
 
 ## Exports
 
