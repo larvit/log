@@ -12,7 +12,7 @@ mechanism, that is evidence of the problem, never the prescribed repair.
   Decided 2026-09-28.
 - [ ] **Warn once per `report` sink about an invalid name in `captureRequestHeaders` or
   `captureResponseHeaders`, and skip it, so it never changes a `log.fetch` result.** Landing it
-  drops README → `log.fetch` in depth's "An invalid header name" sentence. `headers.get("x
+  drops README → `log.fetch` in depth's "Until 2.5.0, an invalid name" sentence. `headers.get("x
   y")` throws a `TypeError`, so a bad request-side name rejects every traced call before the request
   goes out, and a bad response-side one turns a response the platform delivered into a rejection.
 - [ ] **Send a `Request` passed as `init` with its own method, body, signal and other settings.**
