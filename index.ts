@@ -1811,22 +1811,23 @@ function exportSpan(log: Pick<Log, "conf" | "sampled">, span: OtlpSpan, attribut
 function captureHeaders(log: Pick<Log, "conf" | "context">, option: "captureRequestHeaders" | "captureResponseHeaders", headers: Headers, attributes: Metadata): void {
 	const prefix = option === "captureRequestHeaders" ? "http.request.header." : "http.response.header.";
 
-	for (const name of log.conf[option] ?? []) {
+	for (const [index, name] of (log.conf[option] ?? []).entries()) {
+		let key: string;
 		let value: string | null;
 
 		try {
+			key = name.toLowerCase();
 			value = headers.get(name);
 		} catch {
+			// The index, never the name: an invalid one may be a whole header line, value and all.
 			try {
-				warnOnce(log.conf, log.context, `@larvit/log: ${option} holds ${JSON.stringify(name)}, which is no valid header name, so log.fetch skips it`);
+				warnOnce(log.conf, log.context, `@larvit/log: ${option}[${index}] is not a valid header name, so log.fetch skips it`);
 			} catch {
 				// A stderr that throws costs the warning.
 			}
 
 			continue;
 		}
-
-		const key = name.toLowerCase();
 
 		if (value !== null) {
 			attributes[prefix + key] = redactHeaderCredential(key, value);

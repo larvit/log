@@ -112,7 +112,8 @@ log.silly("Open the flood gates!"); // stdout
 
 Levels, most to least severe: `error`, `warn`, `info`, `verbose`, `debug`, `silly`. `"none"` outputs
 nothing but this library's own lines, which no `logLevel` silences: its `@larvit/log:` warnings and,
-with `otlpHttpBaseURI`, the export queue's failure reports.
+with `otlpHttpBaseURI`, the export queue's failure reports. A no-op `stderr` drops them, and a no-op
+`report` on a `Queue` you build.
 
 Keep the message a static string and put every value in the metadata object, so entries with the
 same message aggregate in your log backend:
@@ -256,7 +257,8 @@ writes one `@larvit/log:` line, and throws from 3.0.0. Over
 plain `http:` either one is readable by anything on the network path, so use `https:` unless the
 collector is local or on a network you trust. Either one sent over `http:` to a host other than
 `localhost`, `127.0.0.0/8` or `::1` writes one `@larvit/log:` line per `report` function, or per
-`stderr` for a queue a `Log` built, host and credential source, naming the host, and still sends. On a network you trust, pass
+`stderr` for a queue a `Log` built, host and credential source, naming the host, and still sends.
+On a network you trust, pass
 `acceptPlainHttpAuthorization: true` to the `Queue`; a `Log` using `otlpHttpBaseURI` moves its
 `otlp*` options to `otlpQueue: new Queue({ acceptPlainHttpAuthorization: true, otlpHttpBaseURI })`,
 whose report lines then go to that queue's `report`, `console.error` unless you pass one.
@@ -389,9 +391,8 @@ setting are dropped, though the span still names its method.
 Only a URL that resolves to `http:` or `https:` is traced — a relative one resolves against the
 page, so it is untraced where there is no page, as on a server, and where the page is not
 `http:`/`https:`, as under a `file:` or app-scheme origin. Anything else passes straight through to
-an untraced `fetch`: no span, and no `traceparent` sent. The span is the only output, besides one
-`stderr` warning per invalid name in `captureRequestHeaders` or `captureResponseHeaders`, which is
-skipped.
+an untraced `fetch`: no span, and no `traceparent` sent. The span is the only output. An invalid
+name in `captureRequestHeaders` or `captureResponseHeaders` is skipped, with one `stderr` warning.
 
 Span attributes follow the OpenTelemetry HTTP semantic conventions:
 

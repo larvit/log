@@ -182,7 +182,7 @@ The 2026-10-03 four-seat run scored Navigation 7.1, Locality 5.5, Shape 6.25, Se
 
 ### 85. Redact credentials in a url nested in the request path, or record in `docs/decisions.md` why they stay.
 
-The CHANGELOG says a url nested in the request path stays in `url.full` and "will not be fixed", but no decision records that choice against Goals #3.
+The CHANGELOG says a url nested in the request path stays in `url.full` and "is not fixed in 2.5.0", but no decision records that choice against Goals #3.
 
 ### 80. Run the browser suite in WebKit and Firefox as well as Chromium.
 
