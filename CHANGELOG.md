@@ -5,7 +5,7 @@
 ### Security
 
 - **2.5.0 exports some values v2.4.0 redacted.** Redaction now covers what the runtime's `URL`
-  parses, read on a whole value (README → Goals #3). These go out as written:
+  parses, read on a whole value (README → Credentials in a captured value). These go out as written:
   - a url among other text in a header value or in a status message you set with `end({ error })`,
     its userinfo included, a forwarded `log.fetch` rejection among them;
   - a url percent-encoded into a header value;
@@ -20,8 +20,8 @@
   original value whole. Keep credentials out of those values: strip them before they reach
   `log.fetch` or `end({ error })`, and drop a response header you cannot control from
   `captureResponseHeaders`. A url nested in the request path stays in `url.full` as written, as in
-  v2.4.0, and will not be fixed: Goals #3 does not cover it, so v2.4.0's rotation advice for it
-  stands; keep credentials out of a url you nest in a path.
+  v2.4.0, and will not be fixed: README → Credentials in a captured value does not cover it, so
+  v2.4.0's rotation advice for it stands; keep credentials out of a url you nest in a path.
 - **A captured header records `REDACTED` by Elastic APM's default `sanitize_field_names` rule.**
   Since v2.3.0 only `authorization`, `cookie`, `proxy-authorization` and `set-cookie` did, so a
   listed `x-api-key`, `x-auth-token` or `x-amz-security-token` exported its value. Now a name that,
