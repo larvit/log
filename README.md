@@ -372,15 +372,16 @@ keeps it native. Levels map to OTLP severity through the exported `LogLevels` ta
 ## `log.fetch` in depth
 
 **`log.fetch` mirrors the runtime's `fetch`** ([Goals #1.1 and #5](#goals)). It takes a `string` or
-`URL` and an `init`. Given a plain-object `init` and valid header names to capture, the response,
-the rejection and the promise you see are exactly what the runtime produced. What it adds is
-outbound trace context and a span, and never a success the platform would have refused. The request
-differs from yours only by `traceparent`, which is not CORS-safelisted, so a cross-origin call is
-preflighted and needs the server to list it in `Access-Control-Allow-Headers`.
+`URL` and an `init`. On an instance not yet ended, given a plain-object `init` and valid names in
+`captureRequestHeaders` and `captureResponseHeaders`, the response, the rejection and the promise
+you see are exactly what the runtime produced. What it adds is outbound trace context and a span,
+and never a success the platform would have refused. The request differs from yours only by
+`traceparent`, which is not CORS-safelisted, so a cross-origin call is preflighted and needs the
+server to list it in `Access-Control-Allow-Headers`.
 
 Until 2.5.0, a `Request` as `init` keeps only its headers: its method, body, signal and every other
-setting are dropped, though the span still names its method. An invalid header name to capture
-rejects the call.
+setting are dropped, though the span still names its method. Until 2.5.0, an invalid name in
+`captureRequestHeaders` or `captureResponseHeaders` rejects the call.
 
 Only a URL that resolves to `http:` or `https:` is traced — a relative one resolves against the
 page, so it is untraced where there is no page, as on a server, and where the page is not
@@ -408,8 +409,10 @@ them per call site.
 
 ### Credentials in a captured value
 
-Redaction covers two things: userinfo, wherever the runtime's `URL` parses a url, a captured header
-value or a status message whole; and the values of the header names and query keys matched below.
+Redaction covers three things: the userinfo of a url the runtime's `URL` parses, whether it is the
+url you fetch, sits in a kept query value, or is a whole captured header value or status message;
+the url `log.fetch` fetched, wherever its own rejection quotes it; and the values of the header
+names and query keys matched below.
 Anything else is exported as written, text you log yourself included.
 
 - **A header, whatever you list it for,** whose name, in any casing, is `cookie`, `passwd`,

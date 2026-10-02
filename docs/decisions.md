@@ -113,13 +113,13 @@ as the runtime quotes it back, with its redacted form. A rejection forwarded to 
 read by "A header value or status message is redacted only where it is a url whole". Turning the
 userinfo into an `Authorization: Basic` header, as `otlpHttpBaseURI` does with the same spelling, is
 what README → `log.fetch` in depth forbids of it: "The request differs from yours only by
-`traceparent`" and "never a success the platform would have refused". The two spellings differ because the queue's
-endpoint is this library's own request to make, where `log.fetch`'s is the caller's, so the same
-string means "authenticate me" in one and "mirror what my runtime does with this" in the other.
-React Native does put them on the wire, on one of its two platforms: `whatwg-fetch` hands the url to
-`XMLHttpRequest.open` untouched and sets no header, iOS keeps the userinfo through `[RCTConvert
-NSURL:]` and runs `NSURLSession` with no challenge delegate, so the system answers
-`WWW-Authenticate` with the credentials, while Android passes the string to
+`traceparent`" and "never a success the platform would have refused". The two spellings differ
+because the queue's endpoint is this library's own request to make, where `log.fetch`'s is the
+caller's, so the same string means "authenticate me" in one and "mirror what my runtime does with
+this" in the other. React Native does put them on the wire, on one of its two platforms:
+`whatwg-fetch` hands the url to `XMLHttpRequest.open` untouched and sets no header, iOS keeps the
+userinfo through `[RCTConvert NSURL:]` and runs `NSURLSession` with no challenge delegate, so the
+system answers `WWW-Authenticate` with the credentials, while Android passes the string to
 `Request.Builder().url()` and OkHttp derives no `Authorization` from it — leaving the caller a 401,
 and writing the userinfo out only in a plain-`http:` proxy's request line. Same at `v0.74.0` and at
 `main` on 2026-09-20. Mirroring keeps that the platform's behaviour. It ships in a minor on the
@@ -176,13 +176,13 @@ Footprint's 1 KB, on `node:22-bookworm-slim` over 50 000 retained instances. Ser
 
 2026-09-28, the maintainer, superseding the alias above on `log.conf`: `conf.format` keeps v2.3.0's
 read type, per README → Audience: it never holds a function, and a string written beside
-`entryFormatter` reads back as written. A function formatter reads back from `conf.entryFormatter` alone and wins
-over any `conf.format`, as in v2.3.0, so writing `conf.format` on a function-formatted instance
-changes nothing. Reading or writing `conf.entryFormatter` does not warn, since 2.x has no other
-spelling to move to. Its `@deprecated` tag stays and names 3.0.0's `conf.format`, because README →
-Audience deprecates every 3.0.0 break in a minor first. A parent built by another copy of this
-module hands its child only a function, its built-in formatters included, so writing that child's
-`conf.format` changes nothing either.
+`entryFormatter` reads back as written. A function formatter reads back from `conf.entryFormatter`
+alone and wins over any `conf.format`, as in v2.3.0, so writing `conf.format` on a
+function-formatted instance changes nothing. Reading or writing `conf.entryFormatter` does not warn,
+since 2.x has no other spelling to move to. Its `@deprecated` tag stays and names 3.0.0's
+`conf.format`, because README → Audience deprecates every 3.0.0 break in a minor first. A parent
+built by another copy of this module hands its child only a function, its built-in formatters
+included, so writing that child's `conf.format` changes nothing either.
 
 ## `ResolvedLogConf` keeps `entryFormatter` required
 
