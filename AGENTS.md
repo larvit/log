@@ -41,6 +41,8 @@ In [docs/decisions.md](docs/decisions.md):
 - Inherited `otlpAdditionalHeaders` follow the endpoint's origin
 - A header value or status message is redacted only where it is a url whole
 - Metrics will arrive aggregated, with no instruments
+- `ProtoWriter.string` uses `TextEncoder` with no fallback
+- The protobuf encoder stays
 
 ## Working here
 
@@ -54,6 +56,8 @@ In [docs/decisions.md](docs/decisions.md):
 - A release section with anything a consumer must act on — a rotation advisory, an exposure still
   open — puts `### Security` holding it right after that intro, ahead of `### Everything else`;
   one with none omits both headings. Thirty flat bullets is where a rotation notice goes unread.
+- An item names the target state and the problem; working out *how* is part of it. A mechanism it
+  names is evidence of the problem, never the prescribed repair.
 - Tests-first. The suite (`test.ts`) injects `stdout`/`stderr` and stubs the global `fetch`, so the same tests cover console + OTLP in both Node and the browser.
 - See [README](README.md) for build/test/release commands.
 - Don't wait on CodeRabbit: under 10 stars it reviews only when triggered by hand.
