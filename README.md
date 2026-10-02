@@ -111,7 +111,7 @@ log.silly("Open the flood gates!"); // stdout
 ```
 
 Levels, most to least severe: `error`, `warn`, `info`, `verbose`, `debug`, `silly`. `"none"` outputs
-nothing, except a deprecation warning, which no `logLevel` silences.
+nothing but this library's own `@larvit/log:` warnings, which no `logLevel` silences.
 
 Keep the message a static string and put every value in the metadata object, so entries with the
 same message aggregate in your log backend:
@@ -251,7 +251,7 @@ queue is in memory only.
 
 Credentials go either in the endpoint as `user:pass@`, which is sent as an `Authorization: Basic`
 header, or in `otlpAdditionalHeaders` as a token of your own. Set one: setting both sends the header,
-writes one `@larvit/log:` line per `report` function, and throws from 3.0.0. Over
+writes one `@larvit/log:` line, and throws from 3.0.0. Over
 plain `http:` either one is readable by anything on the network path, so use `https:` unless the
 collector is local or on a network you trust. Either one sent over `http:` to a host other than
 `localhost`, `127.0.0.0/8` or `::1` writes one `@larvit/log:` line per `report` function, host and
@@ -315,7 +315,7 @@ library's entries land in their trace.
 For a span per operation, take a `LogInt` instead, make a child,
 `new Log({ parentLog: log, spanName: "submit_sm" })`, log on it and `end()` it: the child is a
 `Logger`, where the `LogInt` you were handed is not until 3.0.0. It inherits the
-consumer's level, sinks and OTLP settings, so a `"none"` consumer stays silent. Never `end()` the
+consumer's level, sinks and OTLP settings, so a `"none"` consumer gets no line of yours. Never `end()` the
 instance you were handed; it is single-use and the consumer owns it.
 
 ## Options
@@ -482,7 +482,7 @@ a call below `logLevel`, ≤2 µs for a console call, ≤10 µs with OTLP config
 | `Metadata`, `MetadataValue` | `Record<string, string \| number \| boolean>` and its value type: what a formatter and `log.context` see. |
 | `MetadataInput` | `Metadata` whose values may be `undefined`: what `Logger`'s level methods and `LogOptions.context` accept. |
 | `EntryFormatter`, `EntryFormatterConf` | A formatter, `(entry) => string`, and the entry it takes: `{ colors? (unset = on), logLevel, metadata?, msg, msTimestamp? }`. |
-| `OtlpSpan`, `OtlpAttribute`, `OtlpLogPayload`, `OtlpSpanPayload` | The OTLP wire shapes; `log.span` is an `OtlpSpan`. |
+| `OtlpSpan`, `OtlpAttribute`, `OtlpLogPayload`, `OtlpSpanPayload`, `OtlpScope` | The OTLP wire shapes; `log.span` is an `OtlpSpan`. |
 | `OtlpQueue`, `OtlpPayload` | What `otlpQueue` takes, `{ enqueue, flush }`, and what `enqueue` receives, a log or span payload. |
 | `Clock`, `TimerHandle` | The `clock` option, `{ now, setTimeout, clearTimeout }` with `now()` in epoch milliseconds, and what its `setTimeout` hands back. |
 | `QueueConf`, `ResolvedQueueConf`, `QueueStorage` | `Queue`'s options, `queue.conf` with defaults applied, and the `storage` shape, `{ getItem, setItem, removeItem }`. |

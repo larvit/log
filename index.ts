@@ -200,7 +200,7 @@ function formatterOf(conf: LogConf): EntryFormatter {
 
 // A Log's conf.entryFormatter is a getter over formatterOf, so only a hand-built conf reaches its own.
 export function resolveFormatter(conf: LogConf): EntryFormatter {
-	return formatFunctions.get(conf) ?? conf.entryFormatter ?? formatterOf(conf);
+	return conf.entryFormatter ?? formatterOf(conf);
 }
 
 // --- Trace ids and traceparent ---------------------------------------------
@@ -288,7 +288,7 @@ export type OtlpAttribute = {
 	}
 };
 
-type OtlpScope = { name: string, version?: string };
+export type OtlpScope = { name: string, version?: string };
 
 export type OtlpLogPayload = {
 	resourceLogs: {
@@ -351,7 +351,7 @@ export type OtlpPayload = PayloadByKind[OtlpKind];
 const PAYLOAD_KEYS: { [K in OtlpKind]: keyof PayloadByKind[K] } = { logs: "resourceLogs", traces: "resourceSpans" };
 
 // OTel's instrumentation scope names the instrumenting library.
-const SCOPE: OtlpScope = { name: "@larvit/log", version: "__version__" };
+const SCOPE = { name: "@larvit/log", version: "__version__" } as const satisfies OtlpScope;
 
 // OTLP's Span.SpanKind and Status.StatusCode enum values.
 const SPAN_KIND_INTERNAL = 1;
@@ -391,8 +391,8 @@ function buildResourceAttributes(attributes: Metadata): OtlpAttribute[] {
 	return [
 		{ key: "service.name", value: { stringValue: String(attributes["service.name"] || "unnamed-service") } },
 		{ key: "telemetry.sdk.language", value: { stringValue: "ecmascript" } },
-		{ key: "telemetry.sdk.name", value: { stringValue: "@larvit/log" } },
-		{ key: "telemetry.sdk.version", value: { stringValue: "__version__" } },
+		{ key: "telemetry.sdk.name", value: { stringValue: SCOPE.name } },
+		{ key: "telemetry.sdk.version", value: { stringValue: SCOPE.version } },
 	];
 }
 
@@ -919,57 +919,47 @@ function otlpPath(payload: OtlpPayload): string {
 	return byKind(payload, { logs: () => "/v1/logs", traces: () => "/v1/traces" });
 }
 
+// Items sharing a key become one, in first-seen order.
+function groupBy<T>(items: T[], keyOf: (item: T) => string, join: (group: T[]) => T): T[] {
+	const groups = new Map<string, T[]>();
+
+	for (const item of items) {
+		const key = keyOf(item);
+		const group = groups.get(key);
+
+		if (group) {
+			group.push(item);
+		} else {
+			groups.set(key, [item]);
+		}
+	}
+
+	return [...groups.values()].map(join);
+}
+
+const resourceKey = (entry: { resource: unknown }) => JSON.stringify(entry.resource);
+
 // A payload stored by v2.4.0 or earlier carries no scope on its logs, and its span name as its spans' scope.
-function sameScope(left: OtlpScope | undefined, right: OtlpScope | undefined): boolean {
-	return left?.name === right?.name && left?.version === right?.version;
-}
+const scopeKey = (entry: { scope?: OtlpScope }) => JSON.stringify([entry.scope?.name, entry.scope?.version]);
 
-// Records under one resource share a resourceLogs entry, and one scopeLogs entry per scope.
+// One resourceLogs entry per resource, and in it one scopeLogs entry per scope.
 function mergeLogPayloads(payloads: OtlpLogPayload[]): OtlpLogPayload {
-	const byResource = new Map<string, OtlpLogPayload["resourceLogs"][number]>();
-
-	for (const entry of payloads.flatMap(payload => payload.resourceLogs)) {
-		const key = JSON.stringify(entry.resource);
-		const merged = byResource.get(key) ?? { resource: entry.resource, scopeLogs: [] };
-
-		byResource.set(key, merged);
-
-		for (const scopeLog of entry.scopeLogs) {
-			const scope = merged.scopeLogs.find(candidate => sameScope(candidate.scope, scopeLog.scope));
-
-			if (scope) {
-				scope.logRecords.push(...scopeLog.logRecords);
-			} else {
-				merged.scopeLogs.push({ ...scopeLog, logRecords: [...scopeLog.logRecords] });
-			}
-		}
-	}
-
-	return { resourceLogs: [...byResource.values()] };
+	return {
+		resourceLogs: groupBy(payloads.flatMap(payload => payload.resourceLogs), resourceKey, resources => ({
+			...resources[0],
+			scopeLogs: groupBy(resources.flatMap(entry => entry.scopeLogs), scopeKey, scopes => ({ ...scopes[0], logRecords: scopes.flatMap(entry => entry.logRecords) })),
+		})),
+	};
 }
 
-// Spans under one resource share a resourceSpans entry, and one scopeSpans entry per scope.
+// One resourceSpans entry per resource, and in it one scopeSpans entry per scope.
 function mergeSpanPayloads(payloads: OtlpSpanPayload[]): OtlpSpanPayload {
-	const byResource = new Map<string, OtlpSpanPayload["resourceSpans"][number]>();
-
-	for (const entry of payloads.flatMap(payload => payload.resourceSpans)) {
-		const key = JSON.stringify(entry.resource);
-		const merged = byResource.get(key) ?? { resource: entry.resource, scopeSpans: [] };
-
-		byResource.set(key, merged);
-
-		for (const scopeSpan of entry.scopeSpans) {
-			const scope = merged.scopeSpans.find(candidate => sameScope(candidate.scope, scopeSpan.scope));
-
-			if (scope) {
-				scope.spans.push(...scopeSpan.spans);
-			} else {
-				merged.scopeSpans.push({ scope: scopeSpan.scope, spans: [...scopeSpan.spans] });
-			}
-		}
-	}
-
-	return { resourceSpans: [...byResource.values()] };
+	return {
+		resourceSpans: groupBy(payloads.flatMap(payload => payload.resourceSpans), resourceKey, resources => ({
+			...resources[0],
+			scopeSpans: groupBy(resources.flatMap(entry => entry.scopeSpans), scopeKey, scopes => ({ ...scopes[0], spans: scopes.flatMap(entry => entry.spans) })),
+		})),
+	};
 }
 
 // A batch holds one kind, so the first payload decides.
