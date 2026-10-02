@@ -25,8 +25,9 @@ Valid while a queue owns the transport.
 2026-09-17, the maintainer: `colors` precedence is code, then `NO_COLOR`, then `FORCE_COLOR`, then
 the default. The default stays on through 2.x: a terminal is a new user's first sight of the
 library, and a minor never changes output for a consumer whose env says nothing. Following the TTY
-is a 3.0.0 change (`todo.md` item 65); Rails' always-on `colorize_logging` is the precedent for what unconditional
-colour costs log pipelines. Serves README → Goals #4 and #5. Valid while text is the default format.
+is a 3.0.0 change (`todo.md` item 65); Rails' always-on `colorize_logging` is the precedent for what
+unconditional colour costs log pipelines. Serves README → Goals #4 and #5. Valid while text is the
+default format.
 
 ## `Log` and `Queue` each own a `clock`
 
@@ -87,11 +88,9 @@ forbids it and a server splits on the first one, so there is no reading to salva
 without `//` parses to an opaque path, where the userinfo stays in `pathname` and the
 credential-free url cannot be built from its parts. `btoa` is assumed present beside `TextEncoder`,
 on the same floor as "`ProtoWriter.string` uses `TextEncoder` with no fallback": Hermes added both
-(facebook/hermes#1178) and React Native has shipped them since 0.74. Both credential spellings stand
-meanwhile: a collector vendor hands `user:pass@` over as one string, and dropping it in a minor
-would break those consumers, as "Both credential spellings stay, and their combination warns"
-settles.
-Serves README → Goals #1 and #3. Valid while a queue owns the transport.
+(facebook/hermes#1178) and React Native has shipped them since 0.74. Both spellings stand per "Both
+credential spellings stay, and their combination warns". Serves README → Goals #1 and #3. Valid
+while a queue owns the transport.
 
 ## `log.fetch` traces only `http:` and `https:` urls
 
@@ -233,14 +232,13 @@ default and warns.
 
 2026-09-27, the implementing agent: the default `Queue` a `Log` builds from the `otlp*` shorthand
 lives in `conf.otlpQueue`, beside the shorthand it was built from. A `parentLog` is any `LogInt`,
-whose `conf` holds every setting a child reads from it, so only there does the queue share
-through a wrapper; and 3.0.0's plan (`todo.md` item 74) makes `conf.otlpQueue` the one OTLP spelling, so moving it off
-`conf` now would move it back then. Only a queue this library built may sit beside the
+whose `conf` holds every setting a child reads from it, so only there does the queue share through a
+wrapper; and 3.0.0's plan (`todo.md` item 74) makes `conf.otlpQueue` the one OTLP spelling, so
+moving it off `conf` now would move it back then. Only a queue this library built may sit beside the
 shorthand, and only beside exactly the shorthand it was built from; a queue the consumer built is
-rejected beside any shorthand, even an identical one. It leaves `JSON.stringify(log.conf)`
-circular, which "A stringified `Queue` carries its `conf`" fixes on the `Queue`, which stays
-readable on `conf`. Serves
-README → Goals #6. Valid until 3.0.0 clears the shorthand from `conf`.
+rejected beside any shorthand, even an identical one. It leaves `JSON.stringify(log.conf)` circular.
+"A stringified `Queue` carries its `conf`" fixes that on the `Queue`, so the queue can stay on
+`conf`. Serves README → Goals #6. Valid until 3.0.0 clears the shorthand from `conf`.
 
 ## A v2.3.0 copy's child loses a function formatter
 
@@ -268,9 +266,9 @@ it: what it holds reaches nothing but the queue it restores, and a browser's `lo
 the origin's session tokens. That is data the app never handed this library as configuration; a
 credential in `conf` is one the app wrote there itself. Credentials in that `conf` stringify as
 written, as `log.conf`'s own `otlp*` keys beside a queue built from them already do: README →
-Credentials in a captured value stops at what this library emits, and redacting in a `toJSON`
-would be a second spelling of `todo.md` item 75, keeping credentials off `conf`. Serves README → Goals
-#3. Valid until 3.0.0 keeps credentials off `log.conf` and `queue.conf`.
+Credentials in a captured value stops at what this library emits, and redacting in a `toJSON` would
+be a second spelling of `todo.md` item 75, which keeps credentials off `conf` from 3.0.0. Serves
+README → Goals #3. Valid until 3.0.0 keeps credentials off `log.conf` and `queue.conf`.
 
 ## An `Authorization` over plain `http:` warns once
 
@@ -290,9 +288,9 @@ not all known.
 ## `resolveFormatter` is exported
 
 2026-09-28, the maintainer: the resolver from a conf to the `EntryFormatter` it writes with is
-exported (`todo.md` item 1), so a library author handed a conf renders a line the way the instance does once 3.0.0
-takes `conf.entryFormatter` away. Serves README → Goals #5 and Audience #2; an export is a minor
-under #4.
+exported (`todo.md` item 1), so a library author handed a conf renders a line the way the instance
+does once 3.0.0 takes `conf.entryFormatter` away. Serves README → Goals #5 and Audience #2; an
+export is a minor under #4.
 
 ## Both credential spellings stay, and their combination warns
 
@@ -300,8 +298,9 @@ under #4.
 Authorization }` both stay: a vendor hands the endpoint over as one `https://id:token@host` string,
 the only shape one env var carries, and a bearer token has no userinfo spelling. The two can
 disagree, so setting both warns once per `report` sink in 2.x (`todo.md` item 6) and throws in the
-constructor from 3.0.0 (`todo.md` item 76), checked when the queue is built — a header added later is not rechecked; v2.4.0 documents the
-header winning, so rejecting it sooner would spend README → Goals #4. Serves README → Goals #5.
+constructor from 3.0.0 (`todo.md` item 76), checked when the queue is built — a header added later
+is not rechecked; v2.4.0 documents the header winning, so rejecting it sooner would spend README →
+Goals #4. Serves README → Goals #5.
 
 ## Inherited `otlpAdditionalHeaders` follow the endpoint's origin
 
@@ -333,10 +332,11 @@ instruments, temporality conversion and periodic collection stay out. Serves REA
 
 2026-09-17, the maintainer: `new TextEncoder()` in `ProtoWriter.string` has no fallback. Hermes has
 had the global since React Native 0.74 (Expo SDK 51 changelog, 2024-05-07), and every supported
-React Native is newer. Serves README → Goals #7. Valid while README → Audience's runtimes all have
+React Native has it. Serves README → Goals #7. Valid while README → Audience → Runtimes requires
 `TextEncoder`.
 
 ## The protobuf encoder stays
 
 2026-09-16, the maintainer: the protobuf encoder stays. Collectors that reject JSON are real, and
-the whole file is 4.7 KB gzipped. Serves README → Goals #1. Valid while it fits README → Footprint.
+the published `index.js`, encoder included, was 4.7 KB gzipped then. Serves README → Goals #2.
+Valid while `index.js` stays within README → Footprint.
