@@ -198,6 +198,11 @@ function formatterOf(conf: LogConf): EntryFormatter {
 	return formatFunctions.get(conf) ?? (conf.format === "json" ? msgJsonFormatter : msgTextFormatter);
 }
 
+// A Log's conf.entryFormatter is a getter over formatterOf, so only a hand-built conf reaches its own.
+export function resolveFormatter(conf: LogConf): EntryFormatter {
+	return formatFunctions.get(conf) ?? conf.entryFormatter ?? formatterOf(conf);
+}
+
 // --- Trace ids and traceparent ---------------------------------------------
 
 function bytesToHex(bytes: Uint8Array): string {
@@ -283,6 +288,8 @@ export type OtlpAttribute = {
 	}
 };
 
+type OtlpScope = { name: string, version?: string };
+
 export type OtlpLogPayload = {
 	resourceLogs: {
 		resource: {
@@ -300,6 +307,7 @@ export type OtlpLogPayload = {
 				timeUnixNano: string,
 				traceId?: string,
 			}[],
+			scope?: OtlpScope,
 		}[],
 	}[],
 };
@@ -328,9 +336,7 @@ export type OtlpSpanPayload = {
 			droppedAttributesCount: number,
 		},
 		scopeSpans: {
-			scope: {
-				name: string,
-			},
+			scope: OtlpScope,
 			spans: OtlpSpan[],
 		}[],
 	}[],
@@ -343,6 +349,9 @@ type OtlpKind = keyof PayloadByKind;
 export type OtlpPayload = PayloadByKind[OtlpKind];
 
 const PAYLOAD_KEYS: { [K in OtlpKind]: keyof PayloadByKind[K] } = { logs: "resourceLogs", traces: "resourceSpans" };
+
+// OTel's instrumentation scope names the instrumenting library.
+const SCOPE: OtlpScope = { name: "@larvit/log", version: "__version__" };
 
 // OTLP's Span.SpanKind and Status.StatusCode enum values.
 const SPAN_KIND_INTERNAL = 1;
@@ -416,6 +425,7 @@ function buildLogPayload(opts: {
 					timeUnixNano: getNsTimestamp(msTimestamp),
 					traceId: span.traceId,
 				}],
+				scope: { ...SCOPE },
 			}],
 		}],
 	};
@@ -446,7 +456,7 @@ function buildSpanPayload(opts: {
 				droppedAttributesCount: 0,
 			},
 			scopeSpans: [{
-				scope: { name: span.name },
+				scope: { ...SCOPE },
 				spans: [span],
 			}],
 		}],
@@ -552,6 +562,16 @@ function writeKeyValue(writer: ProtoWriter, attr: OtlpAttribute): void {
 	writer.message(2, value => value.string(1, attr.value.stringValue));
 }
 
+// InstrumentationScope { name = 1, version = 2 }
+function writeScope(writer: ProtoWriter, scope: OtlpScope | undefined): void {
+	if (scope) {
+		writer.message(1, scopeMsg => { // ScopeLogs.scope = 1, ScopeSpans.scope = 1
+			scopeMsg.string(1, scope.name);
+			if (scope.version !== undefined) scopeMsg.string(2, scope.version);
+		});
+	}
+}
+
 // Resource / Span / LogRecord attributes are all repeated KeyValue.
 function writeAttributes(writer: ProtoWriter, fieldNo: number, attributes: OtlpAttribute[]): void {
 	for (const attr of attributes) {
@@ -567,6 +587,7 @@ function encodeOtlpLogPayload(payload: OtlpLogPayload): Uint8Array<ArrayBuffer> 
 			resLogs.message(1, resource => writeAttributes(resource, 1, resourceLog.resource.attributes)); // ResourceLogs.resource = 1
 			for (const scopeLog of resourceLog.scopeLogs) {
 				resLogs.message(2, scopeMsg => { // ResourceLogs.scope_logs = 2
+					writeScope(scopeMsg, scopeLog.scope);
 					for (const record of scopeLog.logRecords) {
 						scopeMsg.message(2, logRec => { // ScopeLogs.log_records = 2
 							logRec.fixed64(1, record.timeUnixNano); // time_unix_nano = 1
@@ -594,7 +615,7 @@ function encodeOtlpSpanPayload(payload: OtlpSpanPayload): Uint8Array<ArrayBuffer
 			resSpans.message(1, resource => writeAttributes(resource, 1, resourceSpan.resource.attributes)); // ResourceSpans.resource = 1
 			for (const scopeSpan of resourceSpan.scopeSpans) {
 				resSpans.message(2, scopeMsg => { // ResourceSpans.scope_spans = 2
-					scopeMsg.message(1, scope => scope.string(1, scopeSpan.scope.name)); // ScopeSpans.scope = 1 (InstrumentationScope.name = 1)
+					writeScope(scopeMsg, scopeSpan.scope);
 					for (const span of scopeSpan.spans) {
 						scopeMsg.message(2, spanMsg => { // ScopeSpans.spans = 2
 							spanMsg.bytes(1, hexToBytes(span.traceId)); // trace_id = 1
@@ -898,26 +919,36 @@ function otlpPath(payload: OtlpPayload): string {
 	return byKind(payload, { logs: () => "/v1/logs", traces: () => "/v1/traces" });
 }
 
-// Records under one resource share a resourceLogs entry and its single scopeLogs entry.
+// A payload stored by v2.4.0 or earlier carries no scope on its logs, and its span name as its spans' scope.
+function sameScope(left: OtlpScope | undefined, right: OtlpScope | undefined): boolean {
+	return left?.name === right?.name && left?.version === right?.version;
+}
+
+// Records under one resource share a resourceLogs entry, and one scopeLogs entry per scope.
 function mergeLogPayloads(payloads: OtlpLogPayload[]): OtlpLogPayload {
 	const byResource = new Map<string, OtlpLogPayload["resourceLogs"][number]>();
 
 	for (const entry of payloads.flatMap(payload => payload.resourceLogs)) {
 		const key = JSON.stringify(entry.resource);
-		const records = entry.scopeLogs.flatMap(scopeLog => scopeLog.logRecords);
-		const merged = byResource.get(key);
+		const merged = byResource.get(key) ?? { resource: entry.resource, scopeLogs: [] };
 
-		if (merged) {
-			merged.scopeLogs[0].logRecords.push(...records);
-		} else {
-			byResource.set(key, { resource: entry.resource, scopeLogs: [{ logRecords: records }] });
+		byResource.set(key, merged);
+
+		for (const scopeLog of entry.scopeLogs) {
+			const scope = merged.scopeLogs.find(candidate => sameScope(candidate.scope, scopeLog.scope));
+
+			if (scope) {
+				scope.logRecords.push(...scopeLog.logRecords);
+			} else {
+				merged.scopeLogs.push({ ...scopeLog, logRecords: [...scopeLog.logRecords] });
+			}
 		}
 	}
 
 	return { resourceLogs: [...byResource.values()] };
 }
 
-// Spans under one resource share a resourceSpans entry, and one scopeSpans entry per scope name.
+// Spans under one resource share a resourceSpans entry, and one scopeSpans entry per scope.
 function mergeSpanPayloads(payloads: OtlpSpanPayload[]): OtlpSpanPayload {
 	const byResource = new Map<string, OtlpSpanPayload["resourceSpans"][number]>();
 
@@ -928,7 +959,7 @@ function mergeSpanPayloads(payloads: OtlpSpanPayload[]): OtlpSpanPayload {
 		byResource.set(key, merged);
 
 		for (const scopeSpan of entry.scopeSpans) {
-			const scope = merged.scopeSpans.find(candidate => candidate.scope.name === scopeSpan.scope.name);
+			const scope = merged.scopeSpans.find(candidate => sameScope(candidate.scope, scopeSpan.scope));
 
 			if (scope) {
 				scope.spans.push(...scopeSpan.spans);
@@ -953,6 +984,10 @@ function mergePayloads(payloads: OtlpPayload[]): OtlpPayload {
 
 // Read live, so a rotated otlpAdditionalHeaders reaches the next send; report is the caller's guarded one.
 type SenderConf = Pick<ResolvedQueueConf, "acceptPlainHttpAuthorization" | "clock" | "otlpAdditionalHeaders" | "otlpHttpBaseURI" | "otlpProtocol">;
+
+function setsAuthorization(headers: Record<string, string> | undefined): boolean {
+	return Object.keys(headers ?? {}).some(name => name.toLowerCase() === "authorization");
+}
 
 class OtlpSender {
 	private readonly conf: SenderConf;
@@ -992,6 +1027,10 @@ class OtlpSender {
 
 		if (auth) {
 			this.headers.set("Authorization", auth);
+
+			if (setsAuthorization(conf.otlpAdditionalHeaders)) {
+				warn("@larvit/log: otlpHttpBaseURI carries user:pass@ and otlpAdditionalHeaders sets Authorization, so the header is sent and the userinfo is not; set one of them, as 3.0.0 throws on both");
+			}
 		}
 
 		// URL has already canonicalised an IPv4 host, so 127.1 reads 127.0.0.1 here.
@@ -1023,7 +1062,7 @@ class OtlpSender {
 		}
 
 		if (this.plainHttpHost !== undefined && headers.has("Authorization")) {
-			const source = Object.keys(this.conf.otlpAdditionalHeaders ?? {}).some(name => name.toLowerCase() === "authorization") ? "otlpAdditionalHeaders" : "user:pass@ in otlpHttpBaseURI";
+			const source = setsAuthorization(this.conf.otlpAdditionalHeaders) ? "otlpAdditionalHeaders" : "user:pass@ in otlpHttpBaseURI";
 
 			this.warn(`@larvit/log: an Authorization header from ${source} goes over plain http: to ${this.plainHttpHost}, readable by anything on the network path; use an https: endpoint, or on a network you trust set acceptPlainHttpAuthorization: true on the Queue`);
 		}
@@ -1055,7 +1094,12 @@ class OtlpSender {
 			});
 
 			if (!res.ok) {
-				return { message: "Non-ok return status", retry: res.status === 408 || res.status === 429 || res.status >= 500, status: res.status };
+				return {
+					message: "Non-ok return status",
+					...res.status === 401 || res.status === 403 ? { reportAs: "OTLP export unauthorized, batch dropped" } : {},
+					retry: res.status === 408 || res.status === 429 || res.status >= 500,
+					status: res.status,
+				};
 			}
 
 			// Protobuf responses are binary; only the JSON transport reads the body, for a partialSuccess.
@@ -1773,6 +1817,33 @@ function exportSpan(log: Pick<Log, "conf" | "sampled">, span: OtlpSpan, attribut
 
 // --- log.fetch -------------------------------------------------------------
 
+// An invalid name makes headers.get throw, which must never cost the platform's result.
+function captureHeaders(log: Pick<Log, "conf" | "context">, option: "captureRequestHeaders" | "captureResponseHeaders", headers: Headers, attributes: Metadata): void {
+	const prefix = option === "captureRequestHeaders" ? "http.request.header." : "http.response.header.";
+
+	for (const name of log.conf[option] ?? []) {
+		let value: string | null;
+
+		try {
+			value = headers.get(name);
+		} catch {
+			try {
+				warnOnce(log.conf, log.context, `@larvit/log: ${option} holds ${JSON.stringify(name)}, which is no valid header name, so log.fetch skips it`);
+			} catch {
+				// A stderr that throws costs the warning.
+			}
+
+			continue;
+		}
+
+		const key = name.toLowerCase();
+
+		if (value !== null) {
+			attributes[prefix + key] = redactHeaderCredential(key, value);
+		}
+	}
+}
+
 // A throwing clock or queue costs the span, never the platform's result.
 async function tracedFetch(log: Pick<Log, "conf" | "context" | "sampled" | "span">, url: URL, init: RequestInit | undefined): Promise<Response> {
 	let span: OtlpSpan;
@@ -1803,28 +1874,14 @@ async function tracedFetch(log: Pick<Log, "conf" | "context" | "sampled" | "span
 			headers.set("traceparent", formatTraceparent(span.traceId, span.spanId, log.sampled));
 		}
 
-		for (const name of log.conf.captureRequestHeaders ?? []) {
-			const value = headers.get(name);
-			const key = name.toLowerCase();
-
-			if (value !== null) {
-				attributes[`http.request.header.${key}`] = redactHeaderCredential(key, value);
-			}
-		}
+		captureHeaders(log, "captureRequestHeaders", headers, attributes);
 
 		const res = await globalThis.fetch(url, { ...init, headers });
 
 		attributes["http.response.status_code"] = res.status;
 		span.status.code = res.status >= 400 ? STATUS_CODE_ERROR : STATUS_CODE_UNSET;
 
-		for (const name of log.conf.captureResponseHeaders ?? []) {
-			const value = res.headers.get(name);
-			const key = name.toLowerCase();
-
-			if (value !== null) {
-				attributes[`http.response.header.${key}`] = redactHeaderCredential(key, value);
-			}
-		}
+		captureHeaders(log, "captureResponseHeaders", res.headers, attributes);
 
 		return res;
 	} catch (err) {

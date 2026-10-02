@@ -288,16 +288,16 @@ not all known.
 ## `resolveFormatter` is exported
 
 2026-09-28, the maintainer: the resolver from a conf to the `EntryFormatter` it writes with is
-exported (`todo.md` item 1), so a library author handed a conf renders a line the way the instance
-does once 3.0.0 takes `conf.entryFormatter` away. Serves README → Goals #5 and Audience #2; an
-export is a minor under #4.
+exported, so a library author handed a conf renders a line the way the instance does once 3.0.0
+takes `conf.entryFormatter` away. Serves README → Goals #5 and Audience #2; an export is a minor
+under #4.
 
 ## Both credential spellings stay, and their combination warns
 
 2026-09-28, the maintainer: `user:pass@` in `otlpHttpBaseURI` and `otlpAdditionalHeaders: {
 Authorization }` both stay: a vendor hands the endpoint over as one `https://id:token@host` string,
 the only shape one env var carries, and a bearer token has no userinfo spelling. The two can
-disagree, so setting both warns once per `report` sink in 2.x (`todo.md` item 6) and throws in the
+disagree, so setting both warns once per `report` sink in 2.x and throws in the
 constructor from 3.0.0 (`todo.md` item 76), checked when the queue is built — a header added later
 is not rechecked; v2.4.0 documents the header winning, so rejecting it sooner would spend README →
 Goals #4. Serves README → Goals #5.
