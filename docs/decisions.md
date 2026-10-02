@@ -70,8 +70,10 @@ breaks the once-only rule. An unknown `logLevel` is keyed on its raw value, so o
 `enabled` call builds its text. Every such line opens with `@larvit/log: `, part of that literal, so
 an app developer can tell which dependency emitted one about code they may not own. A `Queue`'s
 failure lines through `report` carry no prefix, since they report that developer's own setup; its
-plain-`http:` `Authorization` warning is a warning, and keeps it. Serves README → Goals #5. Valid
-while this library writes its own warnings to a `stderr` sink.
+plain-`http:` `Authorization` warning is a warning, and keeps it. Serves README → Goals #5. Writing
+to `stderr` works against `~/.claude/principles/logging.md` → Infrastructure until `todo.md` item 50
+settles where this library's own lines go. Valid while this library writes its own warnings to a
+`stderr` sink.
 
 ## `otlpHttpBaseURI` userinfo becomes an `Authorization: Basic` header
 
@@ -282,8 +284,9 @@ in-cluster `http:` collector, a deliberate and common setup. 2026-09-30, the mai
 given `acceptPlainHttpAuthorization: true` does not warn, the opt-out for a network the consumer
 trusts; it sits on the queue alone, which owns the endpoint. Only `Authorization` is checked;
 other credential headers are left as they are. Serves README → Goals #3,
-"Credentials never leave", on the wire, without spending #4. No expiry: the setups it serves are
-not all known.
+"Credentials never leave", on the wire, without spending #4. Its `stderr` route stands until
+`todo.md` item 50 settles where this library's own lines go. No expiry otherwise: the setups it
+serves are not all known.
 
 ## `resolveFormatter` is exported
 
