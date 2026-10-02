@@ -387,7 +387,7 @@ function buildResourceAttributes(attributes: Metadata): OtlpAttribute[] {
 	];
 }
 
-// Unredacted, per README → Goals #3: the message, metadata and context are the caller's own text.
+// Unredacted, per README → Credentials in a captured value: the message, metadata and context are the caller's own text.
 function buildLogPayload(opts: {
 	attributes: Metadata,
 	logLevel: LogLevel,
@@ -421,8 +421,8 @@ function buildLogPayload(opts: {
 }
 
 // Not pure: writes the resolved attributes onto `span` before returning its payload.
-// Unredacted: callers redact what they capture into `attributes`, and per README → Goals #3 the
-// context and span name go as written.
+// Unredacted: callers redact what they capture into `attributes`, and per README → Credentials in a captured value
+// the context and span name go as written.
 function buildSpanPayload(opts: {
 	attributes: Metadata,
 	span: OtlpSpan,
@@ -1567,7 +1567,7 @@ function rejectQueueBesideShorthand(conf: LogSettings): void {
 	}
 }
 
-// One descriptor for every instance: Goals #7's 1 KB budget.
+// One descriptor for every instance: README → Footprint's 1 KB budget.
 const ENTRY_FORMATTER_ALIAS: PropertyDescriptor = {
 	configurable: true,
 	// So a spread never hands the alias back as an option the caller wrote.

@@ -35,14 +35,15 @@ In priority order; the earlier goal wins a tie.
 1. **Runs everywhere.** Node, Bun, Deno, browsers and React Native.
    1. **Behaves the same everywhere,** except where a runtime genuinely differs: then the platform
       wins and the docs say so.
-2. **Correct OTLP, or none at all.**
-3. **Credentials never leave.**
-4. **Semver, read strictly.**
+2. **Correct OTLP.** Leave out what cannot be done to the spec.
+3. **[Credentials never leave](#credentials-in-a-captured-value) in what this library captures.**
+   Text you log is exported as written.
+4. **[Semver, read strictly](#audience).**
 5. **A very easy API.** Nobody learns OTLP to log.
 6. **Composable.** Instances nest, inherit, and attach to an upstream trace.
-7. **Low footprint.**
+7. **[Low footprint](#footprint).**
    1. **Never holds a process open** past the work the app asked for.
-8. **A maintainer can hold it.**
+8. **A maintainer can hold it in their head.**
 
 ## Audience
 
@@ -77,9 +78,10 @@ early in a worse one. Only a major changes:
 - the keys a type you implement is handed or must provide: removing one it is handed, widening
   what one holds, or adding to what it must provide.
 
-**Do not rely on** what the README does not document — an undocumented key of a `conf`,
-enumerability, what a spread or `JSON.stringify` of one carries — which may change in a minor. Nor
-on the text output line, which is written for people to read — parse `format: "json"` instead. Nor
+**Do not rely on** anything this README does not document, which may change in a minor: an
+undocumented key of a `conf`, enumerability, or what a spread or `JSON.stringify` of a `conf`
+carries. Nor on a goal: each is an aim, and the section meeting it says what holds today. Nor on
+the text output line, which is written for people to read — parse `format: "json"` instead. Nor
 on delivery: the export queue is best-effort, it keeps what `storage` accepted and drops the oldest
 past `maxItems`, keeping a batch it has promised to retry, because telemetry is not payload data. A
 major stops being maintained when the next one ships.
@@ -272,7 +274,9 @@ A send has a 3 s timeout. Any 2xx is success; a JSON response whose `partialSucc
 count is reported with the count and the collector's message, and the batch is not resent. A
 network error, timeout, 408, 429 or 5xx keeps the batch for retry; any other non-2xx drops it. A
 retry timer never keeps a Node or Deno process alive, so a script whose first attempt fails loses
-the batch at exit, `await end()` or not; give the queue a `storage` to carry it into the next run.
+the batch at exit, `await end()` or not; until 2.5.0 a pending batch timer does, for up to
+`batchDelayMs`, so `await end()` in a short-lived script. Give the queue a `storage` to carry a
+failed batch into the next run.
 
 `flush()` on `Log` or `Queue` sends everything queued, one attempt per batch, and resolves when that
 round is done. A failed batch stays queued for the retry, and until that fires `flush()` attempts
@@ -365,15 +369,16 @@ keeps it native. Levels map to OTLP severity through the exported `LogLevels` ta
 
 ## `log.fetch` in depth
 
-**`log.fetch` mirrors the runtime's `fetch`** ([Goals #1.1 and #5](#goals)). It accepts what that
-`fetch` accepts, and the response, the rejection and the promise you see are exactly what it
+**`log.fetch` mirrors the runtime's `fetch`** ([Goals #1.1 and #5](#goals)). It takes a `string` or
+`URL` and any `init` that `fetch` takes, and the response, the rejection and the promise you see are exactly what it
 produced. What it adds is outbound trace context and a span, and never a success the platform would
 have refused. The request differs from yours only by `traceparent`, which is not CORS-safelisted,
-so a cross-origin call is preflighted and needs the server to allow that header. An option it
+so a cross-origin call is preflighted and needs the server to list it in
+`Access-Control-Allow-Headers`. An option it
 cannot apply, such as an invalid header name to capture, warns once and is skipped, never changing
 the call.
 
-Input is a `string` or `URL`; a `Request` is not supported. Only a URL that resolves to `http:` or
+Only a URL that resolves to `http:` or
 `https:` is traced — a relative one resolves against the page, so it is untraced where there is no
 page, as on a server, and where the page is not `http:`/`https:`, as under a `file:` or app-scheme
 origin. Anything else passes straight through to an untraced `fetch`: no span, and no
@@ -399,9 +404,9 @@ them per call site.
 
 ### Credentials in a captured value
 
-A credential ([Goals #3](#goals)) is what the runtime's `URL` parses as userinfo — in a url, or in a
-captured header value or status message it parses whole — and the header names and query keys
-matched below. Anything else, and text you log yourself, is exported as written.
+[Goals #3](#goals) covers userinfo, wherever the runtime's `URL` parses a url, or a whole captured
+header value or status message, and the values of the header names and query keys matched below.
+Anything else is exported as written, text you log yourself included.
 
 - **A header, whatever you list it for,** whose name, in any casing, is `cookie`, `passwd`,
   `password`, `pwd`, `secret` or `set-cookie`, ends in `key`, or holds `auth`, `card`, `credit`,
