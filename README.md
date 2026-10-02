@@ -376,8 +376,9 @@ keeps it native. Levels map to OTLP severity through the exported `LogLevels` ta
 runtime produced. What it adds is outbound trace context and a span, and never a success the
 platform would have refused. The request differs from yours only by `traceparent`, which is not
 CORS-safelisted, so a cross-origin call is preflighted and needs the server to list it in
-`Access-Control-Allow-Headers`. Pass `init` as a plain object: a `Request` there loses its method,
-body and headers. List only valid header names to capture: an invalid one rejects the call.
+`Access-Control-Allow-Headers`. Pass `init` as a plain object: a `Request` there keeps only its
+headers; its method, body, signal and every other setting are dropped, though the span still names
+its method. List only valid header names to capture: an invalid one rejects the call.
 
 Only a URL that resolves to `http:` or `https:` is traced — a relative one resolves against the page, so it is untraced where there is no
 page, as on a server, and where the page is not `http:`/`https:`, as under a `file:` or app-scheme
@@ -404,9 +405,9 @@ them per call site.
 
 ### Credentials in a captured value
 
-[Goals #3](#goals) covers userinfo in a url, a captured header value or a status message, wherever
-the runtime's `URL` parses that value whole, and the values of the header names and query keys
-matched below.
+Redaction covers userinfo in a url, a captured header value or a status message, wherever the
+runtime's `URL` parses that value whole, and the values of the header names and query keys matched
+below.
 Anything else is exported as written, text you log yourself included.
 
 - **A header, whatever you list it for,** whose name, in any casing, is `cookie`, `passwd`,

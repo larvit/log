@@ -15,11 +15,11 @@ mechanism, that is evidence of the problem, never the prescribed repair.
   drops README → `log.fetch` in depth's "List only valid header names" sentence. `headers.get("x
   y")` throws a `TypeError`, so a bad request-side name rejects every traced call before the request
   goes out, and a bad response-side one turns a response the platform delivered into a rejection.
-- [ ] **Send a `Request` passed as `init` with its own method, body and headers.** Landing it drops
-  README → `log.fetch` in depth's "Pass `init` as a plain object" sentence. `fetch(url, request)` is
-  valid and TypeScript accepts it, but `{ ...init, headers }` copies own properties only, and a
-  `Request`'s are prototype getters: `log.fetch(url, new Request(url, { method: "POST", body }))`
-  sends a GET with no body. A `Request` as the *input* is 2.6.0's item.
+- [ ] **Send a `Request` passed as `init` with its own method, body, signal and other settings.**
+  Landing it drops README → `log.fetch` in depth's "Pass `init` as a plain object" sentence.
+  `fetch(url, request)` is valid and TypeScript accepts it, but `{ ...init, headers }` copies own
+  properties only, and a `Request`'s are prototype getters: `log.fetch(url, new Request(url, {
+  method: "POST", body }))` sends a GET with no body. A `Request` as the *input* is 2.6.0's item.
 - [ ] **Report a 401 or 403 export as `OTLP export unauthorized, batch dropped`.** Working auth
   makes a wrong credential reachable for the first time, and it is the likeliest misconfiguration of
   `otlpHttpBaseURI` userinfo; today it reads as any other 4xx.
