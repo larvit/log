@@ -111,7 +111,8 @@ log.silly("Open the flood gates!"); // stdout
 ```
 
 Levels, most to least severe: `error`, `warn`, `info`, `verbose`, `debug`, `silly`. `"none"` outputs
-nothing but this library's own `@larvit/log:` warnings, which no `logLevel` silences.
+nothing but this library's own lines, which no `logLevel` silences: its `@larvit/log:` warnings and,
+with `otlpHttpBaseURI`, the export queue's failure reports.
 
 Keep the message a static string and put every value in the metadata object, so entries with the
 same message aggregate in your log backend:
@@ -254,8 +255,8 @@ header, or in `otlpAdditionalHeaders` as a token of your own. Set one: setting b
 writes one `@larvit/log:` line, and throws from 3.0.0. Over
 plain `http:` either one is readable by anything on the network path, so use `https:` unless the
 collector is local or on a network you trust. Either one sent over `http:` to a host other than
-`localhost`, `127.0.0.0/8` or `::1` writes one `@larvit/log:` line per `report` function, host and
-credential source, naming the host, and still sends. On a network you trust, pass
+`localhost`, `127.0.0.0/8` or `::1` writes one `@larvit/log:` line per `report` function, or per
+`stderr` for a queue a `Log` built, host and credential source, naming the host, and still sends. On a network you trust, pass
 `acceptPlainHttpAuthorization: true` to the `Queue`; a `Log` using `otlpHttpBaseURI` moves its
 `otlp*` options to `otlpQueue: new Queue({ acceptPlainHttpAuthorization: true, otlpHttpBaseURI })`,
 whose report lines then go to that queue's `report`, `console.error` unless you pass one.

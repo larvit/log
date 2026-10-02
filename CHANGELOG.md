@@ -20,7 +20,7 @@
   original value whole. Keep credentials out of those values: strip them before they reach
   `log.fetch` or `end({ error })`, and drop a response header you cannot control from
   `captureResponseHeaders`. A url nested in the request path stays in `url.full` as written, as in
-  v2.4.0, and will not be fixed: README → Credentials in a captured value does not cover it, so
+  v2.4.0, and is not fixed in 2.5.0: README → Credentials in a captured value does not cover it, so
   v2.4.0's rotation advice for it stands; keep credentials out of a url you nest in a path.
 - **A captured header records `REDACTED` by Elastic APM's default `sanitize_field_names` rule.**
   Since v2.3.0 only `authorization`, `cookie`, `proxy-authorization` and `set-cookie` did, so a
@@ -77,8 +77,8 @@
   of a spread; the v2.4.0 entry says what to rotate. A `Queue` built from `{ ...queue.conf }` has no
   `storage`; pass `storage` to it by name.
 - **An `Authorization` sent over plain `http:` to a host other than `localhost`, `127.0.0.0/8` or
-  `::1` writes one `@larvit/log: an Authorization header…` line per `report` function, host and
-  credential source, naming the host, unless the `Queue` sets the new
+  `::1` writes one `@larvit/log: an Authorization header…` line per `report` function, or per
+  `stderr` for a queue a `Log` built, host and credential source, naming the host, unless the `Queue` sets the new
   `acceptPlainHttpAuthorization: true`.** Either spelling warns, `user:pass@` in `otlpHttpBaseURI` or
   `Authorization` in `otlpAdditionalHeaders`, set at any time; through a `Log` it is a `warn` line
   on `stderr`. The request still goes. Rotate a credential that has crossed a network you do not
@@ -92,7 +92,8 @@
   version.** A span's scope was its span name, and records had none, so a query or dashboard
   grouping on the scope name sees it change; group on the span name instead.
 - **`user:pass@` in `otlpHttpBaseURI` beside an `Authorization` in `otlpAdditionalHeaders` writes
-  one `@larvit/log:` line per `report` function, and throws from 3.0.0.** The header is still sent
+  one `@larvit/log:` line per `report` function, or per `stderr` for a queue a `Log` built, and
+  throws from 3.0.0.** The header is still sent
   and the userinfo is not, as in v2.4.0. Keep one of the two.
 - **`resolveFormatter(conf)` hands back the `EntryFormatter` a conf writes with.** Read
   `resolveFormatter(log.conf)` where you read `log.conf.entryFormatter`, which 3.0.0 removes.
