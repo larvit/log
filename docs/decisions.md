@@ -323,7 +323,8 @@ a url among other text, a percent-encoded url in a header, and a url the runtime
 as a scheme-relative `//user:pass@host`. Six review rounds each found a new way a scanner for urls
 in free text missed one — a delimiter, an escape the rewrite wrote, a scheme ending another — so the
 scanner went. README → Credentials in a captured value draws that line, serving Goals #3, which
-outranks #4. Valid while that section reads so.
+outranks #4. Valid while that section reads so; `todo.md` item 84 asks whether it stands, since it
+lets more credentials leave than v2.4.0 did.
 
 ## Metrics will arrive aggregated, with no instruments
 
