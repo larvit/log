@@ -1,4 +1,4 @@
-import { type EntryFormatter, type EntryFormatterConf, formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, type Logger, type LogInt, type LogLevel, LogLevels, type LogOptions, type Metadata, msgJsonFormatter, msgTextFormatter, type OtlpPayload, type OtlpQueue, parseTraceparent, Queue, type QueueStorage, type ResolvedLogConf, resolveFormatter, type TimerHandle } from "./index.js";
+import { type EntryFormatter, type EntryFormatterConf, formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, type Logger, type LogInt, type LogLevel, LogLevels, type LogOptions, type Metadata, msgJsonFormatter, msgTextFormatter, type OtlpPayload, type OtlpQueue, type OtlpSpan, parseTraceparent, Queue, type QueueStorage, type ResolvedLogConf, resolveFormatter, type TimerHandle } from "./index.js";
 import test from "./tap.js";
 
 // --- helpers ---------------------------------------------------------------
@@ -1788,6 +1788,32 @@ test("spans of different names share one scopeSpans entry in a POST", async t =>
 	const scopeSpans = calls.filter(call => call.path === "/v1/traces").flatMap(call => call.body.resourceSpans.flatMap((resourceSpan: any) => resourceSpan.scopeSpans));
 
 	t.deepEqual(scopeSpans.map(scopeSpan => scopeSpan.spans.map((span: any) => span.name)), [["child", "parent"]], "both spans under the one scope");
+	t.end();
+});
+
+test("a batch merges per scope, keeping a v2.4.0 stored payload's apart", async t => {
+	const { calls } = stubFetch();
+	const queue = new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318" });
+	const resource = { attributes: [{ key: "service.name", value: { stringValue: "svc" } }] };
+	const record = (msg: string) => ({ body: { stringValue: msg }, severityNumber: 9, severityText: "INFO", timeUnixNano: "1" });
+	const span = (name: string): OtlpSpan => ({ attributes: [], droppedAttributesCount: 0, droppedEventsCount: 0, droppedLinksCount: 0, endTimeUnixNano: "2", events: [], kind: 1, links: [], name, spanId: generateSpanId(), startTimeUnixNano: "1", status: { code: 0 }, traceId: generateTraceId() });
+	const scope = { name: "@larvit/log", version: "2.5.0" };
+
+	for (const [msg, logScope] of [["new", scope], ["stored", undefined], ["new too", scope]] as const) {
+		queue.enqueue({ resourceLogs: [{ resource, scopeLogs: [{ logRecords: [record(msg)], ...logScope ? { scope: logScope } : {} }] }] });
+	}
+
+	for (const [name, spanScope] of [["new", scope], ["stored", { name: "stored" }], ["new too", scope]] as const) {
+		queue.enqueue({ resourceSpans: [{ resource: { ...resource, droppedAttributesCount: 0 }, scopeSpans: [{ scope: spanScope, spans: [span(name)] }] }] });
+	}
+
+	await queue.flush();
+
+	const logs = calls.find(call => call.path === "/v1/logs")!.body.resourceLogs;
+	const traces = calls.find(call => call.path === "/v1/traces")!.body.resourceSpans;
+
+	t.deepEqual(logs.map((entry: any) => entry.scopeLogs.map((scopeLog: any) => [scopeLog.scope?.name, scopeLog.logRecords.map((rec: any) => rec.body.stringValue)])), [[["@larvit/log", ["new", "new too"]], [undefined, ["stored"]]]], "records group under one resource, per scope");
+	t.deepEqual(traces.map((entry: any) => entry.scopeSpans.map((scopeSpan: any) => [scopeSpan.scope.name, scopeSpan.spans.map((item: any) => item.name)])), [[["@larvit/log", ["new", "new too"]], ["stored", ["stored"]]]], "and so do spans");
 	t.end();
 });
 

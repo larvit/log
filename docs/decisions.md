@@ -67,7 +67,8 @@ once per `stderr` sink through the instance's formatter at `warn`, whatever `log
 sharing the default `console.error` share that one warning; a sink the caller injects gets its own,
 which keeps a test independent of run order. A `warnOnce` message is literal: anything varying in it
 breaks the once-only rule. An unknown `logLevel` is keyed on its raw value, so only the first
-`enabled` call builds its text. Every such line opens with `@larvit/log: `, part of that literal, so
+`enabled` call builds its text; that `enabled` writes at all works against CQS until `todo.md` item
+89. Every such line opens with `@larvit/log: `, part of that literal, so
 an app developer can tell which dependency emitted one about code they may not own. A `Queue`'s
 failure lines through `report` carry no prefix, since they report that developer's own setup; its
 plain-`http:` `Authorization` warning is a warning, and keeps it. Serves README → Goals #5. Writing
@@ -174,14 +175,15 @@ while rejecting the documented one would break a minor. The alias stays because 
 `conf.entryFormatter` on every instance, whichever spelling set the formatter; it is one
 module-level descriptor, because a closure pair per `Log` measured 1347 bytes against README →
 Footprint's 1 KB, on `node:22-bookworm-slim` over 50 000 retained instances. Serves README → Goals
-#5 for the one name, README → Goals #4 for the alias. Valid until 3.0.0 removes `entryFormatter`.
+#5 for the one name, README → Goals #4 for the alias. Valid until `todo.md` item 62 removes
+`entryFormatter` in 3.0.0.
 
 2026-09-28, the maintainer, superseding the alias above on `log.conf`: `conf.format` keeps v2.3.0's
 read type, per README → Audience: it never holds a function, and a string written beside
 `entryFormatter` reads back as written. A function formatter reads back from `conf.entryFormatter`
 alone and wins over any `conf.format`, as in v2.3.0, so writing `conf.format` on a
-function-formatted instance changes nothing. Reading or writing `conf.entryFormatter` does not warn,
-since 2.x has no other spelling to move to. Its `@deprecated` tag stays and names 3.0.0's
+function-formatted instance changes nothing. Reading or writing `conf.entryFormatter` does not warn;
+`todo.md` item 92 asks whether it should, now that `resolveFormatter` replaces the read. Its `@deprecated` tag stays and names 3.0.0's
 `conf.format`, because README → Audience deprecates every 3.0.0 break in a minor first. A parent
 built by another copy of this module hands its child only a function, its built-in formatters
 included, so writing that child's `conf.format` changes nothing either.
@@ -248,8 +250,8 @@ rejected beside any shorthand, even an identical one. It leaves `JSON.stringify(
 default text when the parent has a function formatter, because v2.3.0 copies
 `Object.keys(parentLog.conf)` and `conf.entryFormatter` is non-enumerable from 2.4.0. Accepted:
 README → Audience lets enumerability change in a minor, and making the alias enumerable again
-hands it back to a spread of `log.conf` as an option the caller never wrote. Valid until 3.0.0
-removes `entryFormatter`.
+hands it back to a spread of `log.conf` as an option the caller never wrote. Serves README → Goals
+#4, and works against #6 until `todo.md` item 62 removes `entryFormatter`.
 
 ## The comprehension baseline
 
@@ -257,7 +259,8 @@ removes `entryFormatter`.
 depth 1 — 6/10 overall; Navigation 7, Locality 5.25, Shape 6, Self-sufficiency 6 — and a later
 four-seat run at the same depth may not score lower. Comprehension work ships in the release it
 is found in, ahead of that release's other items. Serves README → Goals #8. Valid until a later
-run at or above 7.0 replaces the baseline.
+run at or above 7.0 replaces the baseline; `todo.md` item 90 gets there. The 2026-10-03 run held the
+ratchet: Navigation 7.1, Locality 5.5, Shape 6.25, Self-sufficiency 6.25, overall 6.1.
 
 ## A stringified `Queue` carries its `conf`, less `storage` from 2.5.0
 

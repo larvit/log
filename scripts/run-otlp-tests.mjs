@@ -85,6 +85,9 @@ function assertLog(received, serviceName, protocol) {
 
 	assert.ok(resourceLog, `[${protocol}] collector received a log for ${serviceName}`);
 
+	assert.equal(resourceLog.scopeLogs[0].scope?.name, "@larvit/log", `[${protocol}] log scope name`);
+	assert.match(resourceLog.scopeLogs[0].scope?.version ?? "", /^\d+\.\d+\.\d+/, `[${protocol}] log scope version`);
+
 	const record = resourceLog.scopeLogs[0].logRecords[0];
 
 	assert.equal(record.body.stringValue, `hello over ${protocol}`, `[${protocol}] log body`);
@@ -103,6 +106,9 @@ function assertSpan(received, serviceName, protocol, ids) {
 	const resourceSpan = received.flatMap(line => line.resourceSpans ?? []).find(rs => resourceHasService(rs.resource, serviceName));
 
 	assert.ok(resourceSpan, `[${protocol}] collector received a span for ${serviceName}`);
+
+	assert.equal(resourceSpan.scopeSpans[0].scope?.name, "@larvit/log", `[${protocol}] span scope name`);
+	assert.match(resourceSpan.scopeSpans[0].scope?.version ?? "", /^\d+\.\d+\.\d+/, `[${protocol}] span scope version`);
 
 	const span = resourceSpan.scopeSpans[0].spans[0];
 
