@@ -10,7 +10,7 @@ README → Goals #4 and #6.
 ## No level-string shorthand from 3.0.0
 
 2026-09-16, the maintainer: no level-string shorthand; `{ logLevel }` is the one spelling from
-3.0.0. Serves README → Goals #5.
+3.0.0 (`todo.md` item 61). Serves README → Goals #5.
 
 ## The OTLP endpoint belongs to the queue
 
@@ -25,7 +25,7 @@ Valid while a queue owns the transport.
 2026-09-17, the maintainer: `colors` precedence is code, then `NO_COLOR`, then `FORCE_COLOR`, then
 the default. The default stays on through 2.x: a terminal is a new user's first sight of the
 library, and a minor never changes output for a consumer whose env says nothing. Following the TTY
-is a 3.0.0 change; Rails' always-on `colorize_logging` is the precedent for what unconditional
+is a 3.0.0 change (`todo.md` item 65); Rails' always-on `colorize_logging` is the precedent for what unconditional
 colour costs log pipelines. Serves README → Goals #4 and #5. Valid while text is the default format.
 
 ## `Log` and `Queue` each own a `clock`
@@ -86,10 +86,11 @@ forbids it and a server splits on the first one, so there is no reading to salva
 `https:` are accepted, both because nothing else is fetchable and because any other scheme written
 without `//` parses to an opaque path, where the userinfo stays in `pathname` and the
 credential-free url cannot be built from its parts. `btoa` is assumed present beside `TextEncoder`,
-on the same floor as the `TextEncoder` entry under `todo.md`'s "Kept as is": Hermes added both
+on the same floor as "`ProtoWriter.string` uses `TextEncoder` with no fallback": Hermes added both
 (facebook/hermes#1178) and React Native has shipped them since 0.74. Both credential spellings stand
 meanwhile: a collector vendor hands `user:pass@` over as one string, and dropping it in a minor
-would break those consumers, so `todo.md` carries the question rather than this entry settling it.
+would break those consumers, as "Both credential spellings stay, and their combination warns"
+settles.
 Serves README → Goals #1 and #3. Valid while a queue owns the transport.
 
 ## `log.fetch` traces only `http:` and `https:` urls
@@ -189,7 +190,7 @@ included, so writing that child's `conf.format` changes nothing either.
 2026-09-21, the implementing agent: `ResolvedLogConf` keeps `entryFormatter` in its required half
 while the property is non-enumerable, so a spread's type promises a formatter the spread does not
 carry. Accepted rather than fixed: v2.3.0 shipped the member required and a minor may not narrow it,
-per the required-half entry above, and no type can say "non-enumerable". `todo.md`'s 3.0.0 item
+per the required-half entry above, and no type can say "non-enumerable". `todo.md` item 62
 closes it. Serves README → Goals #4. Valid until 3.0.0 removes `entryFormatter`.
 
 ## A query key is redacted by Datadog's suffix rule
@@ -233,11 +234,12 @@ default and warns.
 2026-09-27, the implementing agent: the default `Queue` a `Log` builds from the `otlp*` shorthand
 lives in `conf.otlpQueue`, beside the shorthand it was built from. A `parentLog` is any `LogInt`,
 whose `conf` holds every setting a child reads from it, so only there does the queue share
-through a wrapper; and 3.0.0's plan makes `conf.otlpQueue` the one OTLP spelling, so moving it off
+through a wrapper; and 3.0.0's plan (`todo.md` item 74) makes `conf.otlpQueue` the one OTLP spelling, so moving it off
 `conf` now would move it back then. Only a queue this library built may sit beside the
 shorthand, and only beside exactly the shorthand it was built from; a queue the consumer built is
 rejected beside any shorthand, even an identical one. It leaves `JSON.stringify(log.conf)`
-circular, so `todo.md`'s item fixes that on the `Queue`, which stays readable on `conf`. Serves
+circular, which "A stringified `Queue` carries its `conf`" fixes on the `Queue`, which stays
+readable on `conf`. Serves
 README → Goals #6. Valid until 3.0.0 clears the shorthand from `conf`.
 
 ## A v2.3.0 copy's child loses a function formatter
@@ -267,7 +269,7 @@ the origin's session tokens. That is data the app never handed this library as c
 credential in `conf` is one the app wrote there itself. Credentials in that `conf` stringify as
 written, as `log.conf`'s own `otlp*` keys beside a queue built from them already do: README →
 Credentials in a captured value stops at what this library emits, and redacting in a `toJSON`
-would be a second spelling of 3.0.0's item keeping credentials off `conf`. Serves README → Goals
+would be a second spelling of `todo.md` item 75, keeping credentials off `conf`. Serves README → Goals
 #3. Valid until 3.0.0 keeps credentials off `log.conf` and `queue.conf`.
 
 ## An `Authorization` over plain `http:` warns once
@@ -288,7 +290,7 @@ not all known.
 ## `resolveFormatter` is exported
 
 2026-09-28, the maintainer: the resolver from a conf to the `EntryFormatter` it writes with is
-exported, so a library author handed a conf renders a line the way the instance does once 3.0.0
+exported (`todo.md` item 1), so a library author handed a conf renders a line the way the instance does once 3.0.0
 takes `conf.entryFormatter` away. Serves README → Goals #5 and Audience #2; an export is a minor
 under #4.
 
@@ -297,8 +299,8 @@ under #4.
 2026-09-28, the maintainer: `user:pass@` in `otlpHttpBaseURI` and `otlpAdditionalHeaders: {
 Authorization }` both stay: a vendor hands the endpoint over as one `https://id:token@host` string,
 the only shape one env var carries, and a bearer token has no userinfo spelling. The two can
-disagree, so setting both warns once per `report` sink in 2.x and throws in the constructor from
-3.0.0, checked when the queue is built — a header added later is not rechecked; v2.4.0 documents the
+disagree, so setting both warns once per `report` sink in 2.x (`todo.md` item 6) and throws in the
+constructor from 3.0.0 (`todo.md` item 76), checked when the queue is built — a header added later is not rechecked; v2.4.0 documents the
 header winning, so rejecting it sooner would spend README → Goals #4. Serves README → Goals #5.
 
 ## Inherited `otlpAdditionalHeaders` follow the endpoint's origin
@@ -325,4 +327,16 @@ sum, histogram — will be handed over already aggregated, and this library will
 deliver it; the types will say what a valid point must carry. Keeping a running total, a stable
 `startTimeUnixNano` and bucket boundaries that match across a series is the caller's, so
 instruments, temporality conversion and periodic collection stay out. Serves README → Goals #5 and
-#7. Valid until 3.0.0's metrics item ships; then the README documents it.
+#7. Valid until `todo.md` item 56 ships; then the README documents it.
+
+## `ProtoWriter.string` uses `TextEncoder` with no fallback
+
+2026-09-17, the maintainer: `new TextEncoder()` in `ProtoWriter.string` has no fallback. Hermes has
+had the global since React Native 0.74 (Expo SDK 51 changelog, 2024-05-07), and every supported
+React Native is newer. Serves README → Goals #7. Valid while README → Audience's runtimes all have
+`TextEncoder`.
+
+## The protobuf encoder stays
+
+2026-09-16, the maintainer: the protobuf encoder stays. Collectors that reject JSON are real, and
+the whole file is 4.7 KB gzipped. Serves README → Goals #1. Valid while it fits README → Footprint.
