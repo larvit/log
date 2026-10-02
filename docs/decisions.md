@@ -143,7 +143,7 @@ whether the value, parsed whole as a url, holds a credential. Elastic's is the o
 cross-agent spec that requires redacting request and response headers: OTel redacts no header value,
 Datadog's tracers only in AppSec, and Datadog's eight exact names there miss `x-api-key` and every
 `x-*-token`; the four RFC 9110 and RFC 6265 names 2.3.0 hard-coded missed them too. Redacting rather
-than rejecting the allow-list entry is what a minor allows — README → Goals #4 deprecates a breaking
+than rejecting the allow-list entry is what a minor allows — README → Audience deprecates a breaking
 change in a 2.x minor first, and the leak is open now — and it matches the stance the query-key list
 already took. `REDACTED` over dropping the attribute keeps the telemetry reader's "was the header
 there?", so a false hit costs a value, never the header's presence. Valid while Elastic's default
@@ -179,10 +179,10 @@ read type, per Goals #4: it never holds a function, and a string written beside 
 reads back as written. A function formatter reads back from `conf.entryFormatter` alone and wins
 over any `conf.format`, as in v2.3.0, so writing `conf.format` on a function-formatted instance
 changes nothing. Reading or writing `conf.entryFormatter` does not warn, since 2.x has no other
-spelling to move to. Its `@deprecated` tag stays and names 3.0.0's `conf.format`, because Goals #4
-deprecates every 3.0.0 break in a minor first. A parent built by another copy of this module hands
-its child only a function, its built-in formatters included, so writing that child's `conf.format`
-changes nothing either.
+spelling to move to. Its `@deprecated` tag stays and names 3.0.0's `conf.format`, because README →
+Audience deprecates every 3.0.0 break in a minor first. A parent built by another copy of this
+module hands its child only a function, its built-in formatters included, so writing that child's
+`conf.format` changes nothing either.
 
 ## `ResolvedLogConf` keeps `entryFormatter` required
 
@@ -245,7 +245,7 @@ README → Goals #6. Valid until 3.0.0 clears the shorthand from `conf`.
 2026-09-28, the maintainer: a child built by a library's own v2.3.0 copy under a 2.4.0 parent logs
 default text when the parent has a function formatter, because v2.3.0 copies
 `Object.keys(parentLog.conf)` and `conf.entryFormatter` is non-enumerable from 2.4.0. Accepted:
-README → Goals #4 lets enumerability change in a minor, and making the alias enumerable again
+README → Audience lets enumerability change in a minor, and making the alias enumerable again
 hands it back to a spread of `log.conf` as an option the caller never wrote. Valid until 3.0.0
 removes `entryFormatter`.
 
@@ -316,3 +316,12 @@ a url among other text, a percent-encoded url in a header, and a url the runtime
 as a scheme-relative `//user:pass@host`. Six review rounds each found a new way a scanner for urls
 in free text missed one — a delimiter, an escape the rewrite wrote, a scheme ending another — so the
 scanner went. Goals #3 draws that line and outranks #4. Valid while Goals #3 reads so.
+
+## Metrics arrive aggregated; no instruments
+
+2026-10-03, the maintainer: any OTLP metric shape — gauge, delta or cumulative sum, histogram — is
+handed over already aggregated, and this library encodes, batches and delivers it; the types say
+what a valid point must carry. Keeping a running total, a stable `startTimeUnixNano` and bucket
+boundaries that match across a series is the caller's, so instruments, temporality conversion and
+periodic collection stay out. Serves README → Goals #5 and #7. Valid until 3.0.0's metrics item
+ships; then the README documents it.
