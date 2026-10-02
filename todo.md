@@ -12,11 +12,11 @@ mechanism, that is evidence of the problem, never the prescribed repair.
   Decided 2026-09-28.
 - [ ] **Warn once per `report` sink about an invalid name in `captureRequestHeaders` or
   `captureResponseHeaders`, and skip it, so it never changes a `log.fetch` result.** Landing it
-  drops README → `log.fetch` in depth's "List only valid header names" sentence. `headers.get("x
+  drops README → `log.fetch` in depth's "An invalid header name" sentence. `headers.get("x
   y")` throws a `TypeError`, so a bad request-side name rejects every traced call before the request
   goes out, and a bad response-side one turns a response the platform delivered into a rejection.
 - [ ] **Send a `Request` passed as `init` with its own method, body, signal and other settings.**
-  Landing it drops README → `log.fetch` in depth's "Pass `init` as a plain object" sentence.
+  Landing it drops README → `log.fetch` in depth's "Until 2.5.0, a `Request`" sentence.
   `fetch(url, request)` is valid and TypeScript accepts it, but `{ ...init, headers }` copies own
   properties only, and a `Request`'s are prototype getters: `log.fetch(url, new Request(url, {
   method: "POST", body }))` sends a GET with no body. A `Request` as the *input* is 2.6.0's item.

@@ -60,11 +60,11 @@ queue survives app restarts through a `storage` adapter, and a full one holds ab
 current Chromium. React Native is supported from 0.74, where Hermes gained `TextEncoder` and
 `btoa`. Deno and Bun meet the rule and are not in CI.
 
-**Rely on** what this README documents, under semver read strictly. A minor only adds — an export,
-an option, a value an option accepts, a field, a span attribute — where code not using it behaves
-as before. A break is deprecated in a minor first and lands in the next major
-with a `MIGRATION.md` entry; a feature whose right shape breaks waits for that major, never shipping
-early in a worse one. Only a major changes:
+**Rely on** what this README documents outside Goals, under semver read strictly. A minor only adds
+— an export, an option, a value an option accepts, a field, a span attribute — where code not using
+it behaves as before. A break is deprecated in a minor first and lands in the next major with a
+`MIGRATION.md` entry; a feature whose right shape breaks waits for that major, never shipping early
+in a worse one. Only a major changes:
 
 - each documented option, read back under its own name, and each documented instance field;
 - each span attribute and value this README documents, on `log.span` and on the wire;
@@ -273,12 +273,12 @@ whose report lines then go to that queue's `report`, `console.error` unless you 
 | `storage` | `QueueStorage` | none | Persists the queue, see above. |
 
 A send has a 3 s timeout. Any 2xx is success; a JSON response whose `partialSuccess` has a rejected
-count is reported with the count and the collector's message, and the batch is not resent. A
-network error, timeout, 408, 429 or 5xx keeps the batch for retry; any other non-2xx drops it. A
-retry timer never keeps a Node or Deno process alive, so a script whose first attempt fails loses
-the batch at exit, `await end()` or not; give the queue a `storage` to carry it into the next run.
-In a short-lived script, `await end()` before exit: it sends what is queued at once. Until 2.5.0 a
-pending batch timer also holds a Node or Deno process for up to `batchDelayMs`.
+count is reported with the count and the collector's message, and the batch is not resent. A network
+error, timeout, 408, 429 or 5xx keeps the batch for retry; any other non-2xx drops it. In a
+short-lived script, `await end()` before exit: it sends what is queued at once. A retry timer never
+keeps a Node or Deno process alive, so a script whose first attempt fails loses the batch at exit,
+`await end()` or not; give the queue a `storage` to carry it into the next run. Until 2.5.0 a
+pending batch timer holds a Node or Deno process for up to `batchDelayMs`.
 
 `flush()` on `Log` or `Queue` sends everything queued, one attempt per batch, and resolves when that
 round is done. A failed batch stays queued for the retry, and until that fires `flush()` attempts
@@ -372,18 +372,21 @@ keeps it native. Levels map to OTLP severity through the exported `LogLevels` ta
 ## `log.fetch` in depth
 
 **`log.fetch` mirrors the runtime's `fetch`** ([Goals #1.1 and #5](#goals)). It takes a `string` or
-`URL` and an `init`, and the response, the rejection and the promise you see are exactly what the
-runtime produced. What it adds is outbound trace context and a span, and never a success the
-platform would have refused. The request differs from yours only by `traceparent`, which is not
-CORS-safelisted, so a cross-origin call is preflighted and needs the server to list it in
-`Access-Control-Allow-Headers`. Pass `init` as a plain object: a `Request` there keeps only its
-headers; its method, body, signal and every other setting are dropped, though the span still names
-its method. List only valid header names to capture: an invalid one rejects the call.
+`URL` and an `init`. Given a plain-object `init` and valid header names to capture, the response,
+the rejection and the promise you see are exactly what the runtime produced. What it adds is
+outbound trace context and a span, and never a success the platform would have refused. The request
+differs from yours only by `traceparent`, which is not CORS-safelisted, so a cross-origin call is
+preflighted and needs the server to list it in `Access-Control-Allow-Headers`.
 
-Only a URL that resolves to `http:` or `https:` is traced — a relative one resolves against the page, so it is untraced where there is no
-page, as on a server, and where the page is not `http:`/`https:`, as under a `file:` or app-scheme
-origin. Anything else passes straight through to an untraced `fetch`: no span, and no
-`traceparent` sent. The span is the only output; no log line is written.
+Until 2.5.0, a `Request` as `init` keeps only its headers: its method, body, signal and every other
+setting are dropped, though the span still names its method. An invalid header name to capture
+rejects the call.
+
+Only a URL that resolves to `http:` or `https:` is traced — a relative one resolves against the
+page, so it is untraced where there is no page, as on a server, and where the page is not
+`http:`/`https:`, as under a `file:` or app-scheme origin. Anything else passes straight through to
+an untraced `fetch`: no span, and no `traceparent` sent. The span is the only output; no log line is
+written.
 
 Span attributes follow the OpenTelemetry HTTP semantic conventions:
 
@@ -405,9 +408,8 @@ them per call site.
 
 ### Credentials in a captured value
 
-Redaction covers userinfo in a url, a captured header value or a status message, wherever the
-runtime's `URL` parses that value whole, and the values of the header names and query keys matched
-below.
+Redaction covers two things: userinfo, wherever the runtime's `URL` parses a url, a captured header
+value or a status message whole; and the values of the header names and query keys matched below.
 Anything else is exported as written, text you log yourself included.
 
 - **A header, whatever you list it for,** whose name, in any casing, is `cookie`, `passwd`,
