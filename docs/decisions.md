@@ -170,12 +170,12 @@ formatter's one name, and `conf.entryFormatter` a deprecated alias of it, read a
 one as 2.x documented, and two *different* formatters throw: nothing can hold that combination yet,
 while rejecting the documented one would break a minor. The alias stays because v2.3.0 filled
 `conf.entryFormatter` on every instance, whichever spelling set the formatter; it is one
-module-level descriptor, because a closure pair per `Log` measured 1347 bytes against Goals #7's 1
-KB, on `node:22-bookworm-slim` over 50 000 retained instances. Serves README → Goals #5 for the one
-name, README → Goals #4 for the alias. Valid until 3.0.0 removes `entryFormatter`.
+module-level descriptor, because a closure pair per `Log` measured 1347 bytes against README →
+Footprint's 1 KB, on `node:22-bookworm-slim` over 50 000 retained instances. Serves README → Goals
+#5 for the one name, README → Goals #4 for the alias. Valid until 3.0.0 removes `entryFormatter`.
 
 2026-09-28, the maintainer, superseding the alias above on `log.conf`: `conf.format` keeps v2.3.0's
-read type, per Goals #4: it never holds a function, and a string written beside `entryFormatter`
+read type, per README → Audience: it never holds a function, and a string written beside `entryFormatter`
 reads back as written. A function formatter reads back from `conf.entryFormatter` alone and wins
 over any `conf.format`, as in v2.3.0, so writing `conf.format` on a function-formatted instance
 changes nothing. Reading or writing `conf.entryFormatter` does not warn, since 2.x has no other
@@ -265,10 +265,10 @@ From 2.5.0 `storage` is non-enumerable on `queue.conf`, so neither a stringify n
 it: what it holds reaches nothing but the queue it restores, and a browser's `localStorage` holds
 the origin's session tokens. That is data the app never handed this library as configuration; a
 credential in `conf` is one the app wrote there itself. Credentials in that `conf` stringify as
-written, as `log.conf`'s own `otlp*` keys beside a queue built from them already do: README → Goals
-#3 stops at what this library emits, and redacting in a `toJSON` would be a second spelling of
-3.0.0's item keeping credentials off `conf`. Serves README → Goals #3. Valid until 3.0.0 keeps
-credentials off `log.conf` and `queue.conf`.
+written, as `log.conf`'s own `otlp*` keys beside a queue built from them already do: README →
+Credentials in a captured value stops at what this library emits, and redacting in a `toJSON`
+would be a second spelling of 3.0.0's item keeping credentials off `conf`. Serves README → Goals
+#3. Valid until 3.0.0 keeps credentials off `log.conf` and `queue.conf`.
 
 ## An `Authorization` over plain `http:` warns once
 
@@ -281,7 +281,7 @@ spellings warn, so moving the credential never silences the exposure; refusing w
 in-cluster `http:` collector, a deliberate and common setup. 2026-09-30, the maintainer: a `Queue`
 given `acceptPlainHttpAuthorization: true` does not warn, the opt-out for a network the consumer
 trusts; it sits on the queue alone, which owns the endpoint. Only `Authorization` is checked;
-other credential headers are left as they are. Serves README → Goals #3's headline,
+other credential headers are left as they are. Serves README → Goals #3,
 "Credentials never leave", on the wire, without spending #4. No expiry: the setups it serves are
 not all known.
 
@@ -306,7 +306,7 @@ header winning, so rejecting it sooner would spend README → Goals #4. Serves R
 2026-09-28, the implementing agent: a child or clone naming its own `otlpHttpBaseURI` inherits
 `otlpAdditionalHeaders` only from a source with no endpoint or one of the same origin, the line
 fetch draws when a redirect drops `Authorization`; a new path on the same collector keeps working.
-Serves README → Goals #3's headline, "Credentials never leave", on the wire.
+Serves README → Goals #3, "Credentials never leave", on the wire.
 
 ## A header value or status message is redacted only where it is a url whole
 
@@ -315,13 +315,14 @@ where the runtime's `URL` parses the whole of it, so 2.5.0 exports as written wh
 a url among other text, a percent-encoded url in a header, and a url the runtime cannot parse, such
 as a scheme-relative `//user:pass@host`. Six review rounds each found a new way a scanner for urls
 in free text missed one — a delimiter, an escape the rewrite wrote, a scheme ending another — so the
-scanner went. Goals #3 draws that line and outranks #4. Valid while Goals #3 reads so.
+scanner went. README → Credentials in a captured value draws that line, serving Goals #3, which
+outranks #4. Valid while that section reads so.
 
-## Metrics arrive aggregated; no instruments
+## Metrics will arrive aggregated, with no instruments
 
-2026-10-03, the maintainer: any OTLP metric shape — gauge, delta or cumulative sum, histogram — is
-handed over already aggregated, and this library encodes, batches and delivers it; the types say
-what a valid point must carry. Keeping a running total, a stable `startTimeUnixNano` and bucket
+2026-10-03, the maintainer: when metrics ship, any OTLP metric shape — gauge, delta or cumulative
+sum, histogram — will be handed over already aggregated, and this library will encode, batch and
+deliver it; the types will say what a valid point must carry. Keeping a running total, a stable `startTimeUnixNano` and bucket
 boundaries that match across a series is the caller's, so instruments, temporality conversion and
 periodic collection stay out. Serves README → Goals #5 and #7. Valid until 3.0.0's metrics item
 ships; then the README documents it.

@@ -19,10 +19,6 @@ mechanism, that is evidence of the problem, never the prescribed repair.
   request)` is valid and TypeScript accepts it, but `{ ...init, headers }` copies own properties
   only, and a `Request`'s are prototype getters: `log.fetch(url, new Request(url, { method: "POST",
   body }))` sends a GET with no body. A `Request` as the *input* is 2.6.0's item.
-- [ ] **Say in README → `log.fetch` in depth that a cross-origin call needs `traceparent` in the
-  server's `Access-Control-Allow-Headers`.** The header is not CORS-safelisted, so it turns a simple
-  request into a preflighted one, and a server that refuses it fails a call plain `fetch` would have
-  made. README → Goals already owns the preflight.
 - [ ] **Report a 401 or 403 export as `OTLP export unauthorized, batch dropped`.** Working auth
   makes a wrong credential reachable for the first time, and it is the likeliest misconfiguration of
   `otlpHttpBaseURI` userinfo; today it reads as any other 4xx.
@@ -30,7 +26,7 @@ mechanism, that is evidence of the problem, never the prescribed repair.
   `otlpAdditionalHeaders` sets `Authorization`.** The two can disagree, and v2.4.0 documents the
   header winning. Decided 2026-09-28.
 - [ ] **Unref the batch timer, so a pending batch never holds a Node or Deno process.** README →
-  Goals #7 asks for it; drop that goal's "until 2.5.0" clause. Today only the retry timer is
+  Goals #7.1 asks for it. Today only the retry timer is
   unref'd, so any pending batch holds the process for up to `batchDelayMs`, and `round()` clears the
   batch timer once, at its start, so a record logged while an export is in flight leaves one behind
   with nothing to send: measured on `node:22`, `await log.flush()` returned with both records
@@ -61,7 +57,7 @@ mechanism, that is evidence of the problem, never the prescribed repair.
   `globalThis.fetch`, process-global state nothing can run beside. A React Native app that pins TLS
   or uses `expo/fetch` cannot route the exporter, the one request that crosses a hostile network,
   through it. Scope as `QueueConf.fetch`; whether `log.fetch` takes one is a separate question,
-  since Goals says it mirrors the runtime and an injected fetch becomes the runtime.
+  since README → `log.fetch` in depth says it mirrors the runtime and an injected fetch becomes the runtime.
 - [ ] **Pin every Node base image to its full patch version, so one commit builds one image on any
   day.** Three places float: `ARG BASE_IMAGE=node:24-bookworm-slim` in the `Dockerfile`,
   `${NODE_IMAGE:-node:22-bookworm-slim}` in `test-docker`, and the major-only `node-version` matrix
@@ -71,7 +67,7 @@ mechanism, that is evidence of the problem, never the prescribed repair.
 
 ## 2.6.0 — every 3.0.0 break deprecated
 
-README → Goals #4 promises a 2.x warning before each break below, so 3.0.0 waits on this release.
+README → Audience promises a 2.x warning before each break below, so 3.0.0 waits on this release.
 
 - [ ] **Deprecate `parentLog` together with `traceparent`.** Today `traceparent` is silently
   ignored.
@@ -107,7 +103,7 @@ README → Goals #4 promises a 2.x warning before each break below, so 3.0.0 wai
   container; `publish.yaml` builds a second one on the runner and publishes that, so the thing
   consumers install is never the thing CI proved. Build once, upload, publish that. Pinning the base
   images above is the other half of the same problem.
-- [ ] **Check the footprint budget in CI, so the numbers in the README's Goals fail a build instead
+- [ ] **Check the footprint budget in CI, so the numbers in README → Footprint fail a build instead
   of going stale.** Bundle size is the easy half; the per-operation figures need a stable enough
   harness to not flake.
 
@@ -223,7 +219,7 @@ Each one is a weigh against README → Goals first: ship it, or delete the item 
 - [ ] **Give the redaction sentinel its own name — `REDACTED by @larvit/log` or similar.** Today one
   token means three things to the telemetry reader: a header redacted by name, a value that matched
   a credential shape, and a value the consumer's own app had already redacted upstream. `REDACTED`
-  shipped in 2.3.0 and Goals #4 promises each documented span value, so renaming it waits for the
+  shipped in 2.3.0 and README → Audience promises each documented span value, so renaming it waits for the
   major.
 - [ ] **Give a `log.fetch` span `end({ error })`'s `error.type`: a string `code`, else `name`, else
   `"_OTHER"`.**
