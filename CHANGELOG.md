@@ -78,8 +78,8 @@
   `storage`; pass `storage` to it by name.
 - **An `Authorization` sent over plain `http:` to a host other than `localhost`, `127.0.0.0/8` or
   `::1` writes one `@larvit/log: an Authorization header…` line per `report` function, or per
-  `stderr` for a queue a `Log` built, host and credential source, naming the host, unless the `Queue` sets the new
-  `acceptPlainHttpAuthorization: true`.** Either spelling warns, `user:pass@` in `otlpHttpBaseURI` or
+  `stderr` for a queue a `Log` built, host and credential source, naming the host, unless the
+  `Queue` sets the new `acceptPlainHttpAuthorization: true`.** Either spelling warns, `user:pass@` in `otlpHttpBaseURI` or
   `Authorization` in `otlpAdditionalHeaders`, set at any time; through a `Log` it is a `warn` line
   on `stderr`. The request still goes. Rotate a credential that has crossed a network you do not
   trust. On one you do, a `Log` using `otlpHttpBaseURI` moves its `otlp*` options to

@@ -1814,6 +1814,13 @@ test("a batch merges per scope, keeping a v2.4.0 stored payload's apart", async 
 
 	t.deepEqual(logs.map((entry: any) => entry.scopeLogs.map((scopeLog: any) => [scopeLog.scope?.name, scopeLog.logRecords.map((rec: any) => rec.body.stringValue)])), [[["@larvit/log", ["new", "new too"]], [undefined, ["stored"]]]], "records group under one resource, per scope");
 	t.deepEqual(traces.map((entry: any) => entry.scopeSpans.map((scopeSpan: any) => [scopeSpan.scope.name, scopeSpan.spans.map((item: any) => item.name)])), [[["@larvit/log", ["new", "new too"]], ["stored", ["stored"]]]], "and so do spans");
+
+	const protobuf = new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", otlpProtocol: "http/protobuf" });
+
+	calls.length = 0;
+	protobuf.enqueue({ resourceLogs: [{ resource, scopeLogs: [{ logRecords: [record("stored")] }] }] });
+	await protobuf.flush();
+	t.strictEqual(pbMsg(pbMsg(pbDecode(calls[0].rawBody).get(1)![0]).get(2)![0]).get(1), undefined, "a scopeless stored record goes out with no scope on the wire, as v2.4.0 sent it");
 	t.end();
 });
 
@@ -2214,7 +2221,7 @@ test("await log.end() drains a fire-and-forget log.fetch span, and its rejection
 
 test("log.fetch skips an invalid name in captureRequestHeaders or captureResponseHeaders and warns once per stderr", async t => {
 	const { calls } = stubFetch(path => path === "/x" ? response({ headers: new Headers({ "x-resp": "rv" }) }) : undefined);
-	const { log, stderr } = capture({ captureRequestHeaders: ["bad name", "x-req"], captureResponseHeaders: ["x-resp", "bad\nname"], format: "json", otlpHttpBaseURI: "http://127.0.0.1:4318" });
+	const { log, stderr } = capture({ captureRequestHeaders: ["X-Api-Key: hunter2", "x-req"], captureResponseHeaders: ["x-resp", "bad\nname"], format: "json", otlpHttpBaseURI: "http://127.0.0.1:4318" });
 
 	for (let i = 0; i < 2; i++) {
 		t.strictEqual((await log.fetch("https://api.test/x", { headers: { "x-req": "rq" } })).status, 200, `call ${i + 1} resolves with the platform's response`);
@@ -2227,9 +2234,14 @@ test("log.fetch skips an invalid name in captureRequestHeaders or captureRespons
 
 	t.deepEqual([attr("http.request.header.x-req"), attr("http.response.header.x-resp"), span.status.code], ["rq", "rv", 0], "the valid names are captured and the span is no error");
 	t.deepEqual(stderr.map(line => [JSON.parse(line).logLevel, JSON.parse(line).msg]), [
-		["warn", "@larvit/log: captureRequestHeaders holds \"bad name\", which is no valid header name, so log.fetch skips it"],
-		["warn", "@larvit/log: captureResponseHeaders holds \"bad\\nname\", which is no valid header name, so log.fetch skips it"],
-	], "each invalid name warns once per stderr");
+		["warn", "@larvit/log: captureRequestHeaders[0] is not a valid header name, so log.fetch skips it"],
+		["warn", "@larvit/log: captureResponseHeaders[1] is not a valid header name, so log.fetch skips it"],
+	], "each invalid name warns once per stderr, by index, never echoing it");
+
+	const untyped = capture({ captureResponseHeaders: [null as unknown as string] });
+
+	t.strictEqual((await untyped.log.fetch("https://api.test/x")).status, 200, "a name that is no string is skipped too");
+	t.strictEqual(untyped.stderr.length, 1, "with its warning");
 
 	const broken = new Log({ captureRequestHeaders: ["bad name"], stderr: () => { throw new Error("stderr closed"); } });
 
