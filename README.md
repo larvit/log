@@ -163,7 +163,9 @@ async function myRequestHandler(req, res) {
 A child inherits every option it does not set itself, `spanName` included; `traceparent` never, and
 the OTLP options as [Options](#options) says. Setting `context` on a child replaces the
 parent's rather than merging, hence the spread above. The `service.name` context key becomes the
-OTLP resource's service name (default `"unnamed-service"`) rather than a per-entry attribute. A
+OTLP resource's service name (default `"unnamed-service"`) rather than a per-entry attribute. Every
+span and record is exported under the instrumentation scope `@larvit/log`, at this package's
+version. A
 child's log entries attach to the parent's span; the child's own span holds its timing and is
 exported by `end()`.
 
@@ -248,7 +250,8 @@ queue is in memory only.
 `otlpHttpBaseURI`, `otlpProtocol` and `otlpAdditionalHeaders` beside it.
 
 Credentials go either in the endpoint as `user:pass@`, which is sent as an `Authorization: Basic`
-header, or in `otlpAdditionalHeaders` as a token of your own, which wins if you set both. Over
+header, or in `otlpAdditionalHeaders` as a token of your own. Set one: setting both sends the header,
+writes one `@larvit/log:` line per `report` function, and throws from 3.0.0. Over
 plain `http:` either one is readable by anything on the network path, so use `https:` unless the
 collector is local or on a network you trust. Either one sent over `http:` to a host other than
 `localhost`, `127.0.0.0/8` or `::1` writes one `@larvit/log:` line per `report` function, host and
@@ -274,7 +277,8 @@ whose report lines then go to that queue's `report`, `console.error` unless you 
 
 A send has a 3 s timeout. Any 2xx is success; a JSON response whose `partialSuccess` has a rejected
 count is reported with the count and the collector's message, and the batch is not resent. A network
-error, timeout, 408, 429 or 5xx keeps the batch for retry; any other non-2xx drops it. In a
+error, timeout, 408, 429 or 5xx keeps the batch for retry; any other non-2xx drops it, a 401 or 403
+reported as `OTLP export unauthorized, batch dropped`. In a
 short-lived script, `await end()` before exit: it sends what is queued at once. A retry timer never
 keeps a Node or Deno process alive, so a script whose first attempt fails loses the batch at exit,
 `await end()` or not; give the queue a `storage` to carry it into the next run. Until 2.5.0 a
@@ -330,7 +334,7 @@ instead. `entryFormatter` is deprecated the same way: pass the function as `form
 | `colors` | `boolean` | `true` | ANSI colour codes in text output. Unset in code, the env decides: `NO_COLOR` (non-empty) turns it off; otherwise `FORCE_COLOR` turns it on, except `0` or `false` which turn it off. |
 | `context` | `MetadataInput` | `{}` | Added to every entry. Wins over a per-call key of the same name. An `undefined` key is dropped, so `log.conf.context` reads back as `Metadata`. |
 | `entryFormatter` | `EntryFormatter` | none | Deprecated, removed in 3.0.0: pass the function as `format`. Wins over a `"text"`/`"json"` `format`; two different formatters, one per spelling, throw. On `log.conf` it reads the formatter in use, and writing it swaps it. |
-| `format` | `"text" \| "json" \| EntryFormatter` | `"text"` | Console output format, or a formatter of your own. Use the entry's `msTimestamp` rather than `new Date()` so console and OTLP timestamps of one entry match. `log.conf.format` never holds a function before 3.0.0; `log.conf.entryFormatter` reads the formatter in use. Writing `"text"` or `"json"` to `log.conf.format` takes effect from the next line, unless a function formatter is set, which wins. |
+| `format` | `"text" \| "json" \| EntryFormatter` | `"text"` | Console output format, or a formatter of your own. Use the entry's `msTimestamp` rather than `new Date()` so console and OTLP timestamps of one entry match. `log.conf.format` never holds a function before 3.0.0; `resolveFormatter(log.conf)` reads the formatter in use, as `log.conf.entryFormatter` does until 3.0.0. Writing `"text"` or `"json"` to `log.conf.format` takes effect from the next line, unless a function formatter is set, which wins. |
 | `logLevel` | `LogLevel \| "none"` | `"info"` | Minimum level to output. Any other value is kept as written, logs at `"info"` and warns once per `stderr` sink and value. |
 | `otlpAdditionalHeaders` | `Record<string, string>` | none | Shorthand: the same option on the default `Queue`, see [Queue exports](#queue-exports). Not inherited by a child or clone whose `otlpHttpBaseURI` has another origin (scheme, host and port) than its source's. |
 | `otlpHttpBaseURI` | `string` | none | Shorthand for `otlpQueue: new Queue({ otlpHttpBaseURI, otlpProtocol, otlpAdditionalHeaders })`. `user:pass@` in it authenticates, see [Queue exports](#queue-exports). |
@@ -372,22 +376,21 @@ keeps it native. Levels map to OTLP severity through the exported `LogLevels` ta
 ## `log.fetch` in depth
 
 **`log.fetch` mirrors the runtime's `fetch`** ([Goals #1.1 and #5](#goals)). It takes a `string` or
-`URL` and an `init`. On an instance not yet ended, given a plain-object `init` and valid names in
-`captureRequestHeaders` and `captureResponseHeaders`, the response, the rejection and the promise
-you see are exactly what the runtime produced. What it adds is outbound trace context and a span,
+`URL` and an `init`. On an instance not yet ended, given a plain-object `init`, the response, the
+rejection and the promise you see are exactly what the runtime produced. What it adds is outbound trace context and a span,
 and never a success the platform would have refused. The request differs from yours only by
 `traceparent`, which is not CORS-safelisted, so a cross-origin call is preflighted and needs the
 server to list it in `Access-Control-Allow-Headers`.
 
 Until 2.5.0, a `Request` as `init` keeps only its headers: its method, body, signal and every other
-setting are dropped, though the span still names its method. Until 2.5.0, an invalid name in
-`captureRequestHeaders` or `captureResponseHeaders` rejects the call.
+setting are dropped, though the span still names its method.
 
 Only a URL that resolves to `http:` or `https:` is traced — a relative one resolves against the
 page, so it is untraced where there is no page, as on a server, and where the page is not
 `http:`/`https:`, as under a `file:` or app-scheme origin. Anything else passes straight through to
-an untraced `fetch`: no span, and no `traceparent` sent. The span is the only output; no log line is
-written.
+an untraced `fetch`: no span, and no `traceparent` sent. The span is the only output, besides one
+`stderr` warning per invalid name in `captureRequestHeaders` or `captureResponseHeaders`, which is
+skipped.
 
 Span attributes follow the OpenTelemetry HTTP semantic conventions:
 
@@ -468,6 +471,7 @@ a call below `logLevel`, ≤2 µs for a console call, ≤10 µs with OTLP config
 | `Queue` | The export queue; `new Queue(options)`, see [Queue exports](#queue-exports). |
 | `LogLevels` | Level → OTLP `severityNumber`/`severityText`, most to least severe. |
 | `msgTextFormatter`, `msgJsonFormatter` | The built-in formatters; wrap one to extend it. |
+| `resolveFormatter(conf)` | The `EntryFormatter` a `LogConf` writes with, e.g. a `LogInt.conf` you were handed. |
 | `parseTraceparent(header)` | `{ traceId, spanId, flags, sampled }` or `null` when malformed or version `ff`. |
 | `formatTraceparent(traceId, spanId, sampled?)` | Builds a W3C `traceparent` header value. |
 | `generateTraceId()`, `generateSpanId()` | Random 32- and 16-hex-char ids. |

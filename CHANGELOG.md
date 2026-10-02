@@ -86,6 +86,22 @@
   `otlpQueue: new Queue({ acceptPlainHttpAuthorization: true, otlpHttpBaseURI })`, whose report
   lines then go to that queue's `report`, `console.error` unless you pass one.
 
+### Everything else
+
+- **Spans and log records export under the instrumentation scope `@larvit/log`, at this package's
+  version.** A span's scope was its span name, and records had none, so a query or dashboard
+  grouping on the scope name sees it change; group on the span name instead.
+- **`user:pass@` in `otlpHttpBaseURI` beside an `Authorization` in `otlpAdditionalHeaders` writes
+  one `@larvit/log:` line per `report` function, and throws from 3.0.0.** The header is still sent
+  and the userinfo is not, as in v2.4.0. Keep one of the two.
+- **`resolveFormatter(conf)` hands back the `EntryFormatter` a conf writes with.** Read
+  `resolveFormatter(log.conf)` where you read `log.conf.entryFormatter`, which 3.0.0 removes.
+- **A 401 or 403 from the collector reports `OTLP export unauthorized, batch dropped`.** It read
+  `OTLP export rejected, batch dropped`, so an alert matching that text sees it change.
+- **An invalid name in `captureRequestHeaders` or `captureResponseHeaders` is skipped, with one
+  `warn` line per `stderr`.** It rejected every traced call, or turned a response the runtime
+  delivered into a rejection.
+
 ## v2.4.0
 
 An export queue that batches, retries and can hold records and spans across an app restart;

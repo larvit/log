@@ -1,4 +1,4 @@
-import { type EntryFormatter, type EntryFormatterConf, formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, type Logger, type LogInt, type LogLevel, LogLevels, type LogOptions, type Metadata, msgJsonFormatter, msgTextFormatter, type OtlpPayload, type OtlpQueue, parseTraceparent, Queue, type QueueStorage, type ResolvedLogConf, type TimerHandle } from "./index.js";
+import { type EntryFormatter, type EntryFormatterConf, formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, type Logger, type LogInt, type LogLevel, LogLevels, type LogOptions, type Metadata, msgJsonFormatter, msgTextFormatter, type OtlpPayload, type OtlpQueue, parseTraceparent, Queue, type QueueStorage, type ResolvedLogConf, resolveFormatter, type TimerHandle } from "./index.js";
 import test from "./tap.js";
 
 // --- helpers ---------------------------------------------------------------
@@ -240,10 +240,18 @@ function pbKeyValue(bytes: bigint | Uint8Array) {
 // Resource { attributes=1: repeated KeyValue }
 const pbResourceAttrs = (bytes: bigint | Uint8Array) => (pbDecode(bytes as Uint8Array).get(1) ?? []).map(pbKeyValue);
 
+// InstrumentationScope { name=1, version=2 }
+function pbScope(bytes: bigint | Uint8Array) {
+	const scope = pbMsg(bytes);
+
+	return { name: pbStr(scope.get(1)![0]), version: pbStr(scope.get(2)![0]) };
+}
+
 // ExportLogsServiceRequest -> ResourceLogs[0] -> ScopeLogs[0] -> LogRecord[0]
 function pbDecodeLogs(buf: Uint8Array) {
 	const resLog = pbMsg(pbDecode(buf).get(1)![0]);
-	const rec = pbMsg(pbMsg(resLog.get(2)![0]).get(2)![0]);
+	const scopeLog = pbMsg(resLog.get(2)![0]);
+	const rec = pbMsg(scopeLog.get(2)![0]);
 
 	return {
 		logRecord: {
@@ -256,6 +264,7 @@ function pbDecodeLogs(buf: Uint8Array) {
 			traceId: pbHex(rec.get(9)![0]),
 		},
 		resourceAttrs: pbResourceAttrs(resLog.get(1)![0]),
+		scope: pbScope(scopeLog.get(1)![0]),
 	};
 }
 
@@ -267,7 +276,7 @@ function pbDecodeSpans(buf: Uint8Array) {
 
 	return {
 		resourceAttrs: pbResourceAttrs(resSpan.get(1)![0]),
-		scopeName: pbStr(pbMsg(scopeSpan.get(1)![0]).get(1)![0]), // ScopeSpans.scope -> InstrumentationScope.name
+		scope: pbScope(scopeSpan.get(1)![0]),
 
 		span: {
 			attributes: (span.get(9) ?? []).map(pbKeyValue),
@@ -761,6 +770,16 @@ test("format and entryFormatter are one setting, and a resolved conf carries nei
 	t.end();
 });
 
+test("resolveFormatter hands back the formatter a conf writes with", t => {
+	const own = (entry: EntryFormatterConf) => `own ${entry.msg}`;
+
+	t.strictEqual(resolveFormatter(new Log({ format: own }).conf), own, "a function format, which conf.format cannot hold before 3.0.0");
+	t.strictEqual(resolveFormatter(new Log({ format: "json" }).conf), msgJsonFormatter, "json");
+	t.strictEqual(resolveFormatter(new Log().conf), msgTextFormatter, "text by default");
+	t.strictEqual(resolveFormatter({ entryFormatter: own, format: "json" }), own, "a hand-built conf's entryFormatter, which wins over its format as on a Log");
+	t.end();
+});
+
 test("conf.entryFormatter reads and writes the formatter until 3.0.0", t => {
 	const readback = capture({ format: "json" });
 
@@ -865,6 +884,22 @@ test("the Log-built queue reports through the instance's stderr and formatter", 
 	t.end();
 });
 
+test("a 401 or 403 export reports unauthorized and drops the batch", async t => {
+	for (const status of [401, 403]) {
+		const { calls } = stubFetch(() => response({ status }));
+		const sink = reportSink();
+		const log = new Log({ otlpQueue: new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", report: sink.report }), stderr: () => {} });
+
+		log.info("x");
+		await log.flush();
+		await log.flush();
+		t.deepEqual(sink.lines.map(line => [line.msg, line.status]), [["OTLP export unauthorized, batch dropped", status]], `${status} reports once, as unauthorized`);
+		t.strictEqual(calls.length, 1, `${status} is never retried`);
+	}
+
+	t.end();
+});
+
 test("a rejected export (4xx) drops the batch, reports one line per batch and does not retry", async t => {
 	const { calls } = stubFetch(() => response({ status: 400 }));
 	const stderr: string[] = [];
@@ -915,6 +950,39 @@ test("endpoint userinfo authenticates through an Authorization header, never thr
 	plain.info("w");
 	await plain.flush();
 	t.strictEqual(callHeader(calls[3], "Authorization"), null, "an endpoint without userinfo sends no Authorization header");
+	t.end();
+});
+
+test("user:pass@ in otlpHttpBaseURI beside an Authorization in otlpAdditionalHeaders warns once per report sink, and the header goes", async t => {
+	const { calls } = stubFetch();
+	const warning = "@larvit/log: otlpHttpBaseURI carries user:pass@ and otlpAdditionalHeaders sets Authorization, so the header is sent and the userinfo is not; set one of them, as 3.0.0 throws on both";
+	const sink = reportSink();
+	const both = { otlpAdditionalHeaders: { authorization: "Bearer t0ken" }, otlpHttpBaseURI: "https://collector:s3cret@collector.test", report: sink.report };
+
+	new Queue(both);
+
+	const queue = new Queue(both);
+	const log = new Log({ otlpQueue: queue, stderr: () => {} });
+
+	log.info("x");
+	await log.flush();
+	t.deepEqual(sink.lines, [{ msg: warning }], "warns once per sink, never naming a credential");
+	t.strictEqual(callHeader(calls[0], "Authorization"), "Bearer t0ken", "the header wins, as in v2.4.0");
+
+	const single = reportSink();
+
+	new Queue({ otlpHttpBaseURI: "https://collector:s3cret@collector.test", report: single.report });
+	new Queue({ otlpAdditionalHeaders: { Authorization: "Bearer t0ken" }, otlpHttpBaseURI: "https://collector.test", report: single.report });
+	t.deepEqual(single.lines, [], "either spelling alone is silent");
+
+	const stderr: string[] = [];
+	const toStderr = (line: string) => { stderr.push(line); };
+
+	for (let i = 0; i < 2; i++) {
+		new Log({ format: "json", otlpAdditionalHeaders: { Authorization: "Bearer t0ken" }, otlpHttpBaseURI: "https://collector:s3cret@collector.test", stderr: toStderr });
+	}
+
+	t.deepEqual(stderr.map(line => [JSON.parse(line).logLevel, JSON.parse(line).msg]), [["warn", warning]], "a Log-built queue warns once per stderr, at warn");
 	t.end();
 });
 
@@ -1101,7 +1169,7 @@ test("Queue batches by time and by size, with keepalive under the browser cap", 
 	t.strictEqual(calls[0].keepalive, true, "a batch under 64 KiB is sent with keepalive");
 
 	calls.length = 0;
-	const sized = new Log({ clock, otlpQueue: new Queue({ batchDelayMs: 10000, clock, maxBatchBytes: 2500, otlpHttpBaseURI: "http://127.0.0.1:4318" }), stderr: () => {} });
+	const sized = new Log({ clock, otlpQueue: new Queue({ batchDelayMs: 10000, clock, maxBatchBytes: 3000, otlpHttpBaseURI: "http://127.0.0.1:4318" }), stderr: () => {} });
 
 	sized.info("a".repeat(700));
 	sized.info("b".repeat(700));
@@ -1560,7 +1628,10 @@ test("OTLP/JSON batches the records into one POST and exports one span sharing t
 
 	const span = traceResource.scopeSpans[0].spans[0];
 
-	t.strictEqual(traceResource.scopeSpans[0].scope.name, "lur-bert", "scope name is the span name");
+	const sdkVersion = resourceAttr(traceResource.resource.attributes, "telemetry.sdk.version");
+
+	t.deepEqual(traceResource.scopeSpans[0].scope, { name: "@larvit/log", version: sdkVersion }, "the span's scope is this library at its version");
+	t.deepEqual(logsBody.resourceLogs[0].scopeLogs[0].scope, { name: "@larvit/log", version: sdkVersion }, "and so is the records'");
 	t.strictEqual(span.name, "lur-bert", "span name");
 	t.strictEqual(span.kind, 1, "span kind 1");
 	t.deepEqual(span.status, { code: 0 }, "span status is ok: a logged error does not fail the span");
@@ -1643,8 +1714,8 @@ test("OTLP protobuf encodes logs and spans on the wire", async t => {
 	t.strictEqual(tracesCall.contentType, "application/x-protobuf", "traces are sent as protobuf");
 	t.strictEqual(pbMsg(pbMsg(pbDecode(logsCall.rawBody).get(1)![0]).get(2)![0]).get(2)!.length, 2, "both records under one resource_logs/scope_logs on the wire");
 
-	const { logRecord, resourceAttrs: logResourceAttrs } = pbDecodeLogs(logsCall.rawBody);
-	const { resourceAttrs: spanResourceAttrs, scopeName, span } = pbDecodeSpans(tracesCall.rawBody);
+	const { logRecord, resourceAttrs: logResourceAttrs, scope: logScope } = pbDecodeLogs(logsCall.rawBody);
+	const { resourceAttrs: spanResourceAttrs, scope: spanScope, span } = pbDecodeSpans(tracesCall.rawBody);
 
 	t.strictEqual(logRecord.body, "protobuf works", "decoded log body matches");
 	t.strictEqual(logRecord.severityNumber, 13, "decoded severityNumber is WARN (13)");
@@ -1662,7 +1733,9 @@ test("OTLP protobuf encodes logs and spans on the wire", async t => {
 	t.notOk(logRecord.attributes.find(attr => attr.key === "service.name"), "service.name is not duplicated in record attributes");
 	t.strictEqual(logRecord.timeUnixNano, nanos(startedAt), "decoded log timeUnixNano is the instant the entry was written");
 
-	t.strictEqual(scopeName, "proto-span", "scope name is the span name");
+	t.strictEqual(spanScope.name, "@larvit/log", "the span's scope is this library on the wire");
+	t.ok(/^\d+\.\d+\.\d+/.test(spanScope.version), "at its version");
+	t.deepEqual(logScope, spanScope, "and so is the records'");
 	t.strictEqual(span.name, "proto-span", "decoded span name matches");
 	t.strictEqual(span.kind, 1, "decoded span kind is 1");
 	t.strictEqual(span.statusCode, 2, "decoded span status code is ERROR (2)");
@@ -1704,6 +1777,19 @@ test("OTLP instances export independently, each with its own service.name", asyn
 });
 
 // --- trace context propagation (W3C traceparent) ---------------------------
+
+test("spans of different names share one scopeSpans entry in a POST", async t => {
+	const { calls } = stubFetch();
+	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", spanName: "parent", stderr: () => {} });
+
+	void new Log({ parentLog: log, spanName: "child" }).end();
+	await log.end();
+
+	const scopeSpans = calls.filter(call => call.path === "/v1/traces").flatMap(call => call.body.resourceSpans.flatMap((resourceSpan: any) => resourceSpan.scopeSpans));
+
+	t.deepEqual(scopeSpans.map(scopeSpan => scopeSpan.spans.map((span: any) => span.name)), [["child", "parent"]], "both spans under the one scope");
+	t.end();
+});
 
 test("formatTraceparent/parseTraceparent round-trip", t => {
 	const traceId = generateTraceId();
@@ -2097,6 +2183,31 @@ test("await log.end() drains a fire-and-forget log.fetch span, and its rejection
 	// The span must be delivered by the time end() resolves, else a short-lived process would exit first.
 	t.strictEqual(exportedSpans(calls).find(span => span.kind === 3 && span.status.code !== 2)?.name, "GET api.test", "the client span was exported before end() resolved");
 	t.strictEqual(unhandled.length, 1, "a rejection nobody awaited reaches the runtime, as plain fetch's would");
+	t.end();
+});
+
+test("log.fetch skips an invalid name in captureRequestHeaders or captureResponseHeaders and warns once per stderr", async t => {
+	const { calls } = stubFetch(path => path === "/x" ? response({ headers: new Headers({ "x-resp": "rv" }) }) : undefined);
+	const { log, stderr } = capture({ captureRequestHeaders: ["bad name", "x-req"], captureResponseHeaders: ["x-resp", "bad\nname"], format: "json", otlpHttpBaseURI: "http://127.0.0.1:4318" });
+
+	for (let i = 0; i < 2; i++) {
+		t.strictEqual((await log.fetch("https://api.test/x", { headers: { "x-req": "rq" } })).status, 200, `call ${i + 1} resolves with the platform's response`);
+	}
+
+	await log.end();
+
+	const span = clientSpan(calls);
+	const attr = (key: string) => span.attributes.find((attribute: any) => attribute.key === key)?.value.stringValue;
+
+	t.deepEqual([attr("http.request.header.x-req"), attr("http.response.header.x-resp"), span.status.code], ["rq", "rv", 0], "the valid names are captured and the span is no error");
+	t.deepEqual(stderr.map(line => [JSON.parse(line).logLevel, JSON.parse(line).msg]), [
+		["warn", "@larvit/log: captureRequestHeaders holds \"bad name\", which is no valid header name, so log.fetch skips it"],
+		["warn", "@larvit/log: captureResponseHeaders holds \"bad\\nname\", which is no valid header name, so log.fetch skips it"],
+	], "each invalid name warns once per stderr");
+
+	const broken = new Log({ captureRequestHeaders: ["bad name"], stderr: () => { throw new Error("stderr closed"); } });
+
+	t.strictEqual((await broken.fetch("https://api.test/x")).status, 200, "a stderr that throws on the warning never changes the result");
 	t.end();
 });
 

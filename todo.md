@@ -25,16 +25,11 @@
 
 | ID | Release | Exempt | Item | R | S | A | G | Goals | Score |
 |---|---|---|---|---|---|---|---|---|---|
-| 10 | 2.5.0 |  | **Name the instrumentation scope after this library.** | 3 | 2 | 6 | 8 | 2 | 22.9 |
-| 2 | 2.5.0 | defect | **Warn once per `report` sink about an invalid name in `captureRequestHeaders` or `captureResponseHeaders`, and skip it, so it never changes a `log.fetch` result.** | 2 | 2 | 6 | 7 | 1.1, 5 | 22.8 |
 | 3 | 2.5.0 | defect | **Send a `Request` passed as `init` with its own method, body, signal and other settings.** | 3 | 3 | 6 | 7 | 1.1 | 21.5 |
 | 12 | 2.5.0 |  | **Let a consumer inject the `fetch` the OTLP queue sends with.** | 3 | 3 | 6 | 6 | 1, 8 | 20.2 |
 | 7 | 2.5.0 | defect | **Unref the batch timer, so a pending batch never holds a Node or Deno process.** | 4 | 4 | 7 | 9 | 7.1 | 19.8 |
-| 6 | 2.5.0 | decision | **Warn once per `report` sink when `otlpHttpBaseURI` carries `user:pass@` and `otlpAdditionalHeaders` sets `Authorization`.** | 2 | 2 | 5 | 6 | 3 | 17.7 |
 | 8 | 2.5.0 | defect | **Keep a restored batch through the `maxItems` trim, so the retry promised for it holds.** | 4 | 3 | 7 | 4 | 1 | 17.2 |
 | 9 | 2.5.0 | defect | **Keep a batch in the persisted queue until its send settles.** | 4 | 3 | 7 | 4 | 1 | 17.2 |
-| 1 | 2.5.0 | decision | **Export `resolveFormatter`, so `conf.format` fully replaces the `conf.entryFormatter` alias 3.0.0 removes.** | 2 | 2 | 5 | 6 | 4, 5 | 17.1 |
-| 5 | 2.5.0 |  | **Report a 401 or 403 export as `OTLP export unauthorized, batch dropped`.** | 2 | 2 | 6 | 5 | 5 | 17.0 |
 | 11 | 2.5.0 | defect | **Keep a transient `storage` read failure from wiping the persisted queue.** | 4 | 4 | 7 | 4 | 1 | 17.0 |
 | 13 | 2.5.0 |  | **Pin every Node base image to its full patch version, so one commit builds one image on any day.** | 1 | 2 | 3 | 7 | 7 | 13.6 |
 | 22 | 2.6.0 |  | **Announce in the README and CHANGELOG that 3.0.0 stops `log.conf` and `queue.conf` handing back a credential, so a consumer reading one out of them moves to their own copy first.** | 1 | 1 | 5 | 8 | 3, 4 | 22.4 |
@@ -104,18 +99,6 @@
 
 ## Details
 
-### 10. Name the instrumentation scope after this library.
-
-Today `scope.name` is the span name, and batch merging splits `scopeSpans` by it, where OTel's scope
-identifies the instrumenting code. The README documents neither, so it ships in a minor.
-
-### 2. Warn once per `report` sink about an invalid name in `captureRequestHeaders` or `captureResponseHeaders`, and skip it, so it never changes a `log.fetch` result.
-
-Landing it drops README → `log.fetch` in depth's "Until 2.5.0, an invalid name" sentence.
-`headers.get("x y")` throws a `TypeError`, so a bad request-side name rejects every traced call
-before the request goes out, and a bad response-side one turns a response the platform delivered
-into a rejection.
-
 ### 3. Send a `Request` passed as `init` with its own method, body, signal and other settings.
 
 Landing it drops README → `log.fetch` in depth's "Until 2.5.0, a `Request`" sentence. `fetch(url,
@@ -144,10 +127,6 @@ log.flush()` returned with both records delivered and the process stayed alive a
 `flush()` then exits without exporting what it queued, so the CHANGELOG says so, and README → Queue
 exports' "A retry timer never keeps…" covers every timer.
 
-### 6. Warn once per `report` sink when `otlpHttpBaseURI` carries `user:pass@` and `otlpAdditionalHeaders` sets `Authorization`.
-
-The two can disagree, and v2.4.0 documents the header winning.
-
 ### 8. Keep a restored batch through the `maxItems` trim, so the retry promised for it holds.
 
 README → Audience says so. `prepend(batch)` unshifts a failed batch to the front, and the `maxItems`
@@ -159,16 +138,6 @@ the round trip and the promise are both spent on the flagship offline path.
 
 `takeBatch` removes it from `items` before `send`, so a record logged during the send saves the
 queue without it, and a process that dies then loses the batch its storage exists to keep.
-
-### 1. Export `resolveFormatter`, so `conf.format` fully replaces the `conf.entryFormatter` alias 3.0.0 removes.
-
-The alias hands back a callable `EntryFormatter`; 3.0.0's `format` hands back `"text" | "json" |
-EntryFormatter`, and the mapping between them is the unexported `formatterOf`.
-
-### 5. Report a 401 or 403 export as `OTLP export unauthorized, batch dropped`.
-
-Working auth makes a wrong credential reachable for the first time, and it is the likeliest
-misconfiguration of `otlpHttpBaseURI` userinfo; today it reads as any other 4xx.
 
 ### 11. Keep a transient `storage` read failure from wiping the persisted queue.
 
