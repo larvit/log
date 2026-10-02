@@ -23,9 +23,8 @@ browsers and React Native. No OpenTelemetry SDK, no dependencies.
 [Group logs into a trace](#group-logs-into-a-trace) ·
 [Trace outgoing HTTP](#trace-outgoing-http) · [Join an incoming trace](#join-an-incoming-trace) ·
 [Queue exports](#queue-exports) · [Accept a logger in your library](#accept-a-logger-in-your-library) ·
-[Options](#options) ·
-[Output formats](#output-formats) · [`log.fetch` in depth](#logfetch-in-depth) · [Footprint](#footprint) ·
-[Exports](#exports) ·
+[Options](#options) · [Output formats](#output-formats) · [`log.fetch` in depth](#logfetch-in-depth) ·
+[Footprint](#footprint) · [Exports](#exports) ·
 [Development](#development) · [Changelog](CHANGELOG.md)
 
 ## Goals
@@ -36,8 +35,8 @@ In priority order; the earlier goal wins a tie.
    1. **Behaves the same everywhere,** except where a runtime genuinely differs: then the platform
       wins and the docs say so.
 2. **Correct OTLP.** Leave out what cannot be done to the spec.
-3. **[Credentials never leave](#credentials-in-a-captured-value) in what this library captures.**
-   Text you log is exported as written.
+3. **[Credentials never leave](#credentials-in-a-captured-value).** Text you log is exported as
+   written.
 4. **[Semver, read strictly](#audience).**
 5. **A very easy API.** Nobody learns OTLP to log.
 6. **Composable.** Instances nest, inherit, and attach to an upstream trace.
@@ -61,9 +60,9 @@ queue survives app restarts through a `storage` adapter, and a full one holds ab
 current Chromium. React Native is supported from 0.74, where Hermes gained `TextEncoder` and
 `btoa`. Deno and Bun meet the rule and are not in CI.
 
-**Rely on** what this README documents, under semver read strictly ([Goals #4](#goals)). A minor
-only adds — an export, an option, a value an option accepts, a field, a span attribute — where code
-not using it behaves as before. A break is deprecated in a minor first and lands in the next major
+**Rely on** what this README documents, under semver read strictly. A minor only adds — an export,
+an option, a value an option accepts, a field, a span attribute — where code not using it behaves
+as before. A break is deprecated in a minor first and lands in the next major
 with a `MIGRATION.md` entry; a feature whose right shape breaks waits for that major, never shipping
 early in a worse one. Only a major changes:
 
@@ -78,13 +77,16 @@ early in a worse one. Only a major changes:
 - the keys a type you implement is handed or must provide: removing one it is handed, widening
   what one holds, or adding to what it must provide.
 
-**Do not rely on** anything this README does not document, which may change in a minor: an
-undocumented key of a `conf`, enumerability, or what a spread or `JSON.stringify` of a `conf`
-carries. Nor on a goal: each is an aim, and the section meeting it says what holds today. Nor on
-the text output line, which is written for people to read — parse `format: "json"` instead. Nor
-on delivery: the export queue is best-effort, it keeps what `storage` accepted and drops the oldest
-past `maxItems`, keeping a batch it has promised to retry, because telemetry is not payload data. A
-major stops being maintained when the next one ships.
+**Do not rely on:**
+
+- anything this README does not document, which may change in a minor: an undocumented key of a
+  `conf`, enumerability, or what a spread or `JSON.stringify` of a `conf` carries;
+- a goal: each is an aim, and the section meeting it says what holds today;
+- delivery: the export queue is best-effort, it keeps what `storage` accepted and drops the oldest
+  past `maxItems`, keeping a batch it has promised to retry, because telemetry is not payload data;
+- the text output line, which is written for people to read — parse `format: "json"` instead.
+
+A major stops being maintained when the next one ships.
 
 ## Install
 
@@ -274,9 +276,9 @@ A send has a 3 s timeout. Any 2xx is success; a JSON response whose `partialSucc
 count is reported with the count and the collector's message, and the batch is not resent. A
 network error, timeout, 408, 429 or 5xx keeps the batch for retry; any other non-2xx drops it. A
 retry timer never keeps a Node or Deno process alive, so a script whose first attempt fails loses
-the batch at exit, `await end()` or not; until 2.5.0 a pending batch timer does, for up to
-`batchDelayMs`, so `await end()` in a short-lived script. Give the queue a `storage` to carry a
-failed batch into the next run.
+the batch at exit, `await end()` or not; give the queue a `storage` to carry it into the next run.
+In a short-lived script, `await end()` before exit: it sends what is queued at once. Until 2.5.0 a
+pending batch timer also holds a Node or Deno process for up to `batchDelayMs`.
 
 `flush()` on `Log` or `Queue` sends everything queued, one attempt per batch, and resolves when that
 round is done. A failed batch stays queued for the retry, and until that fires `flush()` attempts
@@ -370,16 +372,14 @@ keeps it native. Levels map to OTLP severity through the exported `LogLevels` ta
 ## `log.fetch` in depth
 
 **`log.fetch` mirrors the runtime's `fetch`** ([Goals #1.1 and #5](#goals)). It takes a `string` or
-`URL` and any `init` that `fetch` takes, and the response, the rejection and the promise you see are exactly what it
-produced. What it adds is outbound trace context and a span, and never a success the platform would
-have refused. The request differs from yours only by `traceparent`, which is not CORS-safelisted,
-so a cross-origin call is preflighted and needs the server to list it in
-`Access-Control-Allow-Headers`. An option it
-cannot apply, such as an invalid header name to capture, warns once and is skipped, never changing
-the call.
+`URL` and an `init`, and the response, the rejection and the promise you see are exactly what the
+runtime produced. What it adds is outbound trace context and a span, and never a success the
+platform would have refused. The request differs from yours only by `traceparent`, which is not
+CORS-safelisted, so a cross-origin call is preflighted and needs the server to list it in
+`Access-Control-Allow-Headers`. Pass `init` as a plain object: a `Request` there loses its method,
+body and headers. List only valid header names to capture: an invalid one rejects the call.
 
-Only a URL that resolves to `http:` or
-`https:` is traced — a relative one resolves against the page, so it is untraced where there is no
+Only a URL that resolves to `http:` or `https:` is traced — a relative one resolves against the page, so it is untraced where there is no
 page, as on a server, and where the page is not `http:`/`https:`, as under a `file:` or app-scheme
 origin. Anything else passes straight through to an untraced `fetch`: no span, and no
 `traceparent` sent. The span is the only output; no log line is written.
@@ -404,8 +404,9 @@ them per call site.
 
 ### Credentials in a captured value
 
-[Goals #3](#goals) covers userinfo, wherever the runtime's `URL` parses a url, or a whole captured
-header value or status message, and the values of the header names and query keys matched below.
+[Goals #3](#goals) covers userinfo in a url, a captured header value or a status message, wherever
+the runtime's `URL` parses that value whole, and the values of the header names and query keys
+matched below.
 Anything else is exported as written, text you log yourself included.
 
 - **A header, whatever you list it for,** whose name, in any casing, is `cookie`, `passwd`,
