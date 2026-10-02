@@ -11,29 +11,30 @@ mechanism, that is evidence of the problem, never the prescribed repair.
   `"text" | "json" | EntryFormatter`, and the mapping between them is the unexported `formatterOf`.
   Decided 2026-09-28.
 - [ ] **Warn once per `report` sink about an invalid name in `captureRequestHeaders` or
-  `captureResponseHeaders`, and skip it, so it never changes a `log.fetch` result.**
-  `headers.get("x y")` throws a `TypeError`, so a bad request-side name rejects every traced call
-  before the request goes out, and a bad response-side one turns a response the platform delivered
-  into a rejection.
-- [ ] **Send a `Request` passed as `init` with its own method, body and headers.** `fetch(url,
-  request)` is valid and TypeScript accepts it, but `{ ...init, headers }` copies own properties
-  only, and a `Request`'s are prototype getters: `log.fetch(url, new Request(url, { method: "POST",
-  body }))` sends a GET with no body. A `Request` as the *input* is 2.6.0's item.
+  `captureResponseHeaders`, and skip it, so it never changes a `log.fetch` result.** Landing it
+  drops README → `log.fetch` in depth's "List only valid header names" sentence. `headers.get("x
+  y")` throws a `TypeError`, so a bad request-side name rejects every traced call before the request
+  goes out, and a bad response-side one turns a response the platform delivered into a rejection.
+- [ ] **Send a `Request` passed as `init` with its own method, body and headers.** Landing it drops
+  README → `log.fetch` in depth's "Pass `init` as a plain object" sentence. `fetch(url, request)` is
+  valid and TypeScript accepts it, but `{ ...init, headers }` copies own properties only, and a
+  `Request`'s are prototype getters: `log.fetch(url, new Request(url, { method: "POST", body }))`
+  sends a GET with no body. A `Request` as the *input* is 2.6.0's item.
 - [ ] **Report a 401 or 403 export as `OTLP export unauthorized, batch dropped`.** Working auth
   makes a wrong credential reachable for the first time, and it is the likeliest misconfiguration of
   `otlpHttpBaseURI` userinfo; today it reads as any other 4xx.
 - [ ] **Warn once per `report` sink when `otlpHttpBaseURI` carries `user:pass@` and
   `otlpAdditionalHeaders` sets `Authorization`.** The two can disagree, and v2.4.0 documents the
   header winning. Decided 2026-09-28.
-- [ ] **Unref the batch timer, so a pending batch never holds a Node or Deno process.** README →
-  Goals #7.1 asks for it. Today only the retry timer is
-  unref'd, so any pending batch holds the process for up to `batchDelayMs`, and `round()` clears the
-  batch timer once, at its start, so a record logged while an export is in flight leaves one behind
-  with nothing to send: measured on `node:22`, `await log.flush()` returned with both records
-  delivered and the process stayed alive a further 4.7 s of a 5 s `batchDelayMs`. 2.4.0 closes the
-  failed-round half. A script that awaits neither `end()` nor `flush()` then exits without exporting
-  what it queued, so the CHANGELOG says so, and README → Queue exports' "A retry timer never keeps…"
-  covers every timer.
+- [ ] **Unref the batch timer, so a pending batch never holds a Node or Deno process.** Landing it
+  drops README → Queue exports' "Until 2.5.0" sentence. README → Goals #7.1 asks for it. Today only
+  the retry timer is unref'd, so any pending batch holds the process for up to `batchDelayMs`, and
+  `round()` clears the batch timer once, at its start, so a record logged while an export is in
+  flight leaves one behind with nothing to send: measured on `node:22`, `await log.flush()` returned
+  with both records delivered and the process stayed alive a further 4.7 s of a 5 s `batchDelayMs`.
+  2.4.0 closes the failed-round half. A script that awaits neither `end()` nor `flush()` then exits
+  without exporting what it queued, so the CHANGELOG says so, and README → Queue exports' "A retry
+  timer never keeps…" covers every timer.
 - [ ] **Keep a restored batch through the `maxItems` trim, so the retry promised for it holds.**
   README → Audience says so. `prepend(batch)` unshifts a failed
   batch to the front, and the `maxItems` trim then splices the excess off that same front. An
@@ -57,7 +58,8 @@ mechanism, that is evidence of the problem, never the prescribed repair.
   `globalThis.fetch`, process-global state nothing can run beside. A React Native app that pins TLS
   or uses `expo/fetch` cannot route the exporter, the one request that crosses a hostile network,
   through it. Scope as `QueueConf.fetch`; whether `log.fetch` takes one is a separate question,
-  since README → `log.fetch` in depth says it mirrors the runtime and an injected fetch becomes the runtime.
+  since README → `log.fetch` in depth says it mirrors the runtime and an injected fetch becomes the
+  runtime.
 - [ ] **Pin every Node base image to its full patch version, so one commit builds one image on any
   day.** Three places float: `ARG BASE_IMAGE=node:24-bookworm-slim` in the `Dockerfile`,
   `${NODE_IMAGE:-node:22-bookworm-slim}` in `test-docker`, and the major-only `node-version` matrix
@@ -219,8 +221,8 @@ Each one is a weigh against README → Goals first: ship it, or delete the item 
 - [ ] **Give the redaction sentinel its own name — `REDACTED by @larvit/log` or similar.** Today one
   token means three things to the telemetry reader: a header redacted by name, a value that matched
   a credential shape, and a value the consumer's own app had already redacted upstream. `REDACTED`
-  shipped in 2.3.0 and README → Audience promises each documented span value, so renaming it waits for the
-  major.
+  shipped in 2.3.0 and README → Audience promises each documented span value, so renaming it waits
+  for the major.
 - [ ] **Give a `log.fetch` span `end({ error })`'s `error.type`: a string `code`, else `name`, else
   `"_OTHER"`.**
 - [ ] **Make `LogInt` `Logger` plus its own members, `enabled`, `flush` and `sampled` required.**

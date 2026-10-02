@@ -43,7 +43,7 @@ a pending retry from holding a Node or Deno process alive, and only the retry ti
 `| number` arm is what lets a browser, React Native or test clock type-check against types built
 with `"types": ["node"]`. A clock that delegates to platform timers is unref'd like the system one;
 only Deno's numeric `unrefTimer` is skipped for an injected clock, whose id may not be Deno's.
-Serves README → Goals #7. Valid while a pending retry must not hold the process open.
+Serves README → Goals #7.1. Valid while a pending retry must not hold the process open.
 
 ## `clock` is a supported option
 
@@ -112,8 +112,8 @@ carrying userinfo reaches the runtime's `fetch` untouched, and its span's status
 as the runtime quotes it back, with its redacted form. A rejection forwarded to `end({ error })` is
 read by "A header value or status message is redacted only where it is a url whole". Turning the
 userinfo into an `Authorization: Basic` header, as `otlpHttpBaseURI` does with the same spelling, is
-what README → Goals forbids of `log.fetch`: "The request differs from yours only by `traceparent`"
-and "never a success the platform would have refused". The two spellings differ because the queue's
+what README → `log.fetch` in depth forbids of it: "The request differs from yours only by
+`traceparent`" and "never a success the platform would have refused". The two spellings differ because the queue's
 endpoint is this library's own request to make, where `log.fetch`'s is the caller's, so the same
 string means "authenticate me" in one and "mirror what my runtime does with this" in the other.
 React Native does put them on the wire, on one of its two platforms: `whatwg-fetch` hands the url to
@@ -175,8 +175,8 @@ Footprint's 1 KB, on `node:22-bookworm-slim` over 50 000 retained instances. Ser
 #5 for the one name, README → Goals #4 for the alias. Valid until 3.0.0 removes `entryFormatter`.
 
 2026-09-28, the maintainer, superseding the alias above on `log.conf`: `conf.format` keeps v2.3.0's
-read type, per README → Audience: it never holds a function, and a string written beside `entryFormatter`
-reads back as written. A function formatter reads back from `conf.entryFormatter` alone and wins
+read type, per README → Audience: it never holds a function, and a string written beside
+`entryFormatter` reads back as written. A function formatter reads back from `conf.entryFormatter` alone and wins
 over any `conf.format`, as in v2.3.0, so writing `conf.format` on a function-formatted instance
 changes nothing. Reading or writing `conf.entryFormatter` does not warn, since 2.x has no other
 spelling to move to. Its `@deprecated` tag stays and names 3.0.0's `conf.format`, because README →
@@ -322,7 +322,7 @@ outranks #4. Valid while that section reads so.
 
 2026-10-03, the maintainer: when metrics ship, any OTLP metric shape — gauge, delta or cumulative
 sum, histogram — will be handed over already aggregated, and this library will encode, batch and
-deliver it; the types will say what a valid point must carry. Keeping a running total, a stable `startTimeUnixNano` and bucket
-boundaries that match across a series is the caller's, so instruments, temporality conversion and
-periodic collection stay out. Serves README → Goals #5 and #7. Valid until 3.0.0's metrics item
-ships; then the README documents it.
+deliver it; the types will say what a valid point must carry. Keeping a running total, a stable
+`startTimeUnixNano` and bucket boundaries that match across a series is the caller's, so
+instruments, temporality conversion and periodic collection stay out. Serves README → Goals #5 and
+#7. Valid until 3.0.0's metrics item ships; then the README documents it.
