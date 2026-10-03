@@ -173,10 +173,10 @@ and is exported by `end()`.
 `end()` closes the span, queues it and flushes the [export queue](#queue-exports); a span that is
 never ended is never sent. `end({ error })` also marks the span failed: status `ERROR` with the
 error's message, and an `error.type` attribute from its string `code`, else `name`, else `"_OTHER"`;
-a `null` or `undefined` error is a plain `end()`. A url's userinfo in the message is redacted, and so
-is a matched query key's value in a message that is a url whole, see
-[Credentials in a captured value](#credentials-in-a-captured-value); keep other credentials out of
-error messages. A logged `log.error()` never fails the span. `await` it to make one delivery
+a `null` or `undefined` error is a plain `end()`. Userinfo after `//` or `\\` in the message is
+redacted, and a message that is wholly a url is redacted as
+[Credentials in a captured value](#credentials-in-a-captured-value) says; keep other credentials out
+of error messages. A logged `log.error()` never fails the span. `await` it to make one delivery
 attempt before the process exits (a short-lived script); fire-and-forget is fine in a long-running
 process. Against a dead collector `await end()` returns after that attempt, within about 3 s plus
 however long any un-awaited `log.fetch()` takes to complete, and returns at once while a retry
@@ -413,12 +413,7 @@ them per call site.
 
 ### Credentials in a captured value
 
-Redaction covers five things: the userinfo of a url the runtime's `URL` parses, whether it is the
-url you fetch, sits in a kept query value, or is a whole captured header value or status message;
-userinfo written after `//` or `\\` among other text; a url nested in the request path;
-the url `log.fetch` fetched, wherever its own rejection quotes it; and the values of the header
-names and query keys matched below.
-Anything else is exported as written, text you log yourself included.
+Only what the bullets below name is redacted. Anything else is exported as written, text you log yourself included.
 
 - **A header, whatever you list it for,** whose name, in any casing, is `cookie`, `passwd`,
   `password`, `pwd`, `secret` or `set-cookie`, ends in `key`, or holds `auth`, `card`, `credit`,
@@ -443,25 +438,26 @@ Anything else is exported as written, text you log yourself included.
   message record `REDACTED` in place: `http://REDACTED@host/x?access_token=REDACTED`. In its own
   span's status, `log.fetch` also redacts the url it fetched wherever the runtime's rejection quotes
   it, its query and a url nested in its path included.
-- **A url nested in the request path**, as a fetch-through or image proxy takes one, raw or
-  percent-encoded: the path records `REDACTED` from the first segment that starts with a scheme,
-  such as `https:`, and opens a url holding a credential by these rules, its userinfo or a matched
-  key, as in `/fetch/REDACTED`, and from the ninth segment starting with a scheme, whatever it holds.
-  Keep credentials out of a url nested with no scheme, or behind other text in its segment, such as
-  `/fetch/s3.test/k%3Fsig%3D…` or `/a/x=https:%2F%2F…`: neither is read. The path records `/REDACTED` whole where userinfo after
-  `//` or `\\`, as the next bullet reads it, remains outside that cut, and where it is
-  percent-encoded more than eight times.
-- **Userinfo after `//` or `\\` in a captured header value, a kept query key or value, or a status
-  message:** an `@` with no `/`, `?`, `#`, whitespace, or `\` before a `/` or `\` between it and the
-  `//` or `\\`. This covers
-  a url among other text and one the runtime cannot parse, such as `//user:pass@host`. A header value
-  records `REDACTED` whole, a query key, or userinfo running across its `=` as in `?//u:p=w@host`,
-  records `REDACTED` with its value, and a status message records `REDACTED` in place:
-  `fetch failed: https://REDACTED@h/x`. A header value or query part is also read percent-decoded,
-  up to eight times; one encoded deeper records `REDACTED`. Only userinfo is found this way: a matched
-  query key in a url that is not a whole value, such as `?token=` in `fetch failed: https://h/x?token=…`,
-  is exported as written, and so is a relative `location: /cb?token=…`, since it needs a base. Keep
-  credentials out of error messages, or replace a message before `end({ error })`.
+- **Userinfo after `//` or `\\` in a captured header value, a kept query key or value, a status
+  message or the request path:** an `@` after `//` with no `/`, `?`, `#` or whitespace between, or
+  after `\\` with no `\` between either. This covers a url among other text, and one the runtime
+  cannot parse, such as `//user:pass@host`. A header value records `REDACTED` whole. A query key
+  holding such userinfo, or one where the userinfo runs across the `=`, as in `?//u:p=w@host`,
+  records `REDACTED` together with its value. A status message records `REDACTED` in place:
+  `fetch failed: https://REDACTED@h/x`. A header value, query part or path is also read
+  percent-decoded, up to eight times; one encoded deeper records `REDACTED`. Only userinfo is found
+  this way: a matched query key in a url that is not a whole value, such as `?token=` in
+  `fetch failed: https://h/x?token=…`, is exported as written, and so is a relative
+  `location: /cb?token=…`, since it needs a base. Keep credentials out of error messages, or replace
+  a message before `end({ error })`.
+- **A url nested in the request path**, raw or percent-encoded, as a fetch-through or image proxy
+  takes one. The path records `REDACTED` from the first segment that starts with a scheme, such as
+  `https:`, and opens a url holding a credential by these rules: `/fetch/REDACTED`. It also records
+  `REDACTED` from the ninth segment starting with a scheme, whatever that holds. Where userinfo, as
+  the bullet above reads it, remains outside that cut, or the path is percent-encoded more than eight
+  times, the whole path records `/REDACTED`. A matched query key in a url nested with no scheme, or
+  behind other text in its segment, such as `/fetch/s3.test/k%3Fsig%3D…` or `/a/x=https:%2F%2F…`,
+  is not read: keep credentials out of one.
 
 Never put credentials in the url; pass an `Authorization` header, and strip userinfo from a url you
 did not build. `log.fetch` mirrors the runtime: Node and browsers refuse such a url, while React
@@ -471,8 +467,9 @@ you the 401.
 `REDACTED` does not always stand for a credential: a `?key=` lookup, a `?token=` pagination cursor,
 a `?code=` promo code, an `?oauth=` or `?design=` flag, and the headers `www-authenticate`,
 `x-idempotency-key` and `x-session-id` record it, and so does an address read as userinfo, as in
-`https://api.test,mail@example.com`. A path records `/REDACTED` for `/users//bob@x.test`, and from
-a nested url for a `?key=` lookup in its encoded query or past the eighth nested url.
+`https://api.test,mail@example.com`. A path is cut at a nested url whose encoded query holds a
+`?key=` lookup, and at the ninth segment starting with a scheme; `/users//bob@x.test` records
+`/REDACTED`.
 
 Spans are queued when the response arrives and are registered with `flush()` at call time, so
 `await log.end()` delivers a `log.fetch()` you never awaited.

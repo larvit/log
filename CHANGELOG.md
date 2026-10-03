@@ -10,12 +10,12 @@
   and a signed url percent-encoded into the path exported its signature. Now the path records
   `REDACTED` from the first segment starting with a scheme and opening a url that holds a
   credential, at any depth of percent-encoding: `https://proxy.test/fetch/REDACTED`. A dashboard
-  grouping on `url.full` sees such a path change, and some paths holding no credential too: a nested
-  url's `?key=` lookup cuts the path, so does the ninth nested url, a path showing `//…@`, such as
+  grouping on `url.full` sees such a path change, and some paths holding no credential too. A nested
+  url's `?key=` lookup cuts the path, and so does a ninth nested url. A path showing `//…@`, such as
   `/users//bob@x.test`, records `/REDACTED` whole, and so does one percent-encoded more than eight
-  times. v2.4.0's advice to rotate what such a path carried stands for spans exported before. A url
-  nested with no scheme, or behind other text in its segment, such as `/fetch/s3.test/k%3Fsig%3D…`,
-  is not read yet: keep credentials out of one.
+  times. v2.4.0's advice to rotate what such a path carried stands for spans exported before. A
+  matched query key in a url nested with no scheme, or behind other text in its segment, such as
+  `/fetch/s3.test/k%3Fsig%3D…`, is not read yet: keep credentials out of one.
 - **A captured header records `REDACTED` by Elastic APM's default `sanitize_field_names` rule.**
   Since v2.3.0 only `authorization`, `cookie`, `proxy-authorization` and `set-cookie` did, so a
   listed `x-api-key`, `x-auth-token` or `x-amz-security-token` exported its value. Now a name that,
@@ -33,13 +33,14 @@
   and a dashboard grouping on status messages sees it change. Search status messages with the regex
   `(?i)([?&]|%(25)*(3f|26))[-_]*([^&=%\s]*(auth|authentication|authorization|consumer[-_]?id|credential|key|key[-_]?id|pass|pass[-_]?phrase|p(ass)?w(or)?d[12]?|secret|sig|sign|signature|signed|token)|code|googleaccessid|id[-_]?token[-_]?hint)[-_]*(=|%(25)*3d)`
   for a match followed by anything but `REDACTED`, and rotate what it finds.
-- **Userinfo is redacted where the runtime's `URL` parses it, in `\\` and slashless spellings too.**
+- **Userinfo is redacted in `\\` and slashless spellings, among other text, and percent-encoded.**
   Since v2.3.0, a captured `location` of `https:\\u:pw@h` or `http:u:pw@h` exported `pw`, and so did
   a kept query value such as `?next=https://my+user:pw@cb.test/x`, `https:\\u:pw@h` among other text
-  in a header value since v2.3.0 and in a status message since v2.4.0, and a url percent-encoded
-  twice or more into a header value or three times or more into a query value. Search captured header values, status messages and
-  `url.full` with `(?i)(https?:|([\\/]|%(25)*(2F|5C)){2})\S*(@|%(25)*40)` and rotate any password a
-  match holds; a match reading `REDACTED` before its `@` holds none.
+  in a header value, and a url percent-encoded twice or more into a header value or three times or
+  more into a query value. Since v2.4.0, `https:\\u:pw@h` among other text in a status message did
+  too. Search captured header values, status messages and `url.full` with
+  `(?i)(https?:|([\\/]|%(25)*(2F|5C)){2})\S*(@|%(25)*40)` and rotate any password a match holds; a
+  match reading `REDACTED` before its `@` holds none.
 - **`captureQuery` redacts a url a query key or value holds once decoded, at every level.** Its
   userinfo records `REDACTED` in place of the whole key or value, and a matched key's value
   `REDACTED` in place: since v2.3.0, `?next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3D…` with
