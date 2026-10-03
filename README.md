@@ -413,7 +413,8 @@ them per call site.
 
 ### Credentials in a captured value
 
-Only what the bullets below name is redacted. Anything else is exported as written, text you log yourself included.
+Only what the bullets below name is redacted. Anything else is exported as written, text you log
+yourself included.
 
 - **A header, whatever you list it for,** whose name, in any casing, is `cookie`, `passwd`,
   `password`, `pwd`, `secret` or `set-cookie`, ends in `key`, or holds `auth`, `card`, `credit`,
@@ -440,16 +441,16 @@ Only what the bullets below name is redacted. Anything else is exported as writt
   it, its query and a url nested in its path included.
 - **Userinfo after `//` or `\\` in a captured header value, a kept query key or value, a status
   message or the request path:** an `@` after `//` with no `/`, `?`, `#` or whitespace between, or
-  after `\\` with no `\` between either. This covers a url among other text, and one the runtime
-  cannot parse, such as `//user:pass@host`. A header value records `REDACTED` whole. A query key
-  holding such userinfo, or one where the userinfo runs across the `=`, as in `?//u:p=w@host`,
-  records `REDACTED` together with its value. A status message records `REDACTED` in place:
-  `fetch failed: https://REDACTED@h/x`. A header value, query part or path is also read
+  after `\\` with none of those and no `\` between. This covers a url among other text, and one the
+  runtime cannot parse, such as `//user:pass@host`. A header value or query value records `REDACTED`
+  whole. A query key holding such userinfo, or one where the userinfo runs across the `=`, as in
+  `?//u:p=w@host`, records `REDACTED` together with its value. A status message records `REDACTED`
+  in place: `retry https://REDACTED@h/x`. A header value, query part or path is also read
   percent-decoded, up to eight times; one encoded deeper records `REDACTED`. Only userinfo is found
-  this way: a matched query key in a url that is not a whole value, such as `?token=` in
-  `fetch failed: https://h/x?token=…`, is exported as written, and so is a relative
-  `location: /cb?token=…`, since it needs a base. Keep credentials out of error messages, or replace
-  a message before `end({ error })`.
+  this way: a matched query key in a url that is not a whole value, such as `?token=` in `retry
+  https://h/x?token=…`, is exported as written, and so is a relative `location: /cb?token=…`, since
+  it needs a base. Keep credentials out of error messages, or replace a message before `end({ error
+  })`.
 - **A url nested in the request path**, raw or percent-encoded, as a fetch-through or image proxy
   takes one. The path records `REDACTED` from the first segment that starts with a scheme, such as
   `https:`, and opens a url holding a credential by these rules: `/fetch/REDACTED`. It also records
