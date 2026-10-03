@@ -1385,6 +1385,36 @@ function parsedUrl(text: string): URL | undefined {
 
 const holdsUserinfo = (url: URL) => url.username !== "" || url.password !== "";
 
+// v2.4.0's rule, a floor under the whole-url reading: `//` or `\\`, then an `@` with no `/`, `?`,
+// `#` or whitespace between, so a url among other text, or one the runtime cannot parse, matches too.
+const TEXT_USERINFO = /(:?[/\\]{2})[^/?#\s]*@/g;
+const redactTextUserinfo = (text: string) => text.replace(TEXT_USERINFO, "$1REDACTED@");
+
+// Run by run, never the whole string: decodeURIComponent throws on the first invalid escape.
+function percentDecoded(value: string): string {
+	return value.replace(/(?:%[0-9A-Fa-f]{2})+/g, run => {
+		try {
+			return decodeURIComponent(run);
+		} catch {
+			// Only ASCII spells a url delimiter, so keep a non-UTF-8 run's ASCII and leave the rest.
+			return run.replace(/%([0-9A-Fa-f]{2})/g, (escape, hex: string) => parseInt(hex, 16) < 0x80 ? String.fromCharCode(parseInt(hex, 16)) : escape);
+		}
+	});
+}
+
+// Every level, since decoding a `%2F` in userinfo ends the match the level above it made.
+function decodings(text: string): string[] {
+	const levels = [text];
+
+	for (let decoded = percentDecoded(text); decoded !== levels[levels.length - 1]; decoded = percentDecoded(decoded)) {
+		levels.push(decoded);
+	}
+
+	return levels;
+}
+
+const textHoldsUserinfo = (text: string) => decodings(text).some(level => redactTextUserinfo(level) !== level);
+
 // `undefined` where no pair changes.
 function redactedSearch(url: URL, depth: number, partsRead: PartsRead): string | undefined {
 	const pairs = [...url.searchParams];
@@ -1440,7 +1470,11 @@ function redactQueryPair(key: string, value: string, depth: number, partsRead: P
 		}
 	}
 
-	return [key, isSensitiveQueryKey(key) ? "REDACTED" : redactQueryPart(value, depth, partsRead)];
+	if (textHoldsUserinfo(key)) {
+		return ["REDACTED", "REDACTED"];
+	}
+
+	return [key, isSensitiveQueryKey(key) || textHoldsUserinfo(value) ? "REDACTED" : redactQueryPart(value, depth, partsRead)];
 }
 
 // A value the runtime's `URL` parses whole; `undefined` where it is none or holds nothing to redact.
@@ -1463,7 +1497,7 @@ function redactedWholeUrl(value: string): string | undefined {
 }
 
 function redactHeaderCredential(name: string, value: string): string {
-	return SENSITIVE_HEADER_NAME.test(name.toLowerCase()) || redactedWholeUrl(value) !== undefined ? "REDACTED" : value;
+	return SENSITIVE_HEADER_NAME.test(name.toLowerCase()) || redactedWholeUrl(value) !== undefined || textHoldsUserinfo(value) ? "REDACTED" : value;
 }
 
 // The URL log.fetch traces: a scheme written without "//" parses to an opaque path, where
@@ -1480,9 +1514,33 @@ function traceableUrl(input: string | URL): URL | undefined {
 	return url.protocol === "http:" || url.protocol === "https:" ? url : undefined;
 }
 
+// A url nested in the path, as a fetch-through proxy takes one, runs to the path's end, its query
+// percent-encoded, so the path records `REDACTED` from the first segment opening one that holds a
+// credential: the first, since a later cut would leave an earlier url's userinfo in the prefix.
+function redactedPath(pathname: string): string {
+	const segments = pathname.split("/");
+	let opened = 0;
+
+	for (let index = 1; index < segments.length; index++) {
+		if (!decodings(segments[index]).some(level => SCHEME_LED.test(level))) {
+			continue;
+		}
+
+		opened++;
+
+		const nested = decodings(segments.slice(index).join("/"));
+
+		if (opened > MAX_URL_DEPTH || nested.some(level => SCHEME_LED.test(level) && (redactedWholeUrl(level) !== undefined || redactTextUserinfo(level) !== level))) {
+			return `${segments.slice(0, index).join("/")}/REDACTED`;
+		}
+	}
+
+	return textHoldsUserinfo(pathname) ? "/REDACTED" : pathname;
+}
+
 // `url.origin` omits userinfo, which is what keeps the outer url's credentials off the span.
 function buildUrlFull(url: URL, captureQuery: boolean): string {
-	const base = url.origin + url.pathname;
+	const base = url.origin + redactedPath(url.pathname);
 
 	return !captureQuery || !url.search ? base : `${base}?${redactedSearch(url, 0, new Map()) ?? url.searchParams.toString()}`;
 }
@@ -1502,7 +1560,7 @@ function failureMessage(error: unknown, url?: URL): string {
 	// The known url first: Firefox's `Window.fetch: <url> …` parses whole, its quoted userinfo in the path.
 	const quoted = url === undefined ? message : message.split(url.href).join(redactedWholeUrl(url.href) ?? url.href);
 
-	return redactedWholeUrl(quoted) ?? quoted;
+	return redactTextUserinfo(redactedWholeUrl(quoted) ?? quoted);
 }
 
 // --- Resolving a Log's settings --------------------------------------------

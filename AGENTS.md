@@ -39,7 +39,6 @@ In [docs/decisions.md](docs/decisions.md):
 - `resolveFormatter` is exported
 - Both credential spellings stay, and their combination warns
 - Inherited `otlpAdditionalHeaders` follow the endpoint's origin
-- A header value or status message is redacted only where it is a url whole
 - Metrics will arrive aggregated, with no instruments
 - `ProtoWriter.string` uses `TextEncoder` with no fallback
 - The protobuf encoder stays

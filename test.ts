@@ -1679,9 +1679,9 @@ test("end({ error }) marks the span failed", async t => {
 	t.notOk(attr(exportedSpan(3), "error.type"), "no error.type without an error");
 	t.deepEqual(exportedSpan(4).status, { code: 0 }, "end({ error: null }) leaves the span ok, for callback-style errors");
 	t.deepEqual(exportedSpan(5).status, { code: 2, message: "_OTHER" }, "a value that cannot be stringified still ends and exports the span");
-	t.deepEqual(exportedSpan(6).status, { code: 2, message: "Request cannot be constructed from a URL that includes credentials: http://myuser:hunter2@api.test/x, retried against https://backup:s3cr3t@api.test/x" }, "a url in free text is exported as written");
+	t.deepEqual(exportedSpan(6).status, { code: 2, message: "Request cannot be constructed from a URL that includes credentials: http://REDACTED@api.test/x, retried against https://REDACTED@api.test/x" }, "a url in free text has its userinfo redacted in place");
 	t.deepEqual(exportedSpan(7).status, { code: 2, message: "GET https://api.test/mail@example.com?to=a@b failed" }, "an @ outside the userinfo position is left alone");
-	t.deepEqual(exportedSpan(8).status, { code: 2, message: "Failed to parse URL from //myuser:hunter2@api.test/x?access_token=s3cr3t" }, "so is a url the runtime cannot parse");
+	t.deepEqual(exportedSpan(8).status, { code: 2, message: "Failed to parse URL from //REDACTED@api.test/x?access_token=s3cr3t" }, "so is a url the runtime cannot parse, only its userinfo");
 	t.strictEqual(attr(exportedSpan(9), "error.type"), "AbortError", "a numeric code is skipped for the error name");
 	t.deepEqual(exportedSpan(10).status, { code: 2, message: "https://REDACTED@api.test/x?page=2&Access_Token=REDACTED&next=REDACTED#top" }, "a message that is a url has its userinfo, listed keys and nested credentials redacted, its fragment kept");
 	t.ok(!exportedSpan(11).status.message.includes("s3cr3t"), "a url nested thousands deep in query values ends the span and is redacted");
@@ -1985,11 +1985,11 @@ test("log.fetch captureQuery keeps the query but redacts known-sensitive keys an
 	const presigned = ["GoogleAccessId", "X-Amz-Credential", "X-Amz-Security-Token", "X-Amz-Signature", "X-Goog-Credential"];
 	const tokens = ["access_token", "API_KEY", "apikey", "key", "Token", "access-token", "AccessToken", "api-key", "auth_token", "client_secret", "id_token", "password", "refresh_token", "Secret", "Subscription-Key", "authToken", "client-secret", "X_Amz_Signature", "apiKey", "x-api-key", "code", "id_token_hint", "auth", "old_password", "Passphrase", "consumer_id", "PrivateKeyId", "pwd", "X-Custom-Signed", "urn%3Asecret", "pword", "new_password2", "_code"];
 
-	t.ok(urlFull.startsWith("https://api.test/fetch/https://myuser:pwpath@cb.test/x?q=hi&"), "a url nested in the request path is exported as written, and a non-sensitive query param is kept");
+	t.ok(urlFull.startsWith("https://api.test/fetch/REDACTED?q=hi&"), "a url nested in the request path records REDACTED, and a non-sensitive query param is kept");
 	t.ok(urlFull.includes("Signature=REDACTED&Signature=REDACTED"), "a repeated sensitive key keeps one redaction per occurrence");
 	t.ok(!urlFull.includes("abc") && !urlFull.includes("def"), "neither sensitive value is leaked");
 	t.ok(urlFull.includes("&next=REDACTED&"), "a query value parsing as a url with userinfo once decoded records REDACTED");
-	t.ok(urlFull.includes("&deep=https%253A%252F%252Fmyuser%253Apwdeep%2540cb.test%252Fx&"), "a url percent-encoded twice is exported as written");
+	t.ok(urlFull.includes("&deep=REDACTED&"), "a url percent-encoded twice records REDACTED");
 	t.ok(urlFull.endsWith("&REDACTED=REDACTED"), "a credentialed url written as a bare query key is redacted, its value with it");
 	t.ok(!urlFull.includes("hunter2"), "the nested password is not leaked");
 	t.ok(urlFull.includes("X-Amz-Algorithm=AWS4-HMAC-SHA256"), "a presigned url's non-credential params are kept");
@@ -2010,6 +2010,34 @@ test("log.fetch captureQuery keeps the query but redacts known-sensitive keys an
 	t.end();
 });
 
+test("log.fetch redacts credentials in a url nested in the request path", async t => {
+	const { calls } = stubFetch();
+	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+	const paths = {
+		"/a/https://u:pw1@cb.test/x": "/a/REDACTED",
+		"/b/c/https%3A%2F%2Fu%3Apw2%40cb.test%2Fx": "/b/c/REDACTED",
+		"/d/https%253A%252F%252Fu%253Apw3%2540cb.test": "/d/REDACTED",
+		"/e/https:%5C%5Cu:pw4@cb.test": "/e/REDACTED",
+		"/f/https%3A%2F%2Fs3.test%2Fk%3FX-Amz-Signature%3Dpw5%26X-Amz-Date%3D1": "/f/REDACTED",
+		"/g/x:y/https://u:pw6@cb.test": "/g/REDACTED",
+		"/h//u:pw7@cb.test/x": "/REDACTED",
+		"/i/a:/a:/a:/a:/a:/a:/a:/a:/a:/x": "/i/a:/a:/a:/a:/a:/a:/a:/a:/REDACTED",
+		"/registry/@larvit/log/users/bob@x.test/https://cb.test/x?q=1": "/registry/@larvit/log/users/bob@x.test/https://cb.test/x",
+	};
+
+	for (const path of Object.keys(paths)) {
+		await log.fetch(`https://proxy.test${path}`);
+	}
+
+	await log.end();
+
+	const urlFulls = exportedSpans(calls).filter(span => span.kind === 3).map((span: any) => span.attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue);
+
+	t.deepEqual(urlFulls, Object.values(paths).map(path => `https://proxy.test${path}`), "the path records REDACTED from the segment opening a credentialed url, at any encoding, or past the eighth segment opening a url, or whole where no segment opens one, and a url without a credential is kept");
+	t.ok(!/pw\d/.test(JSON.stringify(calls.filter(call => call.path.startsWith("/v1/")))), "no nested credential reaches the collector");
+	t.end();
+});
+
 test("log.fetch redacts a long query within 250 ms", async t => {
 	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 
@@ -2017,12 +2045,12 @@ test("log.fetch redacts a long query within 250 ms", async t => {
 
 	const chain = Array.from({ length: 7 }).reduce<string>(nested => `https://a/?${encodeURIComponent(nested)}=b`, `https://t/?x=${"a".repeat(40000)}`);
 
-	for (const query of ["u=https://a/?".repeat(16384), "https://a/?".repeat(16384), chain]) {
+	for (const query of ["?u=https://a/?".repeat(16384), "?https://a/?".repeat(16384), `?${chain}`, `${"/a:".repeat(16384)}%3F`]) {
 		const started = performance.now();
 
-		await log.fetch(`https://proxy.test/?${query}`);
+		await log.fetch(`https://proxy.test/${query}`);
 
-		t.ok(performance.now() - started < 250, `${query.slice(0, 12)}… is redacted in ${Math.round(performance.now() - started)} ms`);
+		t.ok(performance.now() - started < 250, `${query.slice(0, 13)}… is redacted in ${Math.round(performance.now() - started)} ms`);
 	}
 
 	await log.end();
@@ -2128,8 +2156,8 @@ test("log.fetch captures allow-listed request and response headers only, never a
 	t.strictEqual(attr("http.response.header.location"), "REDACTED", "a url in a header whose query value holds userinfo is redacted whole");
 	t.strictEqual(attr("http.response.header.x-app"), "REDACTED", "so is one without a host holding a listed key");
 	t.strictEqual(attr("http.response.header.x-next"), "REDACTED", "so is one with a listed query key");
-	t.strictEqual(attr("http.response.header.link"), "<https://user:pwlink@cdn.test>; rel=preconnect", "a url in a header with more around it is exported as written");
-	t.strictEqual(attr("http.response.header.x-callback"), "https%3A%2F%2F%C5ke%3Apwenc%40cb.test%2Fx", "a percent-encoded url in a header is exported as written");
+	t.strictEqual(attr("http.response.header.link"), "REDACTED", "a url with userinfo among other text in a header is redacted whole");
+	t.strictEqual(attr("http.response.header.x-callback"), "REDACTED", "so is a percent-encoded one");
 	t.strictEqual(attr("http.response.header.set-cookie"), "REDACTED", "an allow-listed set-cookie records its presence, not its value");
 	t.ok(!JSON.stringify(calls.filter(call => call.path.startsWith("/v1/"))).includes("hunter2"), "no credential reaches the collector");
 	t.end();

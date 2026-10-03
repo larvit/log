@@ -173,9 +173,10 @@ and is exported by `end()`.
 `end()` closes the span, queues it and flushes the [export queue](#queue-exports); a span that is
 never ended is never sent. `end({ error })` also marks the span failed: status `ERROR` with the
 error's message, and an `error.type` attribute from its string `code`, else `name`, else `"_OTHER"`;
-a `null` or `undefined` error is a plain `end()`. A message that is a url is redacted, see
-[Credentials in a captured value](#credentials-in-a-captured-value); keep credentials out of any
-other error message. A logged `log.error()` never fails the span. `await` it to make one delivery
+a `null` or `undefined` error is a plain `end()`. A url's userinfo in the message is redacted, and so
+is the query of a message that is a url whole, see
+[Credentials in a captured value](#credentials-in-a-captured-value); keep other credentials out of
+error messages. A logged `log.error()` never fails the span. `await` it to make one delivery
 attempt before the process exits (a short-lived script); fire-and-forget is fine in a long-running
 process. Against a dead collector `await end()` returns after that attempt, within about 3 s plus
 however long any un-awaited `log.fetch()` takes to complete, and returns at once while a retry
@@ -397,7 +398,7 @@ Span attributes follow the OpenTelemetry HTTP semantic conventions:
 | Attribute | Value |
 |---|---|
 | `http.request.method` | Request method, `GET` when unset |
-| `url.full` | The URL without the outer userinfo; keep credentials out of a url nested in the path, which is exported as written. Query string dropped unless `captureQuery`, redacted as [Credentials in a captured value](#credentials-in-a-captured-value) says |
+| `url.full` | The URL without the outer userinfo. Path and query redacted as [Credentials in a captured value](#credentials-in-a-captured-value) says; query string dropped unless `captureQuery` |
 | `url.scheme`, `server.address`, `server.port` | From the URL; port only when explicit |
 | `http.request.header.<name>` | Headers listed in `captureRequestHeaders` |
 | `http.response.status_code` | Response status |
@@ -412,8 +413,9 @@ them per call site.
 
 ### Credentials in a captured value
 
-Redaction covers three things: the userinfo of a url the runtime's `URL` parses, whether it is the
+Redaction covers five things: the userinfo of a url the runtime's `URL` parses, whether it is the
 url you fetch, sits in a kept query value, or is a whole captured header value or status message;
+userinfo written after `//` or `\\` among other text; a url nested in the request path;
 the url `log.fetch` fetched, wherever its own rejection quotes it; and the values of the header
 names and query keys matched below.
 Anything else is exported as written, text you log yourself included.
@@ -440,9 +442,21 @@ Anything else is exported as written, text you log yourself included.
   a matched key, at every level as above, makes a header value record `REDACTED` whole, and a status
   message record `REDACTED` in place: `http://REDACTED@host/x?access_token=REDACTED`. In its own
   span's status, `log.fetch` also redacts the url it fetched wherever the runtime's rejection quotes
-  it; forwarded to `end({ error })`, that rejection exports the url's userinfo, so replace its
-  message first or keep credentials out of the url. Any other header value or status message is
-  exported as written, a relative `location: /cb?token=…` included, since it needs a base.
+  it, its query included.
+- **A url nested in the request path**, as a fetch-through or image proxy takes one, raw or
+  percent-encoded however many times: the path records `REDACTED` from the first segment opening a
+  url that holds a credential by these rules, its userinfo or a matched key, as in `/fetch/REDACTED`,
+  and from the ninth segment opening a url, whatever it holds. A path showing userinfo, as below,
+  with no segment opening a url records `/REDACTED` whole.
+- **Userinfo after `//` or `\\` in a captured header value, a kept query key or value, or a status
+  message:** an `@` with no `/`, `?`, `#` or whitespace between it and the `//` or `\\`. This covers
+  a url among other text and one the runtime cannot parse, such as `//user:pass@host`. A header value
+  records `REDACTED` whole, a query key records `REDACTED` with its value, and a status message
+  records `REDACTED` in place: `fetch failed: https://REDACTED@h/x`. A header value or query part is
+  also read percent-decoded, however many times encoded. Only userinfo is found this way: a matched
+  query key in a url that is not a whole value, such as `?token=` in `fetch failed: https://h/x?token=…`,
+  is exported as written, and so is a relative `location: /cb?token=…`, since it needs a base. Keep
+  credentials out of error messages, or replace a message before `end({ error })`.
 
 Never put credentials in the url; pass an `Authorization` header, and strip userinfo from a url you
 did not build. `log.fetch` mirrors the runtime: Node and browsers refuse such a url, while React
@@ -451,8 +465,8 @@ you the 401.
 
 `REDACTED` does not always stand for a credential: a `?key=` lookup, a `?token=` pagination cursor,
 a `?code=` promo code, an `?oauth=` or `?design=` flag, and the headers `www-authenticate`,
-`x-idempotency-key` and `x-session-id` record it, and so does an address the runtime reads as
-userinfo, as in `https://api.test,mail@example.com`.
+`x-idempotency-key` and `x-session-id` record it, and so does an address read as userinfo, as in
+`https://api.test,mail@example.com`, and a path's `/users//bob@x.test` records `/REDACTED`.
 
 Spans are queued when the response arrives and are registered with `flush()` at call time, so
 `await log.end()` delivers a `log.fetch()` you never awaited.
