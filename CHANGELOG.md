@@ -4,24 +4,13 @@
 
 ### Security
 
-- **2.5.0 exports some values v2.4.0 redacted.** Redaction now covers what the runtime's `URL`
-  parses, read on a whole value (README → Credentials in a captured value). These go out as written:
-  - a url among other text in a header value or in a status message you set with `end({ error })`,
-    its userinfo included, a forwarded `log.fetch` rejection among them;
-  - a url percent-encoded into a header value;
-  - a query value holding a url percent-encoded twice in the request url;
-  - a url the runtime cannot parse, such as a scheme-relative `//user:pass@host`.
-
-  Before upgrading, find where 2.5.0 exports what v2.4.0 hid: a status message holding `REDACTED@`
-  on a span you ended with `end({ error })`; a captured header whose name README → Credentials in a
-  captured value does not match that recorded exactly `REDACTED`; and a `url.full` query
-  value recording exactly `REDACTED` under a key README → Credentials in a captured value does not
-  match. Each hit is a call site 2.5.0 exports in the clear unless the runtime's `URL` parses its
-  original value whole. Keep credentials out of those values: strip them before they reach
-  `log.fetch` or `end({ error })`, and drop a response header you cannot control from
-  `captureResponseHeaders`. A url nested in the request path stays in `url.full` as written, as in
-  v2.4.0, and is not fixed in 2.5.0: README → Credentials in a captured value does not cover it, so
-  v2.4.0's rotation advice for it stands; keep credentials out of a url you nest in a path.
+- **`url.full` records `REDACTED` for a url nested in the request path.** Since v2.3.0,
+  `log.fetch("https://proxy.test/fetch/https://user:pass@cb.test/x")` — the shape a fetch-through,
+  CORS or image proxy takes — exported the password in `url.full` with no capture option involved,
+  and a signed url percent-encoded into the path exported its signature. Now the path records
+  `REDACTED` from the first segment opening a url that holds a credential, at any depth of
+  percent-encoding: `https://proxy.test/fetch/REDACTED`. A dashboard grouping on `url.full` sees such
+  a path change. v2.4.0's advice to rotate what such a path carried stands for spans exported before.
 - **A captured header records `REDACTED` by Elastic APM's default `sanitize_field_names` rule.**
   Since v2.3.0 only `authorization`, `cookie`, `proxy-authorization` and `set-cookie` did, so a
   listed `x-api-key`, `x-auth-token` or `x-amz-security-token` exported its value. Now a name that,
@@ -41,7 +30,9 @@
   for a match followed by anything but `REDACTED`, and rotate what it finds.
 - **Userinfo is redacted where the runtime's `URL` parses it, in `\\` and slashless spellings too.**
   Since v2.3.0, a captured `location` of `https:\\u:pw@h` or `http:u:pw@h` exported `pw`, and so did
-  a kept query value such as `?next=https://my+user:pw@cb.test/x`. Search captured header values and
+  a kept query value such as `?next=https://my+user:pw@cb.test/x`, `https:\\u:pw@h` among other text
+  in a header value or status message, and a url percent-encoded twice or more into a header value
+  or three times or more into a query value. Search captured header values, status messages and
   `url.full` with `(?i)(https?:|([\\/]|%(25)*(2F|5C)){2})\S*(@|%(25)*40)` and rotate any password a
   match holds; a match reading `REDACTED` before its `@` holds none.
 - **`captureQuery` redacts a url a query key or value holds once decoded, at every level.** Its

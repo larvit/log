@@ -112,17 +112,17 @@ status of those spans were right, their `url.full` (`nulluser:pass@host/x`,
 
 2026-09-20 by the implementing agent, amended 2026-09-29 by the maintainer: a `log.fetch` url
 carrying userinfo reaches the runtime's `fetch` untouched, and its span's status replaces that url,
-as the runtime quotes it back, with its redacted form. A rejection forwarded to `end({ error })` is
-read by "A header value or status message is redacted only where it is a url whole". Turning the
-userinfo into an `Authorization: Basic` header, as `otlpHttpBaseURI` does with the same spelling, is
-what README → `log.fetch` in depth forbids of it: "The request differs from yours only by
-`traceparent`" and "never a success the platform would have refused". The two spellings differ
-because the queue's endpoint is this library's own request to make, where `log.fetch`'s is the
-caller's, so the same string means "authenticate me" in one and "mirror what my runtime does with
-this" in the other. React Native does put them on the wire, on one of its two platforms:
-`whatwg-fetch` hands the url to `XMLHttpRequest.open` untouched and sets no header, iOS keeps the
-userinfo through `[RCTConvert NSURL:]` and runs `NSURLSession` with no challenge delegate, so the
-system answers `WWW-Authenticate` with the credentials, while Android passes the string to
+as the runtime quotes it back, with its redacted form. A rejection forwarded to `end({ error })` has
+its userinfo redacted in place, as any status message does. Turning the userinfo into an
+`Authorization: Basic` header, as `otlpHttpBaseURI` does with the same spelling, is what README →
+`log.fetch` in depth forbids of it: "The request differs from yours only by `traceparent`" and
+"never a success the platform would have refused". The two spellings differ because the queue's
+endpoint is this library's own request to make, where `log.fetch`'s is the caller's, so the same
+string means "authenticate me" in one and "mirror what my runtime does with this" in the other.
+React Native does put them on the wire, on one of its two platforms: `whatwg-fetch` hands the url to
+`XMLHttpRequest.open` untouched and sets no header, iOS keeps the userinfo through `[RCTConvert
+NSURL:]` and runs `NSURLSession` with no challenge delegate, so the system answers
+`WWW-Authenticate` with the credentials, while Android passes the string to
 `Request.Builder().url()` and OkHttp derives no `Authorization` from it — leaving the caller a 401,
 and writing the userinfo out only in a plain-`http:` proxy's request line. Same at `v0.74.0` and at
 `main` on 2026-09-20. Mirroring keeps that the platform's behaviour. It ships in a minor on the
@@ -142,7 +142,8 @@ name where its name, ignoring case, matches Elastic APM's default `sanitize_fiel
 (`password`, `passwd`, `pwd`, `secret`, `*key`, `*token*`, `*session*`, `*credit*`, `*card*`,
 `*auth*`, `set-cookie`, `*principal*`) or is `cookie`, the spec's optional addition
 (https://github.com/elastic/apm/blob/main/specs/agents/sanitization.md), and everything else goes by
-whether the value, parsed whole as a url, holds a credential. Elastic's is the one published
+whether the value, parsed whole as a url, holds a credential, or holds userinfo by v2.4.0's text
+rule, the floor that keeps 2.5.0 redacting all v2.4.0 did. Elastic's is the one published
 cross-agent spec that requires redacting request and response headers: OTel redacts no header value,
 Datadog's tracers only in AppSec, and Datadog's eight exact names there miss `x-api-key` and every
 `x-*-token`; the four RFC 9110 and RFC 6265 names 2.3.0 hard-coded missed them too. Redacting rather
@@ -328,22 +329,6 @@ later is not rechecked. Serves README → Goals #5.
 `otlpAdditionalHeaders` only from a source with no endpoint or one of the same origin, the line
 fetch draws when a redirect drops `Authorization`; a new path on the same collector keeps working.
 Serves README → Goals #3, "Credentials never leave", on the wire.
-
-## A header value or status message is redacted only where it is a url whole
-
-2026-09-29, the maintainer: a captured header value or a span's status message is read as a url only
-where the runtime's `URL` parses the whole of it, so 2.5.0 exports as written what v2.4.0 redacted:
-a url among other text, a percent-encoded url in a header, and a url the runtime cannot parse, such
-as a scheme-relative `//user:pass@host`. Six review rounds each found a new way a scanner for urls
-in free text missed one — a delimiter, an escape the rewrite wrote, a scheme ending another — so the
-scanner went. README → Credentials in a captured value draws that line, serving Goals #3, which
-outranks #4. Valid while that section reads so; it lets more credentials leave than v2.4.0 did, so
-`todo.md` item 84 asks the maintainer to revise it or name the item that ends it.
-
-2026-10-03, the maintainer, overturning this before 2.5.0 ships: what v2.4.0 redacted stays
-redacted (`todo.md` item 84), and so do credentials in a url nested in the request path (`todo.md`
-item 85). Serves README → Goals #3. Valid until both items land, when this entry goes.
-
 
 ## Metrics will arrive aggregated, with no instruments
 
