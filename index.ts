@@ -1385,12 +1385,13 @@ function parsedUrl(text: string): URL | undefined {
 
 const holdsUserinfo = (url: URL) => url.username !== "" || url.password !== "";
 
-// v2.4.0's rule, a floor under the whole-url reading: `//` or `\\`, then an `@` with no `/`, `?`, `#`,
-// whitespace, or `\` before a `/` or `\` between, so a url among other text, or one the runtime cannot
-// parse, matches too. Stopping at each slash pair keeps a run of them from rescanning to its end.
-const TEXT_USERINFO = /(:?[/\\]{2})(?:[^/\\?#\s]|\\(?![/\\]))*@/g;
-const OPENS_USERINFO = /[/\\]{2}(?:[^/\\?#\s]|\\(?![/\\]))*$/;
-const redactTextUserinfo = (text: string) => text.replace(TEXT_USERINFO, "$1REDACTED@");
+// v2.4.0's `//` rule, a floor under the whole-url reading, and the same after `\\`: they match a url
+// among other text, or one the runtime cannot parse. Userinfo after `\\` stops at a `\`, so a run of
+// them stays linear.
+const SLASHED_USERINFO = /(:?\/\/)[^/?#\s]*@/g;
+const BACKSLASHED_USERINFO = /(:?\\\\)[^/\\?#\s]*@/g;
+const OPENS_USERINFO = /\/\/[^/?#\s]*$|\\\\[^/\\?#\s]*$/;
+const redactTextUserinfo = (text: string) => text.replace(SLASHED_USERINFO, "$1REDACTED@").replace(BACKSLASHED_USERINFO, "$1REDACTED@");
 
 // Run by run, never the whole string: decodeURIComponent throws on the first invalid escape.
 function percentDecoded(value: string): string {
@@ -1404,7 +1405,8 @@ function percentDecoded(value: string): string {
 	});
 }
 
-// Every level, since decoding a `%2F` in userinfo ends the match the level above it made.
+// Every level: decoding a `%2F` inside userinfo puts a `/` before the `@`, so a match at one level
+// can vanish at the next.
 // `undefined` past MAX_URL_DEPTH levels, which counts as a credential, as a url nested that deep does.
 function decodings(text: string): string[] | undefined {
 	const levels = [text];
@@ -1477,7 +1479,7 @@ function redactQueryPair(key: string, value: string, depth: number, partsRead: P
 		}
 	}
 
-	// `?//u:p=w@host` splits its userinfo across the `=`: a key ending inside one is read with its value.
+	// `?//u:p=w@host` splits its userinfo across the `=`: a key ending inside userinfo is read with its value.
 	const keyOpensUserinfo = decodings(key)?.some(level => OPENS_USERINFO.test(level)) ?? true;
 
 	if (textHoldsUserinfo(key) || (keyOpensUserinfo && textHoldsUserinfo(`${key}=${value}`))) {
@@ -1524,9 +1526,8 @@ function traceableUrl(input: string | URL): URL | undefined {
 	return url.protocol === "http:" || url.protocol === "https:" ? url : undefined;
 }
 
-// A url nested in the path, as a fetch-through proxy takes one, runs to the path's end, its query
-// percent-encoded, so the path records `REDACTED` from the first segment opening one that holds a
-// credential: the first, since a later cut would leave an earlier url's userinfo in the prefix.
+// Cut at the first segment whose nested url holds a credential: a later cut would leave an earlier
+// url's userinfo in the kept prefix.
 function redactedPath(pathname: string): string {
 	const segments = pathname.split("/");
 	let kept = pathname;
@@ -1547,8 +1548,8 @@ function redactedPath(pathname: string): string {
 		}
 	}
 
-	// Userinfo after `//` needs no scheme, so a segment opening a url never finds it; and the whole
-	// path goes, since the match may sit in a decoded level whose position maps to no raw segment.
+	// The loop reads only segments starting with a scheme, and userinfo after `//` needs none. Its match
+	// may sit in a decoded level that maps to no raw segment, so the whole path goes.
 	return textHoldsUserinfo(kept) ? "/REDACTED" : kept;
 }
 

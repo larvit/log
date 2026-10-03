@@ -1667,6 +1667,7 @@ test("end({ error }) marks the span failed", async t => {
 	await new Log(conf).end({ error: new Error("https://myuser:hunter2@api.test/x?page=2&Access_Token=s3cr3t&next=https%3A%2F%2Fu%3Ahunter2%40cb.test#top") });
 	await new Log(conf).end({ error: new Error("https://a.test/?" + "u=https://a/?".repeat(5000) + "token=s3cr3t") });
 	await new Log(conf).end({ error: new Error("http:myuser:hunter2@h.test/x") });
+	await new Log(conf).end({ error: new Error("db postgres://u:p\\\\w@h and \\\\v:qw@h failed") });
 
 	t.deepEqual(exportedSpan(0).status, { code: 2, message: "refused" }, "status is ERROR with the error message");
 	t.strictEqual(attr(exportedSpan(0), "error.type"), "ECONNREFUSED", "error.type is the error's code when it has one");
@@ -1681,11 +1682,12 @@ test("end({ error }) marks the span failed", async t => {
 	t.deepEqual(exportedSpan(5).status, { code: 2, message: "_OTHER" }, "a value that cannot be stringified still ends and exports the span");
 	t.deepEqual(exportedSpan(6).status, { code: 2, message: "Request cannot be constructed from a URL that includes credentials: http://REDACTED@api.test/x, retried against https://REDACTED@api.test/x" }, "a url in free text has its userinfo redacted in place");
 	t.deepEqual(exportedSpan(7).status, { code: 2, message: "GET https://api.test/mail@example.com?to=a@b failed" }, "an @ outside the userinfo position is left alone");
-	t.deepEqual(exportedSpan(8).status, { code: 2, message: "Failed to parse URL from //REDACTED@api.test/x?access_token=s3cr3t" }, "so is a url the runtime cannot parse, only its userinfo");
+	t.deepEqual(exportedSpan(8).status, { code: 2, message: "Failed to parse URL from //REDACTED@api.test/x?access_token=s3cr3t" }, "a url the runtime cannot parse has only its userinfo redacted");
 	t.strictEqual(attr(exportedSpan(9), "error.type"), "AbortError", "a numeric code is skipped for the error name");
 	t.deepEqual(exportedSpan(10).status, { code: 2, message: "https://REDACTED@api.test/x?page=2&Access_Token=REDACTED&next=REDACTED#top" }, "a message that is a url has its userinfo, listed keys and nested credentials redacted, its fragment kept");
 	t.ok(!exportedSpan(11).status.message.includes("s3cr3t"), "a url nested thousands deep in query values ends the span and is redacted");
 	t.deepEqual(exportedSpan(12).status, { code: 2, message: "http://REDACTED@h.test/x" }, "a slashless spelling the runtime's URL parses is a url too");
+	t.deepEqual(exportedSpan(13).status, { code: 2, message: "db postgres://REDACTED@h and \\\\REDACTED@h failed" }, "userinfo after // is redacted with any backslash it holds, and so is userinfo after \\\\");
 	t.end();
 });
 
@@ -2006,7 +2008,7 @@ test("log.fetch captureQuery keeps the query but redacts known-sensitive keys an
 	t.ok(urlFull.includes("&https%3A%2F%2Ft.test%2Fx%3Fnext=REDACTED&https%3A%2F%2Ft.test%2Fy%3Fnext=REDACTED&") && !/w4[01]/.test(urlFull), "a url value under a url key is read alone too, an escaped delimiter in its userinfo included");
 	t.ok(urlFull.includes("%3Fnext=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&flow=1&") && !/pw42|ss4[3-6]/.test(urlFull), "a url in a query key is read alone too, where its value breaks the joined reading, and a key cut short by an = in its password is read with its value, whitespace or a control character the parser drops included");
 	t.ok(urlFull.includes("&next2=myapp%3A%2F%2F%2Fcb%3Faccess_token%3DREDACTED&q2=a%3Ab&"), "a url without a host has its listed key redacted, and a scheme alone leaves a value be");
-	t.ok(urlFull.includes("&q2=a%3Ab&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&d10=REDACTED&d9=REDACTED&") && !/pw5[0-3]/.test(urlFull), "userinfo after // in a key, or running across its =, redacts both, whatever else the value holds, and a value encoded past eight levels records REDACTED");
+	t.ok(urlFull.includes("&q2=a%3Ab&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&d10=REDACTED&d9=REDACTED&") && !/pw5[0-3]/.test(urlFull), "userinfo in a key, or across its =, redacts both, and a value past eight encodings records REDACTED");
 	t.ok(urlFull.includes("&flow=1&redirect_uri=https%3A%2F%2Flocalhost%3A3000&scope=openid&login_hint=bob%40x.test&"), "an encoded url in a value leaves the pairs after it alone");
 	t.end();
 });
@@ -2037,7 +2039,7 @@ test("log.fetch redacts credentials in a url nested in the request path", async 
 
 	const urlFulls = exportedSpans(calls).filter(span => span.kind === 3).map((span: any) => span.attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue);
 
-	t.deepEqual(urlFulls, Object.values(paths).map(path => `https://proxy.test${path}`), "the path records REDACTED from the segment opening a credentialed url, at any encoding, or past the eighth segment opening a url, or whole where userinfo shows outside a segment opening a url, and a url without a credential is kept");
+	t.deepEqual(urlFulls, Object.values(paths).map(path => `https://proxy.test${path}`), "each path records its expected redaction");
 	t.ok(!/pw\d/.test(JSON.stringify(calls.filter(call => call.path.startsWith("/v1/")))), "no nested credential reaches the collector");
 	t.end();
 });
@@ -2050,7 +2052,7 @@ test("log.fetch redacts a long query within 250 ms", async t => {
 
 	const chain = Array.from({ length: 7 }).reduce<string>(nested => `https://a/?${encodeURIComponent(nested)}=b`, `https://t/?x=${"a".repeat(40000)}`);
 
-	for (const query of ["?u=https://a/?".repeat(16384), "?https://a/?".repeat(16384), `?${chain}`, `${"/a:".repeat(16384)}%3F`, `${deep}/https:/${deep}?q=${deep}`, `?q=${"\\".repeat(32768)} x`, `${"%5C".repeat(32768)}%20x`]) {
+	for (const query of ["?u=https://a/?".repeat(16384), "?https://a/?".repeat(16384), `?${chain}`, `${"/a:".repeat(16384)}%3F`, `${deep}/https:/${deep}?q=${deep}`, `?q=${"\\".repeat(32768)} x`, `?q=//${"\\".repeat(32768)} x`, `${"%5C".repeat(32768)}%20x`]) {
 		const started = performance.now();
 
 		await log.fetch(`https://proxy.test/${query}`, { headers: { "x-deep": deep } });
