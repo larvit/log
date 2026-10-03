@@ -6,7 +6,7 @@
 
 `Bar = 9`
 
-`Next ID = 93`
+`Next ID = 94`
 
 | Goal | W |
 |---|---|
@@ -25,6 +25,7 @@
 
 | ID | Release | Exempt | Item | R | S | A | G | Goals | Score |
 |---|---|---|---|---|---|---|---|---|---|
+| 93 | 2.5.0 | security | **Redact a credential in a url nested in the request path where the url does not open its segment.** | 3 | 4 | 5 | 7 | 3 | 17.9 |
 | 79 | 2.5.0 | defect | **State the real runtime floor, ES2021 syntax and `BigInt`, in README → Runtimes, or build down to the floor it states.** | 2 | 2 | 7 | 8 | 1 | 27.5 |
 | 3 | 2.5.0 | defect | **Send a `Request` passed as `init` with its own method, body, signal and other settings.** | 3 | 3 | 6 | 7 | 1.1 | 21.5 |
 | 12 | 2.5.0 |  | **Let a consumer inject the `fetch` the OTLP queue sends with.** | 3 | 3 | 6 | 6 | 1, 8 | 20.2 |
@@ -109,6 +110,13 @@
 | 74 | 3.0.0 | decision | **Keep `otlpQueue` as the only OTLP representation in `conf`.** | 4 | 4 | 3 | 6 | 6 | 9.4 |
 
 ## Details
+
+### 93. Redact a credential in a url nested in the request path where the url does not open its segment.
+
+`url.full` exports a signed url's `sig` or `X-Amz-Signature` when a proxy path nests the url
+without a scheme or behind other text in its segment: `/fetch/s3.test/k%3Fsig%3D…`,
+`/a/x=https:%2F%2Fcb.test%2Fx%3Fpassword%3D…`, `/a/x;https:%2F%2F…%3Ftoken%3D…`. Userinfo in these
+shapes is already redacted; a matched query key is not. Found by the stability pass on 2026-10-03.
 
 ### 79. State the real runtime floor, ES2021 syntax and `BigInt`, in README → Runtimes, or build down to the floor it states.
 
