@@ -34,7 +34,7 @@
 | 11 | 2.5.0 | defect | **Keep a transient `storage` read failure from wiping the persisted queue.** | 4 | 4 | 7 | 4 | 1 | 17.0 |
 | 89 | 2.5.0 | defect | **Keep `enabled()` free of output: warn about an unknown `logLevel` from the level methods alone.** | 2 | 2 | 5 | 5 | 5 | 15.0 |
 | 13 | 2.5.0 |  | **Pin every Node base image to its full patch version, so one commit builds one image on any day.** | 1 | 2 | 3 | 7 | 7 | 13.6 |
-| 90 | 2.5.0 | decision | **Bring the comprehension panel to 7.0 in every dimension and overall, starting with Locality's four module-level tables.** | 4 | 8 | 3 | 9 | 8 | 9.9 |
+| 90 | 2.5.0 | decision | **Bring every comprehension dimension and the overall score to 7.0, starting with Locality's four module-level tables.** | 4 | 8 | 3 | 9 | 8 | 9.9 |
 | 22 | 2.6.0 |  | **Announce in the README and CHANGELOG that 3.0.0 stops `log.conf` and `queue.conf` handing back a credential, so a consumer reading one out of them moves to their own copy first.** | 1 | 1 | 5 | 8 | 3, 4 | 22.4 |
 | 85 | 2.6.0 | question | **Redact credentials in a url nested in the request path, or record in `docs/decisions.md` why they stay.** | 3 | 4 | 6 | 8 | 3 | 21.6 |
 | 80 | 2.6.0 | principle | **Run the browser suite in WebKit and Firefox as well as Chromium.** | 1 | 3 | 5 | 7 | 1.1 | 21.5 |
@@ -115,7 +115,11 @@
 
 ### 79. State the real runtime floor, ES2021 syntax and `BigInt`, in README → Runtimes, or build down to the floor it states.
 
-`tsconfig.json` targets ES2022 and neither tsc nor uglify lowers syntax, so `index.js` ships `??=`, class fields and `BigInt`. Safari 10.1–13.1, Chrome 42–84 and Firefox 39–78 meet "global `fetch`, `TextEncoder` and `btoa`" and throw a `SyntaxError` parsing the module when a bundler leaves `node_modules` untranspiled. Found by the frontend principles audit, `~/.claude/principles/frontend.md` → broad device support.
+`tsconfig.json` targets ES2022 and neither tsc nor uglify lowers syntax, so `index.js` ships `??=`,
+class fields and `BigInt`. Safari 10.1–13.1, Chrome 42–84 and Firefox 39–78 meet "global `fetch`,
+`TextEncoder` and `btoa`" and throw a `SyntaxError` parsing the module when a bundler leaves
+`node_modules` untranspiled. Found by the frontend principles audit,
+`~/.claude/principles/frontend.md` → broad device support.
 
 ### 3. Send a `Request` passed as `init` with its own method, body, signal and other settings.
 
@@ -166,7 +170,10 @@ a load failure has to suppress saving too.
 
 ### 89. Keep `enabled()` free of output: warn about an unknown `logLevel` from the level methods alone.
 
-`log.enabled(level)` writes the unknown-level warning and marks the once-only state, so a library author's `if (log.enabled("silly"))` emits a line, and which caller warns depends on call order. Against `~/.claude/principles/technical-principles.md` → CQS; "This library's own warnings are written once per `stderr` sink" builds on it.
+`log.enabled(level)` writes the unknown-level warning and marks the once-only state, so a library
+author's `if (log.enabled("silly"))` emits a line, and which caller warns depends on call order.
+Against `~/.claude/principles/technical-principles.md` → CQS; "This library's own warnings are
+written once per `stderr` sink" leans on this until it lands.
 
 ### 13. Pin every Node base image to its full patch version, so one commit builds one image on any day.
 
@@ -176,21 +183,28 @@ Three places float: `ARG BASE_IMAGE=node:24-bookworm-slim` in the `Dockerfile`,
 versions, so drop the npm script's and leave the `ARG`. Renovate already bumps a `Dockerfile` pin; a
 matrix of patch versions needs a `customManagers` rule to get the same.
 
-### 90. Bring the comprehension panel to 7.0 in every dimension and overall, starting with Locality's four module-level tables.
+### 90. Bring every comprehension dimension and the overall score to 7.0, starting with Locality's four module-level tables.
 
-The 2026-10-03 four-seat run scored Navigation 7.1, Locality 5.5, Shape 6.25, Self-sufficiency 6.25, overall 6.1. Every seat named `formatFunctions`, `warned`, `logWarningOfReport` and `defaultQueues`, with the order-dependent mutation in `resolveLogConf`; items 38, 44 and 62 hold parts of it.
+The 2026-10-03 four-seat run scored Navigation 7.1, Locality 5.5, Shape 6.25, Self-sufficiency 6.25,
+overall 6.1. Every seat named `formatFunctions`, `warned`, `logWarningOfReport` and `defaultQueues`,
+with the order-dependent mutation in `resolveLogConf`; items 38, 44 and 62 hold parts of it.
 
 ### 85. Redact credentials in a url nested in the request path, or record in `docs/decisions.md` why they stay.
 
-The CHANGELOG says a url nested in the request path stays in `url.full` and "is not fixed in 2.5.0", but no decision records that choice against Goals #3.
+The CHANGELOG says a url nested in the request path stays in `url.full` and "is not fixed in 2.5.0",
+but no decision records that choice against Goals #3.
 
 ### 80. Run the browser suite in WebKit and Firefox as well as Chromium.
 
-`scripts/run-browser-tests.mjs` launches Chromium alone, though its Playwright image ships both. WebKit is the only engine on an iPhone, and `failureMessage` has a Firefox branch the suite only fakes. `~/.claude/principles/frontend.md` → broad device support.
+`scripts/run-browser-tests.mjs` launches Chromium alone, though its Playwright image ships both.
+WebKit is the only engine on an iPhone, and `failureMessage` has a Firefox branch the suite only
+fakes. `~/.claude/principles/frontend.md` → broad device support.
 
 ### 84. Name the `todo.md` item that ends "A header value or status message is redacted only where it is a url whole", or revise it.
 
-The README goals audit found it makes 2.5.0 export credentials v2.4.0 redacted, such as a `log.fetch` rejection quoting `https://u:p@host` passed to `end({ error })`, while citing Goals #3 and naming no item ending it.
+The README goals audit found it makes 2.5.0 export credentials v2.4.0 redacted, such as a
+`log.fetch` rejection quoting `https://u:p@host` passed to `end({ error })`, while citing Goals #3
+and naming no item ending it.
 
 ### 14. Deprecate `parentLog` together with `traceparent`.
 
@@ -230,7 +244,8 @@ once, upload, publish that. Item 13, pinning the base images, is the other half 
 
 ### 82. Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.
 
-Every cross-origin OTLP POST is preflighted for its `Content-Type`; without CORS on the collector each batch fails as `Failed to fetch` and retries forever.
+Every cross-origin OTLP POST is preflighted for its `Content-Type`; without CORS on the collector
+each batch fails as `Failed to fetch` and retries forever.
 
 ### 26. Check the footprint budget in CI, so the numbers in README → Footprint fail a build instead of going stale.
 
@@ -238,7 +253,8 @@ Bundle size is the easy half; the per-operation figures need a stable enough har
 
 ### 92. Decide whether reading or writing `conf.entryFormatter` warns, now that `resolveFormatter` replaces the read.
 
-"`format` is the formatter's one name" says it does not warn "since 2.x has no other spelling to move to", which 2.5.0's `resolveFormatter` ends for a read.
+2.5.0's `resolveFormatter` gives a reader of `conf.entryFormatter` a spelling to move to, so a
+warning would have somewhere to point.
 
 ### 24. Publish an `index.js.map` that maps the published `index.js`.
 
@@ -246,7 +262,8 @@ It describes tsc's output, which uglify then minifies and, since 2.5.0, mangles.
 
 ### 91. Measure test coverage in CI, and fail a change that lowers it.
 
-Neither suite collects coverage, so `~/.claude/principles/technical-principles.md` → "Coverage should not decline" cannot be checked.
+Neither suite collects coverage, so `~/.claude/principles/technical-principles.md` → "Coverage
+should not decline" cannot be checked.
 
 ### 28. Export resource attributes beyond `service.name`.
 
@@ -271,7 +288,9 @@ span will never arrive.
 
 ### 81. Test export and `log.fetch` against a real server in a browser.
 
-The browser run stubs `globalThis.fetch`, so the 64 KiB `keepalive` cap and the CORS preflight are never exercised. Item 12 removes the global swap, not this gap. `~/.claude/principles/frontend.md` → testability.
+The browser run stubs `globalThis.fetch`, so the 64 KiB `keepalive` cap and the CORS preflight are
+never exercised. Item 12 removes the global swap, not this gap. `~/.claude/principles/frontend.md` →
+testability.
 
 ### 30. Let a consumer sample by ratio.
 
@@ -292,7 +311,8 @@ Today it is `"ecmascript"`, which a backend keying on the language does not reco
 
 ### 83. Measure a full persisted queue's save to `localStorage` on a low-end phone, and budget it in README → Footprint.
 
-Each save stringifies the whole queue, about 1.1 MiB when full, and `localStorage` writes synchronously on the main thread.
+Each save stringifies the whole queue, about 1.1 MiB when full, and `localStorage` writes
+synchronously on the main thread.
 
 ### 32. Propagate `tracestate`.
 
@@ -478,7 +498,7 @@ against the 10 KB budget before deciding.
 
 ### 76. Reject `user:pass@` in `otlpHttpBaseURI` beside an `Authorization` in `otlpAdditionalHeaders`, in the constructor.
 
-Item 6 warns first, in 2.5.0.
+2.5.0 warns first.
 
 ### 70. Stop a child inheriting `spanName`.
 

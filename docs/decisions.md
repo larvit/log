@@ -67,9 +67,9 @@ once per `stderr` sink through the instance's formatter at `warn`, whatever `log
 sharing the default `console.error` share that one warning; a sink the caller injects gets its own,
 which keeps a test independent of run order. A `warnOnce` message is literal: anything varying in it
 breaks the once-only rule. An unknown `logLevel` is keyed on its raw value, so only the first
-`enabled` call builds its text; that `enabled` writes at all works against CQS until `todo.md` item
-89. Every such line opens with `@larvit/log: `, part of that literal, so
-an app developer can tell which dependency emitted one about code they may not own. A `Queue`'s
+`enabled` call builds its text. Every such line opens with `@larvit/log: `, part of that literal, so
+an app developer can tell which dependency emitted one about code they may not own. `enabled`
+writing anything works against CQS until `todo.md` item 89. A `Queue`'s
 failure lines through `report` carry no prefix, since they report that developer's own setup; its
 plain-`http:` `Authorization` warning is a warning, and keeps it. Serves README → Goals #5. Writing
 to `stderr` works against `~/.claude/principles/logging.md` → Infrastructure until `todo.md` item 50
@@ -182,11 +182,15 @@ Footprint's 1 KB, on `node:22-bookworm-slim` over 50 000 retained instances. Ser
 read type, per README → Audience: it never holds a function, and a string written beside
 `entryFormatter` reads back as written. A function formatter reads back from `conf.entryFormatter`
 alone and wins over any `conf.format`, as in v2.3.0, so writing `conf.format` on a
-function-formatted instance changes nothing. Reading or writing `conf.entryFormatter` does not warn;
-`todo.md` item 92 asks whether it should, now that `resolveFormatter` replaces the read. Its `@deprecated` tag stays and names 3.0.0's
+function-formatted instance changes nothing. Reading or writing `conf.entryFormatter` does not warn,
+since 2.x has no other spelling to move to. Its `@deprecated` tag stays and names 3.0.0's
 `conf.format`, because README → Audience deprecates every 3.0.0 break in a minor first. A parent
 built by another copy of this module hands its child only a function, its built-in formatters
 included, so writing that child's `conf.format` changes nothing either.
+
+2026-10-03, the implementing agent: 2.5.0's `resolveFormatter` gives a read of `conf.entryFormatter`
+a spelling to move to, so the reason above no longer holds for a read; `todo.md` item 92 asks the
+maintainer whether reading it now warns.
 
 ## `ResolvedLogConf` keeps `entryFormatter` required
 
@@ -259,8 +263,7 @@ hands it back to a spread of `log.conf` as an option the caller never wrote. Ser
 depth 1 — 6/10 overall; Navigation 7, Locality 5.25, Shape 6, Self-sufficiency 6 — and a later
 four-seat run at the same depth may not score lower. Comprehension work ships in the release it
 is found in, ahead of that release's other items. Serves README → Goals #8. Valid until a later
-run at or above 7.0 replaces the baseline; `todo.md` item 90 gets there. The 2026-10-03 run held the
-ratchet: Navigation 7.1, Locality 5.5, Shape 6.25, Self-sufficiency 6.25, overall 6.1.
+run at or above 7.0 replaces the baseline; `todo.md` item 90 gets there.
 
 ## A stringified `Queue` carries its `conf`, less `storage` from 2.5.0
 
@@ -303,8 +306,8 @@ under #4.
 2026-09-28, the maintainer: `user:pass@` in `otlpHttpBaseURI` and `otlpAdditionalHeaders: {
 Authorization }` both stay: a vendor hands the endpoint over as one `https://id:token@host` string,
 the only shape one env var carries, and a bearer token has no userinfo spelling. The two can
-disagree, so setting both warns once per `report` sink in 2.x and throws in the
-constructor from 3.0.0 (`todo.md` item 76), checked when the queue is built — a header added later
+disagree, so setting both warns once per `report` sink, or per `stderr` for a queue a `Log` built,
+in 2.x and throws in the constructor from 3.0.0 (`todo.md` item 76), checked when the queue is built — a header added later
 is not rechecked; v2.4.0 documents the header winning, so rejecting it sooner would spend README →
 Goals #4. Serves README → Goals #5.
 
