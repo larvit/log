@@ -13,7 +13,9 @@
   grouping on `url.full` sees such a path change, and some paths holding no credential too: a nested
   url's `?key=` lookup cuts the path, so does the ninth nested url, a path showing `//…@`, such as
   `/users//bob@x.test`, records `/REDACTED` whole, and so does one percent-encoded more than eight
-  times. v2.4.0's advice to rotate what such a path carried stands for spans exported before.
+  times. v2.4.0's advice to rotate what such a path carried stands for spans exported before. A url
+  nested with no scheme, or behind other text in its segment, such as `/fetch/s3.test/k%3Fsig%3D…`,
+  is not read yet: keep credentials out of one.
 - **A captured header records `REDACTED` by Elastic APM's default `sanitize_field_names` rule.**
   Since v2.3.0 only `authorization`, `cookie`, `proxy-authorization` and `set-cookie` did, so a
   listed `x-api-key`, `x-auth-token` or `x-amz-security-token` exported its value. Now a name that,

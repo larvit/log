@@ -143,15 +143,15 @@ name where its name, ignoring case, matches Elastic APM's default `sanitize_fiel
 `*auth*`, `set-cookie`, `*principal*`) or is `cookie`, the spec's optional addition
 (https://github.com/elastic/apm/blob/main/specs/agents/sanitization.md), and everything else goes by
 whether the value, parsed whole as a url, holds a credential, or holds userinfo by v2.4.0's text
-rule, the floor that keeps 2.5.0 redacting what v2.4.0 did, less a `\` in userinfo. Elastic's is the
-one published cross-agent spec that requires redacting request and response headers: OTel redacts no
-header value, Datadog's tracers only in AppSec, and Datadog's eight exact names there miss
-`x-api-key` and every `x-*-token`; the four RFC 9110 and RFC 6265 names 2.3.0 hard-coded missed them
-too. Redacting rather than rejecting the allow-list entry is what a minor allows — README → Audience
-deprecates a breaking change in a 2.x minor first, and the leak is open now — and it matches the
-stance the query-key list already took. `REDACTED` over dropping the attribute keeps the telemetry
-reader's "was the header there?", so a false hit costs a value, never the header's presence. Valid
-while Elastic's default list is the published one.
+rule, the floor that keeps 2.5.0 redacting what v2.4.0 did, less a `\\` or `\/` in a password.
+Elastic's is the one published cross-agent spec that requires redacting request and response
+headers: OTel redacts no header value, Datadog's tracers only in AppSec, and Datadog's eight exact
+names there miss `x-api-key` and every `x-*-token`; the four RFC 9110 and RFC 6265 names 2.3.0
+hard-coded missed them too. Redacting rather than rejecting the allow-list entry is what a minor
+allows — README → Audience deprecates a breaking change in a 2.x minor first, and the leak is open
+now — and it matches the stance the query-key list already took. `REDACTED` over dropping the
+attribute keeps the telemetry reader's "was the header there?", so a false hit costs a value, never
+the header's presence. Valid while Elastic's default list is the published one.
 
 ## Every rule on credentials in a span sits in one source section
 
