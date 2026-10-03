@@ -265,6 +265,12 @@ four-seat run at the same depth may not score lower. Comprehension work ships in
 is found in, ahead of that release's other items. Serves README → Goals #8. Valid until a later
 run at or above 7.0 replaces the baseline; `todo.md` item 90 gets there.
 
+2026-10-03, the maintainer: a chunk under the floor merges while no score drops below this
+baseline, so each chunk leaves the code no harder to read; the 2026-10-03 run scored Navigation
+7.1, Locality 5.5, Shape 6.25, Self-sufficiency 6.25, overall 6.1, and merged. Item 90 lands in
+2.5.0 right after the items that reshape the queue and `log.fetch` it would measure (`todo.md`
+items 3, 7, 8, 9, 11 and 12), ahead of the release's other items, whatever their score.
+
 ## A stringified `Queue` carries its `conf`, less `storage` from 2.5.0
 
 2026-09-28, the maintainer: `JSON.stringify` of a `Queue`, and so of `log.conf`, carries the queue's
@@ -328,6 +334,11 @@ in free text missed one — a delimiter, an escape the rewrite wrote, a scheme e
 scanner went. README → Credentials in a captured value draws that line, serving Goals #3, which
 outranks #4. Valid while that section reads so; it lets more credentials leave than v2.4.0 did, so
 `todo.md` item 84 asks the maintainer to revise it or name the item that ends it.
+
+2026-10-03, the maintainer, overturning this before 2.5.0 ships: what v2.4.0 redacted stays
+redacted (`todo.md` item 84), and so do credentials in a url nested in the request path (`todo.md`
+item 85). Serves README → Goals #3. Valid until both items land, when this entry goes.
+
 
 ## Metrics will arrive aggregated, with no instruments
 

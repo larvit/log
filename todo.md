@@ -25,6 +25,8 @@
 
 | ID | Release | Exempt | Item | R | S | A | G | Goals | Score |
 |---|---|---|---|---|---|---|---|---|---|
+| 85 | 2.5.0 | security | **Redact credentials in a url nested in the request path in `url.full`.** | 3 | 4 | 6 | 8 | 3 | 21.6 |
+| 84 | 2.5.0 | security | **Redact every value v2.4.0 redacted: a url among other text in a header value or status message, a percent-encoded url in a header, and a url the runtime cannot parse.** | 4 | 5 | 6 | 8 | 3 | 20.4 |
 | 79 | 2.5.0 | defect | **State the real runtime floor, ES2021 syntax and `BigInt`, in README → Runtimes, or build down to the floor it states.** | 2 | 2 | 7 | 8 | 1 | 27.5 |
 | 3 | 2.5.0 | defect | **Send a `Request` passed as `init` with its own method, body, signal and other settings.** | 3 | 3 | 6 | 7 | 1.1 | 21.5 |
 | 12 | 2.5.0 |  | **Let a consumer inject the `fetch` the OTLP queue sends with.** | 3 | 3 | 6 | 6 | 1, 8 | 20.2 |
@@ -36,9 +38,7 @@
 | 13 | 2.5.0 |  | **Pin every Node base image to its full patch version, so one commit builds one image on any day.** | 1 | 2 | 3 | 7 | 7 | 13.6 |
 | 90 | 2.5.0 | decision | **Bring every comprehension dimension and the overall score to 7.0, starting with Locality's four module-level tables.** | 4 | 8 | 3 | 9 | 8 | 9.9 |
 | 22 | 2.6.0 |  | **Announce in the README and CHANGELOG that 3.0.0 stops `log.conf` and `queue.conf` handing back a credential, so a consumer reading one out of them moves to their own copy first.** | 1 | 1 | 5 | 8 | 3, 4 | 22.4 |
-| 85 | 2.6.0 | question | **Redact credentials in a url nested in the request path, or record in `docs/decisions.md` why they stay.** | 3 | 4 | 6 | 8 | 3 | 21.6 |
 | 80 | 2.6.0 | principle | **Run the browser suite in WebKit and Firefox as well as Chromium.** | 1 | 3 | 5 | 7 | 1.1 | 21.5 |
-| 84 | 2.6.0 | question | **Name the `todo.md` item that ends "A header value or status message is redacted only where it is a url whole", or revise it.** | 4 | 5 | 6 | 8 | 3 | 20.4 |
 | 14 | 2.6.0 |  | **Deprecate `parentLog` together with `traceparent`.** | 2 | 2 | 5 | 8 | 4 | 20.3 |
 | 16 | 2.6.0 |  | **Warn once when `format` is a string other than `"text"` or `"json"`.** | 1 | 1 | 5 | 7 | 4, 5 | 20.0 |
 | 23 | 2.6.0 |  | **Settle one marker for a CHANGELOG entry a consumer must act on, and record it in the `AGENTS.md` line beside `### Security`.** | 1 | 1 | 5 | 7 | 4 | 20.0 |
@@ -112,6 +112,22 @@
 | 74 | 3.0.0 | decision | **Keep `otlpQueue` as the only OTLP representation in `conf`.** | 4 | 4 | 3 | 6 | 6 | 9.4 |
 
 ## Details
+
+### 85. Redact credentials in a url nested in the request path in `url.full`.
+
+A fetch-through or image-proxy call such as `https://api.test/fetch/https://user:pw@cb.test/x`
+exports the nested password in `url.full` on every request, no capture option involved. The
+maintainer chose to redact it on 2026-10-03; landing it rewrites the CHANGELOG's "is not fixed in
+2.5.0" sentence and README → Credentials in a captured value.
+
+### 84. Redact every value v2.4.0 redacted: a url among other text in a header value or status message, a percent-encoded url in a header, and a url the runtime cannot parse.
+
+2.5.0 reads a value as a url only where the runtime's `URL` parses it whole, so it exports what
+v2.4.0 hid: a `log.fetch` rejection quoting `https://u:p@host` passed to `end({ error })` sends
+`u:p` to the tracing backend. The maintainer chose on 2026-10-03 to keep these redacted before
+2.5.0 ships. Six review rounds broke a free-text url scanner, so the repair needs a shape a review
+can close. Landing it rewrites the CHANGELOG's first Security bullet and README → Credentials in a
+captured value.
 
 ### 79. State the real runtime floor, ES2021 syntax and `BigInt`, in README → Runtimes, or build down to the floor it states.
 
@@ -189,22 +205,11 @@ The 2026-10-03 four-seat run scored Navigation 7.1, Locality 5.5, Shape 6.25, Se
 overall 6.1. Every seat named `formatFunctions`, `warned`, `logWarningOfReport` and `defaultQueues`,
 with the order-dependent mutation in `resolveLogConf`; items 38, 44 and 62 hold parts of it.
 
-### 85. Redact credentials in a url nested in the request path, or record in `docs/decisions.md` why they stay.
-
-The CHANGELOG says a url nested in the request path stays in `url.full` and "is not fixed in 2.5.0",
-but no decision records that choice against Goals #3.
-
 ### 80. Run the browser suite in WebKit and Firefox as well as Chromium.
 
 `scripts/run-browser-tests.mjs` launches Chromium alone, though its Playwright image ships both.
 WebKit is the only engine on an iPhone, and `failureMessage` has a Firefox branch the suite only
 fakes. `~/.claude/principles/frontend.md` → broad device support.
-
-### 84. Name the `todo.md` item that ends "A header value or status message is redacted only where it is a url whole", or revise it.
-
-The README goals audit found it makes 2.5.0 export credentials v2.4.0 redacted, such as a
-`log.fetch` rejection quoting `https://u:p@host` passed to `end({ error })`, while citing Goals #3
-and naming no item ending it.
 
 ### 14. Deprecate `parentLog` together with `traceparent`.
 
