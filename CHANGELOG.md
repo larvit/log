@@ -10,7 +10,10 @@
   and a signed url percent-encoded into the path exported its signature. Now the path records
   `REDACTED` from the first segment opening a url that holds a credential, at any depth of
   percent-encoding: `https://proxy.test/fetch/REDACTED`. A dashboard grouping on `url.full` sees such
-  a path change. v2.4.0's advice to rotate what such a path carried stands for spans exported before.
+  a path change, and some paths holding no credential too: a nested url's `?key=` lookup cuts the
+  path, a path showing `//…@`, such as `/users//bob@x.test`, records `/REDACTED` whole, and so does
+  one percent-encoded more than eight times. v2.4.0's advice to rotate what such a path carried
+  stands for spans exported before.
 - **A captured header records `REDACTED` by Elastic APM's default `sanitize_field_names` rule.**
   Since v2.3.0 only `authorization`, `cookie`, `proxy-authorization` and `set-cookie` did, so a
   listed `x-api-key`, `x-auth-token` or `x-amz-security-token` exported its value. Now a name that,
@@ -31,8 +34,8 @@
 - **Userinfo is redacted where the runtime's `URL` parses it, in `\\` and slashless spellings too.**
   Since v2.3.0, a captured `location` of `https:\\u:pw@h` or `http:u:pw@h` exported `pw`, and so did
   a kept query value such as `?next=https://my+user:pw@cb.test/x`, `https:\\u:pw@h` among other text
-  in a header value or status message, and a url percent-encoded twice or more into a header value
-  or three times or more into a query value. Search captured header values, status messages and
+  in a header value since v2.3.0 and in a status message since v2.4.0, and a url percent-encoded
+  twice or more into a header value or three times or more into a query value. Search captured header values, status messages and
   `url.full` with `(?i)(https?:|([\\/]|%(25)*(2F|5C)){2})\S*(@|%(25)*40)` and rotate any password a
   match holds; a match reading `REDACTED` before its `@` holds none.
 - **`captureQuery` redacts a url a query key or value holds once decoded, at every level.** Its
