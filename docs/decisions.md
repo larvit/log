@@ -193,9 +193,9 @@ still does not warn, though 2.5.0's `resolveFormatter` replaces it. The reader i
 library handed a consumer's `Log`, so the warning would reach an app developer who cannot change
 that library's code. Each of this library's own reads would also need a way to skip the warning,
 which adds to the formatter code, already the hardest part to hold in one's head (README → Goals
-#8). The `@deprecated` tag now points reads at `resolveFormatter(log.conf)`; it and the CHANGELOG
-announce the break, and `MIGRATION.md` will once `todo.md` item 78 writes it, as README → Goals #4
-asks.
+#8). The `@deprecated` tag now points reads at `resolveFormatter(log.conf)`. The tag and the
+CHANGELOG announce the break, and so will `MIGRATION.md` once `todo.md` item 78 writes it, as README
+→ Goals #4 asks.
 
 ## `ResolvedLogConf` keeps `entryFormatter` required
 
