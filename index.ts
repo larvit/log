@@ -1386,7 +1386,8 @@ function parsedUrl(text: string): URL | undefined {
 const holdsUserinfo = (url: URL) => url.username !== "" || url.password !== "";
 
 // v2.4.0's `//` rule, and the same after `\\`, `/\` or `\/`: they match a url among other text, or one
-// the runtime cannot parse. Userinfo after a `\` opener stops at a `\`, so a run of them stays linear.
+// the runtime cannot parse. After an opener holding a `\`, userinfo may not hold a `\`, so matching a
+// long run of `\` stays linear.
 const SLASHED_USERINFO = /(:?\/\/)[^/?#\s]*@/g;
 const BACKSLASH_OPENED_USERINFO = /(:?(?:\\[/\\]|\/\\))[^/\\?#\s]*@/g;
 const OPENS_USERINFO = /\/\/[^/?#\s]*$|(?:\\[/\\]|\/\\)[^/\\?#\s]*$/;
@@ -1547,7 +1548,8 @@ function redactedPath(pathname: string): string {
 		}
 	}
 
-	// The loop reads only segments starting with a scheme, and userinfo after `//` or `\\` needs none.
+	// The loop reads only segments starting with a scheme, and userinfo after `//`, `\\`, `/\` or `\/`
+	// needs none.
 	// That userinfo may sit in a decoded level that maps to no raw segment, so the whole path goes.
 	return textHoldsUserinfo(kept) ? "/REDACTED" : kept;
 }
