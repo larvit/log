@@ -1385,12 +1385,12 @@ function parsedUrl(text: string): URL | undefined {
 
 const holdsUserinfo = (url: URL) => url.username !== "" || url.password !== "";
 
-// v2.4.0's `//` rule, and the same after `\\`: they match a url among other text, or one the runtime
-// cannot parse. Userinfo after `\\` stops at a `\`, so a run of backslashes stays linear.
+// v2.4.0's `//` rule, and the same after `\\`, `/\` or `\/`: they match a url among other text, or one
+// the runtime cannot parse. Userinfo after a `\` opener stops at a `\`, so a run of them stays linear.
 const SLASHED_USERINFO = /(:?\/\/)[^/?#\s]*@/g;
-const BACKSLASHED_USERINFO = /(:?\\\\)[^/\\?#\s]*@/g;
-const OPENS_USERINFO = /\/\/[^/?#\s]*$|\\\\[^/\\?#\s]*$/;
-const redactTextUserinfo = (text: string) => text.replace(SLASHED_USERINFO, "$1REDACTED@").replace(BACKSLASHED_USERINFO, "$1REDACTED@");
+const BACKSLASH_OPENED_USERINFO = /(:?(?:\\[/\\]|\/\\))[^/\\?#\s]*@/g;
+const OPENS_USERINFO = /\/\/[^/?#\s]*$|(?:\\[/\\]|\/\\)[^/\\?#\s]*$/;
+const redactTextUserinfo = (text: string) => text.replace(SLASHED_USERINFO, "$1REDACTED@").replace(BACKSLASH_OPENED_USERINFO, "$1REDACTED@");
 
 // Run by run, never the whole string: decodeURIComponent throws on the first invalid escape.
 function percentDecoded(value: string): string {

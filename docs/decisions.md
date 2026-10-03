@@ -138,20 +138,21 @@ userinfo, and a listed key's value in place, per README → Goals #3, "Credentia
 rule for captured header values and for the query values `captureQuery` keeps — and for a query key,
 since a url written as a bare key reaches `url.full` the same way its value would — because the same
 credentialed url arrives by every one of those routes and separate rules would disagree the way the
-two allow-lists used to. A value no name rule below covers is redacted where, parsed whole as a url,
-it holds a credential, or holds userinfo after `//`, as v2.4.0 matched it, or after `\\`, so 2.5.0
-redacts all v2.4.0 did. A header goes by name where its name, ignoring case, matches Elastic APM's
-default `sanitize_field_names` (`password`, `passwd`, `pwd`, `secret`, `*key`, `*token*`,
-`*session*`, `*credit*`, `*card*`, `*auth*`, `set-cookie`, `*principal*`) or is `cookie`, the spec's
-optional addition (https://github.com/elastic/apm/blob/main/specs/agents/sanitization.md). Elastic's
-is the one published cross-agent spec that requires redacting request and response headers: OTel
-redacts no header value, Datadog's tracers only in AppSec, and Datadog's eight exact names there
-miss `x-api-key` and every `x-*-token`; the four RFC 9110 and RFC 6265 names 2.3.0 hard-coded missed
-them too. Redacting rather than rejecting the allow-list entry is what a minor allows — README →
-Audience deprecates a breaking change in a 2.x minor first, and the leak is open now — and it
-matches the stance the query-key list already took. `REDACTED` over dropping the attribute keeps the
-telemetry reader's "was the header there?", so a false hit costs a value, never the header's
-presence. Valid while Elastic's default list is the published one.
+two allow-lists used to. A value no header-name rule below covers is redacted where, parsed whole as
+a url, it holds a credential, or where its text holds userinfo after `//`, `\\`, `/\` or `\/`. The
+`//` rule is v2.4.0's, so 2.5.0 redacts all v2.4.0 did. A header goes by name where its name,
+ignoring case, matches Elastic APM's default `sanitize_field_names` (`password`, `passwd`, `pwd`,
+`secret`, `*key`, `*token*`, `*session*`, `*credit*`, `*card*`, `*auth*`, `set-cookie`,
+`*principal*`) or is `cookie`, the spec's optional addition
+(https://github.com/elastic/apm/blob/main/specs/agents/sanitization.md). Elastic's is the one
+published cross-agent spec that requires redacting request and response headers: OTel redacts no
+header value, Datadog's tracers only in AppSec, and Datadog's eight exact names there miss
+`x-api-key` and every `x-*-token`; the four RFC 9110 and RFC 6265 names 2.3.0 hard-coded missed them
+too. Redacting rather than rejecting the allow-list entry is what a minor allows — README → Audience
+deprecates a breaking change in a 2.x minor first, and the leak is open now — and it matches the
+stance the query-key list already took. `REDACTED` over dropping the attribute keeps the telemetry
+reader's "was the header there?", so a false hit costs a value, never the header's presence. Valid
+while Elastic's default list is the published one.
 
 ## Every rule on credentials in a span sits in one source section
 
