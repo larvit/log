@@ -1668,6 +1668,7 @@ test("end({ error }) marks the span failed", async t => {
 	await new Log(conf).end({ error: new Error("https://a.test/?" + "u=https://a/?".repeat(5000) + "token=s3cr3t") });
 	await new Log(conf).end({ error: new Error("http:myuser:hunter2@h.test/x") });
 	await new Log(conf).end({ error: new Error("db postgres://u:p\\\\w@h and \\\\v:qw@h failed") });
+	await new Log(conf).end({ error: new Error("db https:\\/u:pwmix6@h failed") });
 
 	t.deepEqual(exportedSpan(0).status, { code: 2, message: "refused" }, "status is ERROR with the error message");
 	t.strictEqual(attr(exportedSpan(0), "error.type"), "ECONNREFUSED", "error.type is the error's code when it has one");
@@ -1688,6 +1689,7 @@ test("end({ error }) marks the span failed", async t => {
 	t.ok(!exportedSpan(11).status.message.includes("s3cr3t"), "a url nested thousands deep in query values ends the span and is redacted");
 	t.deepEqual(exportedSpan(12).status, { code: 2, message: "http://REDACTED@h.test/x" }, "a slashless spelling the runtime's URL parses is a url too");
 	t.deepEqual(exportedSpan(13).status, { code: 2, message: "db postgres://REDACTED@h and \\\\REDACTED@h failed" }, "userinfo after // is redacted with any backslash it holds, and so is userinfo after \\\\");
+	t.deepEqual(exportedSpan(14).status, { code: 2, message: "db https:\\/REDACTED@h failed" }, "and userinfo after a mixed \\/");
 	t.end();
 });
 
@@ -2135,10 +2137,10 @@ test("log.fetch redacts its url in a runtime's rejection that parses as a url wh
 });
 
 test("log.fetch captures allow-listed request and response headers only, never a credential", async t => {
-	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ link: "<https://user:pwlink@cdn.test>; rel=preconnect", location: "https://idp.test/authorize?redirect_uri=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&state=a%b", "set-cookie": "sid=hunter2", "x-app": "myapp:///cb?access_token=hunter2", "x-callback": "https%3A%2F%2F%C5ke%3Apwenc%40cb.test%2Fx", "x-db": "db=postgres://u:pw\\db@h", "x-deep": "https%253A%252F%252Fu%253Apwdeep%2540h.test", "x-next": "https://api.test/page?token=hunter2", "x-resp": "rv", "x-secret": "nope" }) }) : undefined);
+	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ link: "<https://user:pwlink@cdn.test>; rel=preconnect", location: "https://idp.test/authorize?redirect_uri=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&state=a%b", "set-cookie": "sid=hunter2", "x-app": "myapp:///cb?access_token=hunter2", "x-callback": "https%3A%2F%2F%C5ke%3Apwenc%40cb.test%2Fx", "x-db": "db=postgres://u:pw\\db@h", "x-db2": "see <https:/\\u:pwmix1@h>; rel=x", "x-deep": "https%253A%252F%252Fu%253Apwdeep%2540h.test", "x-next": "https://api.test/page?token=hunter2", "x-resp": "rv", "x-secret": "nope" }) }) : undefined);
 	const log = new Log({
 		captureRequestHeaders: ["Authorization", "cookie", "referer", "x-amz-security-token", "X-Api-Key", "x-keyboard", "x-password", "x-req"],
-		captureResponseHeaders: ["link", "location", "set-cookie", "x-app", "x-callback", "x-db", "x-deep", "x-next", "x-resp"],
+		captureResponseHeaders: ["link", "location", "set-cookie", "x-app", "x-callback", "x-db", "x-db2", "x-deep", "x-next", "x-resp"],
 		otlpHttpBaseURI: "http://127.0.0.1:4318",
 		stderr: () => {},
 	});
@@ -2167,6 +2169,7 @@ test("log.fetch captures allow-listed request and response headers only, never a
 	t.strictEqual(attr("http.response.header.x-callback"), "REDACTED", "so is a percent-encoded one");
 	t.strictEqual(attr("http.response.header.x-deep"), "REDACTED", "and one percent-encoded twice");
 	t.strictEqual(attr("http.response.header.x-db"), "REDACTED", "and one whose password holds a backslash");
+	t.strictEqual(attr("http.response.header.x-db2"), "REDACTED", "and one opened by a mixed /\\");
 	t.strictEqual(attr("http.response.header.set-cookie"), "REDACTED", "an allow-listed set-cookie records its presence, not its value");
 	t.ok(!JSON.stringify(calls.filter(call => call.path.startsWith("/v1/"))).includes("hunter2"), "no credential reaches the collector");
 	t.end();
