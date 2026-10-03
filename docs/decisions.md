@@ -69,12 +69,12 @@ which keeps a test independent of run order. A `warnOnce` message is literal: an
 breaks the once-only rule. An unknown `logLevel` is keyed on its raw value, so only the first
 `enabled` call builds its text. Every such line opens with `@larvit/log: `, part of that literal, so
 an app developer can tell which dependency emitted one about code they may not own. `enabled`
-writing anything works against CQS until `todo.md` item 89. A `Queue`'s
-failure lines through `report` carry no prefix, since they report that developer's own setup; its
-plain-`http:` `Authorization` warning is a warning, and keeps it. Serves README → Goals #5. Writing
-to `stderr` works against `~/.claude/principles/logging.md` → Infrastructure until `todo.md` item 50
-settles where this library's own lines go. Valid while this library writes its own warnings to a
-`stderr` sink.
+writing anything works against CQS until `todo.md` item 89. A `Queue`'s failure lines through
+`report` carry no prefix, since they report that developer's own setup; its plain-`http:`
+`Authorization` warning is a warning, and keeps it. Serves README → Goals #5. Writing to `stderr`
+works against `~/.claude/principles/logging.md` → Infrastructure until `todo.md` item 50 settles
+where this library's own lines go. Valid while this library writes its own warnings to a `stderr`
+sink.
 
 ## `otlpHttpBaseURI` userinfo becomes an `Authorization: Basic` header
 
@@ -307,8 +307,8 @@ under #4.
 Authorization }` both stay: a vendor hands the endpoint over as one `https://id:token@host` string,
 the only shape one env var carries, and a bearer token has no userinfo spelling. The two can
 disagree, so setting both warns once per `report` sink, or per `stderr` for a queue a `Log` built,
-in 2.x and throws in the constructor from 3.0.0 (`todo.md` item 76), checked when the queue is built — a header added later
-is not rechecked; v2.4.0 documents the header winning, so rejecting it sooner would spend README →
+in 2.x and throws when the queue is built from 3.0.0 (`todo.md` item 76); a header added later is
+not rechecked; v2.4.0 documents the header winning, so rejecting it sooner would spend README →
 Goals #4. Serves README → Goals #5.
 
 ## Inherited `otlpAdditionalHeaders` follow the endpoint's origin
