@@ -1519,6 +1519,7 @@ function traceableUrl(input: string | URL): URL | undefined {
 // credential: the first, since a later cut would leave an earlier url's userinfo in the prefix.
 function redactedPath(pathname: string): string {
 	const segments = pathname.split("/");
+	let kept = pathname;
 	let opened = 0;
 
 	for (let index = 1; index < segments.length; index++) {
@@ -1531,11 +1532,13 @@ function redactedPath(pathname: string): string {
 		const nested = decodings(segments.slice(index).join("/"));
 
 		if (opened > MAX_URL_DEPTH || nested.some(level => SCHEME_LED.test(level) && (redactedWholeUrl(level) !== undefined || redactTextUserinfo(level) !== level))) {
-			return `${segments.slice(0, index).join("/")}/REDACTED`;
+			kept = `${segments.slice(0, index).join("/")}/REDACTED`;
+			break;
 		}
 	}
 
-	return textHoldsUserinfo(pathname) ? "/REDACTED" : pathname;
+	// Userinfo after `//` needs no scheme, so a segment opening a url never finds it.
+	return textHoldsUserinfo(kept) ? "/REDACTED" : kept;
 }
 
 // `url.origin` omits userinfo, which is what keeps the outer url's credentials off the span.
