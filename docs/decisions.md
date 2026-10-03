@@ -188,9 +188,11 @@ since 2.x has no other spelling to move to. Its `@deprecated` tag stays and name
 built by another copy of this module hands its child only a function, its built-in formatters
 included, so writing that child's `conf.format` changes nothing either.
 
-2026-10-03, the implementing agent: 2.5.0's `resolveFormatter` gives a read of `conf.entryFormatter`
-a spelling to move to, so the reason above no longer holds for a read; `todo.md` item 92 asks the
-maintainer whether reading it now warns.
+2026-10-03, the maintainer: a read of `conf.entryFormatter` still does not warn, though 2.5.0's
+`resolveFormatter` replaces it. The reader is almost always a library handed a consumer's `Log`, so
+the line would land on an app developer who cannot change that code, and every internal read would
+need a way past it, in the formatter code README → Goals #8 already finds hardest. The `@deprecated`
+tag, the CHANGELOG and `MIGRATION.md` announce the break, as README → Goals #4 asks.
 
 ## `ResolvedLogConf` keeps `entryFormatter` required
 
