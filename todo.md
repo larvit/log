@@ -82,7 +82,7 @@
 | 43 | 2.8.0 | principle | **Give `ExportScheduler` and save coalescing named states.** | 4 | 5 | 1 | 7 | 8 | 4.5 |
 | 36 | 2.8.0 | principle | **Reach the retry decision and a `log.fetch` span's attributes without a network call.** | 3 | 5 | 1 | 6 | 8 | 4.4 |
 | 49 | 2.8.0 | principle | **Sort what carries no order.** | 1 | 1 | 1 | 3 | 8 | 4.1 |
-| 78 | 3.0.0 |  | **Write `MIGRATION.md`: one entry per 3.0.0 item, with the 2.x spelling and the 3.0.0 spelling.** | 1 | 3 | 8 | 9 | 4 | 28.6 |
+| 78 | 3.0.0 | decision | **Write `MIGRATION.md`: one entry per 3.0.0 item, with the 2.x spelling and the 3.0.0 spelling.** | 1 | 3 | 8 | 9 | 4 | 28.6 |
 | 69 | 3.0.0 |  | **Export metadata as typed OTLP attribute values instead of coercing every one to `stringValue`.** | 3 | 3 | 7 | 8 | 2 | 24.6 |
 | 71 | 3.0.0 |  | **Allow `parentLog` with `traceparent`.** | 3 | 3 | 7 | 8 | 6 | 21.4 |
 | 66 | 3.0.0 |  | **Attach a child's log records to its own span instead of the parent's.** | 3 | 2 | 5 | 8 | 2 | 20.9 |
