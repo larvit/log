@@ -444,14 +444,15 @@ Anything else is exported as written, text you log yourself included.
   span's status, `log.fetch` also redacts the url it fetched wherever the runtime's rejection quotes
   it, its query and a url nested in its path included.
 - **A url nested in the request path**, as a fetch-through or image proxy takes one, raw or
-  percent-encoded: the path records `REDACTED` from the first segment opening a url that holds a
-  credential by these rules, its userinfo or a matched key, as in `/fetch/REDACTED`, and from the
-  ninth segment opening a url, whatever it holds. Keep credentials out of a url that does not open
-  its segment, such as `/fetch/s3.test/k%3Fsig%3D…`, which is not read. The path records `/REDACTED` whole where userinfo after
+  percent-encoded: the path records `REDACTED` from the first segment that starts with a scheme,
+  such as `https:`, and opens a url holding a credential by these rules, its userinfo or a matched
+  key, as in `/fetch/REDACTED`, and from the ninth segment starting with a scheme, whatever it holds.
+  Keep credentials out of a url nested with no scheme, or behind other text in its segment, such as
+  `/fetch/s3.test/k%3Fsig%3D…` or `/a/x=https:%2F%2F…`: neither is read. The path records `/REDACTED` whole where userinfo after
   `//` or `\\`, as the next bullet reads it, remains outside that cut, and where it is
   percent-encoded more than eight times.
 - **Userinfo after `//` or `\\` in a captured header value, a kept query key or value, or a status
-  message:** an `@` with no `/`, `?`, `#` or whitespace between it and the `//` or `\\`. This covers
+  message:** an `@` with no `/`, `\\`, `?`, `#` or whitespace between it and the `//` or `\\`. This covers
   a url among other text and one the runtime cannot parse, such as `//user:pass@host`. A header value
   records `REDACTED` whole, a query key, or userinfo running across its `=` as in `?//u:p=w@host`,
   records `REDACTED` with its value, and a status message records `REDACTED` in place:
