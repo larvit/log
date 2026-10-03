@@ -8,12 +8,12 @@
   `log.fetch("https://proxy.test/fetch/https://user:pass@cb.test/x")` — the shape a fetch-through,
   CORS or image proxy takes — exported the password in `url.full` with no capture option involved,
   and a signed url percent-encoded into the path exported its signature. Now the path records
-  `REDACTED` from the first segment opening a url that holds a credential, at any depth of
-  percent-encoding: `https://proxy.test/fetch/REDACTED`. A dashboard grouping on `url.full` sees such
-  a path change, and some paths holding no credential too: a nested url's `?key=` lookup cuts the
-  path, a path showing `//…@`, such as `/users//bob@x.test`, records `/REDACTED` whole, and so does
-  one percent-encoded more than eight times. v2.4.0's advice to rotate what such a path carried
-  stands for spans exported before.
+  `REDACTED` from the first segment starting with a scheme and opening a url that holds a
+  credential, at any depth of percent-encoding: `https://proxy.test/fetch/REDACTED`. A dashboard
+  grouping on `url.full` sees such a path change, and some paths holding no credential too: a nested
+  url's `?key=` lookup cuts the path, so does the ninth nested url, a path showing `//…@`, such as
+  `/users//bob@x.test`, records `/REDACTED` whole, and so does one percent-encoded more than eight
+  times. v2.4.0's advice to rotate what such a path carried stands for spans exported before.
 - **A captured header records `REDACTED` by Elastic APM's default `sanitize_field_names` rule.**
   Since v2.3.0 only `authorization`, `cookie`, `proxy-authorization` and `set-cookie` did, so a
   listed `x-api-key`, `x-auth-token` or `x-amz-security-token` exported its value. Now a name that,

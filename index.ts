@@ -1385,9 +1385,11 @@ function parsedUrl(text: string): URL | undefined {
 
 const holdsUserinfo = (url: URL) => url.username !== "" || url.password !== "";
 
-// v2.4.0's rule, a floor under the whole-url reading: `//` or `\\`, then an `@` with no `/`, `?`,
-// `#` or whitespace between, so a url among other text, or one the runtime cannot parse, matches too.
-const TEXT_USERINFO = /(:?[/\\]{2})[^/?#\s]*@/g;
+// v2.4.0's rule, a floor under the whole-url reading: `//` or `\\`, then an `@` with no `/`, `\\`,
+// `?`, `#` or whitespace between, so a url among other text, or one the runtime cannot parse, matches
+// too. A `\\` in the class would let a run of them rescan to its end from every pair.
+const TEXT_USERINFO = /(:?[/\\]{2})[^/\\?#\s]*@/g;
+const OPENS_USERINFO = /[/\\]{2}[^/\\?#\s]*$/;
 const redactTextUserinfo = (text: string) => text.replace(TEXT_USERINFO, "$1REDACTED@");
 
 // Run by run, never the whole string: decodeURIComponent throws on the first invalid escape.
@@ -1475,14 +1477,14 @@ function redactQueryPair(key: string, value: string, depth: number, partsRead: P
 		}
 	}
 
-	const valueHoldsUserinfo = textHoldsUserinfo(value);
+	// `?//u:p=w@host` splits its userinfo across the `=`: a key ending inside one is read with its value.
+	const keyOpensUserinfo = decodings(key)?.some(level => OPENS_USERINFO.test(level)) ?? true;
 
-	// `?//u:p=w@host` splits its userinfo across the `=`.
-	if (textHoldsUserinfo(key) || (!valueHoldsUserinfo && textHoldsUserinfo(`${key}=${value}`))) {
+	if (textHoldsUserinfo(key) || (keyOpensUserinfo && textHoldsUserinfo(`${key}=${value}`))) {
 		return ["REDACTED", "REDACTED"];
 	}
 
-	return [key, isSensitiveQueryKey(key) || valueHoldsUserinfo ? "REDACTED" : redactQueryPart(value, depth, partsRead)];
+	return [key, isSensitiveQueryKey(key) || textHoldsUserinfo(value) ? "REDACTED" : redactQueryPart(value, depth, partsRead)];
 }
 
 // A value the runtime's `URL` parses whole; `undefined` where it is none or holds nothing to redact.
