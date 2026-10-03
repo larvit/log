@@ -51,7 +51,6 @@
 | 18 | 2.6.0 |  | **Export `LogEntry` as an alias of `EntryFormatterConf`, so the 3.0.0 rename has a spelling a consumer can move to first.** | 1 | 1 | 3 | 7 | 4 | 16.0 |
 | 21 | 2.6.0 |  | **Announce in the README that 3.0.0 adds a metrics kind to `OtlpPayload`, so an `OtlpQueue` implementer handles one before it arrives.** | 1 | 1 | 3 | 7 | 4 | 16.0 |
 | 26 | 2.6.0 |  | **Check the footprint budget in CI, so the numbers in README → Footprint fail a build instead of going stale.** | 2 | 5 | 4 | 8 | 7 | 15.2 |
-| 92 | 2.6.0 | question | **Decide whether reading or writing `conf.entryFormatter` warns, now that `resolveFormatter` replaces the read.** | 1 | 1 | 4 | 5 | 4 | 14.8 |
 | 24 | 2.6.0 |  | **Publish an `index.js.map` that maps the published `index.js`.** | 2 | 2 | 4 | 3 | 5 | 10.0 |
 | 91 | 2.6.0 | principle | **Measure test coverage in CI, and fail a change that lowers it.** | 1 | 3 | 2 | 5 | 8 | 7.8 |
 | 28 | 2.7.0 |  | **Export resource attributes beyond `service.name`.** | 2 | 3 | 7 | 7 | 2 | 23.9 |
@@ -255,11 +254,6 @@ each batch fails as `Failed to fetch` and retries forever.
 ### 26. Check the footprint budget in CI, so the numbers in README → Footprint fail a build instead of going stale.
 
 Bundle size is the easy half; the per-operation figures need a stable enough harness to not flake.
-
-### 92. Decide whether reading or writing `conf.entryFormatter` warns, now that `resolveFormatter` replaces the read.
-
-2.5.0's `resolveFormatter` gives a reader of `conf.entryFormatter` a spelling to move to, so a
-warning would have somewhere to point.
 
 ### 24. Publish an `index.js.map` that maps the published `index.js`.
 
