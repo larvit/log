@@ -446,8 +446,8 @@ Anything else is exported as written, text you log yourself included.
 - **A url nested in the request path**, as a fetch-through or image proxy takes one, raw or
   percent-encoded however many times: the path records `REDACTED` from the first segment opening a
   url that holds a credential by these rules, its userinfo or a matched key, as in `/fetch/REDACTED`,
-  and from the ninth segment opening a url, whatever it holds. A path showing userinfo, as below,
-  with no segment opening a url records `/REDACTED` whole.
+  and from the ninth segment opening a url, whatever it holds. A path still showing userinfo, as
+  below, records `/REDACTED` whole.
 - **Userinfo after `//` or `\\` in a captured header value, a kept query key or value, or a status
   message:** an `@` with no `/`, `?`, `#` or whitespace between it and the `//` or `\\`. This covers
   a url among other text and one the runtime cannot parse, such as `//user:pass@host`. A header value
