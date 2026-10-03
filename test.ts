@@ -2021,6 +2021,8 @@ test("log.fetch redacts credentials in a url nested in the request path", async 
 		"/f/https%3A%2F%2Fs3.test%2Fk%3FX-Amz-Signature%3Dpw5%26X-Amz-Date%3D1": "/f/REDACTED",
 		"/g/x:y/https://u:pw6@cb.test": "/g/REDACTED",
 		"/h//u:pw7@cb.test/x": "/REDACTED",
+		"/h2/%2F%2Fu:pw8@a.test/https:%2F%2Fv:pw9@cb.test": "/REDACTED",
+		"/h3//tok_en:pw10@a.test/https:%2F%2Fv:pw11@cb.test": "/REDACTED",
 		"/i/a:/a:/a:/a:/a:/a:/a:/a:/a:/x": "/i/a:/a:/a:/a:/a:/a:/a:/a:/REDACTED",
 		"/registry/@larvit/log/users/bob@x.test/https://cb.test/x?q=1": "/registry/@larvit/log/users/bob@x.test/https://cb.test/x",
 	};
@@ -2033,7 +2035,7 @@ test("log.fetch redacts credentials in a url nested in the request path", async 
 
 	const urlFulls = exportedSpans(calls).filter(span => span.kind === 3).map((span: any) => span.attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue);
 
-	t.deepEqual(urlFulls, Object.values(paths).map(path => `https://proxy.test${path}`), "the path records REDACTED from the segment opening a credentialed url, at any encoding, or past the eighth segment opening a url, or whole where no segment opens one, and a url without a credential is kept");
+	t.deepEqual(urlFulls, Object.values(paths).map(path => `https://proxy.test${path}`), "the path records REDACTED from the segment opening a credentialed url, at any encoding, or past the eighth segment opening a url, or whole where userinfo shows outside a segment opening a url, and a url without a credential is kept");
 	t.ok(!/pw\d/.test(JSON.stringify(calls.filter(call => call.path.startsWith("/v1/")))), "no nested credential reaches the collector");
 	t.end();
 });
