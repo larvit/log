@@ -390,8 +390,7 @@ setting are dropped, though the span still names its method.
 Only a URL that resolves to `http:` or `https:` is traced — a relative one resolves against the
 page, so it is untraced where there is no page, as on a server, and where the page is not
 `http:`/`https:`, as under a `file:` or app-scheme origin. Anything else passes straight through to
-an untraced `fetch`: no span, and no `traceparent` sent. The span is the only output; no log line is
-written.
+an untraced `fetch`: no span, and no `traceparent` sent.
 
 Span attributes follow the OpenTelemetry HTTP semantic conventions:
 
