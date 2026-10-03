@@ -1667,6 +1667,8 @@ test("end({ error }) marks the span failed", async t => {
 	await new Log(conf).end({ error: new Error("https://myuser:hunter2@api.test/x?page=2&Access_Token=s3cr3t&next=https%3A%2F%2Fu%3Ahunter2%40cb.test#top") });
 	await new Log(conf).end({ error: new Error("https://a.test/?" + "u=https://a/?".repeat(5000) + "token=s3cr3t") });
 	await new Log(conf).end({ error: new Error("http:myuser:hunter2@h.test/x") });
+	await new Log(conf).end({ error: new Error("db postgres://u:p\\\\w@h and \\\\v:qw@h failed") });
+	await new Log(conf).end({ error: new Error("db https:\\/u:pwmix6@h failed") });
 
 	t.deepEqual(exportedSpan(0).status, { code: 2, message: "refused" }, "status is ERROR with the error message");
 	t.strictEqual(attr(exportedSpan(0), "error.type"), "ECONNREFUSED", "error.type is the error's code when it has one");
@@ -1679,13 +1681,15 @@ test("end({ error }) marks the span failed", async t => {
 	t.notOk(attr(exportedSpan(3), "error.type"), "no error.type without an error");
 	t.deepEqual(exportedSpan(4).status, { code: 0 }, "end({ error: null }) leaves the span ok, for callback-style errors");
 	t.deepEqual(exportedSpan(5).status, { code: 2, message: "_OTHER" }, "a value that cannot be stringified still ends and exports the span");
-	t.deepEqual(exportedSpan(6).status, { code: 2, message: "Request cannot be constructed from a URL that includes credentials: http://myuser:hunter2@api.test/x, retried against https://backup:s3cr3t@api.test/x" }, "a url in free text is exported as written");
+	t.deepEqual(exportedSpan(6).status, { code: 2, message: "Request cannot be constructed from a URL that includes credentials: http://REDACTED@api.test/x, retried against https://REDACTED@api.test/x" }, "a url in free text has its userinfo redacted in place");
 	t.deepEqual(exportedSpan(7).status, { code: 2, message: "GET https://api.test/mail@example.com?to=a@b failed" }, "an @ outside the userinfo position is left alone");
-	t.deepEqual(exportedSpan(8).status, { code: 2, message: "Failed to parse URL from //myuser:hunter2@api.test/x?access_token=s3cr3t" }, "so is a url the runtime cannot parse");
+	t.deepEqual(exportedSpan(8).status, { code: 2, message: "Failed to parse URL from //REDACTED@api.test/x?access_token=s3cr3t" }, "a url the runtime cannot parse has only its userinfo redacted");
 	t.strictEqual(attr(exportedSpan(9), "error.type"), "AbortError", "a numeric code is skipped for the error name");
 	t.deepEqual(exportedSpan(10).status, { code: 2, message: "https://REDACTED@api.test/x?page=2&Access_Token=REDACTED&next=REDACTED#top" }, "a message that is a url has its userinfo, listed keys and nested credentials redacted, its fragment kept");
 	t.ok(!exportedSpan(11).status.message.includes("s3cr3t"), "a url nested thousands deep in query values ends the span and is redacted");
 	t.deepEqual(exportedSpan(12).status, { code: 2, message: "http://REDACTED@h.test/x" }, "a slashless spelling the runtime's URL parses is a url too");
+	t.deepEqual(exportedSpan(13).status, { code: 2, message: "db postgres://REDACTED@h and \\\\REDACTED@h failed" }, "userinfo after // is redacted with any backslash it holds, and so is userinfo after \\\\");
+	t.deepEqual(exportedSpan(14).status, { code: 2, message: "db https:\\/REDACTED@h failed" }, "and userinfo after a mixed \\/");
 	t.end();
 });
 
@@ -1978,18 +1982,18 @@ test("log.fetch captureQuery keeps the query but redacts known-sensitive keys an
 	const { calls } = stubFetch();
 	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 
-	await log.fetch("https://api.test/fetch/https://myuser:pwpath@cb.test/x?q=hi&Signature=abc&Signature=def&next=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&deep=https%253A%252F%252Fmyuser%253Apwdeep%2540cb.test%252Fx&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAEXAMPLE%2F20260923%2Feu-north-1%2Fs3%2Faws4_request&X-Amz-Security-Token=FwoGZXIvYXdz&X-Amz-Signature=8b1c9f&X-Goog-Credential=svc%40proj.iam.gserviceaccount.com%2F20260923%2Fauto%2Fstorage%2Fgoog4_request&GoogleAccessId=svc%40proj.iam.gserviceaccount.com&access_token=ya29tok&API_KEY=k1api&apikey=k2api&key=k3api&Token=k4tok&access-token=v0cred&AccessToken=v1cred&api-key=v2cred&auth_token=v3cred&client_secret=v4cred&id_token=v5cred&password=v6cred&refresh_token=v7cred&Secret=v8cred&Subscription-Key=v9cred&authToken=w0cred&client-secret=w1cred&X_Amz_Signature=w2cred&apiKey=w3cred&x-api-key=u0cred&code=u1cred&id_token_hint=u2cred&auth=u3cred&old_password=u4cred&Passphrase=u5cred&consumer_id=u6cred&PrivateKeyId=u7cred&pwd=u8cred&X-Custom-Signed=u9cred&urn:secret=u10cred&pword=u11cred&new_password2=u14cred&_code=u12cred&https://u:pw47@h.test/x/token=u13cred&zipcode=kept2&X-Amz-SignedHeaders=host&keyword=kept&?kept=1&https://a@b=pw20@evil.test&https://dXNlcg==:pw21@evil.test&https://t.test/x?token=k5tok&then=https://t.test/y?sig=k6sig&n2=https://my+user:pw9@cb.test/x&n6=https%3A%2F%2Ft.test%2Fx%3Fnext2%3Dhttps%253A%252F%252Fu.test%252F%253Ftoken%253Dk10tok&https://t.test/x?next=https%3A%2F%2Fuser%3Ap%2523w40%40h.test%2F&https://t.test/y?next=https%3A%2F%2Fuser%3Ap%252Fw41%40h.test%2F&https%3A%2F%2Ft.test%2Fx%3Fnext%3Dhttps%253A%252F%252Fuser%253Apw42%2540h.test=%3C&https://user:pa=ss43@host&%20https://user:pa=ss44@host&h%09ttps://user:pa=ss45@host&%01https://user:pa=ss46@host&flow=1&redirect_uri=https%3A%2F%2Flocalhost%3A3000&scope=openid&login_hint=bob%40x.test&next2=myapp:///cb%3Faccess_token%3Dk20tok&q2=a:b&https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fz");
+	await log.fetch("https://api.test/fetch/https://myuser:pwpath@cb.test/x?q=hi&Signature=abc&Signature=def&next=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&deep=https%253A%252F%252Fmyuser%253Apwdeep%2540cb.test%252Fx&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAEXAMPLE%2F20260923%2Feu-north-1%2Fs3%2Faws4_request&X-Amz-Security-Token=FwoGZXIvYXdz&X-Amz-Signature=8b1c9f&X-Goog-Credential=svc%40proj.iam.gserviceaccount.com%2F20260923%2Fauto%2Fstorage%2Fgoog4_request&GoogleAccessId=svc%40proj.iam.gserviceaccount.com&access_token=ya29tok&API_KEY=k1api&apikey=k2api&key=k3api&Token=k4tok&access-token=v0cred&AccessToken=v1cred&api-key=v2cred&auth_token=v3cred&client_secret=v4cred&id_token=v5cred&password=v6cred&refresh_token=v7cred&Secret=v8cred&Subscription-Key=v9cred&authToken=w0cred&client-secret=w1cred&X_Amz_Signature=w2cred&apiKey=w3cred&x-api-key=u0cred&code=u1cred&id_token_hint=u2cred&auth=u3cred&old_password=u4cred&Passphrase=u5cred&consumer_id=u6cred&PrivateKeyId=u7cred&pwd=u8cred&X-Custom-Signed=u9cred&urn:secret=u10cred&pword=u11cred&new_password2=u14cred&_code=u12cred&https://u:pw47@h.test/x/token=u13cred&zipcode=kept2&X-Amz-SignedHeaders=host&keyword=kept&?kept=1&https://a@b=pw20@evil.test&https://dXNlcg==:pw21@evil.test&https://t.test/x?token=k5tok&then=https://t.test/y?sig=k6sig&n2=https://my+user:pw9@cb.test/x&n6=https%3A%2F%2Ft.test%2Fx%3Fnext2%3Dhttps%253A%252F%252Fu.test%252F%253Ftoken%253Dk10tok&https://t.test/x?next=https%3A%2F%2Fuser%3Ap%2523w40%40h.test%2F&https://t.test/y?next=https%3A%2F%2Fuser%3Ap%252Fw41%40h.test%2F&https%3A%2F%2Ft.test%2Fx%3Fnext%3Dhttps%253A%252F%252Fuser%253Apw42%2540h.test=%3C&https://user:pa=ss43@host&%20https://user:pa=ss44@host&h%09ttps://user:pa=ss45@host&%01https://user:pa=ss46@host&flow=1&redirect_uri=https%3A%2F%2Flocalhost%3A3000&scope=openid&login_hint=bob%40x.test&next2=myapp:///cb%3Faccess_token%3Dk20tok&q2=a:b&//u:pw50@h.test=v&//u:p=w51@h.test&//u:p=w52@h.test/x?n=//x:y@z&d10=db%20postgres://u:pw53%5Cw@h&d9=%25252525252525252525252541&https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fz");
 	await log.end();
 
 	const urlFull = clientSpan(calls).attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue;
 	const presigned = ["GoogleAccessId", "X-Amz-Credential", "X-Amz-Security-Token", "X-Amz-Signature", "X-Goog-Credential"];
 	const tokens = ["access_token", "API_KEY", "apikey", "key", "Token", "access-token", "AccessToken", "api-key", "auth_token", "client_secret", "id_token", "password", "refresh_token", "Secret", "Subscription-Key", "authToken", "client-secret", "X_Amz_Signature", "apiKey", "x-api-key", "code", "id_token_hint", "auth", "old_password", "Passphrase", "consumer_id", "PrivateKeyId", "pwd", "X-Custom-Signed", "urn%3Asecret", "pword", "new_password2", "_code"];
 
-	t.ok(urlFull.startsWith("https://api.test/fetch/https://myuser:pwpath@cb.test/x?q=hi&"), "a url nested in the request path is exported as written, and a non-sensitive query param is kept");
+	t.ok(urlFull.startsWith("https://api.test/fetch/REDACTED?q=hi&"), "a url nested in the request path records REDACTED, and a non-sensitive query param is kept");
 	t.ok(urlFull.includes("Signature=REDACTED&Signature=REDACTED"), "a repeated sensitive key keeps one redaction per occurrence");
 	t.ok(!urlFull.includes("abc") && !urlFull.includes("def"), "neither sensitive value is leaked");
 	t.ok(urlFull.includes("&next=REDACTED&"), "a query value parsing as a url with userinfo once decoded records REDACTED");
-	t.ok(urlFull.includes("&deep=https%253A%252F%252Fmyuser%253Apwdeep%2540cb.test%252Fx&"), "a url percent-encoded twice is exported as written");
+	t.ok(urlFull.includes("&deep=REDACTED&"), "a url percent-encoded twice records REDACTED");
 	t.ok(urlFull.endsWith("&REDACTED=REDACTED"), "a credentialed url written as a bare query key is redacted, its value with it");
 	t.ok(!urlFull.includes("hunter2"), "the nested password is not leaked");
 	t.ok(urlFull.includes("X-Amz-Algorithm=AWS4-HMAC-SHA256"), "a presigned url's non-credential params are kept");
@@ -2006,23 +2010,56 @@ test("log.fetch captureQuery keeps the query but redacts known-sensitive keys an
 	t.ok(urlFull.includes("&https%3A%2F%2Ft.test%2Fx%3Fnext=REDACTED&https%3A%2F%2Ft.test%2Fy%3Fnext=REDACTED&") && !/w4[01]/.test(urlFull), "a url value under a url key is read alone too, an escaped delimiter in its userinfo included");
 	t.ok(urlFull.includes("%3Fnext=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&flow=1&") && !/pw42|ss4[3-6]/.test(urlFull), "a url in a query key is read alone too, where its value breaks the joined reading, and a key cut short by an = in its password is read with its value, whitespace or a control character the parser drops included");
 	t.ok(urlFull.includes("&next2=myapp%3A%2F%2F%2Fcb%3Faccess_token%3DREDACTED&q2=a%3Ab&"), "a url without a host has its listed key redacted, and a scheme alone leaves a value be");
+	t.ok(urlFull.includes("&q2=a%3Ab&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&d10=REDACTED&d9=REDACTED&") && !/pw5[0-3]/.test(urlFull), "userinfo in a key, or across its =, redacts both, and a value past eight encodings records REDACTED");
 	t.ok(urlFull.includes("&flow=1&redirect_uri=https%3A%2F%2Flocalhost%3A3000&scope=openid&login_hint=bob%40x.test&"), "an encoded url in a value leaves the pairs after it alone");
 	t.end();
 });
 
+test("log.fetch redacts credentials in a url nested in the request path", async t => {
+	const { calls } = stubFetch();
+	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+	const paths = {
+		"/a/https://u:pw1@cb.test/x": "/a/REDACTED",
+		"/b/c/https%3A%2F%2Fu%3Apw2%40cb.test%2Fx": "/b/c/REDACTED",
+		"/d/https%253A%252F%252Fu%253Apw3%2540cb.test": "/d/REDACTED",
+		"/e/https:%5C%5Cu:pw4@cb.test": "/e/REDACTED",
+		"/f/https%3A%2F%2Fs3.test%2Fk%3FX-Amz-Signature%3Dpw5%26X-Amz-Date%3D1": "/f/REDACTED",
+		"/g/x:y/https://u:pw6@cb.test": "/g/REDACTED",
+		"/h//u:pw7@cb.test/x": "/REDACTED",
+		"/h2/%2F%2Fu:pw8@a.test/https:%2F%2Fv:pw9@cb.test": "/REDACTED",
+		"/h3//tok_en:pw10@a.test/https:%2F%2Fv:pw11@cb.test": "/REDACTED",
+		"/i/a:/a:/a:/a:/a:/a:/a:/a:/a:/x": "/i/a:/a:/a:/a:/a:/a:/a:/a:/REDACTED",
+		"/j/%25252525252525252525252541": "/REDACTED",
+		"/registry/@larvit/log/users/bob@x.test/https://cb.test/x?q=1": "/registry/@larvit/log/users/bob@x.test/https://cb.test/x",
+	};
+
+	for (const path of Object.keys(paths)) {
+		await log.fetch(`https://proxy.test${path}`);
+	}
+
+	await log.end();
+
+	const urlFulls = exportedSpans(calls).filter(span => span.kind === 3).map((span: any) => span.attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue);
+
+	t.deepEqual(urlFulls, Object.values(paths).map(path => `https://proxy.test${path}`), "each path records its expected redaction");
+	t.ok(!/pw\d/.test(JSON.stringify(calls.filter(call => call.path.startsWith("/v1/")))), "no nested credential reaches the collector");
+	t.end();
+});
+
 test("log.fetch redacts a long query within 250 ms", async t => {
-	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+	const deep = `%${"25".repeat(16384)}41`;
+	const log = new Log({ captureQuery: true, captureRequestHeaders: ["x-deep"], otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 
 	stubFetch();
 
 	const chain = Array.from({ length: 7 }).reduce<string>(nested => `https://a/?${encodeURIComponent(nested)}=b`, `https://t/?x=${"a".repeat(40000)}`);
 
-	for (const query of ["u=https://a/?".repeat(16384), "https://a/?".repeat(16384), chain]) {
+	for (const query of ["?u=https://a/?".repeat(16384), "?https://a/?".repeat(16384), `?${chain}`, `${"/a:".repeat(16384)}%3F`, `${deep}/https:/${deep}?q=${deep}`, `?q=${"\\".repeat(32768)} x`, `?q=//${"\\".repeat(32768)} x`, `${"%5C".repeat(32768)}%20x`]) {
 		const started = performance.now();
 
-		await log.fetch(`https://proxy.test/?${query}`);
+		await log.fetch(`https://proxy.test/${query}`, { headers: { "x-deep": deep } });
 
-		t.ok(performance.now() - started < 250, `${query.slice(0, 12)}… is redacted in ${Math.round(performance.now() - started)} ms`);
+		t.ok(performance.now() - started < 250, `${query.slice(0, 13)}… is redacted in ${Math.round(performance.now() - started)} ms`);
 	}
 
 	await log.end();
@@ -2081,9 +2118,9 @@ test("log.fetch keeps a url's credentials off the exported span", async t => {
 });
 
 test("log.fetch redacts its url in a runtime's rejection that parses as a url whole", async t => {
-	const href = "https://myuser:hunter2@api.test/x?token=s3cr3t";
+	const href = "https://myuser:hunter2@api.test/fetch/https:%2F%2Fcb.test%2Fy%3Ftoken%3Dnested1?token=s3cr3t";
 	const { calls } = stubFetch(path => {
-		if (path === "/x") {
+		if (path.startsWith("/fetch/")) {
 			// Firefox's wording, whose `Window.fetch:` prefix is a scheme.
 			throw new TypeError(`Window.fetch: ${href} is an url with embedded credentials.`);
 		}
@@ -2095,15 +2132,15 @@ test("log.fetch redacts its url in a runtime's rejection that parses as a url wh
 
 	const exported = JSON.stringify(calls.filter(call => call.path.startsWith("/v1/")));
 
-	t.ok(!exported.includes("hunter2") && !exported.includes("s3cr3t"), "neither the password nor the token reaches the collector");
+	t.ok(!exported.includes("hunter2") && !exported.includes("s3cr3t") && !exported.includes("nested1"), "neither the password nor a token, in the query or in a url nested in the path, reaches the collector");
 	t.end();
 });
 
 test("log.fetch captures allow-listed request and response headers only, never a credential", async t => {
-	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ link: "<https://user:pwlink@cdn.test>; rel=preconnect", location: "https://idp.test/authorize?redirect_uri=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&state=a%b", "set-cookie": "sid=hunter2", "x-app": "myapp:///cb?access_token=hunter2", "x-callback": "https%3A%2F%2F%C5ke%3Apwenc%40cb.test%2Fx", "x-next": "https://api.test/page?token=hunter2", "x-resp": "rv", "x-secret": "nope" }) }) : undefined);
+	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ link: "<https://user:pwlink@cdn.test>; rel=preconnect", location: "https://idp.test/authorize?redirect_uri=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&state=a%b", "set-cookie": "sid=hunter2", "x-app": "myapp:///cb?access_token=hunter2", "x-callback": "https%3A%2F%2F%C5ke%3Apwenc%40cb.test%2Fx", "x-db": "db=postgres://u:pw\\db@h", "x-db2": "see <https:/\\u:pwmix1@h>; rel=x", "x-deep": "https%253A%252F%252Fu%253Apwdeep%2540h.test", "x-next": "https://api.test/page?token=hunter2", "x-resp": "rv", "x-secret": "nope" }) }) : undefined);
 	const log = new Log({
 		captureRequestHeaders: ["Authorization", "cookie", "referer", "x-amz-security-token", "X-Api-Key", "x-keyboard", "x-password", "x-req"],
-		captureResponseHeaders: ["link", "location", "set-cookie", "x-app", "x-callback", "x-next", "x-resp"],
+		captureResponseHeaders: ["link", "location", "set-cookie", "x-app", "x-callback", "x-db", "x-db2", "x-deep", "x-next", "x-resp"],
 		otlpHttpBaseURI: "http://127.0.0.1:4318",
 		stderr: () => {},
 	});
@@ -2128,8 +2165,11 @@ test("log.fetch captures allow-listed request and response headers only, never a
 	t.strictEqual(attr("http.response.header.location"), "REDACTED", "a url in a header whose query value holds userinfo is redacted whole");
 	t.strictEqual(attr("http.response.header.x-app"), "REDACTED", "so is one without a host holding a listed key");
 	t.strictEqual(attr("http.response.header.x-next"), "REDACTED", "so is one with a listed query key");
-	t.strictEqual(attr("http.response.header.link"), "<https://user:pwlink@cdn.test>; rel=preconnect", "a url in a header with more around it is exported as written");
-	t.strictEqual(attr("http.response.header.x-callback"), "https%3A%2F%2F%C5ke%3Apwenc%40cb.test%2Fx", "a percent-encoded url in a header is exported as written");
+	t.strictEqual(attr("http.response.header.link"), "REDACTED", "a url with userinfo among other text in a header is redacted whole");
+	t.strictEqual(attr("http.response.header.x-callback"), "REDACTED", "so is a percent-encoded one");
+	t.strictEqual(attr("http.response.header.x-deep"), "REDACTED", "and one percent-encoded twice");
+	t.strictEqual(attr("http.response.header.x-db"), "REDACTED", "and one whose password holds a backslash");
+	t.strictEqual(attr("http.response.header.x-db2"), "REDACTED", "and one opened by a mixed /\\");
 	t.strictEqual(attr("http.response.header.set-cookie"), "REDACTED", "an allow-listed set-cookie records its presence, not its value");
 	t.ok(!JSON.stringify(calls.filter(call => call.path.startsWith("/v1/"))).includes("hunter2"), "no credential reaches the collector");
 	t.end();

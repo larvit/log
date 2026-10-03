@@ -6,7 +6,7 @@
 
 `Bar = 9`
 
-`Next ID = 93`
+`Next ID = 96`
 
 | Goal | W |
 |---|---|
@@ -25,8 +25,8 @@
 
 | ID | Release | Exempt | Item | R | S | A | G | Goals | Score |
 |---|---|---|---|---|---|---|---|---|---|
-| 85 | 2.5.0 | security | **Redact credentials in a url nested in the request path in `url.full`.** | 3 | 4 | 6 | 8 | 3 | 21.6 |
-| 84 | 2.5.0 | security | **Redact every value v2.4.0 redacted: a url among other text in a header value or status message, a percent-encoded url in a header, and a url the runtime cannot parse.** | 4 | 5 | 6 | 8 | 3 | 20.4 |
+| 93 | 2.5.0 | security | **Redact a credential in a url nested in the request path where the url does not open its segment.** | 3 | 4 | 5 | 7 | 3 | 17.9 |
+| 95 | 2.5.0 | security | **Redact userinfo a kept query splits across `&`.** | 3 | 3 | 3 | 5 | 3 | 10.8 |
 | 79 | 2.5.0 | defect | **State the real runtime floor, ES2021 syntax and `BigInt`, in README → Runtimes, or build down to the floor it states.** | 2 | 2 | 7 | 8 | 1 | 27.5 |
 | 3 | 2.5.0 | defect | **Send a `Request` passed as `init` with its own method, body, signal and other settings.** | 3 | 3 | 6 | 7 | 1.1 | 21.5 |
 | 12 | 2.5.0 |  | **Let a consumer inject the `fetch` the OTLP queue sends with.** | 3 | 3 | 6 | 6 | 1, 8 | 20.2 |
@@ -112,21 +112,18 @@
 
 ## Details
 
-### 85. Redact credentials in a url nested in the request path in `url.full`.
+### 93. Redact a credential in a url nested in the request path where the url does not open its segment.
 
-A fetch-through or image-proxy call such as `https://api.test/fetch/https://user:pw@cb.test/x`
-exports the nested password in `url.full` on every request, no capture option involved. The
-maintainer chose to redact it on 2026-10-03; landing it rewrites the CHANGELOG's "is not fixed in
-2.5.0" sentence and README → Credentials in a captured value.
+`url.full` exports a signed url's `sig` or `X-Amz-Signature` when a proxy path nests the url
+without a scheme or behind other text in its segment: `/fetch/s3.test/k%3Fsig%3D…`,
+`/a/x=https:%2F%2Fcb.test%2Fx%3Fpassword%3D…`, `/a/x;https:%2F%2F…%3Ftoken%3D…`. Userinfo in these
+shapes is already redacted; a matched query key is not. Found by the stability pass on 2026-10-03.
 
-### 84. Redact every value v2.4.0 redacted: a url among other text in a header value or status message, a percent-encoded url in a header, and a url the runtime cannot parse.
+### 95. Redact userinfo a kept query splits across `&`.
 
-2.5.0 reads a value as a url only where the runtime's `URL` parses it whole, so it exports what
-v2.4.0 hid: a `log.fetch` rejection quoting `https://u:p@host` passed to `end({ error })` sends
-`u:p` to the tracing backend. The maintainer chose on 2026-10-03 to keep these redacted before
-2.5.0 ships. Six review rounds broke a free-text url scanner, so the repair needs a shape a review
-can close. Landing it rewrites the CHANGELOG's first Security bullet and README → Credentials in a
-captured value.
+`captureQuery` exports `?//u:p&w@host` as `%2F%2Fu%3Ap=&w%40host=`: the `&` in the password ends the
+pair, so neither part holds `//…@`. Same class as the split across `=`, which is redacted. Found by
+the security pass on 2026-10-03.
 
 ### 79. State the real runtime floor, ES2021 syntax and `BigInt`, in README → Runtimes, or build down to the floor it states.
 
