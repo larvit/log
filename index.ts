@@ -1385,8 +1385,8 @@ function parsedUrl(text: string): URL | undefined {
 
 const holdsUserinfo = (url: URL) => url.username !== "" || url.password !== "";
 
-// v2.4.0's `//` rule, a floor under the whole-url reading, and the same after `\\`: they match a url
-// among other text, or one the runtime cannot parse. Userinfo after `\\` stops at a `\`, so a run of
+// v2.4.0's `//` rule, and the same after `\\`: they match a url among other text, or one the runtime
+// cannot parse. Userinfo after `\\` stops at a `\`, so a run of
 // them stays linear.
 const SLASHED_USERINFO = /(:?\/\/)[^/?#\s]*@/g;
 const BACKSLASHED_USERINFO = /(:?\\\\)[^/\\?#\s]*@/g;
@@ -1548,8 +1548,8 @@ function redactedPath(pathname: string): string {
 		}
 	}
 
-	// The loop reads only segments starting with a scheme, and userinfo after `//` needs none. Its match
-	// may sit in a decoded level that maps to no raw segment, so the whole path goes.
+	// The loop reads only segments starting with a scheme, and userinfo after `//` or `\\` needs none.
+	// That userinfo may sit in a decoded level that maps to no raw segment, so the whole path goes.
 	return textHoldsUserinfo(kept) ? "/REDACTED" : kept;
 }
 
