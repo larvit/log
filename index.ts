@@ -1386,8 +1386,7 @@ function parsedUrl(text: string): URL | undefined {
 const holdsUserinfo = (url: URL) => url.username !== "" || url.password !== "";
 
 // v2.4.0's `//` rule, and the same after `\\`: they match a url among other text, or one the runtime
-// cannot parse. Userinfo after `\\` stops at a `\`, so a run of
-// them stays linear.
+// cannot parse. Userinfo after `\\` stops at a `\`, so a run of backslashes stays linear.
 const SLASHED_USERINFO = /(:?\/\/)[^/?#\s]*@/g;
 const BACKSLASHED_USERINFO = /(:?\\\\)[^/\\?#\s]*@/g;
 const OPENS_USERINFO = /\/\/[^/?#\s]*$|\\\\[^/\\?#\s]*$/;
