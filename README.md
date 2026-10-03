@@ -452,7 +452,8 @@ Anything else is exported as written, text you log yourself included.
   `//` or `\\`, as the next bullet reads it, remains outside that cut, and where it is
   percent-encoded more than eight times.
 - **Userinfo after `//` or `\\` in a captured header value, a kept query key or value, or a status
-  message:** an `@` with no `/`, `\\`, `?`, `#` or whitespace between it and the `//` or `\\`. This covers
+  message:** an `@` with no `/`, `?`, `#`, whitespace, or `\` before a `/` or `\` between it and the
+  `//` or `\\`. This covers
   a url among other text and one the runtime cannot parse, such as `//user:pass@host`. A header value
   records `REDACTED` whole, a query key, or userinfo running across its `=` as in `?//u:p=w@host`,
   records `REDACTED` with its value, and a status message records `REDACTED` in place:

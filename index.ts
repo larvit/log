@@ -1385,11 +1385,11 @@ function parsedUrl(text: string): URL | undefined {
 
 const holdsUserinfo = (url: URL) => url.username !== "" || url.password !== "";
 
-// v2.4.0's rule, a floor under the whole-url reading: `//` or `\\`, then an `@` with no `/`, `\\`,
-// `?`, `#` or whitespace between, so a url among other text, or one the runtime cannot parse, matches
-// too. A `\\` in the class would let a run of them rescan to its end from every pair.
-const TEXT_USERINFO = /(:?[/\\]{2})[^/\\?#\s]*@/g;
-const OPENS_USERINFO = /[/\\]{2}[^/\\?#\s]*$/;
+// v2.4.0's rule, a floor under the whole-url reading: `//` or `\\`, then an `@` with no `/`, `?`, `#`,
+// whitespace, or `\` before a `/` or `\` between, so a url among other text, or one the runtime cannot
+// parse, matches too. Stopping at each slash pair keeps a run of them from rescanning to its end.
+const TEXT_USERINFO = /(:?[/\\]{2})(?:[^/\\?#\s]|\\(?![/\\]))*@/g;
+const OPENS_USERINFO = /[/\\]{2}(?:[^/\\?#\s]|\\(?![/\\]))*$/;
 const redactTextUserinfo = (text: string) => text.replace(TEXT_USERINFO, "$1REDACTED@");
 
 // Run by run, never the whole string: decodeURIComponent throws on the first invalid escape.
