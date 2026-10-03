@@ -112,8 +112,8 @@ log.silly("Open the flood gates!"); // stdout
 
 Levels, most to least severe: `error`, `warn`, `info`, `verbose`, `debug`, `silly`. `"none"` outputs
 nothing but this library's own lines, which no `logLevel` silences: its `@larvit/log:` warnings and,
-with `otlpHttpBaseURI`, the export queue's failure reports. A no-op `stderr` drops them, and a no-op
-`report` on a `Queue` you build.
+with `otlpHttpBaseURI`, the export queue's failure reports. To drop them too, pass a no-op `stderr`,
+and a no-op `report` to a `Queue` you build.
 
 Keep the message a static string and put every value in the metadata object, so entries with the
 same message aggregate in your log backend:
@@ -167,9 +167,8 @@ the OTLP options as [Options](#options) says. Setting `context` on a child repla
 parent's rather than merging, hence the spread above. The `service.name` context key becomes the
 OTLP resource's service name (default `"unnamed-service"`) rather than a per-entry attribute. Every
 span and record is exported under the instrumentation scope `@larvit/log`, at this package's
-version. A
-child's log entries attach to the parent's span; the child's own span holds its timing and is
-exported by `end()`.
+version. A child's log entries attach to the parent's span; the child's own span holds its timing
+and is exported by `end()`.
 
 `end()` closes the span, queues it and flushes the [export queue](#queue-exports); a span that is
 never ended is never sent. `end({ error })` also marks the span failed: status `ERROR` with the
@@ -252,16 +251,16 @@ queue is in memory only.
 `otlpHttpBaseURI`, `otlpProtocol` and `otlpAdditionalHeaders` beside it.
 
 Credentials go either in the endpoint as `user:pass@`, which is sent as an `Authorization: Basic`
-header, or in `otlpAdditionalHeaders` as a token of your own. Set one: setting both sends the header,
-writes one `@larvit/log:` line, and throws from 3.0.0. Over
+header, or in `otlpAdditionalHeaders` as a token of your own. Set one: with both, the
+`otlpAdditionalHeaders` one is sent, one `@larvit/log:` line is written, and 3.0.0 throws. Over
 plain `http:` either one is readable by anything on the network path, so use `https:` unless the
 collector is local or on a network you trust. Either one sent over `http:` to a host other than
-`localhost`, `127.0.0.0/8` or `::1` writes one `@larvit/log:` line per `report` function, or per
-`stderr` for a queue a `Log` built, host and credential source, naming the host, and still sends.
-On a network you trust, pass
-`acceptPlainHttpAuthorization: true` to the `Queue`; a `Log` using `otlpHttpBaseURI` moves its
-`otlp*` options to `otlpQueue: new Queue({ acceptPlainHttpAuthorization: true, otlpHttpBaseURI })`,
-whose report lines then go to that queue's `report`, `console.error` unless you pass one.
+`localhost`, `127.0.0.0/8` or `::1` writes one `@larvit/log:` line naming the host, and still sends.
+It is written once per host and credential source to each `report` function, or to each `stderr` for
+a queue a `Log` built. On a network you trust, pass `acceptPlainHttpAuthorization: true` to the
+`Queue`; a `Log` using `otlpHttpBaseURI` moves its `otlp*` options to `otlpQueue: new Queue({
+acceptPlainHttpAuthorization: true, otlpHttpBaseURI })`, whose report lines then go to that queue's
+`report`, `console.error` unless you pass one.
 
 | Option | Type | Default | |
 |---|---|---|---|
@@ -331,8 +330,8 @@ instead. `entryFormatter` is deprecated the same way: pass the function as `form
 | Option | Type | Default | |
 |---|---|---|---|
 | `captureQuery` | `boolean` | `false` | `log.fetch` only: keep the query string in `url.full`. Not every secret in it is redacted — see [Credentials in a captured value](#credentials-in-a-captured-value). |
-| `captureRequestHeaders` | `string[]` | none | `log.fetch` only: request header names to record as `http.request.header.*`. Not every secret in one is redacted — see [Credentials in a captured value](#credentials-in-a-captured-value). |
-| `captureResponseHeaders` | `string[]` | none | `log.fetch` only: response header names to record as `http.response.header.*`. Same redaction as `captureRequestHeaders`. |
+| `captureRequestHeaders` | `string[]` | none | `log.fetch` only: request header names to record as `http.request.header.*`. Not every secret in one is redacted — see [Credentials in a captured value](#credentials-in-a-captured-value). An invalid name is skipped, with one `stderr` warning. |
+| `captureResponseHeaders` | `string[]` | none | `log.fetch` only: response header names to record as `http.response.header.*`. Same redaction and invalid-name handling as `captureRequestHeaders`. |
 | `clock` | `Clock` | system clock | `{ now, setTimeout, clearTimeout }` behind every span and record timestamp. Passed on to the default `Queue`; a `Queue` you build takes its own. |
 | `colors` | `boolean` | `true` | ANSI colour codes in text output. Unset in code, the env decides: `NO_COLOR` (non-empty) turns it off; otherwise `FORCE_COLOR` turns it on, except `0` or `false` which turn it off. |
 | `context` | `MetadataInput` | `{}` | Added to every entry. Wins over a per-call key of the same name. An `undefined` key is dropped, so `log.conf.context` reads back as `Metadata`. |
@@ -391,8 +390,8 @@ setting are dropped, though the span still names its method.
 Only a URL that resolves to `http:` or `https:` is traced — a relative one resolves against the
 page, so it is untraced where there is no page, as on a server, and where the page is not
 `http:`/`https:`, as under a `file:` or app-scheme origin. Anything else passes straight through to
-an untraced `fetch`: no span, and no `traceparent` sent. The span is the only output. An invalid
-name in `captureRequestHeaders` or `captureResponseHeaders` is skipped, with one `stderr` warning.
+an untraced `fetch`: no span, and no `traceparent` sent. The span is the only output; no log line is
+written.
 
 Span attributes follow the OpenTelemetry HTTP semantic conventions:
 

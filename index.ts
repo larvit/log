@@ -198,7 +198,7 @@ function formatterOf(conf: LogConf): EntryFormatter {
 	return formatFunctions.get(conf) ?? (conf.format === "json" ? msgJsonFormatter : msgTextFormatter);
 }
 
-// A Log's conf.entryFormatter is a getter over formatterOf, so only a hand-built conf reaches its own.
+// On a Log's conf, entryFormatter already returns formatterOf(conf); the fallback serves a hand-built conf without one.
 export function resolveFormatter(conf: LogConf): EntryFormatter {
 	return conf.entryFormatter ?? formatterOf(conf);
 }
@@ -350,7 +350,6 @@ export type OtlpPayload = PayloadByKind[OtlpKind];
 
 const PAYLOAD_KEYS: { [K in OtlpKind]: keyof PayloadByKind[K] } = { logs: "resourceLogs", traces: "resourceSpans" };
 
-// OTel's instrumentation scope names the instrumenting library.
 const SCOPE = { name: "@larvit/log", version: "__version__" } as const satisfies OtlpScope;
 
 // OTLP's Span.SpanKind and Status.StatusCode enum values.
@@ -942,7 +941,6 @@ const resourceKey = (entry: { resource: unknown }) => JSON.stringify(entry.resou
 // A payload stored by v2.4.0 or earlier carries no scope on its logs, and its span name as its spans' scope.
 const scopeKey = (entry: { scope?: OtlpScope }) => JSON.stringify([entry.scope?.name, entry.scope?.version]);
 
-// One resourceLogs entry per resource, and in it one scopeLogs entry per scope.
 function mergeLogPayloads(payloads: OtlpLogPayload[]): OtlpLogPayload {
 	return {
 		resourceLogs: groupBy(payloads.flatMap(payload => payload.resourceLogs), resourceKey, resources => ({
@@ -952,7 +950,6 @@ function mergeLogPayloads(payloads: OtlpLogPayload[]): OtlpLogPayload {
 	};
 }
 
-// One resourceSpans entry per resource, and in it one scopeSpans entry per scope.
 function mergeSpanPayloads(payloads: OtlpSpanPayload[]): OtlpSpanPayload {
 	return {
 		resourceSpans: groupBy(payloads.flatMap(payload => payload.resourceSpans), resourceKey, resources => ({
@@ -1019,7 +1016,7 @@ class OtlpSender {
 			this.headers.set("Authorization", auth);
 
 			if (setsAuthorization(conf.otlpAdditionalHeaders)) {
-				warn("@larvit/log: otlpHttpBaseURI carries user:pass@ and otlpAdditionalHeaders sets Authorization, so the header is sent and the userinfo is not; set one of them, as 3.0.0 throws on both");
+				warn("@larvit/log: otlpHttpBaseURI carries user:pass@ and otlpAdditionalHeaders sets Authorization, so the otlpAdditionalHeaders one is sent and the userinfo is not; set one of them, as 3.0.0 throws on both");
 			}
 		}
 

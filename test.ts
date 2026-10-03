@@ -955,7 +955,7 @@ test("endpoint userinfo authenticates through an Authorization header, never thr
 
 test("user:pass@ in otlpHttpBaseURI beside an Authorization in otlpAdditionalHeaders warns once per report sink, and the header goes", async t => {
 	const { calls } = stubFetch();
-	const warning = "@larvit/log: otlpHttpBaseURI carries user:pass@ and otlpAdditionalHeaders sets Authorization, so the header is sent and the userinfo is not; set one of them, as 3.0.0 throws on both";
+	const warning = "@larvit/log: otlpHttpBaseURI carries user:pass@ and otlpAdditionalHeaders sets Authorization, so the otlpAdditionalHeaders one is sent and the userinfo is not; set one of them, as 3.0.0 throws on both";
 	const sink = reportSink();
 	const both = { otlpAdditionalHeaders: { authorization: "Bearer t0ken" }, otlpHttpBaseURI: "https://collector:s3cret@collector.test", report: sink.report };
 

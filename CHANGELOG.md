@@ -77,11 +77,11 @@
   of a spread; the v2.4.0 entry says what to rotate. A `Queue` built from `{ ...queue.conf }` has no
   `storage`; pass `storage` to it by name.
 - **An `Authorization` sent over plain `http:` to a host other than `localhost`, `127.0.0.0/8` or
-  `::1` writes one `@larvit/log: an Authorization header…` line per `report` function, or per
-  `stderr` for a queue a `Log` built, host and credential source, naming the host, unless the
-  `Queue` sets the new `acceptPlainHttpAuthorization: true`.** Either spelling warns, `user:pass@` in `otlpHttpBaseURI` or
-  `Authorization` in `otlpAdditionalHeaders`, set at any time; through a `Log` it is a `warn` line
-  on `stderr`. The request still goes. Rotate a credential that has crossed a network you do not
+  `::1` writes one `@larvit/log:` warning naming the host, unless the `Queue` sets the new
+  `acceptPlainHttpAuthorization: true`.** Either spelling warns, `user:pass@` in `otlpHttpBaseURI` or
+  `Authorization` in `otlpAdditionalHeaders`, set at any time, once per host and credential source:
+  to each `report` function, or at `warn` to each `stderr` for a queue a `Log` built. The request
+  still goes. Rotate a credential that has crossed a network you do not
   trust. On one you do, a `Log` using `otlpHttpBaseURI` moves its `otlp*` options to
   `otlpQueue: new Queue({ acceptPlainHttpAuthorization: true, otlpHttpBaseURI })`, whose report
   lines then go to that queue's `report`, `console.error` unless you pass one.
@@ -93,8 +93,8 @@
   grouping on the scope name sees it change; group on the span name instead.
 - **`user:pass@` in `otlpHttpBaseURI` beside an `Authorization` in `otlpAdditionalHeaders` writes
   one `@larvit/log:` line per `report` function, or per `stderr` for a queue a `Log` built, and
-  throws from 3.0.0.** The header is still sent
-  and the userinfo is not, as in v2.4.0. Keep one of the two.
+  throws from 3.0.0.** The `otlpAdditionalHeaders` `Authorization` is still sent and the userinfo is
+  not, as in v2.4.0. Keep one of the two.
 - **`resolveFormatter(conf)` hands back the `EntryFormatter` a conf writes with.** Read
   `resolveFormatter(log.conf)` where you read `log.conf.entryFormatter`, which 3.0.0 removes.
 - **A 401 or 403 from the collector reports `OTLP export unauthorized, batch dropped`.** It read
