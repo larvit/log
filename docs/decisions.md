@@ -141,8 +141,8 @@ credentialed url arrives by every one of those routes and separate rules would d
 two allow-lists used to. A header goes by name where its name, ignoring case, matches Elastic APM's
 default `sanitize_field_names` (`password`, `passwd`, `pwd`, `secret`, `*key`, `*token*`,
 `*session*`, `*credit*`, `*card*`, `*auth*`, `set-cookie`, `*principal*`) or is `cookie`, the spec's
-optional addition (https://github.com/elastic/apm/blob/main/specs/agents/sanitization.md), and
-everything else goes by whether the value, parsed whole as a url, holds a credential, or holds
+optional addition (https://github.com/elastic/apm/blob/main/specs/agents/sanitization.md).
+Everything else is redacted where the value, parsed whole as a url, holds a credential, or holds
 userinfo after `//`, as v2.4.0 matched it, or after `\\`, so 2.5.0 redacts all v2.4.0 did. Elastic's
 is the one published cross-agent spec that requires redacting request and response headers: OTel
 redacts no header value, Datadog's tracers only in AppSec, and Datadog's eight exact names there
