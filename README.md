@@ -174,7 +174,7 @@ and is exported by `end()`.
 never ended is never sent. `end({ error })` also marks the span failed: status `ERROR` with the
 error's message, and an `error.type` attribute from its string `code`, else `name`, else `"_OTHER"`;
 a `null` or `undefined` error is a plain `end()`. A url's userinfo in the message is redacted, and so
-is the query of a message that is a url whole, see
+is a matched query key's value in a message that is a url whole, see
 [Credentials in a captured value](#credentials-in-a-captured-value); keep other credentials out of
 error messages. A logged `log.error()` never fails the span. `await` it to make one delivery
 attempt before the process exits (a short-lived script); fire-and-forget is fine in a long-running
@@ -442,18 +442,21 @@ Anything else is exported as written, text you log yourself included.
   a matched key, at every level as above, makes a header value record `REDACTED` whole, and a status
   message record `REDACTED` in place: `http://REDACTED@host/x?access_token=REDACTED`. In its own
   span's status, `log.fetch` also redacts the url it fetched wherever the runtime's rejection quotes
-  it, its query included.
+  it, its query and a url nested in its path included.
 - **A url nested in the request path**, as a fetch-through or image proxy takes one, raw or
-  percent-encoded however many times: the path records `REDACTED` from the first segment opening a
-  url that holds a credential by these rules, its userinfo or a matched key, as in `/fetch/REDACTED`,
-  and from the ninth segment opening a url, whatever it holds. A path still showing userinfo, as
-  below, records `/REDACTED` whole.
+  percent-encoded: the path records `REDACTED` from the first segment opening a url that holds a
+  credential by these rules, its userinfo or a matched key, as in `/fetch/REDACTED`, and from the
+  ninth segment opening a url, whatever it holds. Keep credentials out of a url that does not open
+  its segment, such as `/fetch/s3.test/k%3Fsig%3D…`, which is not read. The path records `/REDACTED` whole where userinfo after
+  `//` or `\\`, as the next bullet reads it, remains outside that cut, and where it is
+  percent-encoded more than eight times.
 - **Userinfo after `//` or `\\` in a captured header value, a kept query key or value, or a status
   message:** an `@` with no `/`, `?`, `#` or whitespace between it and the `//` or `\\`. This covers
   a url among other text and one the runtime cannot parse, such as `//user:pass@host`. A header value
-  records `REDACTED` whole, a query key records `REDACTED` with its value, and a status message
-  records `REDACTED` in place: `fetch failed: https://REDACTED@h/x`. A header value or query part is
-  also read percent-decoded, however many times encoded. Only userinfo is found this way: a matched
+  records `REDACTED` whole, a query key, or userinfo running across its `=` as in `?//u:p=w@host`,
+  records `REDACTED` with its value, and a status message records `REDACTED` in place:
+  `fetch failed: https://REDACTED@h/x`. A header value or query part is also read percent-decoded,
+  up to eight times; one encoded deeper records `REDACTED`. Only userinfo is found this way: a matched
   query key in a url that is not a whole value, such as `?token=` in `fetch failed: https://h/x?token=…`,
   is exported as written, and so is a relative `location: /cb?token=…`, since it needs a base. Keep
   credentials out of error messages, or replace a message before `end({ error })`.
@@ -466,7 +469,8 @@ you the 401.
 `REDACTED` does not always stand for a credential: a `?key=` lookup, a `?token=` pagination cursor,
 a `?code=` promo code, an `?oauth=` or `?design=` flag, and the headers `www-authenticate`,
 `x-idempotency-key` and `x-session-id` record it, and so does an address read as userinfo, as in
-`https://api.test,mail@example.com`, and a path's `/users//bob@x.test` records `/REDACTED`.
+`https://api.test,mail@example.com`. A path records `/REDACTED` for `/users//bob@x.test`, and from
+a nested url for a `?key=` lookup in its encoded query or past the eighth nested url.
 
 Spans are queued when the response arrives and are registered with `flush()` at call time, so
 `await log.end()` delivers a `log.fetch()` you never awaited.

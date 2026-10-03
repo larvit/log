@@ -1403,17 +1403,22 @@ function percentDecoded(value: string): string {
 }
 
 // Every level, since decoding a `%2F` in userinfo ends the match the level above it made.
-function decodings(text: string): string[] {
+// `undefined` past MAX_URL_DEPTH levels, which counts as a credential, as a url nested that deep does.
+function decodings(text: string): string[] | undefined {
 	const levels = [text];
 
 	for (let decoded = percentDecoded(text); decoded !== levels[levels.length - 1]; decoded = percentDecoded(decoded)) {
+		if (levels.length > MAX_URL_DEPTH) {
+			return undefined;
+		}
+
 		levels.push(decoded);
 	}
 
 	return levels;
 }
 
-const textHoldsUserinfo = (text: string) => decodings(text).some(level => redactTextUserinfo(level) !== level);
+const textHoldsUserinfo = (text: string) => decodings(text)?.some(level => redactTextUserinfo(level) !== level) ?? true;
 
 // `undefined` where no pair changes.
 function redactedSearch(url: URL, depth: number, partsRead: PartsRead): string | undefined {
@@ -1470,11 +1475,14 @@ function redactQueryPair(key: string, value: string, depth: number, partsRead: P
 		}
 	}
 
-	if (textHoldsUserinfo(key)) {
+	const valueHoldsUserinfo = textHoldsUserinfo(value);
+
+	// `?//u:p=w@host` splits its userinfo across the `=`.
+	if (textHoldsUserinfo(key) || (!valueHoldsUserinfo && textHoldsUserinfo(`${key}=${value}`))) {
 		return ["REDACTED", "REDACTED"];
 	}
 
-	return [key, isSensitiveQueryKey(key) || textHoldsUserinfo(value) ? "REDACTED" : redactQueryPart(value, depth, partsRead)];
+	return [key, isSensitiveQueryKey(key) || valueHoldsUserinfo ? "REDACTED" : redactQueryPart(value, depth, partsRead)];
 }
 
 // A value the runtime's `URL` parses whole; `undefined` where it is none or holds nothing to redact.
@@ -1523,7 +1531,7 @@ function redactedPath(pathname: string): string {
 	let opened = 0;
 
 	for (let index = 1; index < segments.length; index++) {
-		if (!decodings(segments[index]).some(level => SCHEME_LED.test(level))) {
+		if (decodings(segments[index])?.some(level => SCHEME_LED.test(level)) !== true) {
 			continue;
 		}
 
@@ -1531,13 +1539,14 @@ function redactedPath(pathname: string): string {
 
 		const nested = decodings(segments.slice(index).join("/"));
 
-		if (opened > MAX_URL_DEPTH || nested.some(level => SCHEME_LED.test(level) && (redactedWholeUrl(level) !== undefined || redactTextUserinfo(level) !== level))) {
+		if (opened > MAX_URL_DEPTH || nested === undefined || nested.some(level => SCHEME_LED.test(level) && (redactedWholeUrl(level) !== undefined || redactTextUserinfo(level) !== level))) {
 			kept = `${segments.slice(0, index).join("/")}/REDACTED`;
 			break;
 		}
 	}
 
-	// Userinfo after `//` needs no scheme, so a segment opening a url never finds it.
+	// Userinfo after `//` needs no scheme, so a segment opening a url never finds it; and the whole
+	// path goes, since the match may sit in a decoded level whose position maps to no raw segment.
 	return textHoldsUserinfo(kept) ? "/REDACTED" : kept;
 }
 
@@ -1561,7 +1570,14 @@ function failureMessage(error: unknown, url?: URL): string {
 	}
 
 	// The known url first: Firefox's `Window.fetch: <url> …` parses whole, its quoted userinfo in the path.
-	const quoted = url === undefined ? message : message.split(url.href).join(redactedWholeUrl(url.href) ?? url.href);
+	let quoted = message;
+
+	if (url !== undefined) {
+		const known = new URL(redactedWholeUrl(url.href) ?? url.href);
+
+		known.pathname = redactedPath(url.pathname);
+		quoted = message.split(url.href).join(known.href);
+	}
 
 	return redactTextUserinfo(redactedWholeUrl(quoted) ?? quoted);
 }
