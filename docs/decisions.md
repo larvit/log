@@ -307,9 +307,9 @@ under #4.
 Authorization }` both stay: a vendor hands the endpoint over as one `https://id:token@host` string,
 the only shape one env var carries, and a bearer token has no userinfo spelling. The two can
 disagree, so setting both warns once per `report` sink, or per `stderr` for a queue a `Log` built,
-in 2.x and throws when the queue is built from 3.0.0 (`todo.md` item 76); a header added later is
-not rechecked; v2.4.0 documents the header winning, so rejecting it sooner would spend README →
-Goals #4. Serves README → Goals #5.
+in 2.x, and throws when the queue is built from 3.0.0 (`todo.md` item 76): v2.4.0 documents the
+header winning, so rejecting the combination sooner would spend README → Goals #4. A header added
+later is not rechecked. Serves README → Goals #5.
 
 ## Inherited `otlpAdditionalHeaders` follow the endpoint's origin
 
