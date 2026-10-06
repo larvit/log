@@ -36,12 +36,12 @@
   for a match followed by anything but `REDACTED`, and rotate what it finds.
 - **Userinfo is redacted in `\\` and mixed-slash spellings among other text, in a slashless url, and
   percent-encoded.** Since v2.3.0, a captured `location` of `https:\\u:pw@h` or `http:u:pw@h`
-  exported `pw`, and so did a kept query value such as `?next=https://my+user:pw@cb.test/x`,
-  `https:\\u:pw@h` or `https:/\u:pw@h` among other text in a header value, and a url percent-encoded
-  twice or more into a header value or three times or more into a query value. Since v2.4.0, either
-  spelling among other text in a status message did too. Search captured header values, status
-  messages and `url.full` with `(?i)(https?:|([\\/]|%(25)*(2F|5C)){2})\S*(@|%(25)*40)` and rotate
-  any password a match holds; a match reading `REDACTED` before its `@` holds none.
+  exported `pw`. So did `https:\\u:pw@h` or `https:/\u:pw@h` among other text in a header value, a
+  kept query value such as `?next=https://my+user:pw@cb.test/x`, and a url percent-encoded twice or
+  more into a header value or three times or more into a query value. Since v2.4.0, either spelling
+  among other text in a status message did too. Search captured header values, status messages and
+  `url.full` with `(?i)(https?:|([\\/]|%(25)*(2F|5C)){2})\S*(@|%(25)*40)` and rotate any password a
+  match holds; a match reading `REDACTED` before its `@` holds none.
 - **`captureQuery` redacts a url a query key or value holds once decoded, at every level.** Its
   userinfo records `REDACTED` in place of the whole key or value, and a matched key's value
   `REDACTED` in place: since v2.3.0, `?next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3D…` with

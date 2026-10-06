@@ -1549,7 +1549,7 @@ function redactedPath(pathname: string): string {
 	}
 
 	// The loop reads only segments starting with a scheme, and userinfo after `//`, `\\`, `/\` or `\/`
-	// needs none.
+	// needs no scheme.
 	// That userinfo may sit in a decoded level that maps to no raw segment, so the whole path goes.
 	return textHoldsUserinfo(kept) ? "/REDACTED" : kept;
 }
