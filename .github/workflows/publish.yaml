@@ -7,7 +7,7 @@ permissions:
   id-token: write # for npm provenance
 jobs:
   publish:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
         with:

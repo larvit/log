@@ -2,7 +2,7 @@ name: Push
 on: [push]
 jobs:
   Build-and-test:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     strategy:
       matrix:
         node-version: ["18", "20", "22", "24", "26"]
@@ -17,7 +17,7 @@ jobs:
           NODE_IMAGE: node:${{ matrix.node-version }}-bookworm-slim
 
   Browser-test:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
         with:
@@ -26,7 +26,7 @@ jobs:
       - run: npm run test-browser
 
   OTLP-test:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     # End-to-end check: export to a real (pinned) OpenTelemetry Collector and assert it parsed both
     # our JSON and protobuf output. index.js is built in Docker (deps in the container), so the host
     # needs only Docker plus Node to run the driver — no `npm ci`.
@@ -40,7 +40,7 @@ jobs:
       - run: npm run test-otlp
 
   Lint:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     # eslint 10 / eslint-plugin-perfectionist need Node 20+; lint is static, so run it once
     # here instead of inside every test-matrix node (Node 18 can't run the linter).
     steps:
