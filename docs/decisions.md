@@ -5,19 +5,19 @@
 2026-09-16, the maintainer: the OTLP types (`OtlpSpan`, `OtlpAttribute`, `OtlpLogPayload`,
 `OtlpSpanPayload`) and `ResolvedLogConf` stay exported. `log.span` and `log.conf` are public, so
 declaration emit requires the first two and the last; queue implementers need the payloads. Serves
-README → Goals #5 and #7.
+README → Goals #8 and #4.
 
 ## No level-string shorthand from 3.0.0
 
 2026-09-16, the maintainer: no level-string shorthand; `{ logLevel }` is the one spelling from
-3.0.0 (`todo.md` item 61). Serves README → Goals #6.
+3.0.0 (`todo.md` item 61). Serves README → Goals #3.
 
 ## The OTLP endpoint belongs to the queue
 
 2026-09-16, the maintainer: the OTLP endpoint belongs to the queue. `otlpHttpBaseURI`,
 `otlpProtocol` and `otlpAdditionalHeaders` on `Log` are shorthand for a default `Queue` and are
 rejected beside an `otlpQueue` they did not build. One `Queue` class, in memory or persisted through
-`storage`; a second implementation needs a reason a `storage` cannot give. Serves README → Goals #7.
+`storage`; a second implementation needs a reason a `storage` cannot give. Serves README → Goals #4.
 Valid while a queue owns the transport.
 
 ## `colors` precedence, and colour on by default through 2.x
@@ -26,7 +26,7 @@ Valid while a queue owns the transport.
 the default. The default stays on through 2.x: a terminal is a new user's first sight of the
 library, and a minor never changes output for a consumer whose env says nothing. Following the TTY
 is a 3.0.0 change (`todo.md` item 65); Rails' always-on `colorize_logging` is the precedent for what
-unconditional colour costs log pipelines. Serves README → Goals #5 and #6. Valid while text is the
+unconditional colour costs log pipelines. Serves README → Goals #8 and #3. Valid while text is the
 default format.
 
 ## `Log` and `Queue` each own a `clock`
@@ -34,7 +34,7 @@ default format.
 2026-09-18, the implementing agent: `Log` and `Queue` each own a `clock`, because each is usable
 without the other. A `Log` passes its clock to the default `Queue` it builds; a `Queue` the consumer
 built keeps its own, like its endpoint, since a `Log` must not mutate a queue it may share. Serves
-README → Goals #7. Valid while a queue is independently constructible.
+README → Goals #4. Valid while a queue is independently constructible.
 
 ## `Clock` hands back the platform's timer handle
 
@@ -44,7 +44,7 @@ a pending retry from holding a Node or Deno process alive, and only the retry ti
 `| number` arm is what lets a browser, React Native or test clock type-check against types built
 with `"types": ["node"]`. A clock that delegates to platform timers is unref'd like the system one;
 only Deno's numeric `unrefTimer` is skipped for an injected clock, whose id may not be Deno's.
-Serves README → Goals #8.1. Valid while a pending retry must not hold the process open.
+Serves README → Goals #9. Valid while a pending retry must not hold the process open.
 
 ## `clock` is a supported option
 
@@ -58,7 +58,7 @@ process-exit behaviour intact.
 half ships in a minor; removing one, or making it optional, waits for a major, because a consumer
 reading that key stops compiling. They are output types describing what the library produces; a
 consumer hand-building one is writing a test double, not running existing code. Serves README →
-Goals #5.
+Goals #8.
 
 ## This library's own warnings are written once per `stderr` sink
 
@@ -71,7 +71,7 @@ breaks the once-only rule. An unknown `logLevel` is keyed on its raw value, so o
 an app developer can tell which dependency emitted one about code they may not own. `enabled`
 writing anything works against CQS until `todo.md` item 89. A `Queue`'s failure lines through
 `report` carry no prefix, since they report that developer's own setup; its plain-`http:`
-`Authorization` warning is a warning, and keeps it. Serves README → Goals #6. Writing to `stderr`
+`Authorization` warning is a warning, and keeps it. Serves README → Goals #3. Writing to `stderr`
 works against `~/.claude/principles/logging.md` → Infrastructure until `todo.md` item 50 settles
 where this library's own lines go. Valid while this library writes its own warnings to a `stderr`
 sink.
@@ -92,7 +92,7 @@ without `//` parses to an opaque path, where the userinfo stays in `pathname` an
 credential-free url cannot be built from its parts. `btoa` is assumed present beside `TextEncoder`,
 on the same floor as "`ProtoWriter.string` uses `TextEncoder` with no fallback": Hermes added both
 (facebook/hermes#1178) and React Native has shipped them since 0.74. Both spellings stand per "Both
-credential spellings stay, and their combination warns". Serves README → Goals #2 and #4. Valid
+credential spellings stay, and their combination warns". Serves README → Goals #2 and #7. Valid
 while a queue owns the transport.
 
 ## `log.fetch` traces only `http:` and `https:` urls
@@ -105,7 +105,7 @@ cannot be rebuilt from the parts without shipping what the url holds — credent
 client span. It ships in a minor rather than waiting for 3.0.0 because it is the security fix
 itself, and what it drops is telemetry for urls nobody traces over the network: the timing and
 status of those spans were right, their `url.full` (`nulluser:pass@host/x`,
-`https://example.comhttps://example.com/uuid`) was not. Serves README → Goals #3 and #4. Valid while
+`https://example.comhttps://example.com/uuid`) was not. Serves README → Goals #6 and #7. Valid while
 `url.full` is built from `origin` + `pathname`.
 
 ## `log.fetch` passes url userinfo through, and redacts it in its own span's status
@@ -126,7 +126,7 @@ NSURL:]` and runs `NSURLSession` with no challenge delegate, so the system answe
 `Request.Builder().url()` and OkHttp derives no `Authorization` from it — leaving the caller a 401,
 and writing the userinfo out only in a plain-`http:` proxy's request line. Same at `v0.74.0` and at
 `main` on 2026-09-20. Mirroring keeps that the platform's behaviour. It ships in a minor on the
-precedent of the entry above, being the security fix itself. Serves README → Goals #2 and #4. Valid
+precedent of the entry above, being the security fix itself. Serves README → Goals #2 and #7. Valid
 while `log.fetch` is a drop-in for the runtime's `fetch`.
 
 ## A captured value holding a credential records `REDACTED`
@@ -134,7 +134,7 @@ while `log.fetch` is a drop-in for the runtime's `fetch`.
 2026-09-20 by the implementing agent, header names revised 2026-09-30 and v2.4.0's text rule
 restored 2026-10-03 by the maintainer: a value `log.fetch` copies onto a span records `REDACTED`
 where it holds a credential: a header value whole, a query key or value whole where its url holds
-userinfo, and a listed key's value in place, per README → Goals #4, "Credentials never leave". One
+userinfo, and a listed key's value in place, per README → Goals #7, "Credentials never leave". One
 rule for captured header values and for the query values `captureQuery` keeps — and for a query key,
 since a url written as a bare key reaches `url.full` the same way its value would — because the same
 credentialed url arrives by every one of those routes and separate rules would disagree the way the
@@ -159,12 +159,12 @@ while Elastic's default list is the published one.
 2026-09-20, the implementing agent: every rule deciding whether a credential reaches a span sits in
 one region, `// --- Credentials on a span ---`, grouped by that question and not by the caller
 asking it, so `traceableUrl` and `buildUrlFull` are there and not beside `log.fetch`. README → Goals
-#4 is checkable only against the whole set, and the rules used to sit in two places ~800 lines apart
+#7 is checkable only against the whole set, and the rules used to sit in two places ~800 lines apart
 with the call running upward and no comment at either end naming the other. Neither the banner nor
 this entry lists the routes in: prose has nothing keeping a count true, and the
 userinfo-free-by-construction choices at the `log.fetch` call site are not rules this region holds.
 Scoped to spans because the remaining credential rules are the queue's, and the conf-redaction and
-Basic-over-`http:` items rewrite that code. Serves README → Goals #4 and code health. Valid while the source
+Basic-over-`http:` items rewrite that code. Serves README → Goals #7 and code health. Valid while the source
 is a single `index.ts`.
 
 ## `format` is the formatter's one name, `entryFormatter` its alias until 3.0.0
@@ -177,7 +177,7 @@ while rejecting the documented one would break a minor. The alias stays because 
 `conf.entryFormatter` on every instance, whichever spelling set the formatter; it is one
 module-level descriptor, because a closure pair per `Log` measured 1347 bytes against README →
 Footprint's 1 KB, on `node:22-bookworm-slim` over 50 000 retained instances. Serves README → Goals
-#6 for the one name, README → Goals #5 for the alias. Valid until `todo.md` item 62 removes
+#3 for the one name, README → Goals #8 for the alias. Valid until `todo.md` item 62 removes
 `entryFormatter` in 3.0.0.
 
 2026-09-28, the maintainer, superseding the alias above on `log.conf`: `conf.format` keeps v2.3.0's
@@ -197,7 +197,7 @@ that library's code. Each of this library's own reads would also need a way to s
 which adds to the formatter code, already the hardest part to hold in one's head (code
 health). The `@deprecated` tag now points reads at `resolveFormatter(log.conf)`. The tag and the
 CHANGELOG announce the break, and so will `MIGRATION.md` once `todo.md` item 78 writes it, as README
-→ Goals #5 asks.
+→ Goals #8 asks.
 
 ## `ResolvedLogConf` keeps `entryFormatter` required
 
@@ -205,7 +205,7 @@ CHANGELOG announce the break, and so will `MIGRATION.md` once `todo.md` item 78 
 while the property is non-enumerable, so a spread's type promises a formatter the spread does not
 carry. Accepted rather than fixed: v2.3.0 shipped the member required and a minor may not narrow it,
 per the required-half entry above, and no type can say "non-enumerable". `todo.md` item 62
-closes it. Serves README → Goals #5. Valid until 3.0.0 removes `entryFormatter`.
+closes it. Serves README → Goals #8. Valid until 3.0.0 removes `entryFormatter`.
 
 ## A query key is redacted by Datadog's suffix rule
 
@@ -225,14 +225,14 @@ A false hit such as `oauth`, `bypass` or `design` costs the reader a value, neve
 of a presigned url is kept, because `X-Amz-Date` and `X-Amz-Expires` are what README → Audience #3
 reads to explain a 403.
 
-Serves README → Goals #4; over-redaction in a minor stands on the 2026-09-20 captured-value entry.
+Serves README → Goals #7; over-redaction in a minor stands on the 2026-09-20 captured-value entry.
 Valid while Datadog's default and semconv's list stay within these terms.
 
 ## An unsampled `traceparent` drops the span, never the log records
 
 2026-09-25, the maintainer: an incoming `traceparent` with the sampled flag off drops the span,
 never the log records. OTel's stable logs spec defines no sampling; a record links to its trace by
-id, so an unsampled request's `log.error` still reaches the log store. Serves README → Goals #3.
+id, so an unsampled request's `log.error` still reaches the log store. Serves README → Goals #6.
 Valid until OTel's trace-based log filtering is stable and on by default.
 
 ## An empty `logLevel` logs at `info` and warns
@@ -240,7 +240,7 @@ Valid until OTel's trace-based log filtering is stable and on by default.
 2026-09-25, the maintainer: an empty `logLevel` (`""`, as compose's `${LOG_LEVEL}` substitutes
 for an unset variable) is a value the caller wrote: it logs at `"info"` and
 warns once, like any other unknown level, so the operator sees the empty substitution. Only
-`undefined` means unset. Serves README → Goals #6. Valid while an unknown `logLevel` logs at the
+`undefined` means unset. Serves README → Goals #3. Valid while an unknown `logLevel` logs at the
 default and warns.
 
 ## The default `Queue` lives in `conf.otlpQueue`
@@ -248,12 +248,12 @@ default and warns.
 2026-09-27, the implementing agent: the default `Queue` a `Log` builds from the `otlp*` shorthand
 lives in `conf.otlpQueue`, beside the shorthand it was built from. A `parentLog` is any `LogInt`,
 whose `conf` holds every setting a child reads from it, so only there does the queue share through a
-wrapper; and 3.0.0's plan (`todo.md` item 74) makes `conf.otlpQueue` the one OTLP spelling, so
-moving it off `conf` now would move it back then. Only a queue this library built may sit beside the
+wrapper; and 3.0.0's plan (`todo.md` item 97) moves every OTLP setting into the OTLP transport, so
+moving the queue off `conf` before then would move it twice. Only a queue this library built may sit beside the
 shorthand, and only beside exactly the shorthand it was built from; a queue the consumer built is
 rejected beside any shorthand, even an identical one. It leaves `JSON.stringify(log.conf)` circular.
 "A stringified `Queue` carries its `conf`" fixes that on the `Queue`, so the queue can stay on
-`conf`. Serves README → Goals #7. Valid until 3.0.0 clears the shorthand from `conf`.
+`conf`. Serves README → Goals #4. Valid until 3.0.0 clears the shorthand from `conf`.
 
 ## A v2.3.0 copy's child loses a function formatter
 
@@ -262,7 +262,7 @@ default text when the parent has a function formatter, because v2.3.0 copies
 `Object.keys(parentLog.conf)` and `conf.entryFormatter` is non-enumerable from 2.4.0. Accepted:
 README → Audience lets enumerability change in a minor, and making the alias enumerable again
 hands it back to a spread of `log.conf` as an option the caller never wrote. Serves README → Goals
-#5, and works against #7 until `todo.md` item 62 removes `entryFormatter`.
+#8, and works against #4 until `todo.md` item 62 removes `entryFormatter`.
 
 ## The comprehension baseline
 
@@ -276,7 +276,7 @@ run at or above 7.0 replaces the baseline; `todo.md` item 90 gets there.
 baseline, so each chunk leaves the code no harder to read; the 2026-10-03 run scored Navigation
 7.1, Locality 5.5, Shape 6.25, Self-sufficiency 6.25, overall 6.1, and merged. Item 90 lands in
 2.5.0 right after the items that reshape the queue and `log.fetch` it would measure (`todo.md`
-items 3, 7, 8, 9, 11 and 12), ahead of the release's other items, whatever their score.
+items 3, 7, 8, 9 and 11), ahead of the release's other items, whatever their score.
 
 ## A stringified `Queue` carries its `conf`, less `storage` from 2.5.0
 
@@ -289,7 +289,7 @@ credential in `conf` is one the app wrote there itself. Credentials in that `con
 written, as `log.conf`'s own `otlp*` keys beside a queue built from them already do: README →
 Credentials in a captured value stops at what this library emits, and redacting in a `toJSON` would
 be a second spelling of `todo.md` item 75, which keeps credentials off `conf` from 3.0.0. Serves
-README → Goals #4. Valid until 3.0.0 keeps credentials off `log.conf` and `queue.conf`.
+README → Goals #7. Valid until 3.0.0 keeps credentials off `log.conf` and `queue.conf`.
 
 ## An `Authorization` over plain `http:` warns once
 
@@ -302,8 +302,8 @@ spellings warn, so moving the credential never silences the exposure; refusing w
 in-cluster `http:` collector, a deliberate and common setup. 2026-09-30, the maintainer: a `Queue`
 given `acceptPlainHttpAuthorization: true` does not warn, the opt-out for a network the consumer
 trusts; it sits on the queue alone, which owns the endpoint. Only `Authorization` is checked;
-other credential headers are left as they are. Serves README → Goals #4,
-"Credentials never leave", on the wire, without spending #5. Its `stderr` route stands until
+other credential headers are left as they are. Serves README → Goals #7,
+"Credentials never leave", on the wire, without spending #8. Its `stderr` route stands until
 `todo.md` item 50 settles where this library's own lines go. No expiry otherwise: the setups it
 serves are not all known.
 
@@ -311,8 +311,8 @@ serves are not all known.
 
 2026-09-28, the maintainer: the resolver from a conf to the `EntryFormatter` it writes with is
 exported, so a library author handed a conf renders a line the way the instance does once 3.0.0
-takes `conf.entryFormatter` away. Serves README → Goals #6 and Audience #2; an export is a minor
-under #5.
+takes `conf.entryFormatter` away. Serves README → Goals #3 and Audience #2; an export is a minor
+under #8.
 
 ## Both credential spellings stay, and their combination warns
 
@@ -321,15 +321,15 @@ Authorization }` both stay: a vendor hands the endpoint over as one `https://id:
 the only shape one env var carries, and a bearer token has no userinfo spelling. The two can
 disagree, so setting both warns once per `report` sink, or per `stderr` for a queue a `Log` built,
 in 2.x, and throws when the queue is built from 3.0.0 (`todo.md` item 76): v2.4.0 documents the
-header winning, so rejecting the combination sooner would spend README → Goals #5. A header added
-later is not rechecked. Serves README → Goals #6.
+header winning, so rejecting the combination sooner would spend README → Goals #8. A header added
+later is not rechecked. Serves README → Goals #3.
 
 ## Inherited `otlpAdditionalHeaders` follow the endpoint's origin
 
 2026-09-28, the implementing agent: a child or clone naming its own `otlpHttpBaseURI` inherits
 `otlpAdditionalHeaders` only from a source with no endpoint or one of the same origin, the line
 fetch draws when a redirect drops `Authorization`; a new path on the same collector keeps working.
-Serves README → Goals #4, "Credentials never leave", on the wire.
+Serves README → Goals #7, "Credentials never leave", on the wire.
 
 ## Metrics will arrive aggregated, with no instruments
 
@@ -337,18 +337,18 @@ Serves README → Goals #4, "Credentials never leave", on the wire.
 sum, histogram — will be handed over already aggregated, and this library will encode, batch and
 deliver it; the types will say what a valid point must carry. Keeping a running total, a stable
 `startTimeUnixNano` and bucket boundaries that match across a series is the caller's, so
-instruments, temporality conversion and periodic collection stay out. Serves README → Goals #6 and
-#8. Valid until `todo.md` item 56 ships; then the README documents it.
+instruments, temporality conversion and periodic collection stay out. Serves README → Goals #3 and
+#5. Valid until `todo.md` item 56 ships; then the README documents it.
 
 ## `ProtoWriter.string` uses `TextEncoder` with no fallback
 
 2026-09-17, the maintainer: `new TextEncoder()` in `ProtoWriter.string` has no fallback. Hermes has
 had the global since React Native 0.74 (Expo SDK 51 changelog, 2024-05-07), and every supported
-React Native has it. Serves README → Goals #8. Valid while README → Audience → Runtimes requires
+React Native has it. Serves README → Goals #5. Valid while README → Audience → Runtimes requires
 `TextEncoder`.
 
 ## The protobuf encoder stays
 
 2026-09-16, the maintainer: the protobuf encoder stays. Collectors that reject JSON are real, and
-the published `index.js`, encoder included, was 4.7 KB gzipped then. Serves README → Goals #3.
+the published `index.js`, encoder included, was 4.7 KB gzipped then. Serves README → Goals #6.
 Valid while `index.js` stays within README → Footprint.
