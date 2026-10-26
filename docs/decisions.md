@@ -270,13 +270,17 @@ hands it back to a spread of `log.conf` as an option the caller never wrote. Ser
 depth 1 — 6/10 overall; Navigation 7, Locality 5.25, Shape 6, Self-sufficiency 6 — and a later
 four-seat run at the same depth may not score lower. Comprehension work ships in the release it
 is found in, ahead of that release's other items. Serves code health. Valid until a later
-run at or above 7.0 replaces the baseline; `todo.md` item 90 gets there.
+run at or above 7.0 replaces the baseline; `todo.md` item 98 measures it, and files the next items
+while a score stays under.
 
 2026-10-03, the maintainer: a chunk under the floor merges while no score drops below this
 baseline, so each chunk leaves the code no harder to read; the 2026-10-03 run scored Navigation
-7.1, Locality 5.5, Shape 6.25, Self-sufficiency 6.25, overall 6.1, and merged. Item 90 lands in
-2.5.0 right after the items that reshape the queue and `log.fetch` it would measure (`todo.md`
-items 3, 7, 8, 9 and 11), ahead of the release's other items, whatever their score.
+7.1, Locality 5.5, Shape 6.25, Self-sufficiency 6.25, overall 6.1, and merged.
+
+2026-10-26, the maintainer: the work to reach the floor is specific items, each lifting a place the
+seats named, and one item, `todo.md` item 98, that scores again once they ship. While a score stays
+under 7.0, that item files the next specific items and a successor of itself, so the floor is
+pursued without one open-ended item.
 
 ## A stringified `Queue` carries its `conf`, less `storage` from 2.5.0
 

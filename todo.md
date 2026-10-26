@@ -6,7 +6,7 @@
 
 `Bar = 0.5`
 
-`Next ID = 98`
+`Next ID = 99`
 
 ## Items
 
@@ -16,7 +16,6 @@
 | 95 | 2.5.0 |  | security | **Redact userinfo a kept query splits across `&`.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
 | 7 | 2.5.0 |  | defect | **Unref the batch timer, so a pending batch never holds a Node or Deno process.** | 2 | 2 | 2 | 4 | 4 | 9 by 9 | 7.0 |
 | 13 | 2.5.0 |  |  | **Pin every Node base image to its full patch version, so one commit builds one image on any day.** | 1 | 1 | 1 | 1 | 2 | code health by 3 | 6.2 |
-| 90 | 2.5.0 |  | decision | **Bring every comprehension dimension and the overall score to 7.0, starting with Locality's four module-level tables.** | 4 | 2 | 2 | 6 | 8 | code health by 9 | 4.0 |
 | 89 | 2.5.0 |  | defect | **Keep `enabled()` free of output: warn about an unknown `logLevel` from the level methods alone.** | 1 | 1 | 1 | 1 | 2 | 3 by 5 | 2.3 |
 | 79 | 2.5.0 |  | defect | **State the real runtime floor, ES2021 syntax and `BigInt`, in README → Runtimes, or build down to the floor it states.** | 2 | 2 | 3 | 5 | 2 | 2 by 8 | 1.7 |
 | 3 | 2.5.0 |  | defect | **Send a `Request` passed as `init` with its own method, body, signal and other settings.** | 2 | 1 | 2 | 3 | 3 | 2.1 by 7 | 1.7 |
@@ -25,15 +24,16 @@
 | 11 | 2.5.0 |  | defect | **Keep a transient `storage` read failure from wiping the persisted queue.** | 2 | 1 | 2 | 3 | 4 | 2 by 4 | 0.8 |
 | 34 | 2.6.0 |  | principle | **Let a consumer inject the randomness trace and span ids come from.** | 1 | 1 | 1 | 1 | 2 | code health by 5 | 10.4 |
 | 37 | 2.6.0 |  | principle | **Build a span payload without writing to `log.span`.** | 1 | 1 | 1 | 1 | 2 | code health by 5 | 10.4 |
+| 44 | 2.6.0 |  | principle | **Route a `Queue`'s warnings through one explicit seam.** | 2 | 1 | 1 | 2 | 4 | code health by 9 | 9.4 |
 | 49 | 2.6.0 |  | principle | **Sort what carries no order.** | 1 | 1 | 1 | 1 | 1 | code health by 3 | 9.4 |
 | 47 | 2.6.0 |  | principle | **Collapse `entryFormatterDeprecation` and `load()` to one error channel each.** | 1 | 1 | 1 | 1 | 2 | code health by 4 | 8.3 |
 | 91 | 2.6.0 |  | principle | **Measure test coverage in CI, and fail a change that lowers it.** | 1 | 1 | 1 | 1 | 3 | code health by 5 | 7.8 |
+| 38 | 2.6.0 |  | principle | **Resolve a `Log`'s conf in steps that each return a new value, with no cast at the end.** | 3 | 1 | 2 | 4 | 5 | code health by 9 | 6.2 |
 | 39 | 2.6.0 |  | principle | **Keep a `Queue`'s items and their byte count in one structure.** | 2 | 1 | 1 | 2 | 3 | code health by 5 | 6.2 |
 | 45 | 2.6.0 |  | principle | **Build the shared parts of a span and of a payload's attributes once.** | 2 | 1 | 1 | 2 | 3 | code health by 5 | 6.2 |
+| 98 | 2.6.0 | 38, 44 | decision | **Score the project against the 7.0 comprehension floor, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
 | 35 | 2.6.0 |  | principle | **Let a consumer inject what `colorsFromEnv`, `traceableUrl` and `unref` read from the platform.** | 2 | 1 | 1 | 2 | 4 | code health by 5 | 5.2 |
-| 44 | 2.6.0 |  | principle | **Route a `Queue`'s warnings through one explicit seam.** | 2 | 1 | 1 | 2 | 4 | code health by 5 | 5.2 |
 | 36 | 2.6.0 |  | principle | **Reach the retry decision and a `log.fetch` span's attributes without a network call.** | 2 | 1 | 1 | 2 | 5 | code health by 5 | 4.5 |
-| 38 | 2.6.0 |  | principle | **Resolve a `Log`'s conf in steps that each return a new value, with no cast at the end.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
 | 43 | 2.6.0 |  | principle | **Give `ExportScheduler` and save coalescing named states.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
 | 48 | 2.6.0 |  | principle | **Test the untested failure paths.** | 2 | 1 | 1 | 2 | 4 | code health by 4 | 4.2 |
 | 25 | 2.6.0 |  |  | **Publish the artifact the gate tested.** | 2 | 2 | 3 | 5 | 4 | code health by 5 | 3.5 |
@@ -131,12 +131,6 @@ Three places float: `ARG BASE_IMAGE=node:24-bookworm-slim` in the `Dockerfile`,
 versions, so drop the npm script's and leave the `ARG`. Renovate already bumps a `Dockerfile` pin; a
 matrix of patch versions needs a `customManagers` rule to get the same.
 
-### 90. Bring every comprehension dimension and the overall score to 7.0, starting with Locality's four module-level tables.
-
-The 2026-10-03 four-seat run scored Navigation 7.1, Locality 5.5, Shape 6.25, Self-sufficiency 6.25,
-overall 6.1. Every seat named `formatFunctions`, `warned`, `logWarningOfReport` and `defaultQueues`,
-with the order-dependent mutation in `resolveLogConf`; items 38, 44 and 62 hold parts of it.
-
 ### 89. Keep `enabled()` free of output: warn about an unknown `logLevel` from the level methods alone.
 
 `log.enabled(level)` writes the unknown-level warning and marks the once-only state, so a library
@@ -187,6 +181,15 @@ a load failure has to suppress saving too.
 
 `buildSpanPayload` sets `span.attributes` as it builds. Principle: One owner per value.
 
+### 44. Route a `Queue`'s warnings through one explicit seam.
+
+`logWarningOfReport` finds a Log's warner by the identity of its `report` function, and
+`warnOnce(conf)` and `Queue.warnOnce` are two once-only rules. Principle: Explicit over implicit.
+
+
+Every seat of the 2026-10-03 run named the module-level tables `warned` and `logWarningOfReport`, so
+it lifts Locality, the lowest dimension at 5.5.
+
 ### 49. Sort what carries no order.
 
 `format`'s `"text" | "json"`, `msg`/`msTimestamp`, and `server.port` after `url.scheme` in a
@@ -202,6 +205,16 @@ errors explicitly, as values.
 Neither suite collects coverage, so `~/.claude/principles/technical-principles.md` → "Coverage
 should not decline" cannot be checked.
 
+### 38. Resolve a `Log`'s conf in steps that each return a new value, with no cast at the end.
+
+`confFromOptions`, `inheritSettings`, `rejectQueueBesideShorthand` and `withDefaults` mutate one
+object in an order that carries meaning, and `conf as ResolvedLogConf` hides what they miss.
+Principle: Compose, do not entangle; validate data and build DTOs as early as possible.
+
+
+Every seat of the 2026-10-03 run named this order-dependent mutation in `resolveLogConf`, so it
+lifts Locality, the lowest dimension at 5.5.
+
 ### 39. Keep a `Queue`'s items and their byte count in one structure.
 
 Four writers keep `items` and `bytes` in step by hand, and the size-triggered flush trusts them.
@@ -212,28 +225,25 @@ Principle: One owner per value.
 `openSpan` and `childSpan` repeat the span object; both payload builders drop `service.name` and
 stringify values. Principle: Don't Repeat Yourself.
 
+### 98. Score the project against the 7.0 comprehension floor, and while any score is under it, file items lifting the lowest dimension, with this item's successor.
+
+The 2026-10-03 run scored Navigation 7.1, Locality 5.5, Shape 6.25, Self-sufficiency 6.25, overall
+6.1; items 38, 44, 96 and 97 take the places its seats named. Its tagline names the floor, so its
+chunk runs the four-seat scoring run. Where a dimension or the overall stays under 7.0, file items
+for the places the seats name, lowest dimension first, and a copy of this item blocked by them.
+Where every score reaches 7.0, it files nothing, and the run replaces the comprehension baseline.
+
 ### 35. Let a consumer inject what `colorsFromEnv`, `traceableUrl` and `unref` read from the platform.
 
 They read `process.env`, `globalThis.location` and `globalThis.Deno`, and the suite swaps
 `globalThis.process` and `console.error` to reach them. Principle: Functional core, imperative
 shell.
 
-### 44. Route a `Queue`'s warnings through one explicit seam.
-
-`logWarningOfReport` finds a Log's warner by the identity of its `report` function, and
-`warnOnce(conf)` and `Queue.warnOnce` are two once-only rules. Principle: Explicit over implicit.
-
 ### 36. Reach the retry decision and a `log.fetch` span's attributes without a network call.
 
 `OtlpSender.send` holds the plain-http warning, encoding, the send and the status decision in one
 method, and `tracedFetch` builds and redacts attributes around the live call. Principle: Functional
 core, imperative shell.
-
-### 38. Resolve a `Log`'s conf in steps that each return a new value, with no cast at the end.
-
-`confFromOptions`, `inheritSettings`, `rejectQueueBesideShorthand` and `withDefaults` mutate one
-object in an order that carries meaning, and `conf as ResolvedLogConf` hides what they miss.
-Principle: Compose, do not entangle; validate data and build DTOs as early as possible.
 
 ### 43. Give `ExportScheduler` and save coalescing named states.
 
@@ -325,6 +335,11 @@ the transport" and "The OTLP endpoint belongs to the queue" are revised in the s
 **Done only once the maintainer approves both** the transport configuration a consumer writes, and
 examples of building a transport, each shown to them before the item is marked complete. The
 spelling is benched with the README's audience before it is shown.
+
+
+Every seat of the 2026-10-03 comprehension run named `formatFunctions` and `defaultQueues`, two
+module-level tables a reader must trace to know a `Log`'s formatter and queue. Where the console
+and OTLP transports take those over, the formatter and the queue are read where they are used.
 
 ### 28. Export resource attributes beyond `service.name`.
 
