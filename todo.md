@@ -2,113 +2,101 @@
 
 ## Scoring
 
-`Score = -R - S/4 + 2*A + 2*G*W`
+`Score = 10 * V / (R + S)`
 
-`Bar = 9`
+`Bar = 0.5`
 
-`Next ID = 96`
-
-| Goal | W |
-|---|---|
-| 1 | 1.00 |
-| 1.1 | 0.95 |
-| 2 | 0.90 |
-| 3 | 0.85 |
-| 4 | 0.80 |
-| 5 | 0.75 |
-| 6 | 0.70 |
-| 7 | 0.65 |
-| 7.1 | 0.60 |
-| 8 | 0.55 |
+`Next ID = 97`
 
 ## Items
 
-| ID | Release | Exempt | Item | R | S | A | G | Goals | Score |
-|---|---|---|---|---|---|---|---|---|---|
-| 93 | 2.5.0 | security | **Redact a credential in a url nested in the request path where the url does not open its segment.** | 3 | 4 | 5 | 7 | 3 | 17.9 |
-| 95 | 2.5.0 | security | **Redact userinfo a kept query splits across `&`.** | 3 | 3 | 3 | 5 | 3 | 10.8 |
-| 79 | 2.5.0 | defect | **State the real runtime floor, ES2021 syntax and `BigInt`, in README → Runtimes, or build down to the floor it states.** | 2 | 2 | 7 | 8 | 1 | 27.5 |
-| 3 | 2.5.0 | defect | **Send a `Request` passed as `init` with its own method, body, signal and other settings.** | 3 | 3 | 6 | 7 | 1.1 | 21.5 |
-| 12 | 2.5.0 |  | **Let a consumer inject the `fetch` the OTLP queue sends with.** | 3 | 3 | 6 | 6 | 1, 8 | 20.2 |
-| 7 | 2.5.0 | defect | **Unref the batch timer, so a pending batch never holds a Node or Deno process.** | 4 | 4 | 7 | 9 | 7.1 | 19.8 |
-| 8 | 2.5.0 | defect | **Keep a restored batch through the `maxItems` trim, so the retry promised for it holds.** | 4 | 3 | 7 | 4 | 1 | 17.2 |
-| 9 | 2.5.0 | defect | **Keep a batch in the persisted queue until its send settles.** | 4 | 3 | 7 | 4 | 1 | 17.2 |
-| 11 | 2.5.0 | defect | **Keep a transient `storage` read failure from wiping the persisted queue.** | 4 | 4 | 7 | 4 | 1 | 17.0 |
-| 89 | 2.5.0 | defect | **Keep `enabled()` free of output: warn about an unknown `logLevel` from the level methods alone.** | 2 | 2 | 5 | 5 | 5 | 15.0 |
-| 13 | 2.5.0 |  | **Pin every Node base image to its full patch version, so one commit builds one image on any day.** | 1 | 2 | 3 | 7 | 7 | 13.6 |
-| 90 | 2.5.0 | decision | **Bring every comprehension dimension and the overall score to 7.0, starting with Locality's four module-level tables.** | 4 | 8 | 3 | 9 | 8 | 9.9 |
-| 22 | 2.6.0 |  | **Announce in the README and CHANGELOG that 3.0.0 stops `log.conf` and `queue.conf` handing back a credential, so a consumer reading one out of them moves to their own copy first.** | 1 | 1 | 5 | 8 | 3, 4 | 22.4 |
-| 80 | 2.6.0 | principle | **Run the browser suite in WebKit and Firefox as well as Chromium.** | 1 | 3 | 5 | 7 | 1.1 | 21.5 |
-| 14 | 2.6.0 |  | **Deprecate `parentLog` together with `traceparent`.** | 2 | 2 | 5 | 8 | 4 | 20.3 |
-| 16 | 2.6.0 |  | **Warn once when `format` is a string other than `"text"` or `"json"`.** | 1 | 1 | 5 | 7 | 4, 5 | 20.0 |
-| 23 | 2.6.0 |  | **Settle one marker for a CHANGELOG entry a consumer must act on, and record it in the `AGENTS.md` line beside `### Security`.** | 1 | 1 | 5 | 7 | 4 | 20.0 |
-| 20 | 2.6.0 |  | **Announce in the README and CHANGELOG that 3.0.0 gives a `log.fetch` span `end({ error })`'s `error.type`, so a query on `"20"` for an abort or `"fetch_error"` moves first.** | 1 | 1 | 4 | 8 | 4 | 19.6 |
-| 19 | 2.6.0 | defect | **Leave a `Request` untraced in `log.fetch`.** | 2 | 2 | 5 | 6 | 1.1 | 18.9 |
-| 15 | 2.6.0 |  | **Warn once when `colors` is unset, `process.stdout.isTTY` is false and neither `NO_COLOR` nor `FORCE_COLOR` is set, where 3.0.0 turns colour off.** | 2 | 2 | 4 | 8 | 4 | 18.3 |
-| 17 | 2.6.0 |  | **Warn once when an instance with `otlpQueue` set or inherited leaves `spanName` unset.** | 2 | 2 | 4 | 8 | 4 | 18.3 |
-| 25 | 2.6.0 |  | **Publish the artifact the gate tested.** | 3 | 4 | 5 | 6 | 1 | 18.0 |
-| 82 | 2.6.0 |  | **Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.** | 1 | 1 | 5 | 5 | 5 | 16.2 |
-| 18 | 2.6.0 |  | **Export `LogEntry` as an alias of `EntryFormatterConf`, so the 3.0.0 rename has a spelling a consumer can move to first.** | 1 | 1 | 3 | 7 | 4 | 16.0 |
-| 21 | 2.6.0 |  | **Announce in the README that 3.0.0 adds a metrics kind to `OtlpPayload`, so an `OtlpQueue` implementer handles one before it arrives.** | 1 | 1 | 3 | 7 | 4 | 16.0 |
-| 26 | 2.6.0 |  | **Check the footprint budget in CI, so the numbers in README → Footprint fail a build instead of going stale.** | 2 | 5 | 4 | 8 | 7 | 15.2 |
-| 24 | 2.6.0 |  | **Publish an `index.js.map` that maps the published `index.js`.** | 2 | 2 | 4 | 3 | 5 | 10.0 |
-| 91 | 2.6.0 | principle | **Measure test coverage in CI, and fail a change that lowers it.** | 1 | 3 | 2 | 5 | 8 | 7.8 |
-| 28 | 2.7.0 |  | **Export resource attributes beyond `service.name`.** | 2 | 3 | 7 | 7 | 2 | 23.9 |
-| 27 | 2.7.0 |  | **Name a `log.fetch` span and its errors as HTTP semconv does.** | 3 | 3 | 6 | 8 | 2 | 22.6 |
-| 29 | 2.7.0 |  | **Export span events.** | 3 | 5 | 6 | 6 | 2 | 18.6 |
-| 31 | 2.7.0 |  | **Set a log record's `flags` to the W3C trace flags.** | 2 | 2 | 4 | 7 | 2 | 18.1 |
-| 81 | 2.7.0 | principle | **Test export and `log.fetch` against a real server in a browser.** | 2 | 5 | 4 | 6 | 1.1 | 16.1 |
-| 30 | 2.7.0 |  | **Let a consumer sample by ratio.** | 4 | 5 | 6 | 5 | 2, 7 | 15.8 |
-| 87 | 2.7.0 |  | **Report a protobuf export's `partialSuccess` as the JSON transport does.** | 3 | 4 | 4 | 6 | 2 | 14.8 |
-| 86 | 2.7.0 |  | **Set `telemetry.sdk.language` to a semconv value, `nodejs` or `webjs`.** | 2 | 2 | 3 | 6 | 2 | 14.3 |
-| 88 | 2.7.0 |  | **Parse `traceparent` as W3C Trace Context does: ignore uppercase hex, and read a higher version by its first four fields.** | 2 | 2 | 3 | 6 | 2 | 14.3 |
-| 83 | 2.7.0 |  | **Measure a full persisted queue's save to `localStorage` on a low-end phone, and budget it in README → Footprint.** | 1 | 3 | 4 | 5 | 7 | 12.8 |
-| 32 | 2.7.0 |  | **Propagate `tracestate`.** | 4 | 5 | 3 | 5 | 2 | 9.8 |
-| 41 | 2.8.0 | principle | **Warn once about a negative, zero or `NaN` numeric `QueueConf` option, and use the default.** | 2 | 2 | 5 | 6 | 5 | 16.5 |
-| 42 | 2.8.0 | defect | **Check each persisted or enqueued payload's shape, so one corrupt item never drops its batch.** | 3 | 3 | 6 | 4 | 1 | 16.2 |
-| 51 | 2.8.0 | principle | **Keep a retried export from duplicating log records, or record in `docs/decisions.md` why duplicates stand.** | 3 | 4 | 4 | 6 | 2 | 14.8 |
-| 40 | 2.8.0 | principle | **Make `queue.conf` read back what the queue sends with.** | 3 | 4 | 4 | 6 | 5 | 13.0 |
-| 46 | 2.8.0 | principle | **Keep an injected `clock` or `stdout` that throws from escaping a level method.** | 2 | 2 | 4 | 5 | 5 | 13.0 |
-| 48 | 2.8.0 | principle | **Test the untested failure paths.** | 1 | 4 | 3 | 4 | 2, 8 | 11.2 |
-| 50 | 2.8.0 | principle | **Match the level set and where the queue's own failures go to `~/.claude/principles/logging.md`, or record why not.** | 2 | 2 | 3 | 4 | 5 | 9.5 |
-| 34 | 2.8.0 | principle | **Let a consumer inject the randomness trace and span ids come from.** | 2 | 2 | 2 | 6 | 8 | 8.1 |
-| 35 | 2.8.0 | principle | **Let a consumer inject what `colorsFromEnv`, `traceableUrl` and `unref` read from the platform.** | 3 | 4 | 2 | 6 | 8 | 6.6 |
-| 37 | 2.8.0 | principle | **Build a span payload without writing to `log.span`.** | 2 | 2 | 1 | 6 | 8 | 6.1 |
-| 47 | 2.8.0 | principle | **Collapse `entryFormatterDeprecation` and `load()` to one error channel each.** | 2 | 2 | 1 | 5 | 8 | 5.0 |
-| 39 | 2.8.0 | principle | **Keep a `Queue`'s items and their byte count in one structure.** | 3 | 3 | 1 | 6 | 8 | 4.9 |
-| 45 | 2.8.0 | principle | **Build the shared parts of a span and of a payload's attributes once.** | 2 | 3 | 1 | 5 | 8 | 4.8 |
-| 44 | 2.8.0 | principle | **Route a `Queue`'s warnings through one explicit seam.** | 3 | 4 | 1 | 6 | 8 | 4.6 |
-| 38 | 2.8.0 | principle | **Resolve a `Log`'s conf in steps that each return a new value, with no cast at the end.** | 4 | 5 | 1 | 7 | 8 | 4.5 |
-| 43 | 2.8.0 | principle | **Give `ExportScheduler` and save coalescing named states.** | 4 | 5 | 1 | 7 | 8 | 4.5 |
-| 36 | 2.8.0 | principle | **Reach the retry decision and a `log.fetch` span's attributes without a network call.** | 3 | 5 | 1 | 6 | 8 | 4.4 |
-| 49 | 2.8.0 | principle | **Sort what carries no order.** | 1 | 1 | 1 | 3 | 8 | 4.1 |
-| 78 | 3.0.0 | decision | **Write `MIGRATION.md`: one entry per 3.0.0 item, with the 2.x spelling and the 3.0.0 spelling.** | 1 | 3 | 8 | 9 | 4 | 28.6 |
-| 69 | 3.0.0 |  | **Export metadata as typed OTLP attribute values instead of coercing every one to `stringValue`.** | 3 | 3 | 7 | 8 | 2 | 24.6 |
-| 71 | 3.0.0 |  | **Allow `parentLog` with `traceparent`.** | 3 | 3 | 7 | 8 | 6 | 21.4 |
-| 66 | 3.0.0 |  | **Attach a child's log records to its own span instead of the parent's.** | 3 | 2 | 5 | 8 | 2 | 20.9 |
-| 75 | 3.0.0 | decision | **Keep credentials off `log.conf` and `queue.conf`.** | 3 | 3 | 6 | 7 | 3 | 20.1 |
-| 73 | 3.0.0 |  | **Send `traceparent` cross-origin only to urls the caller lists, or record why not.** | 3 | 3 | 5 | 7 | 1.1 | 19.5 |
-| 72 | 3.0.0 |  | **Make nothing throw after `end()`.** | 3 | 4 | 6 | 7 | 5 | 18.5 |
-| 52 | 3.0.0 |  | **Spell a redacted `url.full` the way OTel semconv asks: `https://REDACTED:REDACTED@host/x`.** | 2 | 2 | 4 | 7 | 2, 3 | 18.1 |
-| 57 | 3.0.0 |  | **Retry only what OTLP/HTTP calls retryable — 429, 502, 503 and 504 — and honour `Retry-After`.** | 2 | 2 | 4 | 7 | 2 | 18.1 |
-| 77 | 3.0.0 |  | **Require `spanName` whenever `otlpQueue` is set or inherited.** | 2 | 1 | 4 | 6 | 2 | 16.6 |
-| 59 | 3.0.0 |  | **Give a `log.fetch` span `end({ error })`'s `error.type`: a string `code`, else `name`, else `"_OTHER"`.** | 2 | 2 | 4 | 6 | 2 | 16.3 |
-| 53 | 3.0.0 |  | **Keep the auth scheme when an allow-listed `authorization` records `REDACTED`.** | 2 | 2 | 5 | 5 | 3 | 16.0 |
-| 65 | 3.0.0 | decision | **Default `colors` to `process.stdout.isTTY` when neither `NO_COLOR` nor `FORCE_COLOR` is set.** | 3 | 2 | 5 | 6 | 5 | 15.5 |
-| 56 | 3.0.0 | decision | **Export OTLP metrics as a stateless pass-through.** | 4 | 7 | 6 | 5 | 2 | 15.2 |
-| 64 | 3.0.0 |  | **Reject a `format` string other than `"text"` or `"json"` in the constructor.** | 2 | 1 | 4 | 6 | 5 | 14.8 |
-| 76 | 3.0.0 | decision | **Reject `user:pass@` in `otlpHttpBaseURI` beside an `Authorization` in `otlpAdditionalHeaders`, in the constructor.** | 2 | 1 | 4 | 6 | 5 | 14.8 |
-| 61 | 3.0.0 | decision | **Remove the level-string shorthand from `Log` and `clone`.** | 2 | 1 | 3 | 7 | 5 | 14.2 |
-| 70 | 3.0.0 |  | **Stop a child inheriting `spanName`.** | 2 | 1 | 4 | 6 | 6 | 14.1 |
-| 60 | 3.0.0 |  | **Make `LogInt` `Logger` plus its own members, `enabled`, `flush` and `sampled` required.** | 2 | 2 | 4 | 6 | 6 | 13.9 |
-| 67 | 3.0.0 |  | **Let per-call metadata win over `context` on a key collision.** | 2 | 1 | 4 | 5 | 5 | 13.2 |
-| 55 | 3.0.0 | principle | **Make `log.span` and `ended` read-only, and an open span carry no end time.** | 3 | 3 | 3 | 6 | 2 | 13.1 |
-| 62 | 3.0.0 | decision | **Remove `entryFormatter`, the option and the `conf` alias of `format` beside it.** | 3 | 3 | 3 | 7 | 5 | 12.8 |
-| 58 | 3.0.0 |  | **Give the redaction sentinel its own name — `REDACTED by @larvit/log` or similar.** | 2 | 2 | 4 | 4 | 2 | 12.7 |
-| 68 | 3.0.0 |  | **Merge a child's `context` per key with the parent's, as `clone()` does.** | 3 | 3 | 4 | 6 | 6 | 12.6 |
-| 63 | 3.0.0 |  | **Rename `EntryFormatterConf` to `LogEntry`.** | 2 | 2 | 3 | 6 | 5 | 12.5 |
-| 54 | 3.0.0 | principle | **Require `msTimestamp` in `EntryFormatterConf`, and have the built-in formatters return a value for an unknown level.** | 2 | 2 | 3 | 5 | 5 | 11.0 |
-| 74 | 3.0.0 | decision | **Keep `otlpQueue` as the only OTLP representation in `conf`.** | 4 | 4 | 3 | 6 | 6 | 9.4 |
+| ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 93 | 2.5.0 |  | security | **Redact a credential in a url nested in the request path where the url does not open its segment.** | 2 | 2 | 4 | 6 | 4 |  | 0.0 |
+| 95 | 2.5.0 |  | security | **Redact userinfo a kept query splits across `&`.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
+| 7 | 2.5.0 |  | defect | **Unref the batch timer, so a pending batch never holds a Node or Deno process.** | 2 | 2 | 2 | 4 | 4 | 8.1 by 9 | 7.0 |
+| 13 | 2.5.0 |  |  | **Pin every Node base image to its full patch version, so one commit builds one image on any day.** | 1 | 1 | 1 | 1 | 2 | code health by 3 | 6.2 |
+| 12 | 2.5.0 |  |  | **Let a consumer inject the `fetch` the OTLP queue sends with.** | 2 | 1 | 2 | 3 | 3 | 2 by 6, code health by 3 | 4.6 |
+| 90 | 2.5.0 |  | decision | **Bring every comprehension dimension and the overall score to 7.0, starting with Locality's four module-level tables.** | 4 | 2 | 2 | 6 | 8 | code health by 9 | 4.0 |
+| 89 | 2.5.0 |  | defect | **Keep `enabled()` free of output: warn about an unknown `logLevel` from the level methods alone.** | 1 | 1 | 1 | 1 | 2 | 6 by 5 | 2.3 |
+| 79 | 2.5.0 |  | defect | **State the real runtime floor, ES2021 syntax and `BigInt`, in README → Runtimes, or build down to the floor it states.** | 2 | 2 | 3 | 5 | 2 | 2 by 8 | 1.7 |
+| 3 | 2.5.0 |  | defect | **Send a `Request` passed as `init` with its own method, body, signal and other settings.** | 2 | 1 | 2 | 3 | 3 | 2.1 by 7 | 1.7 |
+| 8 | 2.5.0 |  | defect | **Keep a restored batch through the `maxItems` trim, so the retry promised for it holds.** | 2 | 1 | 2 | 3 | 3 | 2 by 4 | 1.0 |
+| 9 | 2.5.0 |  | defect | **Keep a batch in the persisted queue until its send settles.** | 2 | 1 | 2 | 3 | 3 | 2 by 4 | 1.0 |
+| 11 | 2.5.0 |  | defect | **Keep a transient `storage` read failure from wiping the persisted queue.** | 2 | 1 | 2 | 3 | 4 | 2 by 4 | 0.8 |
+| 91 | 2.6.0 |  | principle | **Measure test coverage in CI, and fail a change that lowers it.** | 1 | 1 | 1 | 1 | 3 | code health by 5 | 7.8 |
+| 25 | 2.6.0 |  |  | **Publish the artifact the gate tested.** | 2 | 2 | 3 | 5 | 4 | code health by 5 | 3.5 |
+| 16 | 2.6.0 |  |  | **Warn once when `format` is a string other than `"text"` or `"json"`.** | 1 | 1 | 1 | 1 | 1 | 6 by 5 | 3.5 |
+| 82 | 2.6.0 |  |  | **Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.** | 1 | 2 | 1 | 2 | 1 | 6 by 5 | 2.3 |
+| 19 | 2.6.0 |  | defect | **Leave a `Request` untraced in `log.fetch`.** | 1 | 1 | 2 | 2 | 2 | 2.1 by 6 | 2.1 |
+| 18 | 2.6.0 |  |  | **Export `LogEntry` as an alias of `EntryFormatterConf`, so the 3.0.0 rename has a spelling a consumer can move to first.** | 1 | 1 | 1 | 1 | 1 | 6 by 3 | 2.1 |
+| 20 | 2.6.0 |  |  | **Announce in the README and CHANGELOG that 3.0.0 gives a `log.fetch` span `end({ error })`'s `error.type`, so a query on `"20"` for an abort or `"fetch_error"` moves first.** | 1 | 1 | 1 | 1 | 1 | 6 by 3 | 2.1 |
+| 23 | 2.6.0 |  |  | **Settle one marker for a CHANGELOG entry a consumer must act on, and record it in the `AGENTS.md` line beside `### Security`.** | 1 | 1 | 1 | 1 | 1 | 6 by 3 | 2.1 |
+| 80 | 2.6.0 |  | principle | **Run the browser suite in WebKit and Firefox as well as Chromium.** | 2 | 1 | 1 | 2 | 3 | 2 by 7 | 2.1 |
+| 21 | 2.6.0 |  |  | **Announce in the README that 3.0.0 adds a metrics kind to `OtlpPayload`, so an `OtlpQueue` implementer handles one before it arrives.** | 1 | 1 | 1 | 1 | 1 | 7 by 3 | 2.0 |
+| 15 | 2.6.0 |  |  | **Warn once when `colors` is unset, `process.stdout.isTTY` is false and neither `NO_COLOR` nor `FORCE_COLOR` is set, where 3.0.0 turns colour off.** | 1 | 1 | 1 | 1 | 2 | 6 by 4 | 1.8 |
+| 17 | 2.6.0 |  |  | **Warn once when an instance with `otlpQueue` set or inherited leaves `spanName` unset.** | 1 | 1 | 1 | 1 | 2 | 6 by 4 | 1.8 |
+| 26 | 2.6.0 |  |  | **Check the footprint budget in CI, so the numbers in README → Footprint fail a build instead of going stale.** | 2 | 1 | 1 | 2 | 5 | 8 by 8 | 1.5 |
+| 22 | 2.6.0 |  |  | **Announce in the README and CHANGELOG that 3.0.0 stops `log.conf` and `queue.conf` handing back a credential, so a consumer reading one out of them moves to their own copy first.** | 1 | 2 | 1 | 2 | 1 | 6 by 3 | 1.4 |
+| 24 | 2.6.0 |  |  | **Publish an `index.js.map` that maps the published `index.js`.** | 1 | 1 | 1 | 1 | 2 | 6 by 3 | 1.4 |
+| 14 | 2.6.0 |  |  | **Deprecate `parentLog` together with `traceparent`.** | 1 | 1 | 2 | 2 | 2 | 7 by 4 | 1.3 |
+| 28 | 2.7.0 |  |  | **Export resource attributes beyond `service.name`.** | 2 | 1 | 2 | 3 | 3 | 1 by 7 | 1.8 |
+| 31 | 2.7.0 |  |  | **Set a log record's `flags` to the W3C trace flags.** | 1 | 1 | 2 | 2 | 2 | 1 by 4 | 1.5 |
+| 88 | 2.7.0 |  |  | **Parse `traceparent` as W3C Trace Context does: ignore uppercase hex, and read a higher version by its first four fields.** | 1 | 1 | 1 | 1 | 2 | 1 by 3 | 1.5 |
+| 83 | 2.7.0 |  |  | **Measure a full persisted queue's save to `localStorage` on a low-end phone, and budget it in README → Footprint.** | 1 | 2 | 1 | 2 | 3 | 8 by 5 | 1.3 |
+| 27 | 2.7.0 |  |  | **Name a `log.fetch` span and its errors as HTTP semconv does.** | 2 | 1 | 3 | 4 | 3 | 1 by 6 | 1.3 |
+| 30 | 2.7.0 |  |  | **Let a consumer sample by ratio.** | 3 | 2 | 2 | 5 | 5 | 1 by 5, 8 by 4 | 1.3 |
+| 81 | 2.7.0 |  | principle | **Test export and `log.fetch` against a real server in a browser.** | 2 | 1 | 1 | 2 | 5 | 2.1 by 6 | 1.2 |
+| 86 | 2.7.0 |  |  | **Set `telemetry.sdk.language` to a semconv value, `nodejs` or `webjs`.** | 1 | 1 | 2 | 2 | 2 | 1 by 3 | 1.1 |
+| 29 | 2.7.0 |  |  | **Export span events.** | 3 | 1 | 2 | 4 | 5 | 1 by 6 | 1.0 |
+| 87 | 2.7.0 |  |  | **Report a protobuf export's `partialSuccess` as the JSON transport does.** | 2 | 1 | 2 | 3 | 4 | 1 by 4 | 0.9 |
+| 32 | 2.7.0 |  |  | **Propagate `tracestate`.** | 3 | 2 | 2 | 5 | 5 | 1 by 4 | 0.6 |
+| 34 | 2.8.0 |  | principle | **Let a consumer inject the randomness trace and span ids come from.** | 1 | 1 | 1 | 1 | 2 | code health by 5 | 10.4 |
+| 37 | 2.8.0 |  | principle | **Build a span payload without writing to `log.span`.** | 1 | 1 | 1 | 1 | 2 | code health by 5 | 10.4 |
+| 49 | 2.8.0 |  | principle | **Sort what carries no order.** | 1 | 1 | 1 | 1 | 1 | code health by 3 | 9.4 |
+| 47 | 2.8.0 |  | principle | **Collapse `entryFormatterDeprecation` and `load()` to one error channel each.** | 1 | 1 | 1 | 1 | 2 | code health by 4 | 8.3 |
+| 39 | 2.8.0 |  | principle | **Keep a `Queue`'s items and their byte count in one structure.** | 2 | 1 | 1 | 2 | 3 | code health by 5 | 6.2 |
+| 45 | 2.8.0 |  | principle | **Build the shared parts of a span and of a payload's attributes once.** | 2 | 1 | 1 | 2 | 3 | code health by 5 | 6.2 |
+| 35 | 2.8.0 |  | principle | **Let a consumer inject what `colorsFromEnv`, `traceableUrl` and `unref` read from the platform.** | 2 | 1 | 1 | 2 | 4 | code health by 5 | 5.2 |
+| 44 | 2.8.0 |  | principle | **Route a `Queue`'s warnings through one explicit seam.** | 2 | 1 | 1 | 2 | 4 | code health by 5 | 5.2 |
+| 36 | 2.8.0 |  | principle | **Reach the retry decision and a `log.fetch` span's attributes without a network call.** | 2 | 1 | 1 | 2 | 5 | code health by 5 | 4.5 |
+| 38 | 2.8.0 |  | principle | **Resolve a `Log`'s conf in steps that each return a new value, with no cast at the end.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
+| 43 | 2.8.0 |  | principle | **Give `ExportScheduler` and save coalescing named states.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
+| 48 | 2.8.0 |  | principle | **Test the untested failure paths.** | 2 | 1 | 1 | 2 | 4 | code health by 4 | 4.2 |
+| 41 | 2.8.0 |  | principle | **Warn once about a negative, zero or `NaN` numeric `QueueConf` option, and use the default.** | 1 | 1 | 1 | 1 | 2 | 6 by 5 | 2.3 |
+| 46 | 2.8.0 |  | principle | **Keep an injected `clock` or `stdout` that throws from escaping a level method.** | 1 | 1 | 2 | 2 | 2 | 6 by 4 | 1.4 |
+| 50 | 2.8.0 |  | principle | **Match the level set and where the queue's own failures go to `~/.claude/principles/logging.md`, or record why not.** | 1 | 1 | 1 | 1 | 2 | 6 by 3 | 1.4 |
+| 42 | 2.8.0 |  | defect | **Check each persisted or enqueued payload's shape, so one corrupt item never drops its batch.** | 2 | 1 | 2 | 3 | 3 | 2 by 4 | 1.0 |
+| 40 | 2.8.0 |  | principle | **Make `queue.conf` read back what the queue sends with.** | 2 | 1 | 1 | 2 | 4 | 6 by 4 | 0.9 |
+| 51 | 2.8.0 |  | principle | **Keep a retried export from duplicating log records, or record in `docs/decisions.md` why duplicates stand.** | 2 | 2 | 2 | 4 | 4 | 1 by 4 | 0.8 |
+| 55 | 3.0.0 |  | principle | **Make `log.span` and `ended` read-only, and an open span carry no end time.** | 2 | 1 | 1 | 2 | 3 | code health by 4 | 5.0 |
+| 57 | 3.0.0 |  |  | **Retry only what OTLP/HTTP calls retryable — 429, 502, 503 and 504 — and honour `Retry-After`.** | 1 | 1 | 2 | 2 | 2 | 1 by 5 | 1.9 |
+| 61 | 3.0.0 |  | decision | **Remove the level-string shorthand from `Log` and `clone`.** | 1 | 1 | 2 | 2 | 1 | 6 by 4 | 1.8 |
+| 64 | 3.0.0 | 16 |  | **Reject a `format` string other than `"text"` or `"json"` in the constructor.** | 1 | 1 | 2 | 2 | 1 | 6 by 4 | 1.8 |
+| 67 | 3.0.0 |  |  | **Let per-call metadata win over `context` on a key collision.** | 1 | 1 | 2 | 2 | 1 | 6 by 4 | 1.8 |
+| 76 | 3.0.0 |  | decision | **Reject `user:pass@` in `otlpHttpBaseURI` beside an `Authorization` in `otlpAdditionalHeaders`, in the constructor.** | 1 | 1 | 2 | 2 | 1 | 6 by 4 | 1.8 |
+| 77 | 3.0.0 | 17 |  | **Require `spanName` whenever `otlpQueue` is set or inherited.** | 1 | 1 | 2 | 2 | 1 | 6 by 4 | 1.8 |
+| 78 | 3.0.0 |  | decision | **Write `MIGRATION.md`: one entry per 3.0.0 item, with the 2.x spelling and the 3.0.0 spelling.** | 1 | 2 | 2 | 3 | 3 | 6 by 8 | 1.8 |
+| 70 | 3.0.0 |  |  | **Stop a child inheriting `spanName`.** | 1 | 1 | 2 | 2 | 1 | 7 by 4 | 1.8 |
+| 71 | 3.0.0 | 14 |  | **Allow `parentLog` with `traceparent`.** | 2 | 1 | 2 | 3 | 3 | 7 by 8 | 1.8 |
+| 60 | 3.0.0 |  |  | **Make `LogInt` `Logger` plus its own members, `enabled`, `flush` and `sampled` required.** | 1 | 1 | 2 | 2 | 2 | 7 by 5 | 1.7 |
+| 66 | 3.0.0 |  |  | **Attach a child's log records to its own span instead of the parent's.** | 2 | 1 | 2 | 3 | 2 | 7 by 6 | 1.6 |
+| 52 | 3.0.0 |  |  | **Spell a redacted `url.full` the way OTel semconv asks: `https://REDACTED:REDACTED@host/x`.** | 1 | 1 | 2 | 2 | 2 | 1 by 4 | 1.5 |
+| 59 | 3.0.0 | 20 |  | **Give a `log.fetch` span `end({ error })`'s `error.type`: a string `code`, else `name`, else `"_OTHER"`.** | 1 | 1 | 2 | 2 | 2 | 1 by 4 | 1.5 |
+| 69 | 3.0.0 |  |  | **Export metadata as typed OTLP attribute values instead of coercing every one to `stringValue`.** | 2 | 1 | 3 | 4 | 3 | 1 by 7 | 1.5 |
+| 96 | 3.0.0 |  |  | **Send records and spans through a list of transports, with the OTLP transport this library ships as the default.** | 4 | 2 | 3 | 7 | 8 | 1 by 7, 7 by 8 | 1.4 |
+| 53 | 3.0.0 |  |  | **Keep the auth scheme when an allow-listed `authorization` records `REDACTED`.** | 1 | 1 | 2 | 2 | 2 | 6 by 4 | 1.4 |
+| 54 | 3.0.0 |  | principle | **Require `msTimestamp` in `EntryFormatterConf`, and have the built-in formatters return a value for an unknown level.** | 1 | 1 | 1 | 1 | 2 | 6 by 3 | 1.4 |
+| 63 | 3.0.0 | 18 |  | **Rename `EntryFormatterConf` to `LogEntry`.** | 1 | 1 | 2 | 2 | 2 | 6 by 4 | 1.4 |
+| 65 | 3.0.0 | 15 | decision | **Default `colors` to `process.stdout.isTTY` when neither `NO_COLOR` nor `FORCE_COLOR` is set.** | 2 | 1 | 2 | 3 | 2 | 6 by 5 | 1.4 |
+| 72 | 3.0.0 |  |  | **Make nothing throw after `end()`.** | 2 | 1 | 2 | 3 | 4 | 6 by 6 | 1.2 |
+| 68 | 3.0.0 |  |  | **Merge a child's `context` per key with the parent's, as `clone()` does.** | 2 | 1 | 2 | 3 | 3 | 7 by 5 | 1.1 |
+| 58 | 3.0.0 |  |  | **Give the redaction sentinel its own name — `REDACTED by @larvit/log` or similar.** | 1 | 1 | 2 | 2 | 2 | 6 by 3 | 1.0 |
+| 62 | 3.0.0 |  | decision | **Remove `entryFormatter`, the option and the `conf` alias of `format` beside it.** | 2 | 1 | 2 | 3 | 3 | 6 by 4 | 0.9 |
+| 56 | 3.0.0 | 21 | decision | **Export OTLP metrics as a stateless pass-through.** | 3 | 1 | 2 | 4 | 7 | 1 by 6 | 0.8 |
+| 73 | 3.0.0 |  |  | **Send `traceparent` cross-origin only to urls the caller lists, or record why not.** | 2 | 2 | 3 | 5 | 3 | 2 by 4 | 0.7 |
+| 75 | 3.0.0 | 22 | decision | **Keep credentials off `log.conf` and `queue.conf`.** | 2 | 1 | 2 | 3 | 3 | 6 by 3 | 0.7 |
+| 74 | 3.0.0 | 96 | decision | **Keep `otlpQueue` as the only OTLP representation in `conf`.** | 3 | 1 | 2 | 4 | 4 | 7 by 4 | 0.7 |
 
 ## Details
 
@@ -125,6 +113,48 @@ shapes is already redacted; a matched query key is not. Found by the stability p
 pair, so neither part holds `//…@`. Same class as the split across `=`, which is redacted. Found by
 the security pass on 2026-10-03.
 
+### 7. Unref the batch timer, so a pending batch never holds a Node or Deno process.
+
+Landing it drops README → Queue exports' "Until 2.5.0" sentence. README → Goals #7.1 asks for it.
+Today only the retry timer is unref'd, so any pending batch holds the process for up to
+`batchDelayMs`, and `round()` clears the batch timer once, at its start, so a record logged while an
+export is in flight leaves one behind with nothing to send: measured on `node:22`, `await
+log.flush()` returned with both records delivered and the process stayed alive a further 4.7 s of a
+5 s `batchDelayMs`. 2.4.0 closes the failed-round half. A script that awaits neither `end()` nor
+`flush()` then exits without exporting what it queued, so the CHANGELOG says so, and README → Queue
+exports' "A retry timer never keeps…" covers every timer.
+
+### 13. Pin every Node base image to its full patch version, so one commit builds one image on any day.
+
+Three places float: `ARG BASE_IMAGE=node:24-bookworm-slim` in the `Dockerfile`,
+`${NODE_IMAGE:-node:22-bookworm-slim}` in `test-docker`, and the major-only `node-version` matrix
+`push.yaml` builds its `NODE_IMAGE` from. The first two are one default written twice at two
+versions, so drop the npm script's and leave the `ARG`. Renovate already bumps a `Dockerfile` pin; a
+matrix of patch versions needs a `customManagers` rule to get the same.
+
+### 12. Let a consumer inject the `fetch` the OTLP queue sends with.
+
+The queue and `log.fetch` both reach for the global, the one un-injected seam in a library that
+injects `stdout`, `stderr`, `clock`, `storage`, `report` and `otlpQueue` — and the suite pays for it
+by swapping `globalThis.fetch`, process-global state nothing can run beside. A React Native app that
+pins TLS or uses `expo/fetch` cannot route the exporter, the one request that crosses a hostile
+network, through it. Scope as `QueueConf.fetch`; whether `log.fetch` takes one is a separate
+question, since README → `log.fetch` in depth says it mirrors the runtime and an injected fetch
+becomes the runtime.
+
+### 90. Bring every comprehension dimension and the overall score to 7.0, starting with Locality's four module-level tables.
+
+The 2026-10-03 four-seat run scored Navigation 7.1, Locality 5.5, Shape 6.25, Self-sufficiency 6.25,
+overall 6.1. Every seat named `formatFunctions`, `warned`, `logWarningOfReport` and `defaultQueues`,
+with the order-dependent mutation in `resolveLogConf`; items 38, 44 and 62 hold parts of it.
+
+### 89. Keep `enabled()` free of output: warn about an unknown `logLevel` from the level methods alone.
+
+`log.enabled(level)` writes the unknown-level warning and marks the once-only state, so a library
+author's `if (log.enabled("silly"))` emits a line, and which caller warns depends on call order.
+Against `~/.claude/principles/technical-principles.md` → CQS; "This library's own warnings are
+written once per `stderr` sink" leans on this until it lands.
+
 ### 79. State the real runtime floor, ES2021 syntax and `BigInt`, in README → Runtimes, or build down to the floor it states.
 
 `tsconfig.json` targets ES2022 and neither tsc nor uglify lowers syntax, so `index.js` ships `??=`,
@@ -139,27 +169,6 @@ Landing it drops README → `log.fetch` in depth's "Until 2.5.0, a `Request`" se
 request)` is valid and TypeScript accepts it, but `{ ...init, headers }` copies own properties only,
 and a `Request`'s are prototype getters: `log.fetch(url, new Request(url, { method: "POST", body
 }))` sends a GET with no body. A `Request` as the *input* is item 19.
-
-### 12. Let a consumer inject the `fetch` the OTLP queue sends with.
-
-The queue and `log.fetch` both reach for the global, the one un-injected seam in a library that
-injects `stdout`, `stderr`, `clock`, `storage`, `report` and `otlpQueue` — and the suite pays for it
-by swapping `globalThis.fetch`, process-global state nothing can run beside. A React Native app that
-pins TLS or uses `expo/fetch` cannot route the exporter, the one request that crosses a hostile
-network, through it. Scope as `QueueConf.fetch`; whether `log.fetch` takes one is a separate
-question, since README → `log.fetch` in depth says it mirrors the runtime and an injected fetch
-becomes the runtime.
-
-### 7. Unref the batch timer, so a pending batch never holds a Node or Deno process.
-
-Landing it drops README → Queue exports' "Until 2.5.0" sentence. README → Goals #7.1 asks for it.
-Today only the retry timer is unref'd, so any pending batch holds the process for up to
-`batchDelayMs`, and `round()` clears the batch timer once, at its start, so a record logged while an
-export is in flight leaves one behind with nothing to send: measured on `node:22`, `await
-log.flush()` returned with both records delivered and the process stayed alive a further 4.7 s of a
-5 s `batchDelayMs`. 2.4.0 closes the failed-round half. A script that awaits neither `end()` nor
-`flush()` then exits without exporting what it queued, so the CHANGELOG says so, and README → Queue
-exports' "A retry timer never keeps…" covers every timer.
 
 ### 8. Keep a restored batch through the `maxItems` trim, so the retry promised for it holds.
 
@@ -180,51 +189,26 @@ so one flaky AsyncStorage read at startup loses everything a phone held offline.
 larger than skipping the remove: after a failed load the first `save` overwrites the key anyway, so
 a load failure has to suppress saving too.
 
-### 89. Keep `enabled()` free of output: warn about an unknown `logLevel` from the level methods alone.
+### 91. Measure test coverage in CI, and fail a change that lowers it.
 
-`log.enabled(level)` writes the unknown-level warning and marks the once-only state, so a library
-author's `if (log.enabled("silly"))` emits a line, and which caller warns depends on call order.
-Against `~/.claude/principles/technical-principles.md` → CQS; "This library's own warnings are
-written once per `stderr` sink" leans on this until it lands.
+Neither suite collects coverage, so `~/.claude/principles/technical-principles.md` → "Coverage
+should not decline" cannot be checked.
 
-### 13. Pin every Node base image to its full patch version, so one commit builds one image on any day.
+### 25. Publish the artifact the gate tested.
 
-Three places float: `ARG BASE_IMAGE=node:24-bookworm-slim` in the `Dockerfile`,
-`${NODE_IMAGE:-node:22-bookworm-slim}` in `test-docker`, and the major-only `node-version` matrix
-`push.yaml` builds its `NODE_IMAGE` from. The first two are one default written twice at two
-versions, so drop the npm script's and leave the `ARG`. Renovate already bumps a `Dockerfile` pin; a
-matrix of patch versions needs a `customManagers` rule to get the same.
-
-### 90. Bring every comprehension dimension and the overall score to 7.0, starting with Locality's four module-level tables.
-
-The 2026-10-03 four-seat run scored Navigation 7.1, Locality 5.5, Shape 6.25, Self-sufficiency 6.25,
-overall 6.1. Every seat named `formatFunctions`, `warned`, `logWarningOfReport` and `defaultQueues`,
-with the order-dependent mutation in `resolveLogConf`; items 38, 44 and 62 hold parts of it.
-
-### 80. Run the browser suite in WebKit and Firefox as well as Chromium.
-
-`scripts/run-browser-tests.mjs` launches Chromium alone, though its Playwright image ships both.
-WebKit is the only engine on an iPhone, and `failureMessage` has a Firefox branch the suite only
-fakes. `~/.claude/principles/frontend.md` → broad device support.
-
-### 14. Deprecate `parentLog` together with `traceparent`.
-
-Today `traceparent` is silently ignored.
+`push.yaml` builds and tests `index.js` inside the container; `publish.yaml` builds a second one on
+the runner and publishes that, so the thing consumers install is never the thing CI proved. Build
+once, upload, publish that. Item 13, pinning the base images, is the other half of the same problem.
 
 ### 16. Warn once when `format` is a string other than `"text"` or `"json"`.
 
 Today it falls back to text unsignalled: `new Log({ format: process.env.LOG_FORMAT })` logs text for
 `"pretty"`.
 
-### 23. Settle one marker for a CHANGELOG entry a consumer must act on, and record it in the `AGENTS.md` line beside `### Security`.
+### 82. Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.
 
-Two spellings exist: the `**Breaking:**` prefix `v2.0.0` uses, and the `### Security` grouping.
-Neither covers a deprecation, so `entryFormatter` and the `new Log("debug")` shorthand tell a
-consumer their code stops working in 3.0.0 from inside `### Everything else`, unmarked.
-
-### 20. Announce in the README and CHANGELOG that 3.0.0 gives a `log.fetch` span `end({ error })`'s `error.type`, so a query on `"20"` for an abort or `"fetch_error"` moves first.
-
-A numeric `code` gives way to `name` and the fallback becomes semconv's `"_OTHER"`.
+Every cross-origin OTLP POST is preflighted for its `Content-Type`; without CORS on the collector
+each batch fails as `Failed to fetch` and retries forever.
 
 ### 19. Leave a `Request` untraced in `log.fetch`.
 
@@ -233,20 +217,25 @@ against `location.href` to an http(s) url: `log.fetch` then traces that invented
 with `init` alone, dropping the request's own method, body and headers. The signature says `string |
 URL`, so a TypeScript consumer cannot reach it.
 
+### 20. Announce in the README and CHANGELOG that 3.0.0 gives a `log.fetch` span `end({ error })`'s `error.type`, so a query on `"20"` for an abort or `"fetch_error"` moves first.
+
+A numeric `code` gives way to `name` and the fallback becomes semconv's `"_OTHER"`.
+
+### 23. Settle one marker for a CHANGELOG entry a consumer must act on, and record it in the `AGENTS.md` line beside `### Security`.
+
+Two spellings exist: the `**Breaking:**` prefix `v2.0.0` uses, and the `### Security` grouping.
+Neither covers a deprecation, so `entryFormatter` and the `new Log("debug")` shorthand tell a
+consumer their code stops working in 3.0.0 from inside `### Everything else`, unmarked.
+
+### 80. Run the browser suite in WebKit and Firefox as well as Chromium.
+
+`scripts/run-browser-tests.mjs` launches Chromium alone, though its Playwright image ships both.
+WebKit is the only engine on an iPhone, and `failureMessage` has a Firefox branch the suite only
+fakes. `~/.claude/principles/frontend.md` → broad device support.
+
 ### 17. Warn once when an instance with `otlpQueue` set or inherited leaves `spanName` unset.
 
 Item 77 makes the constructor reject it in 3.0.0, and this warning is that break's only notice.
-
-### 25. Publish the artifact the gate tested.
-
-`push.yaml` builds and tests `index.js` inside the container; `publish.yaml` builds a second one on
-the runner and publishes that, so the thing consumers install is never the thing CI proved. Build
-once, upload, publish that. Item 13, pinning the base images, is the other half of the same problem.
-
-### 82. Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.
-
-Every cross-origin OTLP POST is preflighted for its `Content-Type`; without CORS on the collector
-each batch fails as `Failed to fetch` and retries forever.
 
 ### 26. Check the footprint budget in CI, so the numbers in README → Footprint fail a build instead of going stale.
 
@@ -256,50 +245,19 @@ Bundle size is the easy half; the per-operation figures need a stable enough har
 
 It describes tsc's output, which uglify then minifies and, since 2.5.0, mangles.
 
-### 91. Measure test coverage in CI, and fail a change that lowers it.
+### 14. Deprecate `parentLog` together with `traceparent`.
 
-Neither suite collects coverage, so `~/.claude/principles/technical-principles.md` → "Coverage
-should not decline" cannot be checked.
+Today `traceparent` is silently ignored.
 
 ### 28. Export resource attributes beyond `service.name`.
 
 `service.version` and `deployment.environment` are what the telemetry reader groups on in Grafana,
 and the shape is a map on the resource we already build.
 
-### 27. Name a `log.fetch` span and its errors as HTTP semconv does.
-
-That is `{method}` alone without a url template, where today it is `{method} {host}`; an unknown
-method as `_OTHER` with `http.request.method_original`; and `error.type` set to the status code on a
-4xx or 5xx.
-
-### 29. Export span events.
-
-A reader expects to find the exception on an errored span, and the OTLP shape carries a
-dropped-count we would owe them.
-
 ### 31. Set a log record's `flags` to the W3C trace flags.
 
 An unsampled request's records export without their span, and nothing on them tells the backend that
 span will never arrive.
-
-### 81. Test export and `log.fetch` against a real server in a browser.
-
-The browser run stubs `globalThis.fetch`, so the 64 KiB `keepalive` cap and the CORS preflight are
-never exercised. Item 12 removes the global swap, not this gap. `~/.claude/principles/frontend.md` →
-testability.
-
-### 30. Let a consumer sample by ratio.
-
-A fleet of phones on cellular has no way to cap what it sends, so the 1000-item queue bound is a
-sampling decision made by accident. An incoming `traceparent` flag still wins where there is one.
-
-### 87. Report a protobuf export's `partialSuccess` as the JSON transport does.
-
-Under `http/protobuf` a partially rejected batch counts as delivered.
-
-### 86. Set `telemetry.sdk.language` to a semconv value, `nodejs` or `webjs`.
-
-Today it is `"ecmascript"`, which a backend keying on the language does not recognise.
 
 ### 88. Parse `traceparent` as W3C Trace Context does: ignore uppercase hex, and read a higher version by its first four fields.
 
@@ -310,66 +268,54 @@ Today it is `"ecmascript"`, which a backend keying on the language does not reco
 Each save stringifies the whole queue, about 1.1 MiB when full, and `localStorage` writes
 synchronously on the main thread.
 
+### 27. Name a `log.fetch` span and its errors as HTTP semconv does.
+
+That is `{method}` alone without a url template, where today it is `{method} {host}`; an unknown
+method as `_OTHER` with `http.request.method_original`; and `error.type` set to the status code on a
+4xx or 5xx.
+
+### 30. Let a consumer sample by ratio.
+
+A fleet of phones on cellular has no way to cap what it sends, so the 1000-item queue bound is a
+sampling decision made by accident. An incoming `traceparent` flag still wins where there is one.
+
+### 81. Test export and `log.fetch` against a real server in a browser.
+
+The browser run stubs `globalThis.fetch`, so the 64 KiB `keepalive` cap and the CORS preflight are
+never exercised. Item 12 removes the global swap, not this gap. `~/.claude/principles/frontend.md` →
+testability.
+
+### 86. Set `telemetry.sdk.language` to a semconv value, `nodejs` or `webjs`.
+
+Today it is `"ecmascript"`, which a backend keying on the language does not recognise.
+
+### 29. Export span events.
+
+A reader expects to find the exception on an errored span, and the OTLP shape carries a
+dropped-count we would owe them.
+
+### 87. Report a protobuf export's `partialSuccess` as the JSON transport does.
+
+Under `http/protobuf` a partially rejected batch counts as delivered.
+
 ### 32. Propagate `tracestate`.
 
 It is invisible when unused, and the W3C rules it must hold to — 512-char limit, list-member
 ordering, the `ot` vendor key — are where the cost sits.
-
-### 41. Warn once about a negative, zero or `NaN` numeric `QueueConf` option, and use the default.
-
-A negative `retryDelayMs` retries at once, `maxItems: 0` drops everything, a `NaN` `maxBatchBytes`
-never flushes on size. Principle: Validate data and build DTOs as early as possible.
-
-### 42. Check each persisted or enqueued payload's shape, so one corrupt item never drops its batch.
-
-`isOtlpPayload` checks the top-level array only; `mergePayloads` then throws and every valid record
-merged with it is lost, on the offline phone path. Principle: Validate data and build DTOs as early
-as possible.
-
-### 51. Keep a retried export from duplicating log records, or record in `docs/decisions.md` why duplicates stand.
-
-A timeout or 5xx after the collector accepted a batch sends it again; spans dedupe by id, records do
-not, and OTLP has no idempotency key. Principle: Idempotent data writing.
-
-### 40. Make `queue.conf` read back what the queue sends with.
-
-A write to `otlpHttpBaseURI`, `otlpProtocol` or `acceptPlainHttpAuthorization` changes nothing the
-sender froze, and a replaced `storage` is saved to a store it was never loaded from. Principle:
-Don't Repeat Yourself (two spellings that can disagree).
-
-### 46. Keep an injected `clock` or `stdout` that throws from escaping a level method.
-
-`log.fetch` guards the same failure; `log.info` lets it through to the app. Principle: Handle errors
-explicitly, as values.
-
-### 48. Test the untested failure paths.
-
-An unencodable payload, the 3 s send abort, `unref`'s effect, the clock-shape rejection, a malformed
-`%` in the endpoint password, stored JSON that is not a list, a throwing `removeItem`, retries on
-408/429/500, `end()` twice, and a level method after `end()`. Principle: Most, if not all, code
-should have automated tests.
-
-### 50. Match the level set and where the queue's own failures go to `~/.claude/principles/logging.md`, or record why not.
-
-It names five levels where this has six, `verbose` exports in `debug`'s severity band, the queue's
-own failures log at `error` where the app still works, `error` and `warn` go to `stderr` where the
-principle says OTLP or stdout, and nothing turns the console off beside OTLP. Principle:
-`~/.claude/principles/logging.md`, levels and where each goes.
 
 ### 34. Let a consumer inject the randomness trace and span ids come from.
 
 `getRandomBytes` reads `globalThis.crypto`, else `Math.random`, so a test checks ids by regex and
 "differs" only. Principle: Functional core, imperative shell.
 
-### 35. Let a consumer inject what `colorsFromEnv`, `traceableUrl` and `unref` read from the platform.
-
-They read `process.env`, `globalThis.location` and `globalThis.Deno`, and the suite swaps
-`globalThis.process` and `console.error` to reach them. Principle: Functional core, imperative
-shell.
-
 ### 37. Build a span payload without writing to `log.span`.
 
 `buildSpanPayload` sets `span.attributes` as it builds. Principle: One owner per value.
+
+### 49. Sort what carries no order.
+
+`format`'s `"text" | "json"`, `msg`/`msTimestamp`, and `server.port` after `url.scheme` in a
+`log.fetch` span. Principle: Deterministic order wherever order carries no meaning.
 
 ### 47. Collapse `entryFormatterDeprecation` and `load()` to one error channel each.
 
@@ -386,10 +332,22 @@ Principle: One owner per value.
 `openSpan` and `childSpan` repeat the span object; both payload builders drop `service.name` and
 stringify values. Principle: Don't Repeat Yourself.
 
+### 35. Let a consumer inject what `colorsFromEnv`, `traceableUrl` and `unref` read from the platform.
+
+They read `process.env`, `globalThis.location` and `globalThis.Deno`, and the suite swaps
+`globalThis.process` and `console.error` to reach them. Principle: Functional core, imperative
+shell.
+
 ### 44. Route a `Queue`'s warnings through one explicit seam.
 
 `logWarningOfReport` finds a Log's warner by the identity of its `report` function, and
 `warnOnce(conf)` and `Queue.warnOnce` are two once-only rules. Principle: Explicit over implicit.
+
+### 36. Reach the retry decision and a `log.fetch` span's attributes without a network call.
+
+`OtlpSender.send` holds the plain-http warning, encoding, the send and the status decision in one
+method, and `tracedFetch` builds and redacts attributes around the live call. Principle: Functional
+core, imperative shell.
 
 ### 38. Resolve a `Log`'s conf in steps that each return a new value, with no cast at the end.
 
@@ -403,27 +361,78 @@ Principle: Compose, do not entangle; validate data and build DTOs as early as po
 nobody named; the batch timer left behind mid-round is one of them. Principle: Always use explicit
 state machines.
 
-### 36. Reach the retry decision and a `log.fetch` span's attributes without a network call.
+### 48. Test the untested failure paths.
 
-`OtlpSender.send` holds the plain-http warning, encoding, the send and the status decision in one
-method, and `tracedFetch` builds and redacts attributes around the live call. Principle: Functional
-core, imperative shell.
+An unencodable payload, the 3 s send abort, `unref`'s effect, the clock-shape rejection, a malformed
+`%` in the endpoint password, stored JSON that is not a list, a throwing `removeItem`, retries on
+408/429/500, `end()` twice, and a level method after `end()`. Principle: Most, if not all, code
+should have automated tests.
 
-### 49. Sort what carries no order.
+### 41. Warn once about a negative, zero or `NaN` numeric `QueueConf` option, and use the default.
 
-`format`'s `"text" | "json"`, `msg`/`msTimestamp`, and `server.port` after `url.scheme` in a
-`log.fetch` span. Principle: Deterministic order wherever order carries no meaning.
+A negative `retryDelayMs` retries at once, `maxItems: 0` drops everything, a `NaN` `maxBatchBytes`
+never flushes on size. Principle: Validate data and build DTOs as early as possible.
+
+### 46. Keep an injected `clock` or `stdout` that throws from escaping a level method.
+
+`log.fetch` guards the same failure; `log.info` lets it through to the app. Principle: Handle errors
+explicitly, as values.
+
+### 50. Match the level set and where the queue's own failures go to `~/.claude/principles/logging.md`, or record why not.
+
+It names five levels where this has six, `verbose` exports in `debug`'s severity band, the queue's
+own failures log at `error` where the app still works, `error` and `warn` go to `stderr` where the
+principle says OTLP or stdout, and nothing turns the console off beside OTLP. Principle:
+`~/.claude/principles/logging.md`, levels and where each goes.
+
+### 42. Check each persisted or enqueued payload's shape, so one corrupt item never drops its batch.
+
+`isOtlpPayload` checks the top-level array only; `mergePayloads` then throws and every valid record
+merged with it is lost, on the offline phone path. Principle: Validate data and build DTOs as early
+as possible.
+
+### 40. Make `queue.conf` read back what the queue sends with.
+
+A write to `otlpHttpBaseURI`, `otlpProtocol` or `acceptPlainHttpAuthorization` changes nothing the
+sender froze, and a replaced `storage` is saved to a store it was never loaded from. Principle:
+Don't Repeat Yourself (two spellings that can disagree).
+
+### 51. Keep a retried export from duplicating log records, or record in `docs/decisions.md` why duplicates stand.
+
+A timeout or 5xx after the collector accepted a batch sends it again; spans dedupe by id, records do
+not, and OTLP has no idempotency key. Principle: Idempotent data writing.
+
+### 55. Make `log.span` and `ended` read-only, and an open span carry no end time.
+
+Anyone handed a `LogInt` can rewrite what is exported, `log.ended = false` exports a span twice, and
+an open span reads as a finished zero-length one. Principle: One owner per value.
+
+### 57. Retry only what OTLP/HTTP calls retryable — 429, 502, 503 and 504 — and honour `Retry-After`.
+
+Today 408, 500 and 501 retry too, and README → Queue exports documents that set, so narrowing it
+waits for the major; honouring `Retry-After` alone may ship earlier.
+
+### 67. Let per-call metadata win over `context` on a key collision.
+
+The more specific value wins; today `context` wins.
+
+### 76. Reject `user:pass@` in `otlpHttpBaseURI` beside an `Authorization` in `otlpAdditionalHeaders`, in the constructor.
+
+2.5.0 warns first.
+
+### 77. Require `spanName` whenever `otlpQueue` is set or inherited.
+
+A child or clone of an OTLP-configured instance must name its span, and the constructor rejects one
+that does not, so no backend shows `unnamed-span`.
 
 ### 78. Write `MIGRATION.md`: one entry per 3.0.0 item, with the 2.x spelling and the 3.0.0 spelling.
 
 `entryFormatter` needs the pair case too: renaming the key beside a `format` string leaves two
 `format` keys, and the last one wins.
 
-### 69. Export metadata as typed OTLP attribute values instead of coercing every one to `stringValue`.
+### 70. Stop a child inheriting `spanName`.
 
-Use `boolValue` for a boolean, `intValue` for a safe integer, `doubleValue` for any other number, so
-OTLP carries what the JSON formatter already emits. Breaking because a backend that indexed these as
-strings re-types the field, and queries and dashboards built on the string change with it.
+Default to `"unnamed-span"` for both derivations.
 
 ### 71. Allow `parentLog` with `traceparent`.
 
@@ -435,26 +444,6 @@ request-handler case; today it silently loses the trace.
 OTel's rule is that a record carries the active span, and a child's `log.fetch` spans already nest
 under it. No test asserts the old behaviour; write one for the new rule first.
 
-### 75. Keep credentials off `log.conf` and `queue.conf`.
-
-`otlpHttpBaseURI`'s `user:pass@` and an `otlpAdditionalHeaders` bearer token sit there verbatim, so
-a consumer who logs their own conf puts them in their log store. Goals #3 stops at what this library
-emits, so this is a Goals #4 break. Item 74 clears `log.conf`; `queue.conf` still needs redacting,
-or its credentials held off it.
-
-### 73. Send `traceparent` cross-origin only to urls the caller lists, or record why not.
-
-OTel's browser fetch instrumentation defaults that way (`propagateTraceHeaderCorsUrls`), because the
-header preflights a cross-origin request; today `log.fetch` sends it everywhere, so narrowing it
-changes a default.
-
-### 72. Make nothing throw after `end()`.
-
-Level methods still write to the console and their OTLP records attach to the ended span, entering
-the queue like any other record, so the queue's size/time flush exports them with no further call.
-`end()` a second time resolves `{ err }`. Add `ended` to `LogInt`. `log.fetch` on an ended log sends
-untraced, where today it throws synchronously, which the runtime's `fetch` never does.
-
 ### 52. Spell a redacted `url.full` the way OTel semconv asks: `https://REDACTED:REDACTED@host/x`.
 
 Today the userinfo is dropped silently, so a span can carry `url.full` showing a credential-free url
@@ -463,15 +452,22 @@ credentials were written and that they were not. Only React Native reaches it; N
 refuse the url first. README → `log.fetch` in depth documents `url.full` as the url without its
 userinfo, so per Goals #4 this waits for the major.
 
-### 57. Retry only what OTLP/HTTP calls retryable — 429, 502, 503 and 504 — and honour `Retry-After`.
+### 69. Export metadata as typed OTLP attribute values instead of coercing every one to `stringValue`.
 
-Today 408, 500 and 501 retry too, and README → Queue exports documents that set, so narrowing it
-waits for the major; honouring `Retry-After` alone may ship earlier.
+Use `boolValue` for a boolean, `intValue` for a safe integer, `doubleValue` for any other number, so
+OTLP carries what the JSON formatter already emits. Breaking because a backend that indexed these as
+strings re-types the field, and queries and dashboards built on the string change with it.
 
-### 77. Require `spanName` whenever `otlpQueue` is set or inherited.
+### 96. Send records and spans through a list of transports, with the OTLP transport this library ships as the default.
 
-A child or clone of an OTLP-configured instance must name its span, and the constructor rejects one
-that does not, so no backend shows `unnamed-span`.
+Today a `Log` has one export seam, `otlpQueue`, and it takes OTLP payloads; console output is a
+separate path through `stdout` and `stderr`. Serving README → Goals #1 means a consumer can add a
+destination of their own, or several, beside OTLP, without a second library. The OTLP transport
+stays shipped and the default, since OTLP without the OpenTelemetry SDK, in every runtime, is the
+library's main selling point. Open when the item starts: whether console output becomes a transport
+too, what a transport is handed (OTLP payloads or records it encodes itself), and how `otlpQueue`
+and the `otlp*` options map onto the list. Item 74 rests on the shape this settles. The option's
+spelling is benched with the README's audience before it ships.
 
 ### 53. Keep the auth scheme when an allow-listed `authorization` records `REDACTED`.
 
@@ -480,40 +476,32 @@ kind of credential, and RFC 9110's `auth-scheme` is a fixed token, never the sec
 first space and keep the prefix only where it matches the token grammar. README documents the value
 as `REDACTED`, so per Goals #4 this waits for the major.
 
+### 54. Require `msTimestamp` in `EntryFormatterConf`, and have the built-in formatters return a value for an unknown level.
+
+Today they fall back to `Date.now()`, bypassing `clock`, and `msgTextFormatter` throws. Principle:
+Functional core, imperative shell.
+
+### 63. Rename `EntryFormatterConf` to `LogEntry`.
+
+It is an entry, and the option it was named after is gone.
+
 ### 65. Default `colors` to `process.stdout.isTTY` when neither `NO_COLOR` nor `FORCE_COLOR` is set.
 
 A browser, with no `process`, defaults to off. The TTY detection and its tests are in commit
 9706b0a.
 
-### 56. Export OTLP metrics as a stateless pass-through.
+### 72. Make nothing throw after `end()`.
 
-That is a metrics kind in `OtlpPayload`, batched through `Queue` and POSTed to `/v1/metrics`, with
-the types carrying what a valid point must have. It waits for the major because an `OtlpQueue`
-implementer receives the wider union. Measure what the metrics messages add to the protobuf encoder
-against the 10 KB budget before deciding.
+Level methods still write to the console and their OTLP records attach to the ended span, entering
+the queue like any other record, so the queue's size/time flush exports them with no further call.
+`end()` a second time resolves `{ err }`. Add `ended` to `LogInt`. `log.fetch` on an ended log sends
+untraced, where today it throws synchronously, which the runtime's `fetch` never does.
 
-### 76. Reject `user:pass@` in `otlpHttpBaseURI` beside an `Authorization` in `otlpAdditionalHeaders`, in the constructor.
+### 68. Merge a child's `context` per key with the parent's, as `clone()` does.
 
-2.5.0 warns first.
-
-### 70. Stop a child inheriting `spanName`.
-
-Default to `"unnamed-span"` for both derivations.
-
-### 67. Let per-call metadata win over `context` on a key collision.
-
-The more specific value wins; today `context` wins.
-
-### 55. Make `log.span` and `ended` read-only, and an open span carry no end time.
-
-Anyone handed a `LogInt` can rewrite what is exported, `log.ended = false` exports a span twice, and
-an open span reads as a finished zero-length one. Principle: One owner per value.
-
-### 62. Remove `entryFormatter`, the option and the `conf` alias of `format` beside it.
-
-`format` is `"text" | "json" | ((entry) => string)`. This closes the one unsoundness 2.4.0 could
-not: the alias is non-enumerable, so `ResolvedLogConf` declares a member a spread of a conf does not
-carry.
+Today a child's `context` replaces the parent's wholesale. Settle first which parent value merges: a
+clone takes the live `log.context`, a child today reads `conf.context`, so they differ once
+`log.context` is written to.
 
 ### 58. Give the redaction sentinel its own name — `REDACTED by @larvit/log` or similar.
 
@@ -522,20 +510,31 @@ matched a credential shape, and a value the consumer's own app had already redac
 `REDACTED` shipped in 2.3.0 and README → Audience promises each documented span value, so renaming
 it waits for the major.
 
-### 68. Merge a child's `context` per key with the parent's, as `clone()` does.
+### 62. Remove `entryFormatter`, the option and the `conf` alias of `format` beside it.
 
-Today a child's `context` replaces the parent's wholesale. Settle first which parent value merges: a
-clone takes the live `log.context`, a child today reads `conf.context`, so they differ once
-`log.context` is written to.
+`format` is `"text" | "json" | ((entry) => string)`. This closes the one unsoundness 2.4.0 could
+not: the alias is non-enumerable, so `ResolvedLogConf` declares a member a spread of a conf does not
+carry.
 
-### 63. Rename `EntryFormatterConf` to `LogEntry`.
+### 56. Export OTLP metrics as a stateless pass-through.
 
-It is an entry, and the option it was named after is gone.
+That is a metrics kind in `OtlpPayload`, batched through `Queue` and POSTed to `/v1/metrics`, with
+the types carrying what a valid point must have. It waits for the major because an `OtlpQueue`
+implementer receives the wider union. Measure what the metrics messages add to the protobuf encoder
+against the 10 KB budget before deciding.
 
-### 54. Require `msTimestamp` in `EntryFormatterConf`, and have the built-in formatters return a value for an unknown level.
+### 73. Send `traceparent` cross-origin only to urls the caller lists, or record why not.
 
-Today they fall back to `Date.now()`, bypassing `clock`, and `msgTextFormatter` throws. Principle:
-Functional core, imperative shell.
+OTel's browser fetch instrumentation defaults that way (`propagateTraceHeaderCorsUrls`), because the
+header preflights a cross-origin request; today `log.fetch` sends it everywhere, so narrowing it
+changes a default.
+
+### 75. Keep credentials off `log.conf` and `queue.conf`.
+
+`otlpHttpBaseURI`'s `user:pass@` and an `otlpAdditionalHeaders` bearer token sit there verbatim, so
+a consumer who logs their own conf puts them in their log store. Goals #3 stops at what this library
+emits, so this is a Goals #4 break. Item 74 clears `log.conf`; `queue.conf` still needs redacting,
+or its credentials held off it.
 
 ### 74. Keep `otlpQueue` as the only OTLP representation in `conf`.
 
