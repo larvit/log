@@ -6,19 +6,24 @@
 
 `Bar = 0.5`
 
-`Next ID = 100`
+`Next ID = 115`
 
 ## Items
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 93 | 2.5.0 |  | security | **Redact a credential in a url nested in the request path where the url does not open its segment.** | 2 | 2 | 4 | 6 | 4 |  | 0.0 |
+| 103 | 2.5.0 |  | question | **Settle whether any release may redact more, and state the answer in README → Audience.** | 1 | 1 | 2 | 2 | 1 |  | 0.0 |
+| 104 | 2.5.0 |  | question | **Settle whether every credential header crossing plain `http:` warns, not only `Authorization`.** | 1 | 1 | 2 | 2 | 2 |  | 0.0 |
 | 95 | 2.5.0 |  | security | **Redact userinfo a kept query splits across `&`.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
+| 100 | 2.5.0 |  | security | **Redact a listed query key's value in a url that does not parse whole: in a header value, a status message or a kept query value.** | 2 | 2 | 4 | 6 | 4 |  | 0.0 |
+| 101 | 2.5.0 |  | security | **Redact a credential in a url's fragment, such as `#access_token=…`, wherever a url is read.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
+| 102 | 2.5.0 |  | security | **Redact a credential in a url nested base64-encoded in the request path, as an image proxy takes one.** | 2 | 2 | 4 | 6 | 4 |  | 0.0 |
 | 7 | 2.5.0 |  | defect | **Unref the batch timer, so a pending batch never holds a Node or Deno process.** | 2 | 2 | 2 | 4 | 4 | 9 by 9 | 7.0 |
 | 13 | 2.5.0 |  |  | **Pin every Node base image to its full patch version, so one commit builds one image on any day.** | 1 | 1 | 1 | 1 | 2 | code health by 3 | 6.2 |
 | 89 | 2.5.0 |  | defect | **Keep `enabled()` free of output: warn about an unknown `logLevel` from the level methods alone.** | 1 | 1 | 1 | 1 | 2 | 3 by 5 | 2.3 |
 | 79 | 2.5.0 |  | defect | **State the real runtime floor, ES2021 syntax and `BigInt`, in README → Runtimes, or build down to the floor it states.** | 2 | 2 | 3 | 5 | 2 | 2 by 8 | 1.7 |
 | 3 | 2.5.0 |  | defect | **Send a `Request` passed as `init` with its own method, body, signal and other settings.** | 2 | 1 | 2 | 3 | 3 | 2.1 by 7 | 1.7 |
+| 106 | 2.5.0 |  | defect | **Run on React Native's own `URL`, whose getters throw "not implemented", or state in README → Runtimes that an app installs a `URL` polyfill.** | 2 | 3 | 3 | 6 | 2 | 2 by 8 | 1.5 |
 | 8 | 2.5.0 |  | defect | **Keep a restored batch through the `maxItems` trim, so the retry promised for it holds.** | 2 | 1 | 2 | 3 | 3 | 2 by 4 | 1.0 |
 | 9 | 2.5.0 |  | defect | **Keep a batch in the persisted queue until its send settles.** | 2 | 1 | 2 | 3 | 3 | 2 by 4 | 1.0 |
 | 11 | 2.5.0 |  | defect | **Keep a transient `storage` read failure from wiping the persisted queue.** | 2 | 1 | 2 | 3 | 4 | 2 by 4 | 0.8 |
@@ -27,20 +32,27 @@
 | 44 | 2.6.0 |  | principle | **Route a `Queue`'s warnings through one explicit seam.** | 2 | 1 | 1 | 2 | 4 | code health by 9 | 9.4 |
 | 49 | 2.6.0 |  | principle | **Sort what carries no order.** | 1 | 1 | 1 | 1 | 1 | code health by 3 | 9.4 |
 | 47 | 2.6.0 |  | principle | **Collapse `entryFormatterDeprecation` and `load()` to one error channel each.** | 1 | 1 | 1 | 1 | 2 | code health by 4 | 8.3 |
-| 91 | 2.6.0 |  | principle | **Measure test coverage in CI, and fail a change that lowers it.** | 1 | 1 | 1 | 1 | 3 | code health by 5 | 7.8 |
 | 38 | 2.6.0 |  | principle | **Resolve a `Log`'s conf in steps that each return a new value, with no cast at the end.** | 3 | 1 | 2 | 4 | 5 | code health by 9 | 6.2 |
 | 39 | 2.6.0 |  | principle | **Keep a `Queue`'s items and their byte count in one structure.** | 2 | 1 | 1 | 2 | 3 | code health by 5 | 6.2 |
 | 45 | 2.6.0 |  | principle | **Build the shared parts of a span and of a payload's attributes once.** | 2 | 1 | 1 | 2 | 3 | code health by 5 | 6.2 |
 | 98 | 2.6.0 | 38, 44 | decision | **Score the project against the 7.0 comprehension floor, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
+| 111 | 2.6.0 |  |  | **Name `scripts/` by what it holds: the browser and OTLP test runners and the collector config.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
 | 35 | 2.6.0 |  | principle | **Let a consumer inject what `colorsFromEnv`, `traceableUrl` and `unref` read from the platform.** | 2 | 1 | 1 | 2 | 4 | code health by 5 | 5.2 |
 | 36 | 2.6.0 |  | principle | **Reach the retry decision and a `log.fetch` span's attributes without a network call.** | 2 | 1 | 1 | 2 | 5 | code health by 5 | 4.5 |
 | 43 | 2.6.0 |  | principle | **Give `ExportScheduler` and save coalescing named states.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
 | 48 | 2.6.0 |  | principle | **Test the untested failure paths.** | 2 | 1 | 1 | 2 | 4 | code health by 4 | 4.2 |
+| 109 | 2.6.0 |  | principle | **Test without the wall clock: no sleep, no real timer and no time bound.** | 2 | 1 | 1 | 2 | 4 | code health by 4 | 4.2 |
+| 110 | 2.6.0 |  | principle | **Register one test per case where a test loops over its cases or checks many behaviours.** | 1 | 1 | 1 | 1 | 4 | code health by 3 | 3.7 |
 | 25 | 2.6.0 |  |  | **Publish the artifact the gate tested.** | 2 | 2 | 3 | 5 | 4 | code health by 5 | 3.5 |
+| 113 | 2.6.0 |  |  | **Make `.editorconfig` match what the files hold: spaces in `package.json`, and never tabs in YAML.** | 1 | 1 | 1 | 1 | 1 | code health by 1 | 3.1 |
 | 82 | 2.6.0 |  |  | **Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.** | 1 | 2 | 1 | 2 | 1 | 3 by 5 | 2.3 |
 | 19 | 2.6.0 |  | defect | **Leave a `Request` untraced in `log.fetch`.** | 1 | 1 | 2 | 2 | 2 | 2.1 by 6 | 2.1 |
+| 114 | 2.6.0 |  |  | **Move `package.json`'s build and test one-liners into named scripts, and let the OTLP test read its collector's port, image and container name from the environment, today's values as defaults.** | 1 | 1 | 1 | 1 | 2 | code health by 1 | 2.1 |
 | 80 | 2.6.0 |  | principle | **Run the browser suite in WebKit and Firefox as well as Chromium.** | 2 | 1 | 1 | 2 | 3 | 2 by 7 | 2.1 |
 | 26 | 2.6.0 |  |  | **Check the footprint budget in CI, so the numbers in README → Footprint fail a build instead of going stale.** | 2 | 1 | 1 | 2 | 5 | 5 by 8 | 1.5 |
+| 112 | 2.6.0 |  |  | **Run the suite on Deno and Bun in CI.** | 2 | 1 | 1 | 2 | 3 | 2 by 5 | 1.5 |
+| 107 | 2.6.0 |  | principle | **Run the suite on React Native's Hermes in CI.** | 3 | 1 | 1 | 3 | 5 | 2 by 7 | 1.3 |
+| 108 | 2.6.0 |  | principle | **Keep two tabs of one web app sharing a `storage` key from sending a record twice or deleting each other's backlog.** | 3 | 2 | 2 | 5 | 5 | 2 by 5 | 0.7 |
 | 96 | 2.7.0 |  | owner | **Add a list of transports, each handed plain records it encodes itself, with console and OTLP as the two this library ships and uses by default.** | 4 | 2 | 3 | 7 | 8 | 1 by 7, 4 by 8 | 1.4 |
 | 28 | 2.7.0 | 96 |  | **Export resource attributes beyond `service.name`.** | 2 | 1 | 2 | 3 | 3 | 1 by 7 | 1.8 |
 | 31 | 2.7.0 | 96 |  | **Set a log record's `flags` to the W3C trace flags.** | 1 | 1 | 2 | 2 | 2 | 1 by 4 | 1.5 |
@@ -63,13 +75,14 @@
 | 22 | 2.8.0 |  |  | **Announce in the README and CHANGELOG that 3.0.0 stops `log.conf` and `queue.conf` handing back a credential, so a consumer reading one out of them moves to their own copy first.** | 1 | 2 | 1 | 2 | 1 | 3 by 3 | 1.4 |
 | 24 | 2.8.0 |  |  | **Publish an `index.js.map` that maps the published `index.js`.** | 1 | 1 | 1 | 1 | 2 | 3 by 3 | 1.4 |
 | 46 | 2.8.0 |  | principle | **Keep an injected `clock` or `stdout` that throws from escaping a level method.** | 1 | 1 | 2 | 2 | 2 | 3 by 4 | 1.4 |
-| 50 | 2.8.0 |  | principle | **Match the level set and where the queue's own failures go to `~/.claude/principles/logging.md`, or record why not.** | 1 | 1 | 1 | 1 | 2 | 3 by 3 | 1.4 |
+| 50 | 2.8.0 |  | principle | **Match the level set and where this library's own lines go to `~/.claude/principles/logging.md`, or record why not.** | 1 | 1 | 1 | 1 | 2 | 3 by 3 | 1.4 |
 | 14 | 2.8.0 |  |  | **Deprecate `parentLog` together with `traceparent`.** | 1 | 1 | 2 | 2 | 2 | 4 by 4 | 1.3 |
 | 83 | 2.8.0 |  |  | **Measure a full persisted queue's save to `localStorage` on a low-end phone, and budget it in README → Footprint.** | 1 | 2 | 1 | 2 | 3 | 5 by 5 | 1.3 |
 | 42 | 2.8.0 |  | defect | **Check each persisted or enqueued payload's shape, so one corrupt item never drops its batch.** | 2 | 1 | 2 | 3 | 3 | 2 by 4 | 1.0 |
 | 40 | 2.8.0 |  | principle | **Make `queue.conf` read back what the queue sends with.** | 2 | 1 | 1 | 2 | 4 | 3 by 4 | 0.9 |
 | 51 | 2.8.0 |  | principle | **Keep a retried export from duplicating log records, or record in `docs/decisions.md` why duplicates stand.** | 2 | 2 | 2 | 4 | 4 | 1 by 4 | 0.8 |
 | 32 | 2.8.0 |  |  | **Propagate `tracestate`.** | 3 | 2 | 2 | 5 | 5 | 1 by 4 | 0.6 |
+| 105 | 3.0.0 |  | question | **Settle whether metrics arrive aggregated by the caller, as the metrics decision says, now that Goals #1 asks for no second library.** | 1 | 1 | 1 | 1 | 1 |  | 0.0 |
 | 55 | 3.0.0 |  | principle | **Make `log.span` and `ended` read-only, and an open span carry no end time.** | 2 | 1 | 1 | 2 | 3 | code health by 4 | 5.0 |
 | 57 | 3.0.0 |  |  | **Retry only what OTLP/HTTP calls retryable: 429, 502, 503 and 504.** | 1 | 1 | 2 | 2 | 2 | 1 by 5 | 1.9 |
 | 61 | 3.0.0 |  | decision | **Remove the level-string shorthand from `Log` and `clone`.** | 1 | 1 | 2 | 2 | 1 | 3 by 4 | 1.8 |
@@ -94,18 +107,27 @@
 | 97 | 3.0.0 | 96 | decision | **Keep every OTLP option, type and encoding inside the OTLP transport, so no other code knows OTLP.** | 4 | 2 | 3 | 7 | 8 | 1 by 5, 4 by 6 | 1.0 |
 | 58 | 3.0.0 |  |  | **Give the redaction sentinel its own name — `REDACTED by @larvit/log` or similar.** | 1 | 1 | 2 | 2 | 2 | 3 by 3 | 1.0 |
 | 62 | 3.0.0 |  | decision | **Remove `entryFormatter`, the option and the `conf` alias of `format` beside it.** | 2 | 1 | 2 | 3 | 3 | 3 by 4 | 0.9 |
-| 56 | 3.0.0 | 21 | decision | **Export OTLP metrics as a stateless pass-through.** | 3 | 1 | 2 | 4 | 7 | 1 by 6 | 0.8 |
+| 56 | 3.0.0 | 21, 105 | decision | **Export OTLP metrics as a stateless pass-through.** | 3 | 1 | 2 | 4 | 7 | 1 by 6 | 0.8 |
 | 73 | 3.0.0 |  |  | **Send `traceparent` cross-origin only to urls the caller lists, or record why not.** | 2 | 2 | 3 | 5 | 3 | 2 by 4 | 0.7 |
 | 75 | 3.0.0 | 22 | decision | **Keep credentials off `log.conf` and `queue.conf`.** | 2 | 1 | 2 | 3 | 3 | 3 by 3 | 0.7 |
 
 ## Details
 
-### 93. Redact a credential in a url nested in the request path where the url does not open its segment.
+### 103. Settle whether any release may redact more, and state the answer in README → Audience.
 
-`url.full` exports a signed url's `sig` or `X-Amz-Signature` when a proxy path nests the url
-without a scheme or behind other text in its segment: `/fetch/s3.test/k%3Fsig%3D…`,
-`/a/x=https:%2F%2Fcb.test%2Fx%3Fpassword%3D…`, `/a/x;https:%2F%2F…%3Ftoken%3D…`. Userinfo in these
-shapes is already redacted; a matched query key is not. Found by the stability pass on 2026-10-03.
+Each security minor that redacts more, 2.5.0 included, changes a documented span value a dashboard
+groups on: `url.full`, a header value or a status message. README → Credentials in a captured value
+documents every value it doesn't redact as exported as written, and README → Audience says only a
+major changes a documented value. The decisions behind those minors say a security fix may ship in
+a minor. The technical principles audit recommends adding to "Do not rely on" a line such as "which
+values record `REDACTED`: any release may redact more, since a credential reaching a span is a
+defect". Found on 2026-10-26.
+
+### 104. Settle whether every credential header crossing plain `http:` warns, not only `Authorization`.
+
+The decision "An `Authorization` over plain `http:` warns once" checks only `Authorization`, so an
+`api-key` or `x-honeycomb-team` in `otlpAdditionalHeaders` crosses plain `http:` with no warning.
+Found by the goals principles audit on 2026-10-26.
 
 ### 95. Redact userinfo a kept query splits across `&`.
 
@@ -113,9 +135,30 @@ shapes is already redacted; a matched query key is not. Found by the stability p
 pair, so neither part holds `//…@`. Same class as the split across `=`, which is redacted. Found by
 the security pass on 2026-10-03.
 
+### 100. Redact a listed query key's value in a url that does not parse whole: in a header value, a status message or a kept query value.
+
+`location: /cb?token=…`, a `link: <…?access_token=…>` header, an `end({ error })` message such as
+node-fetch's `request to …?token=… failed`, and a kept query value holding a scheme-less or protocol-relative url, such as
+`?src=%2F%2Fcdn.test%2Fk%3Fsig%3D…`, export the credential: a listed query key is read only where the
+whole value parses as a url. README → Credentials in a captured value documents the gap. 2.5.0 cuts the
+same text in the request path. Found by the goals and frontend principles audits on
+2026-10-26.
+
+### 101. Redact a credential in a url's fragment, such as `#access_token=…`, wherever a url is read.
+
+A listed key opening a fragment is read nowhere, so a captured `location: …#access_token=…`, an OAuth implicit-flow
+redirect, exports the token, and so does a kept query value or a url nested in the path holding one.
+Found by the goals principles audit and the stability pass on 2026-10-26.
+
+### 102. Redact a credential in a url nested base64-encoded in the request path, as an image proxy takes one.
+
+`decodings` undoes percent-encoding only, so `/insecure/rs:fit:300/<base64url of
+https://s3.test/k?X-Amz-Signature=…>` exports the signature in `url.full`. README and CHANGELOG say
+it is exported as written. Found by the goals principles audit on 2026-10-26.
+
 ### 7. Unref the batch timer, so a pending batch never holds a Node or Deno process.
 
-Landing it drops README → Queue exports' "Until 2.5.0" sentence. README → Goals #7.1 asks for it.
+Landing it drops README → Queue exports' "Until 2.5.0" sentence. README → Goals #9 asks for it.
 Today only the retry timer is unref'd, so any pending batch holds the process for up to
 `batchDelayMs`, and `round()` clears the batch timer once, at its start, so a record logged while an
 export is in flight leaves one behind with nothing to send: measured on `node:22`, `await
@@ -153,6 +196,14 @@ Landing it drops README → `log.fetch` in depth's "Until 2.5.0, a `Request`" se
 request)` is valid and TypeScript accepts it, but `{ ...init, headers }` copies own properties only,
 and a `Request`'s are prototype getters: `log.fetch(url, new Request(url, { method: "POST", body
 }))` sends a GET with no body. A `Request` as the *input* is item 19.
+
+### 106. Run on React Native's own `URL`, whose getters throw "not implemented", or state in README → Runtimes that an app installs a `URL` polyfill.
+
+React Native 0.74's `Libraries/Blob/URL.js` throws "not implemented" from `host`, `origin`,
+`password`, `pathname`, `protocol`, `search` and `username`. `new Queue`, `new Log({ otlpHttpBaseURI })` and
+`log.fetch` read them, so those calls throw on an app with no `URL` polyfill. README → Runtimes names
+`fetch`, `TextEncoder` and `btoa` only. Found by the goals and frontend principles audits on
+2026-10-26; the throwing getters were checked against the v0.74.0 source.
 
 ### 8. Keep a restored batch through the `maxItems` trim, so the retry promised for it holds.
 
@@ -201,11 +252,6 @@ it lifts Locality, the lowest dimension at 5.5.
 One returns a warning and throws; the other throws into its own catch as a goto. Principle: Handle
 errors explicitly, as values.
 
-### 91. Measure test coverage in CI, and fail a change that lowers it.
-
-Neither suite collects coverage, so `~/.claude/principles/technical-principles.md` → "Coverage
-should not decline" cannot be checked.
-
 ### 38. Resolve a `Log`'s conf in steps that each return a new value, with no cast at the end.
 
 `confFromOptions`, `inheritSettings`, `rejectQueueBesideShorthand` and `withDefaults` mutate one
@@ -234,6 +280,10 @@ chunk runs the four-seat scoring run. Where a dimension or the overall stays und
 for the places the seats name, lowest dimension first, and a copy of this item blocked by them.
 Where every score reaches 7.0, it files nothing, and the run replaces the comprehension baseline.
 
+### 111. Name `scripts/` by what it holds: the browser and OTLP test runners and the collector config.
+
+`~/.claude/CLAUDE.md` → "Naming files & folders" bans `scripts`.
+
 ### 35. Let a consumer inject what `colorsFromEnv`, `traceableUrl` and `unref` read from the platform.
 
 They read `process.env`, `globalThis.location` and `globalThis.Deno`, and the suite swaps
@@ -259,11 +309,28 @@ An unencodable payload, the 3 s send abort, `unref`'s effect, the clock-shape re
 408/429/500, `end()` twice, and a level method after `end()`. Principle: Most, if not all, code
 should have automated tests.
 
+### 109. Test without the wall clock: no sleep, no real timer and no time bound.
+
+`log.fetch redacts a long query within 250 ms` asserts on `performance.now()`, `waitFor` polls with a
+real `setTimeout`, one test sleeps 10 ms and one runs a real 20 ms retry timer. Principle: a test
+neither sleeps nor asserts on the wall clock (`~/.claude/principles/technical-principles.md`).
+
+### 110. Register one test per case where a test loops over its cases or checks many behaviours.
+
+`tap.ts`'s `test()` can register one test per case, yet the redaction tables loop
+inside one test, and one `deepEqual` covers a whole table, so a failure names no case. Principle:
+one behaviour per test, named for it; no loops or branches in a test body, parametrize the cases
+(`~/.claude/principles/technical-principles.md`).
+
 ### 25. Publish the artifact the gate tested.
 
 `push.yaml` builds and tests `index.js` inside the container; `publish.yaml` builds a second one on
 the runner and publishes that, so the thing consumers install is never the thing CI proved. Build
 once, upload, publish that. Item 13, pinning the base images, is the other half of the same problem.
+
+### 113. Make `.editorconfig` match what the files hold: spaces in `package.json`, and never tabs in YAML.
+
+`.editorconfig` asks tabs of `package.json`, which holds spaces, and of `*.yml`, where YAML forbids tabs. Found by the technical principles audit on 2026-10-26.
 
 ### 82. Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.
 
@@ -277,6 +344,13 @@ against `location.href` to an http(s) url: `log.fetch` then traces that invented
 with `init` alone, dropping the request's own method, body and headers. The signature says `string |
 URL`, so a TypeScript consumer cannot reach it.
 
+### 114. Move `package.json`'s build and test one-liners into named scripts, and let the OTLP test read its collector's port, image and container name from the environment, today's values as defaults.
+
+`build`, `build-tests`, `replace-version-string`, `test-browser`, `test-docker` and `test-otlp` chain
+shell inside one JSON string. `scripts/run-otlp-tests.mjs` fixes port 4318, the image and the
+container name, so two runs on one machine clash, and its `docker rm -f` removes the other run's
+collector. Found by the technical principles audit on 2026-10-26.
+
 ### 80. Run the browser suite in WebKit and Firefox as well as Chromium.
 
 `scripts/run-browser-tests.mjs` launches Chromium alone, though its Playwright image ships both.
@@ -286,6 +360,23 @@ fakes. `~/.claude/principles/frontend.md` → broad device support.
 ### 26. Check the footprint budget in CI, so the numbers in README → Footprint fail a build instead of going stale.
 
 Bundle size is the easy half; the per-operation figures need a stable enough harness to not flake.
+
+### 112. Run the suite on Deno and Bun in CI.
+
+README → Runtimes says Deno and Bun meet the rule and are not in CI; CI proving more runtimes is Goals #2's signal. Found by the goals principles audit on 2026-10-26.
+
+### 107. Run the suite on React Native's Hermes in CI.
+
+README → Audience calls React Native a primary target, but CI runs Node and Chromium only, so a break
+under Hermes or React Native's own globals, like item 106, ships unseen. Items 80 and 81 don't cover
+it. `~/.claude/principles/frontend.md` → Testability and broad device support.
+
+### 108. Keep two tabs of one web app sharing a `storage` key from sending a record twice or deleting each other's backlog.
+
+Every tab builds a `Queue` on the same `localStorage` key: each loads another tab's backlog at start,
+then overwrites or removes the key on every change, so offline records go twice and a tab that drains
+first deletes another's backlog. README's "one `Queue` per `key` per process" is advice a web app
+cannot follow. `~/.claude/principles/frontend.md` → Prefer state in the URL first, backend second.
 
 ### 96. Add a list of transports, each handed plain records it encodes itself, with console and OTLP as the two this library ships and uses by default.
 
@@ -346,7 +437,7 @@ sampling decision made by accident. An incoming `traceparent` flag still wins wh
 ### 81. Test export and `log.fetch` against a real server in a browser.
 
 The browser run stubs `globalThis.fetch`, so the 64 KiB `keepalive` cap and the CORS preflight are
-never exercised. Item 12 removes the global swap, not this gap. `~/.claude/principles/frontend.md` →
+never exercised. Item 96 removes the global swap, not this gap. `~/.claude/principles/frontend.md` →
 testability.
 
 ### 99. Honour a collector's `Retry-After` before retrying a batch.
@@ -402,7 +493,7 @@ It describes tsc's output, which uglify then minifies and, since 2.5.0, mangles.
 `log.fetch` guards the same failure; `log.info` lets it through to the app. Principle: Handle errors
 explicitly, as values.
 
-### 50. Match the level set and where the queue's own failures go to `~/.claude/principles/logging.md`, or record why not.
+### 50. Match the level set and where this library's own lines go to `~/.claude/principles/logging.md`, or record why not.
 
 It names five levels where this has six, `verbose` exports in `debug`'s severity band, the queue's
 own failures log at `error` where the app still works, `error` and `warn` go to `stderr` where the
@@ -439,6 +530,13 @@ not, and OTLP has no idempotency key. Principle: Idempotent data writing.
 
 It is invisible when unused, and the W3C rules it must hold to — 512-char limit, list-member
 ordering, the `ot` vendor key — are where the cost sits.
+
+### 105. Settle whether metrics arrive aggregated by the caller, as the metrics decision says, now that Goals #1 asks for no second library.
+
+The decision "Metrics will arrive aggregated, with no instruments" leaves aggregation to the caller,
+citing Goals #3 and #5. Goals #1's signal counts each common need that sends a user to a second
+library, and a caller aggregating its own metrics needs one. Goals #5's counter-signal, a common need
+left to user code to save bytes, argues against the decision too. Found by the goals principles audit on 2026-10-26.
 
 ### 55. Make `log.span` and `ended` read-only, and an open span carry no end time.
 
@@ -488,7 +586,7 @@ Today the userinfo is dropped silently, so a span can carry `url.full` showing a
 beside a `status.message` quoting `http://REDACTED@host/x`, and the reader is told both that
 credentials were written and that they were not. Only React Native reaches it; Node and browsers
 refuse the url first. README → `log.fetch` in depth documents `url.full` as the url without its
-userinfo, so per Goals #4 this waits for the major.
+userinfo, so per Goals #8 this waits for the major.
 
 ### 69. Export metadata as typed OTLP attribute values instead of coercing every one to `stringValue`.
 
@@ -501,7 +599,7 @@ strings re-types the field, and queries and dashboards built on the string chang
 `Bearer REDACTED` and `Basic REDACTED` tell a reader chasing a 401 whether the caller sent the wrong
 kind of credential, and RFC 9110's `auth-scheme` is a fixed token, never the secret. Split on the
 first space and keep the prefix only where it matches the token grammar. README documents the value
-as `REDACTED`, so per Goals #4 this waits for the major.
+as `REDACTED`, so per Goals #8 this waits for the major.
 
 ### 54. Require `msTimestamp` in `EntryFormatterConf`, and have the built-in formatters return a value for an unknown level.
 
@@ -567,6 +665,6 @@ changes a default.
 ### 75. Keep credentials off `log.conf` and `queue.conf`.
 
 `otlpHttpBaseURI`'s `user:pass@` and an `otlpAdditionalHeaders` bearer token sit there verbatim, so
-a consumer who logs their own conf puts them in their log store. Goals #3 stops at what this library
-emits, so this is a Goals #4 break. Item 74 clears `log.conf`; `queue.conf` still needs redacting,
+a consumer who logs their own conf puts them in their log store. Goals #7 stops at what this library
+emits, so this is a Goals #8 break. Item 97 clears `log.conf`; `queue.conf` still needs redacting,
 or its credentials held off it.

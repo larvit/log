@@ -278,8 +278,9 @@ Credentials go either in the endpoint as `user:pass@`, which is sent as an `Auth
 header, or in `otlpAdditionalHeaders` as a token of your own. Set one: with both, the
 `otlpAdditionalHeaders` one is sent, one `@larvit/log:` line is written, and 3.0.0 throws. Over
 plain `http:` either one is readable by anything on the network path, so use `https:` unless the
-collector is local or on a network you trust. Either one sent over `http:` to a host other than
-`localhost`, `127.0.0.0/8` or `::1` writes one `@larvit/log:` line naming the host, and still sends.
+collector is local or on a network you trust. An `Authorization` from either one sent over `http:`
+to a host other than `localhost`, `127.0.0.0/8` or `::1` writes one `@larvit/log:` line naming the
+host, and still sends.
 It is written once per host and credential source to each `report` function, or to each `stderr` for
 a queue a `Log` built. On a network you trust, pass `acceptPlainHttpAuthorization: true` to the
 `Queue`; a `Log` using `otlpHttpBaseURI` moves its `otlp*` options to `otlpQueue: new Queue({
@@ -470,18 +471,20 @@ yourself included.
   runs across the `=`, as in `?//u:p=w@host`, records `REDACTED` together with its value. A status
   message records `REDACTED` in place: `retry https://REDACTED@h/x`. A header value, query part or
   path is also read percent-decoded, up to eight times; one encoded deeper records `REDACTED`. Only
-  userinfo is found this way: a matched query key in a url that is not a whole value, such as
-  `?token=` in `retry https://h/x?token=…`, is exported as written, and so is a relative `location:
+  userinfo is found this way: a matched query key in a header value, query value or status message
+  that is not a whole url, such as `?token=` in `retry https://h/x?token=…`, is exported as written, and so is a relative `location:
   /cb?token=…`, since it needs a base. Keep credentials out of error messages, or replace a message
   before `end({ error })`.
 - **A url nested in the request path**, raw or percent-encoded, as a fetch-through or image proxy
   takes one. The path records `REDACTED` from the first segment that starts with a scheme, such as
   `https:`, and opens a url holding a credential by these rules: `/fetch/REDACTED`. It also records
-  `REDACTED` from the ninth segment starting with a scheme, whatever that holds. Where userinfo, as
-  the bullet above reads it, remains outside that cut, or the path is percent-encoded more than eight
-  times, the whole path records `/REDACTED`. A matched query key in a url nested with no scheme, or
-  behind other text in its segment, such as `/fetch/s3.test/k%3Fsig%3D…` or `/a/x=https:%2F%2F…`,
-  is not read: keep credentials out of one.
+  `REDACTED` from the first segment where a matched query key follows a `?` or `&`, raw or
+  percent-encoded, wherever the nested url sits: `/fetch/s3.test/k%3Fsig%3D…` records
+  `/fetch/s3.test/REDACTED`, and `/a/x=https:%2F%2Fcb.test%2Fx%3Fpassword%3D…` records
+  `/a/REDACTED`. It also records `REDACTED` from the ninth segment starting with a scheme, whatever
+  that segment holds. Where userinfo, as the bullet above reads it, remains in what the path keeps,
+  or the path is percent-encoded more than eight times, the whole path records `/REDACTED`. A url nested base64-encoded, as an image proxy such as imgproxy takes one, is not
+  read: keep credentials out of one.
 
 Never put credentials in the url; pass an `Authorization` header, and strip userinfo from a url you
 did not build. `log.fetch` mirrors the runtime: Node and browsers refuse such a url, while React
@@ -491,9 +494,9 @@ you the 401.
 `REDACTED` does not always stand for a credential: a `?key=` lookup, a `?token=` pagination cursor,
 a `?code=` promo code, an `?oauth=` or `?design=` flag, and the headers `www-authenticate`,
 `x-idempotency-key` and `x-session-id` record it, and so does an address read as userinfo, as in
-`https://api.test,mail@example.com`. A path is cut at a nested url whose encoded query holds a
-`?key=` lookup, and at the ninth segment starting with a scheme; `/users//bob@x.test` records
-`/REDACTED`.
+`https://api.test,mail@example.com`. In a path, `REDACTED` replaces everything from the cut on:
+`/fetch/s3.test/k%3Fkey%3D1`, a `?key=` lookup, records `/fetch/s3.test/REDACTED`, and
+`/users//bob@x.test` records `/REDACTED`.
 
 Spans are queued when the response arrives and are registered with `flush()` at call time, so
 `await log.end()` delivers a `log.fetch()` you never awaited.

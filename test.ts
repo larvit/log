@@ -2030,6 +2030,13 @@ test("log.fetch redacts credentials in a url nested in the request path", async 
 		"/h3//tok_en:pw10@a.test/https:%2F%2Fv:pw11@cb.test": "/REDACTED",
 		"/i/a:/a:/a:/a:/a:/a:/a:/a:/a:/x": "/i/a:/a:/a:/a:/a:/a:/a:/a:/REDACTED",
 		"/j/%25252525252525252525252541": "/REDACTED",
+		"/k/s3.test/k%3Fsig%3Dpw12": "/k/s3.test/REDACTED",
+		"/l/s3.test/k%3FX-Amz-Date%3D1%26X-Amz-Signature%3Dpw13": "/l/s3.test/REDACTED",
+		"/m/x=https:%2F%2Fcb.test%2Fx%3Fpassword%3Dpw14": "/m/REDACTED",
+		"/n/x;https:%2F%2Fcb.test%2Fx%3Ftoken%3Dpw15": "/n/REDACTED",
+		"/o/s3.test/k%253Fsig%253Dpw16": "/o/s3.test/REDACTED",
+		"/p/k%3Fa%3D1%26/sig%3Dpw17": "/p/k%3Fa%3D1%26/REDACTED",
+		"/q/s3.test/k%3Fpage%3D2/token": "/q/s3.test/k%3Fpage%3D2/token",
 		"/registry/@larvit/log/users/bob@x.test/https://cb.test/x?q=1": "/registry/@larvit/log/users/bob@x.test/https://cb.test/x",
 	};
 
@@ -2054,7 +2061,7 @@ test("log.fetch redacts a long query within 250 ms", async t => {
 
 	const chain = Array.from({ length: 7 }).reduce<string>(nested => `https://a/?${encodeURIComponent(nested)}=b`, `https://t/?x=${"a".repeat(40000)}`);
 
-	for (const query of ["?u=https://a/?".repeat(16384), "?https://a/?".repeat(16384), `?${chain}`, `${"/a:".repeat(16384)}%3F`, `${deep}/https:/${deep}?q=${deep}`, `?q=${"\\".repeat(32768)} x`, `?q=//${"\\".repeat(32768)} x`, `${"%5C".repeat(32768)}%20x`]) {
+	for (const query of ["?u=https://a/?".repeat(16384), "?https://a/?".repeat(16384), `?${chain}`, `${"/a:".repeat(16384)}%3F`, `${deep}/https:/${deep}?q=${deep}`, `?q=${"\\".repeat(32768)} x`, `?q=//${"\\".repeat(32768)} x`, `${"%5C".repeat(32768)}%20x`, `${"a%3Fb%3D1/".repeat(16384)}x`]) {
 		const started = performance.now();
 
 		await log.fetch(`https://proxy.test/${query}`, { headers: { "x-deep": deep } });

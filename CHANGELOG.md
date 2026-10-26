@@ -14,9 +14,10 @@
   url's `?key=` lookup cuts the path, and so does a ninth nested url. A path showing userinfo after
   `//`, `\\`, `/\` or `\/`, raw or percent-encoded, such as `/users//bob@x.test`, records
   `/REDACTED` whole, and so does one percent-encoded more than eight times. v2.4.0's advice to
-  rotate what such a path carried stands for spans exported before. A matched query key in a url
-  nested with no scheme, or behind other text in its segment, such as `/fetch/s3.test/k%3Fsig%3D…`,
-  is not read yet: keep credentials out of one.
+  rotate what such a path carried stands for spans exported before. A listed query key cuts the
+  path wherever the nested url sits, with no scheme or behind other text in its segment:
+  `/fetch/s3.test/k%3Fsig%3D…` records `/fetch/s3.test/REDACTED`, and
+  `/a/x=https:%2F%2Fcb.test%2Fx%3Fpassword%3D…` records `/a/REDACTED`.
 - **A captured header records `REDACTED` by Elastic APM's default `sanitize_field_names` rule.**
   Since v2.3.0 only `authorization`, `cookie`, `proxy-authorization` and `set-cookie` did, so a
   listed `x-api-key`, `x-auth-token` or `x-amz-security-token` exported its value. Now a name that,

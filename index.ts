@@ -1526,15 +1526,33 @@ function traceableUrl(input: string | URL): URL | undefined {
 	return url.protocol === "http:" || url.protocol === "https:" ? url : undefined;
 }
 
+// A query key in a segment's decoded level: after a `?` or `&`, or at the segment's start where an
+// earlier segment left a key open, as `/s3.test/k%3Fa%3D1%26/sig%3D…` does. Read segment by segment,
+// so a path of many `?` stays linear.
+const QUERY_KEY = /[?&]([^?&=]*)/g;
+const OPEN_QUERY_KEY = /[?&][^?&=]*$/;
+const holdsSensitiveQueryKey = (level: string) => [...level.matchAll(QUERY_KEY)].some(([, key]) => isSensitiveQueryKey(key));
+
 // Cut at the first segment whose nested url holds a credential: a later cut would leave an earlier
-// url's userinfo in the kept prefix.
+// url's userinfo in the kept prefix. A nested url needs no scheme to carry a query, and its scheme may
+// sit behind other text in its segment, so a sensitive query key cuts wherever it sits.
 function redactedPath(pathname: string): string {
 	const segments = pathname.split("/");
 	let kept = pathname;
 	let opened = 0;
+	let keyOpen = false;
 
 	for (let index = 1; index < segments.length; index++) {
-		if (decodings(segments[index])?.some(level => SCHEME_LED.test(level)) !== true) {
+		const levels = decodings(segments[index]);
+
+		if (levels?.some(level => holdsSensitiveQueryKey(keyOpen ? `&${level}` : level)) === true) {
+			kept = `${segments.slice(0, index).join("/")}/REDACTED`;
+			break;
+		}
+
+		keyOpen = levels?.some(level => OPEN_QUERY_KEY.test(level) || (keyOpen && !/[?&=]/.test(level))) === true;
+
+		if (levels?.some(level => SCHEME_LED.test(level)) !== true) {
 			continue;
 		}
 
@@ -1548,8 +1566,8 @@ function redactedPath(pathname: string): string {
 		}
 	}
 
-	// The loop reads only segments starting with a scheme, and userinfo after `//`, `\\`, `/\` or `\/`
-	// needs no scheme.
+	// The loop reads query keys and segments starting with a scheme, and userinfo after `//`, `\\`, `/\`
+	// or `\/` needs neither.
 	// That userinfo may sit in a decoded level that maps to no raw segment, so the whole path goes.
 	return textHoldsUserinfo(kept) ? "/REDACTED" : kept;
 }
