@@ -13,7 +13,7 @@
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 104 | 2.5.0 |  | question | **Settle whether every credential header crossing plain `http:` warns, not only `Authorization`.** | 1 | 1 | 2 | 2 | 2 |  | 0.0 |
-| 115 | 2.5.0 |  | question | **Settle where the redactions in CHANGELOG → Unreleased ship, now that redacting more is a major: in 3.0.0, or in 2.5.0 because Goals #7 ranks above #8.** | 1 | 1 | 2 | 2 | 1 |  | 0.0 |
+| 115 | 2.5.0 |  | question | **Settle whether 2.5.0's redactions, shipped and planned, ship in 2.5.0 or wait for 3.0.0.** | 1 | 1 | 2 | 2 | 1 |  | 0.0 |
 | 95 | 2.5.0 | 115 | security | **Redact userinfo a kept query splits across `&`.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
 | 100 | 2.5.0 | 115 | security | **Redact a listed query key's value in a url that does not parse whole: in a header value, a status message or a kept query value.** | 2 | 2 | 4 | 6 | 4 |  | 0.0 |
 | 101 | 2.5.0 | 115 | security | **Redact a credential in a url's fragment, such as `#access_token=…`, wherever a url is read.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
@@ -119,13 +119,14 @@ The decision "An `Authorization` over plain `http:` warns once" checks only `Aut
 `api-key` or `x-honeycomb-team` in `otlpAdditionalHeaders` crosses plain `http:` with no warning.
 Found by the goals principles audit on 2026-10-26.
 
-### 115. Settle where the redactions in CHANGELOG → Unreleased ship, now that redacting more is a major: in 3.0.0, or in 2.5.0 because Goals #7 ranks above #8.
+### 115. Settle whether 2.5.0's redactions, shipped and planned, ship in 2.5.0 or wait for 3.0.0.
 
 On 2026-10-26 the maintainer ruled that redacting a value a release exported as written is a major,
 and README → Audience now says so. CHANGELOG → Unreleased → Security already holds such changes:
 `url.full` cutting a url nested in the path, a header redacted by Elastic APM's name rule, the url
-`log.fetch` fetched redacted in its own span's status, and userinfo in `\\` and mixed-slash
-spellings. Items 95, 100, 101 and 102 redact more too. README → Goals says the earlier maintain goal
+`log.fetch` fetched redacted in its own span's status, userinfo in `\\` and mixed-slash spellings,
+a url a kept query key or value holds once decoded, and a query key's value redacted by Datadog's
+rule. Items 95, 100, 101 and 102 redact more too. README → Goals says the earlier maintain goal
 wins where two conflict, and #7, credentials never leave, comes before #8, semver read strictly.
 
 ### 95. Redact userinfo a kept query splits across `&`.
