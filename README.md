@@ -29,8 +29,9 @@ browsers and React Native. No OpenTelemetry SDK, no dependencies.
 
 ## Goals
 
-In priority order; the earlier goal wins a tie. A **Maintain** goal is a state every change holds; an
-**Achieve** goal is a direction, weighed against the others.
+Achieve goals come first, in priority order: each is a direction, weighed against the others, and the
+earlier one wins a tie. Maintain goals follow: each is a state every change holds, whatever it does
+for an achieve goal, and where two conflict the earlier one wins.
 
 1. **Achieve:** **The logger you reach for first.** Useful with no config, and enough for most apps
    without a second logging or tracing library.
@@ -47,23 +48,24 @@ In priority order; the earlier goal wins a tie. A **Maintain** goal is a state e
       - Signal: fewer tests skip or branch on the runtime they run in.
       - Counter-signal: code emulates on one runtime what its platform does differently.
       - Why: sameness forced against the platform surprises that platform's users.
-3. **Maintain:** **Correct OTLP.** Leave out what cannot be done to the spec.
-4. **Maintain:** **[Credentials never leave](#credentials-in-a-captured-value).** Text you log is
-   exported as written.
-5. **Maintain:** **[Semver, read strictly](#audience).**
-6. **Achieve:** **A very easy API.** Nobody learns OTLP to log.
+3. **Achieve:** **A very easy API.** Nobody learns OTLP to log.
    - Signal: the README's example for a common task gets shorter and uses no OTLP term.
    - Counter-signal: an option does more than its name says, or a default surprises a user.
    - Why: an API shortened by hiding behaviour trades ease for surprise.
-7. **Achieve:** **Composable.** Instances nest, inherit, and attach to an upstream trace.
+4. **Achieve:** **Composable.** Instances nest, inherit, attach to an upstream trace, and send to
+   any set of destinations.
    - Signal: an app or a library combines instances and traces with no glue code of its own.
    - Counter-signal: a feature works at one level of nesting only.
    - Why: composition that stops at one level pushes the glue back onto the user.
-8. **Achieve:** **[Low footprint](#footprint).**
+5. **Achieve:** **[Low footprint](#footprint).**
    - Signal: the budgets in README → Footprint hold, or tighten.
    - Counter-signal: a common need is left to user code to save bytes.
    - Why: a footprint kept small by pushing work onto users only moves the cost.
-   1. **Maintain:** **Never holds a process open** past the work the app asked for.
+6. **Maintain:** **Correct OTLP.** Leave out what cannot be done to the spec.
+7. **Maintain:** **[Credentials never leave](#credentials-in-a-captured-value).** Text you log is
+   exported as written.
+8. **Maintain:** **[Semver, read strictly](#audience).**
+9. **Maintain:** **Never holds a process open** past the work the app asked for.
 
 ## Audience
 
@@ -399,7 +401,7 @@ keeps it native. Levels map to OTLP severity through the exported `LogLevels` ta
 
 ## `log.fetch` in depth
 
-**`log.fetch` mirrors the runtime's `fetch`** ([Goals #2.1 and #6](#goals)). It takes a `string` or
+**`log.fetch` mirrors the runtime's `fetch`** ([Goals #2.1 and #3](#goals)). It takes a `string` or
 `URL` and an `init`. On an instance not yet ended, given a plain-object `init`, the response, the
 rejection and the promise you see are exactly what the runtime produced. What it adds is outbound trace context and a span,
 and never a success the platform would have refused. The request differs from yours only by
@@ -498,7 +500,7 @@ Spans are queued when the response arrives and are registered with `flush()` at 
 
 ## Footprint
 
-Budgets for [Goals #8](#goals), measured on this repo's container image: ≤10 KB gzipped, ≤50 ns for
+Budgets for [Goals #5](#goals), measured on this repo's container image: ≤10 KB gzipped, ≤50 ns for
 a call below `logLevel`, ≤2 µs for a console call, ≤10 µs with OTLP configured, ≤1 KB per instance,
 ≤1.5 KB per queued record, ≤1.5 MiB for a full 1000-item queue.
 
