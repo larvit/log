@@ -1532,7 +1532,7 @@ const holdsSensitiveQueryKey = (level: string) => level.split(/[?&]/).slice(1).s
 
 // Cut at the first segment whose nested url holds a credential: a later cut would leave an earlier
 // url's userinfo in the kept prefix. A nested url needs no scheme to carry a query, and its scheme may
-// sit behind other text in its segment, so a listed query key cuts first, wherever it sits.
+// sit behind other text in its segment, so a listed query key cuts too, wherever it sits.
 function redactedPath(pathname: string): string {
 	const segments = pathname.split("/");
 	const keyed = segments.findIndex((segment, index) => index > 0 && decodings(segment)?.some(holdsSensitiveQueryKey) === true);
@@ -1547,7 +1547,7 @@ function redactedPath(pathname: string): string {
 
 		opened++;
 
-		const nested = decodings(scanned.slice(index).join("/"));
+		const nested = decodings(segments.slice(index).join("/"));
 
 		if (opened > MAX_URL_DEPTH || nested === undefined || nested.some(level => SCHEME_LED.test(level) && (redactedWholeUrl(level) !== undefined || redactTextUserinfo(level) !== level))) {
 			kept = `${scanned.slice(0, index).join("/")}/REDACTED`;

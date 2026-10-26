@@ -2038,6 +2038,7 @@ test("log.fetch redacts credentials in a url nested in the request path", async 
 		"/p/k%3Fsig%3Dpw17/x%3Ftoken%3Dpw18": "/p/REDACTED",
 		"/q/s3.test/k%3Fpage%3D2/token": "/q/s3.test/k%3Fpage%3D2/token",
 		"/r/s3.test/k%3Fsi%09g%3Dpw19": "/r/s3.test/REDACTED",
+		"/r2/https://s3.test/k%3Fsig%3Dpw20": "/r2/REDACTED",
 		"/registry/@larvit/log/users/bob@x.test/https://cb.test/x?q=1": "/registry/@larvit/log/users/bob@x.test/https://cb.test/x",
 	};
 
