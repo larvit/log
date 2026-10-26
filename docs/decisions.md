@@ -108,10 +108,6 @@ status of those spans were right, their `url.full` (`nulluser:pass@host/x`,
 `https://example.comhttps://example.com/uuid`) was not. Serves README → Goals #6 and #7. Valid while
 `url.full` is built from `origin` + `pathname`.
 
-2026-10-26, the maintainer: README → Audience now makes redacting more a major, so no later
-redaction ships in a minor on this entry's precedent; `todo.md` item 115 settles where 2.5.0's
-redactions ship.
-
 ## `log.fetch` passes url userinfo through, and redacts it in its own span's status
 
 2026-09-20 by the implementing agent, amended 2026-09-29 by the maintainer: a `log.fetch` url
@@ -132,10 +128,6 @@ and writing the userinfo out only in a plain-`http:` proxy's request line. Same 
 `main` on 2026-09-20. Mirroring keeps that the platform's behaviour. It ships in a minor on the
 precedent of the entry above, being the security fix itself. Serves README → Goals #2 and #7. Valid
 while `log.fetch` is a drop-in for the runtime's `fetch`.
-
-2026-10-26, the maintainer: README → Audience now makes redacting more a major, so no later
-redaction ships in a minor on this entry's precedent; `todo.md` item 115 settles where 2.5.0's
-redactions ship.
 
 ## A captured value holding a credential records `REDACTED`
 
@@ -165,10 +157,6 @@ while Elastic's default list is the published one.
 2026-10-26, the implementing agent: outside the request path and the url `log.fetch` fetched, a
 listed key is read only in a header value, kept query value or status message that parses whole as
 a url; `todo.md` item 100 closes that gap.
-
-2026-10-26, the maintainer: README → Audience now makes redacting more a major, so no later
-redaction ships in a minor on this entry's precedent; `todo.md` item 115 settles where 2.5.0's
-redactions ship.
 
 ## Every rule on credentials in a span sits in one source section
 
@@ -243,10 +231,6 @@ reads to explain a 403.
 
 Serves README → Goals #7; over-redaction in a minor stands on the 2026-09-20 captured-value entry.
 Valid while Datadog's default and semconv's list stay within these terms.
-
-2026-10-26, the maintainer: README → Audience now makes redacting more a major, so no later
-redaction ships in a minor on this entry's precedent; `todo.md` item 115 settles where 2.5.0's
-redactions ship.
 
 ## An unsampled `traceparent` drops the span, never the log records
 

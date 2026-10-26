@@ -13,11 +13,10 @@
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 104 | 2.5.0 |  | question | **Settle whether every credential header crossing plain `http:` warns, not only `Authorization`.** | 1 | 1 | 2 | 2 | 2 |  | 0.0 |
-| 115 | 2.5.0 |  | question | **Settle whether 2.5.0's redactions, shipped and planned, ship in 2.5.0 or wait for 3.0.0.** | 1 | 1 | 2 | 2 | 1 |  | 0.0 |
-| 95 | 2.5.0 | 115 | security | **Redact userinfo a kept query splits across `&`.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
-| 100 | 2.5.0 | 115 | security | **Redact a listed query key's value in a url that does not parse whole: in a header value, a status message or a kept query value.** | 2 | 2 | 4 | 6 | 4 |  | 0.0 |
-| 101 | 2.5.0 | 115 | security | **Redact a credential in a url's fragment, such as `#access_token=…`, wherever a url is read.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
-| 102 | 2.5.0 | 115 | security | **Redact a credential in a url nested base64-encoded in the request path, as an image proxy takes one.** | 2 | 2 | 4 | 6 | 4 |  | 0.0 |
+| 95 | 2.5.0 |  | security | **Redact userinfo a kept query splits across `&`.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
+| 100 | 2.5.0 |  | security | **Redact a listed query key's value in a url that does not parse whole: in a header value, a status message or a kept query value.** | 2 | 2 | 4 | 6 | 4 |  | 0.0 |
+| 101 | 2.5.0 |  | security | **Redact a credential in a url's fragment, such as `#access_token=…`, wherever a url is read.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
+| 102 | 2.5.0 |  | security | **Redact a credential in a url nested base64-encoded in the request path, as an image proxy takes one.** | 2 | 2 | 4 | 6 | 4 |  | 0.0 |
 | 7 | 2.5.0 |  | defect | **Unref the batch timer, so a pending batch never holds a Node or Deno process.** | 2 | 2 | 2 | 4 | 4 | 9 by 9 | 7.0 |
 | 13 | 2.5.0 |  |  | **Pin every Node base image to its full patch version, so one commit builds one image on any day.** | 1 | 1 | 1 | 1 | 2 | code health by 3 | 6.2 |
 | 89 | 2.5.0 |  | defect | **Keep `enabled()` free of output: warn about an unknown `logLevel` from the level methods alone.** | 1 | 1 | 1 | 1 | 2 | 3 by 5 | 2.3 |
@@ -118,16 +117,6 @@
 The decision "An `Authorization` over plain `http:` warns once" checks only `Authorization`, so an
 `api-key` or `x-honeycomb-team` in `otlpAdditionalHeaders` crosses plain `http:` with no warning.
 Found by the goals principles audit on 2026-10-26.
-
-### 115. Settle whether 2.5.0's redactions, shipped and planned, ship in 2.5.0 or wait for 3.0.0.
-
-On 2026-10-26 the maintainer ruled that redacting a value a release exported as written is a major,
-and README → Audience now says so. CHANGELOG → Unreleased → Security already holds such changes:
-`url.full` cutting a url nested in the path, a header redacted by Elastic APM's name rule, the url
-`log.fetch` fetched redacted in its own span's status, userinfo in `\\` and mixed-slash spellings,
-a url a kept query key or value holds once decoded, and a query key's value redacted by Datadog's
-rule. Items 95, 100, 101 and 102 redact more too. README → Goals says the earlier maintain goal
-wins where two conflict, and #7, credentials never leave, comes before #8, semver read strictly.
 
 ### 95. Redact userinfo a kept query splits across `&`.
 
