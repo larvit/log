@@ -1526,47 +1526,36 @@ function traceableUrl(input: string | URL): URL | undefined {
 	return url.protocol === "http:" || url.protocol === "https:" ? url : undefined;
 }
 
-// A query key in a segment's decoded level: after a `?` or `&`, or at the segment's start where an
-// earlier segment left a key open, as `/s3.test/k%3Fa%3D1%26/sig%3D…` does. Read segment by segment,
-// so a path of many `?` stays linear.
-const QUERY_KEY = /[?&]([^?&=]*)/g;
-const OPEN_QUERY_KEY = /[?&][^?&=]*$/;
-const holdsSensitiveQueryKey = (level: string) => [...level.matchAll(QUERY_KEY)].some(([, key]) => isSensitiveQueryKey(key));
+// A key after a `?` or `&` in a segment's decoded level, read as a parser reads a url's: with no
+// tab or newline.
+const holdsSensitiveQueryKey = (level: string) => level.split(/[?&]/).slice(1).some(pair => isSensitiveQueryKey(pair.split("=")[0].replace(/[\t\n\r]/g, "")));
 
 // Cut at the first segment whose nested url holds a credential: a later cut would leave an earlier
 // url's userinfo in the kept prefix. A nested url needs no scheme to carry a query, and its scheme may
-// sit behind other text in its segment, so a sensitive query key cuts wherever it sits.
+// sit behind other text in its segment, so a listed query key cuts first, wherever it sits.
 function redactedPath(pathname: string): string {
 	const segments = pathname.split("/");
-	let kept = pathname;
+	const keyed = segments.findIndex((segment, index) => index > 0 && decodings(segment)?.some(holdsSensitiveQueryKey) === true);
+	const scanned = keyed === -1 ? segments : [...segments.slice(0, keyed), "REDACTED"];
+	let kept = scanned.join("/");
 	let opened = 0;
-	let keyOpen = false;
 
-	for (let index = 1; index < segments.length; index++) {
-		const levels = decodings(segments[index]);
-
-		if (levels?.some(level => holdsSensitiveQueryKey(keyOpen ? `&${level}` : level)) === true) {
-			kept = `${segments.slice(0, index).join("/")}/REDACTED`;
-			break;
-		}
-
-		keyOpen = levels?.some(level => OPEN_QUERY_KEY.test(level) || (keyOpen && !/[?&=]/.test(level))) === true;
-
-		if (levels?.some(level => SCHEME_LED.test(level)) !== true) {
+	for (let index = 1; index < scanned.length; index++) {
+		if (decodings(scanned[index])?.some(level => SCHEME_LED.test(level)) !== true) {
 			continue;
 		}
 
 		opened++;
 
-		const nested = decodings(segments.slice(index).join("/"));
+		const nested = decodings(scanned.slice(index).join("/"));
 
 		if (opened > MAX_URL_DEPTH || nested === undefined || nested.some(level => SCHEME_LED.test(level) && (redactedWholeUrl(level) !== undefined || redactTextUserinfo(level) !== level))) {
-			kept = `${segments.slice(0, index).join("/")}/REDACTED`;
+			kept = `${scanned.slice(0, index).join("/")}/REDACTED`;
 			break;
 		}
 	}
 
-	// The loop reads query keys and segments starting with a scheme, and userinfo after `//`, `\\`, `/\`
+	// The cuts read query keys and segments starting with a scheme, and userinfo after `//`, `\\`, `/\`
 	// or `\/` needs neither.
 	// That userinfo may sit in a decoded level that maps to no raw segment, so the whole path goes.
 	return textHoldsUserinfo(kept) ? "/REDACTED" : kept;
