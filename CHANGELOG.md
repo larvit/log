@@ -17,7 +17,9 @@
   rotate what such a path carried stands for spans exported before. A listed query key cuts the
   path wherever the nested url sits, with no scheme or behind other text in its segment:
   `/fetch/s3.test/k%3Fsig%3D…` records `/fetch/s3.test/REDACTED`, and
-  `/a/x=https:%2F%2Fcb.test%2Fx%3Fpassword%3D…` records `/a/REDACTED`.
+  `/a/x=https:%2F%2Fcb.test%2Fx%3Fpassword%3D…` records `/a/REDACTED`. A url nested
+  base64-encoded, which v2.4.0's `aHR0c` search finds, is still exported as written: keep
+  credentials out of one.
 - **A captured header records `REDACTED` by Elastic APM's default `sanitize_field_names` rule.**
   Since v2.3.0 only `authorization`, `cookie`, `proxy-authorization` and `set-cookie` did, so a
   listed `x-api-key`, `x-auth-token` or `x-amz-security-token` exported its value. Now a name that,
