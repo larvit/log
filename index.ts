@@ -1526,15 +1526,21 @@ function traceableUrl(input: string | URL): URL | undefined {
 	return url.protocol === "http:" || url.protocol === "https:" ? url : undefined;
 }
 
+// A url parser drops a tab or newline, so `si%09g` reads as `sig`.
+const holdsSensitiveQueryKey = (level: string) => level.split(/[?&]/).slice(1).some(pair => isSensitiveQueryKey(pair.split("=")[0].replace(/[\t\n\r]/g, "")));
+
 // Cut at the first segment whose nested url holds a credential: a later cut would leave an earlier
-// url's userinfo in the kept prefix.
+// url's userinfo in the kept prefix. A url nested with no scheme, or behind other text in its segment,
+// still carries a query, so a segment holding a listed key cuts too.
 function redactedPath(pathname: string): string {
 	const segments = pathname.split("/");
-	let kept = pathname;
+	const keyed = segments.findIndex((segment, index) => index > 0 && decodings(segment)?.some(holdsSensitiveQueryKey) === true);
+	const scanned = keyed === -1 ? segments : [...segments.slice(0, keyed), "REDACTED"];
+	let kept = scanned.join("/");
 	let opened = 0;
 
-	for (let index = 1; index < segments.length; index++) {
-		if (decodings(segments[index])?.some(level => SCHEME_LED.test(level)) !== true) {
+	for (let index = 1; index < scanned.length; index++) {
+		if (decodings(scanned[index])?.some(level => SCHEME_LED.test(level)) !== true) {
 			continue;
 		}
 
@@ -1543,13 +1549,12 @@ function redactedPath(pathname: string): string {
 		const nested = decodings(segments.slice(index).join("/"));
 
 		if (opened > MAX_URL_DEPTH || nested === undefined || nested.some(level => SCHEME_LED.test(level) && (redactedWholeUrl(level) !== undefined || redactTextUserinfo(level) !== level))) {
-			kept = `${segments.slice(0, index).join("/")}/REDACTED`;
+			kept = `${scanned.slice(0, index).join("/")}/REDACTED`;
 			break;
 		}
 	}
 
-	// The loop reads only segments starting with a scheme, and userinfo after `//`, `\\`, `/\` or `\/`
-	// needs no scheme.
+	// Userinfo after `//`, `\\`, `/\` or `\/` needs no scheme and no query key, so both cuts can miss it.
 	// That userinfo may sit in a decoded level that maps to no raw segment, so the whole path goes.
 	return textHoldsUserinfo(kept) ? "/REDACTED" : kept;
 }

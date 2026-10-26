@@ -154,6 +154,10 @@ stance the query-key list already took. `REDACTED` over dropping the attribute k
 reader's "was the header there?", so a false hit costs a value, never the header's presence. Valid
 while Elastic's default list is the published one.
 
+2026-10-26, the implementing agent: outside the request path and the url `log.fetch` fetched, a
+listed key is read only in a header value, kept query value or status message that parses whole as
+a url; `todo.md` item 100 closes that gap.
+
 ## Every rule on credentials in a span sits in one source section
 
 2026-09-20, the implementing agent: every rule deciding whether a credential reaches a span sits in
@@ -311,6 +315,9 @@ other credential headers are left as they are. Serves README → Goals #7,
 `todo.md` item 50 settles where this library's own lines go. No expiry otherwise: the setups it
 serves are not all known.
 
+2026-10-26, the implementing agent: `todo.md` item 104 asks whether every credential header should
+warn.
+
 ## `resolveFormatter` is exported
 
 2026-09-28, the maintainer: the resolver from a conf to the `EntryFormatter` it writes with is
@@ -343,6 +350,10 @@ deliver it; the types will say what a valid point must carry. Keeping a running 
 `startTimeUnixNano` and bucket boundaries that match across a series is the caller's, so
 instruments, temporality conversion and periodic collection stay out. Serves README → Goals #3 and
 #5. Valid until `todo.md` item 56 ships; then the README documents it.
+
+2026-10-26, the implementing agent: Goals #1, now ranked above the #3 and #5 this entry serves,
+counts each common need that sends a user to a second library, and a caller aggregating its own
+metrics may need one; `todo.md` item 105 asks whether this entry stands.
 
 ## `ProtoWriter.string` uses `TextEncoder` with no fallback
 
