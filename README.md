@@ -91,6 +91,7 @@ in a worse one. Only a major changes:
 
 - each documented option, read back under its own name, and each documented instance field;
 - each span attribute and value this README documents, on `log.span` and on the wire;
+- which values record `REDACTED`: redacting one a release exported as written is a change too;
 - the `format: "json"` output;
 - a default;
 - a supported runtime;
