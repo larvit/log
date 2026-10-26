@@ -1526,13 +1526,12 @@ function traceableUrl(input: string | URL): URL | undefined {
 	return url.protocol === "http:" || url.protocol === "https:" ? url : undefined;
 }
 
-// A key after a `?` or `&` in a segment's decoded level, read as a parser reads a url's: with no
-// tab or newline.
+// A url parser drops a tab or newline, so `si%09g` reads as `sig`.
 const holdsSensitiveQueryKey = (level: string) => level.split(/[?&]/).slice(1).some(pair => isSensitiveQueryKey(pair.split("=")[0].replace(/[\t\n\r]/g, "")));
 
 // Cut at the first segment whose nested url holds a credential: a later cut would leave an earlier
-// url's userinfo in the kept prefix. A nested url needs no scheme to carry a query, and its scheme may
-// sit behind other text in its segment, so a listed query key cuts too, wherever it sits.
+// url's userinfo in the kept prefix. A url nested with no scheme, or behind other text in its segment,
+// still carries a query, so a segment holding a listed key cuts too.
 function redactedPath(pathname: string): string {
 	const segments = pathname.split("/");
 	const keyed = segments.findIndex((segment, index) => index > 0 && decodings(segment)?.some(holdsSensitiveQueryKey) === true);
@@ -1555,8 +1554,7 @@ function redactedPath(pathname: string): string {
 		}
 	}
 
-	// The cuts read query keys and segments starting with a scheme, and userinfo after `//`, `\\`, `/\`
-	// or `\/` needs neither.
+	// Userinfo after `//`, `\\`, `/\` or `\/` needs no scheme and no query key, so both cuts can miss it.
 	// That userinfo may sit in a decoded level that maps to no raw segment, so the whole path goes.
 	return textHoldsUserinfo(kept) ? "/REDACTED" : kept;
 }
