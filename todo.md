@@ -184,7 +184,7 @@ written once per `stderr` sink" leans on this until it lands.
 
 ### 79. State the real runtime floor, ES2021 syntax and `BigInt`, in README → Runtimes, or build down to the floor it states.
 
-`tsconfig.json` targets ES2022 and neither tsc nor uglify lowers syntax, so `index.js` ships `??=`,
+`tsconfig.build.json` targets ES2022 and neither tsc nor uglify lowers syntax, so `index.js` ships `??=`,
 class fields and `BigInt`. Safari 10.1–13.1, Chrome 42–84 and Firefox 39–78 meet "global `fetch`,
 `TextEncoder` and `btoa`" and throw a `SyntaxError` parsing the module when a bundler leaves
 `node_modules` untranspiled. Found by the frontend principles audit,
