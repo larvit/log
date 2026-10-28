@@ -470,8 +470,11 @@ yourself included.
   between, or after `\\`, `/\` or `\/` with none of those and no `\` between. This covers a url
   among other text, and one the runtime cannot parse, such as `//user:pass@host`. A header value or
   query value records `REDACTED` whole. A query key holding such userinfo, or one where the userinfo
-  runs across the `=` or the `&`, as in `?//u:p=w@host` and `?//u:p&w@host`, records `REDACTED`
-  together with its value, and so does each pair after it up to the one holding the last `@` before a `/`, `?` or `#`. A status
+  runs across the `=` or an `&`, as in `?//u:p=w@host` and `?//u:p&w@host`, records `REDACTED`
+  together with its value. So does each pair after the key, up to the one holding the last `@`
+  before the next `/`, `?`, `#` or whitespace, or before the query ends. A kept query is read
+  form-decoded: a `+` reads as a space, and `%2F`, `%3F` and `%23` as `/`, `?` and `#`. Userinfo
+  holding one of them is exported as written, such as `pw` in `?next=//my+user:pw@cb.test/x`. A status
   message records `REDACTED` in place: `retry https://REDACTED@h/x`. A header value, query part or
   path is also read percent-decoded, up to eight times; one encoded deeper records `REDACTED`. Only
   userinfo is found this way: a matched query key in a header value, query value or status message

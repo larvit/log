@@ -50,9 +50,10 @@
   `captureQuery` on exported the token in `url.full`, and now records
   `next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3DREDACTED`. A url in a key is read with its value too, as
   a proxy taking `?<url>` reads it, and where that finds a credential both record `REDACTED`:
-  `?https://t.test/x?token=…`, `?https://a@b=pw@evil.test`, whose userinfo runs across the `=`, and
-  `?//u:pw&w@evil.test`, whose userinfo runs across the `&`, where each pair up to the one holding
-  the last `@` before a `/`, `?` or `#` records `REDACTED`.
+  `?https://t.test/x?token=…` and `?https://a@b=pw@evil.test`, whose userinfo runs across the `=`.
+  `?//u:pw&w@evil.test`, whose userinfo runs across the `&`, records
+  `REDACTED=REDACTED&REDACTED=REDACTED`; README → Credentials in a captured value says which pairs
+  such userinfo takes.
   Search `url.full` with
   `(?i)%(25)*(3f|26)[-_]*([^&=%]*(auth|authentication|authorization|consumer[-_]?id|credential|key|key[-_]?id|pass|pass[-_]?phrase|p(ass)?w(or)?d[12]?|secret|sig|sign|signature|signed|token)|code|googleaccessid|id[-_]?token[-_]?hint)[-_]*(=|%(25)*3d)`,
   and with `(?i)(^|[?&])[^&=]*%(25)*2F%(25)*2F\S*%(25)*40` for a match followed by anything

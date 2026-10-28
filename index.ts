@@ -1426,18 +1426,19 @@ const textHoldsUserinfo = (text: string) => decodings(text)?.some(level => redac
 
 const URL_DELIMITER = /[/?#\s]/;
 
-// What a key holds after the `//` or `\\` that opens userinfo at its end; `undefined` where it opens
-// none. A key nested past eight decodings is read as holding an `@`.
+// What follows the `//`, `\\`, `/\` or `\/` that opens userinfo at a key's end; `undefined` where the
+// key doesn't open any. A key encoded more than eight times deep reads as holding an `@`.
 function openedUserinfo(key: string): string | undefined {
 	const levels = decodings(key);
 
 	return levels === undefined ? "@" : levels.map(level => OPENS_USERINFO.exec(level)?.[0].slice(2)).find(tail => tail !== undefined);
 }
 
-// `?//u:p&w@host` splits its userinfo across the `&`, which a parser reads as part of it. A key
-// opening userinfo starts a run: each pair after it joins, up to the first holding a delimiter, and
-// the pairs up to the last `@` in the run are returned. A `\` ends no run, so a run a backslash
-// opens may redact a pair holding no credential. A value opening userinfo is a url of its own, so
+// A parser reads the `&` in `?//u:p&w@host` as part of the userinfo, which `searchParams` splits into
+// two pairs. A key opening userinfo starts a run: its value and each later pair join it, up to the
+// first URL_DELIMITER. The pairs up to the run's last `@` are returned. Keep `\` out of
+// URL_DELIMITER, since userinfo after `//` may hold one; a run that a backslash opens may then redact
+// a pair holding no credential. A value opening userinfo is a url of its own, so
 // `?next=https://h&q=a@b` is kept.
 function splitUserinfoPairs(pairs: Array<[string, string]>): Set<number> {
 	const split = new Set<number>();
@@ -1473,7 +1474,8 @@ function splitUserinfoPairs(pairs: Array<[string, string]>): Set<number> {
 
 		if (opened !== undefined) {
 			start = index;
-			// Whole, at every decoding level: a value holding userinfo of its own once decoded, as `ss%2F%2Fx@h`, hides it from `read`, which stops at the first delimiter.
+			// The whole pair: `read` stops at the first delimiter, so it misses the `//x@` in a value such
+			// as `ss//x@h`, which `?//u:p=ss%2F%2Fx@h` decodes to.
 			end = textHoldsUserinfo(`${key}=${value}`) ? index : -1;
 			read(`${opened}=${value}`, index);
 		}
@@ -1542,7 +1544,7 @@ function redactQueryPair(key: string, value: string, depth: number, partsRead: P
 		}
 	}
 
-	// `?//u:p=w@host`, whose userinfo runs across the `=`, is read by `splitUserinfoPairs`.
+	// Userinfo across the `=`, as in `?//u:p=w@host`, is found by `splitUserinfoPairs` and never reaches here.
 	if (textHoldsUserinfo(key)) {
 		return ["REDACTED", "REDACTED"];
 	}
