@@ -1473,7 +1473,7 @@ function splitUserinfoPairs(pairs: Array<[string, string]>): Set<number> {
 
 		if (opened !== undefined) {
 			start = index;
-			// Whole, at every decoding level: an escaped delimiter in the value hides its own userinfo from `read`.
+			// Whole, at every decoding level: a value holding userinfo of its own once decoded, as `ss%2F%2Fx@h`, hides it from `read`, which stops at the first delimiter.
 			end = textHoldsUserinfo(`${key}=${value}`) ? index : -1;
 			read(`${opened}=${value}`, index);
 		}
