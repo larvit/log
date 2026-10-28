@@ -1669,6 +1669,9 @@ test("end({ error }) marks the span failed", async t => {
 	await new Log(conf).end({ error: new Error("http:myuser:hunter2@h.test/x") });
 	await new Log(conf).end({ error: new Error("db postgres://u:p\\\\w@h and \\\\v:qw@h failed") });
 	await new Log(conf).end({ error: new Error("db https:\\/u:pwmix6@h failed") });
+	await new Log(conf).end({ error: new Error("request to https://api.test/x?page=2&token=s3cr3tA failed, retry /cb?Access_Token=s3cr3tB&code=s3cr3tC#top") });
+	await new Log(conf).end({ error: new Error("request to https://api.test/x%3Fpage=2%26token%3Ds3cr3tD failed") });
+	await new Log(conf).end({ error: new Error("lookup https://api.test/x?keyword=kept&q=a?b=c failed") });
 
 	t.deepEqual(exportedSpan(0).status, { code: 2, message: "refused" }, "status is ERROR with the error message");
 	t.strictEqual(attr(exportedSpan(0), "error.type"), "ECONNREFUSED", "error.type is the error's code when it has one");
@@ -1683,13 +1686,16 @@ test("end({ error }) marks the span failed", async t => {
 	t.deepEqual(exportedSpan(5).status, { code: 2, message: "_OTHER" }, "a value that cannot be stringified still ends and exports the span");
 	t.deepEqual(exportedSpan(6).status, { code: 2, message: "Request cannot be constructed from a URL that includes credentials: http://REDACTED@api.test/x, retried against https://REDACTED@api.test/x" }, "a url in free text has its userinfo redacted in place");
 	t.deepEqual(exportedSpan(7).status, { code: 2, message: "GET https://api.test/mail@example.com?to=a@b failed" }, "an @ outside the userinfo position is left alone");
-	t.deepEqual(exportedSpan(8).status, { code: 2, message: "Failed to parse URL from //REDACTED@api.test/x?access_token=s3cr3t" }, "a url the runtime cannot parse has only its userinfo redacted");
+	t.deepEqual(exportedSpan(8).status, { code: 2, message: "Failed to parse URL from //REDACTED@api.test/x?access_token=REDACTED" }, "a url the runtime cannot parse has its userinfo and its listed keys redacted");
 	t.strictEqual(attr(exportedSpan(9), "error.type"), "AbortError", "a numeric code is skipped for the error name");
 	t.deepEqual(exportedSpan(10).status, { code: 2, message: "https://REDACTED@api.test/x?page=2&Access_Token=REDACTED&next=REDACTED#top" }, "a message that is a url has its userinfo, listed keys and nested credentials redacted, its fragment kept");
 	t.ok(!exportedSpan(11).status.message.includes("s3cr3t"), "a url nested thousands deep in query values ends the span and is redacted");
 	t.deepEqual(exportedSpan(12).status, { code: 2, message: "http://REDACTED@h.test/x" }, "a slashless spelling the runtime's URL parses is a url too");
 	t.deepEqual(exportedSpan(13).status, { code: 2, message: "db postgres://REDACTED@h and \\\\REDACTED@h failed" }, "userinfo after // is redacted with any backslash it holds, and so is userinfo after \\\\");
 	t.deepEqual(exportedSpan(14).status, { code: 2, message: "db https:\\/REDACTED@h failed" }, "and userinfo after a mixed \\/");
+	t.deepEqual(exportedSpan(15).status, { code: 2, message: "request to https://api.test/x?page=2&token=REDACTED failed, retry /cb?Access_Token=REDACTED&code=REDACTED#top" }, "a listed key in free text, a relative url included, has its value redacted in place");
+	t.deepEqual(exportedSpan(16).status, { code: 2, message: "REDACTED" }, "a listed key percent-encoded in free text records REDACTED for the whole message");
+	t.deepEqual(exportedSpan(17).status, { code: 2, message: "lookup https://api.test/x?keyword=kept&q=a?b=c failed" }, "a key merely ending in no listed name leaves the message alone");
 	t.end();
 });
 
@@ -2182,6 +2188,37 @@ test("log.fetch redacts its url in a runtime's rejection that parses as a url wh
 	const exported = JSON.stringify(calls.filter(call => call.path.startsWith("/v1/")));
 
 	t.ok(!exported.includes("hunter2") && !exported.includes("s3cr3t") && !exported.includes("nested1"), "neither the password nor a token, in the query or in a url nested in the path, reaches the collector");
+	t.end();
+});
+
+test("log.fetch redacts a listed query key in a header value or kept query value that no url parser reads whole", async t => {
+	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ link: "</next?page=2&access_token=hunter2>; rel=next", location: "/cb?token=hunter2", "x-cursor": "page=2&sig=hunter2", "x-enc": "cb%3Ftoken%3Dhunter2", "x-keyword": "/search?keyword=kept&q=a", "x-plain": "text/html; q=0.9" }) }) : undefined);
+	const log = new Log({
+		captureQuery: true,
+		captureResponseHeaders: ["link", "location", "x-cursor", "x-enc", "x-keyword", "x-plain"],
+		otlpHttpBaseURI: "http://127.0.0.1:4318",
+		stderr: () => {},
+	});
+
+	await log.fetch("https://api.test/h?src=%2F%2Fcdn.test%2Fk%3Fsig%3Dhunter2&via=cdn.test%2Fk%3Fx-amz-signature%3Dhunter2%26a%3Db&%2F%2Fcdn.test%2Fk%3Fsig%3Dhunter2&plain=cdn.test%2Fk%3Fpage%3D2&n=%2F%2Fcdn.test%2Fk%3Ftoken%3DREDACTED");
+	await log.end();
+
+	const span = clientSpan(calls);
+	const attr = (key: string) => span.attributes.find((attribute: any) => attribute.key === key)?.value.stringValue;
+
+	t.strictEqual(attr("http.response.header.location"), "REDACTED", "a relative url holding a listed key records REDACTED");
+	t.strictEqual(attr("http.response.header.link"), "REDACTED", "so does a link header holding one in angle brackets");
+	t.strictEqual(attr("http.response.header.x-cursor"), "REDACTED", "so does text holding one with no url around it");
+	t.strictEqual(attr("http.response.header.x-enc"), "REDACTED", "and one percent-encoded");
+	t.strictEqual(attr("http.response.header.x-keyword"), "/search?keyword=kept&q=a", "a key that no listed name ends is kept");
+	t.strictEqual(attr("http.response.header.x-plain"), "text/html; q=0.9", "a value with no query is kept");
+
+	const urlFull = attr("url.full") as string;
+
+	t.ok(urlFull.includes("?src=REDACTED&via=REDACTED&REDACTED=REDACTED&plain=cdn.test%2Fk%3Fpage%3D2&"), "a kept query value or key holding a protocol-relative or scheme-less url with a listed key records REDACTED");
+	t.ok(urlFull.endsWith("&n=%2F%2Fcdn.test%2Fk%3Ftoken%3DREDACTED"), "a value whose listed key is already redacted is kept");
+	t.ok(!urlFull.includes("hunter2"), "no credential is exported in url.full");
+	t.notOk(JSON.stringify(calls.filter(call => call.path.startsWith("/v1/"))).includes("hunter2"), "no credential reaches the collector");
 	t.end();
 });
 

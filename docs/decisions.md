@@ -155,8 +155,10 @@ reader's "was the header there?", so a false hit costs a value, never the header
 while Elastic's default list is the published one.
 
 2026-10-26, the implementing agent: outside the request path and the url `log.fetch` fetched, a
-listed key is read only in a header value, kept query value or status message that parses whole as
-a url; `todo.md` item 100 closes that gap.
+listed key was read only in a header value, kept query value or status message that parses whole as
+a url. 2.5.0 also reads one after a `?` or `&` in text no parser reads whole: a header value or
+query value records `REDACTED` whole, a status message in place of the value, and percent-encoded
+text whole. The value ends at `&`, `#` or whitespace, so nothing after it is read as part of the key.
 
 ## Every rule on credentials in a span sits in one source section
 

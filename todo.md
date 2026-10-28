@@ -12,7 +12,6 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 100 | 2.5.0 |  | security | **Redact a listed query key's value in a url that does not parse whole: in a header value, a status message or a kept query value.** | 2 | 2 | 4 | 6 | 4 |  | 0.0 |
 | 101 | 2.5.0 |  | security | **Redact a credential in a url's fragment, such as `#access_token=…`, wherever a url is read.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
 | 102 | 2.5.0 |  | security | **Redact a credential in a url nested base64-encoded in the request path, as an image proxy takes one.** | 2 | 2 | 4 | 6 | 4 |  | 0.0 |
 | 116 | 2.5.0 |  | security | **Redact userinfo holding a `+`, `%2F`, `%3F` or `%23` in a kept query.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
@@ -110,15 +109,6 @@
 | 75 | 3.0.0 | 22 | decision | **Keep credentials off `log.conf` and `queue.conf`.** | 2 | 1 | 2 | 3 | 3 | 3 by 3 | 0.7 |
 
 ## Details
-
-### 100. Redact a listed query key's value in a url that does not parse whole: in a header value, a status message or a kept query value.
-
-`location: /cb?token=…`, a `link: <…?access_token=…>` header, an `end({ error })` message such as
-node-fetch's `request to …?token=… failed`, and a kept query value holding a scheme-less or protocol-relative url, such as
-`?src=%2F%2Fcdn.test%2Fk%3Fsig%3D…`, export the credential: a listed query key is read only where the
-whole value parses as a url. README → Credentials in a captured value documents the gap. 2.5.0 cuts the
-same text in the request path. Found by the goals and frontend principles audits on
-2026-10-26.
 
 ### 101. Redact a credential in a url's fragment, such as `#access_token=…`, wherever a url is read.
 
