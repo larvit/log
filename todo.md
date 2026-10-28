@@ -6,7 +6,7 @@
 
 `Bar = 0.5`
 
-`Next ID = 119`
+`Next ID = 120`
 
 ## Items
 
@@ -15,6 +15,7 @@
 | 101 | 2.5.0 |  | security | **Redact a credential in a url's fragment, such as `#access_token=…`, wherever a url is read.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
 | 102 | 2.5.0 |  | security | **Redact a credential in a url nested base64-encoded in the request path, as an image proxy takes one.** | 2 | 2 | 4 | 6 | 4 |  | 0.0 |
 | 116 | 2.5.0 |  | security | **Redact userinfo holding a `+`, `%2F`, `%3F` or `%23` in a kept query.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
+| 119 | 2.5.0 |  | security | **Redact the whole of a listed query key's value in text that isn't a whole url, a tab, newline or carriage return inside the value included.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
 | 7 | 2.5.0 |  | defect | **Unref the batch timer, so a pending batch never holds a Node or Deno process.** | 2 | 2 | 2 | 4 | 4 | 9 by 9 | 7.0 |
 | 13 | 2.5.0 |  |  | **Pin every Node base image to its full patch version, so one commit builds one image on any day.** | 1 | 1 | 1 | 1 | 2 | code health by 3 | 6.2 |
 | 89 | 2.5.0 |  | defect | **Keep `enabled()` free of output: warn about an unknown `logLevel` from the level methods alone.** | 1 | 1 | 1 | 1 | 2 | 3 by 5 | 2.3 |
@@ -134,6 +135,18 @@ exports `pw`, and `?//u:p&a%2Fb&w@host` exports the whole password, as
 userinfo, so each is a credential exported as written. The gap dates from v2.3.0, and the `&` split
 rule that v2.5.0 adds has it too. Found by the principles audits and the stability pass on
 2026-10-28.
+
+### 119. Redact the whole of a listed query key's value in text that isn't a whole url, a tab, newline or carriage return inside the value included.
+
+A span's status message exports part of a credential. `end({ error })` and a failed `log.fetch`
+set it, and `log.span` and the OTLP export carry it. `redactTextQueryKeys` ends a listed key's
+value at the first `&`, `#` or whitespace, so a tab, newline or carriage return inside the value
+ends the redaction early. `request to https://h/x?token=ab<TAB>cd failed` exports
+`request to https://h/x?token=REDACTED<TAB>cd failed`, and `cd` leaves. A url parser drops those
+three characters, so it reads the value as `abcd`; `withoutDropped` already treats them so for a
+key. The same reader covers a header value and a kept query value, so the item checks those too.
+The gap isn't new: before v2.5.0 a listed key in a status message wasn't redacted at all unless the
+message parsed whole as a url. Found by the principles audit and the product-owner pass on 2026-10-28.
 
 ### 7. Unref the batch timer, so a pending batch never holds a Node or Deno process.
 
