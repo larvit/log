@@ -2036,6 +2036,8 @@ test("log.fetch captureQuery redacts userinfo that a kept query splits across &"
 		[`//u:pw77&%${"25".repeat(10)}40&m=1`, `${redacted(2)}&m=1`],
 		[`%${"25".repeat(10)}41&w@h.test&m=1`, `${redacted(2)}&m=1`],
 		["//u:pw78@h.test/x=1&m=1", `${redacted(1)}&m=1`],
+		["//u:pw79&k=w@&m=1", `${redacted(2)}&m=1`],
+		["//u:pw80&/x@y&m=1", "%2F%2Fu%3Apw80=&%2Fx%40y=&m=1"],
 		["e=//host&mail=a@b.test&%2F%2Fx/y&z=4", "e=%2F%2Fhost&mail=a%40b.test&%2F%2Fx%2Fy=&z=4"],
 	];
 	const { calls } = stubFetch();
