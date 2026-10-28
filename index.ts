@@ -1427,11 +1427,12 @@ const withoutDropped = (text: string) => text.replace(/[\t\n\r]/g, "");
 
 // The text with each listed key's value replaced by `REDACTED`, wherever a url's own query rules don't
 // reach it: a status message such as `request to …?token=… failed`, a relative `location`, a
-// scheme-less url, a `?` in a fragment. A value ends at `&`, `#` or whitespace and may hold a `?`. A key
-// is whatever stands between its `?` or `&` and its `=`, a space or `#` included, so a listed key after
-// a `?` in an unlisted value is found.
+// scheme-less url, a `?` in a fragment, a fragment's own pairs such as an OAuth redirect's
+// `#access_token=…`. A value ends at `&`, `#` or whitespace and may hold a `?`. A key is whatever stands
+// between its `?`, `&` or `#` and its `=`, a space or `#` included, so a listed key after a `?` in an
+// unlisted value is found.
 function redactTextQueryKeys(text: string): string {
-	const opener = /[?&]([^&=?]*)=/g;
+	const opener = /[?&#]([^&=?]*)=/g;
 	const valueEnd = /[&#\s]/g;
 	let redacted = "";
 	let copied = 0;

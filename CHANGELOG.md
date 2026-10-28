@@ -4,6 +4,13 @@
 
 ### Security
 
+- **A listed key opening a url's fragment, such as `#access_token=…`, records `REDACTED` wherever a
+  url is read.** Since v2.3.0, an OAuth implicit-flow redirect captured as a `location` header, quoted
+  in a status message, held in a kept query value or nested in the request path exported its token:
+  only a key after a `?` or `&` was read. Now `location: https://app.test/cb#access_token=…` records
+  `REDACTED`, a status message records `…/cb#access_token=REDACTED&token_type=bearer`, and the path
+  and a kept query value holding one record `REDACTED` as for a key after a `?`. Rotate what such a
+  redirect carried in spans exported before.
 - **`url.full` records `REDACTED` for a url nested in the request path.** Since v2.3.0,
   `log.fetch("https://proxy.test/fetch/https://user:pass@cb.test/x")` — the shape a fetch-through,
   CORS or image proxy takes — exported the password in `url.full` with no capture option involved,
