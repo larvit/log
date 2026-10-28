@@ -318,13 +318,12 @@ once, upload, publish that. Item 13, pinning the base images, is the other half 
 
 ### 118. Bring `index.ts`'s `// --- Credentials on a span ---` section within about seven things per level, or record why it holds more.
 
-The section holds about 32 flat top-level declarations: the principles audit counted 29 before the
-chunk for item 100 and 32 after. That crosses the limit of about seven things per level, with no
-recorded reason and no name order a reader could find them by. The principle asks for a grouping
-under names a reader can follow, or a recorded reason. The rules must stay in one section, as
-`docs/decisions.md` → "Every rule on credentials in a span sits in one source section" asks.
-Principle: `~/.claude/principles/technical-principles.md` → "About seven things per level". Found by
-the principles audit of the chunk for item 100 on 2026-10-28.
+The section holds over 30 flat top-level declarations, with no recorded reason and no name order
+a reader could find them by. That crosses the limit of about seven things per level. The principle
+asks for a grouping under names a reader can follow, or a recorded reason. The rules must stay in
+one section, as `docs/decisions.md` → "Every rule on credentials in a span sits in one source
+section" asks. Principle: `~/.claude/principles/technical-principles.md` → "About seven things per
+level". Found by the principles audit of 2026-10-28.
 
 ### 113. Make `.editorconfig` match what the files hold: spaces in `package.json`, and never tabs in YAML.
 
@@ -360,9 +359,8 @@ fakes. `~/.claude/principles/frontend.md` → broad device support.
 README → Footprint budgets `index.js` at ≤10 KB gzipped for Goals #5, and `origin/main` builds to
 10439 bytes: `npm run build` in the repo's container image, then `gzip -9c index.js | wc -c`. The
 budget is already broken, and nothing checks it. Whether to shrink the build or re-state the
-budget is for this item to work out. Item 26 checks the budget in CI; that check fails from its
-first run until this item lands, so this item comes first. Found by the chunk for item 100 on
-2026-10-28.
+budget is for this item to work out. Item 26 checks the budget in CI, and that check fails from its
+first run until this item lands. Found on 2026-10-28.
 
 ### 26. Check the footprint budget in CI, so the numbers in README → Footprint fail a build instead of going stale.
 

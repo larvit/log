@@ -139,8 +139,8 @@ rule for captured header values and for the query values `captureQuery` keeps �
 since a url written as a bare key reaches `url.full` the same way its value would — because the same
 credentialed url arrives by every one of those routes and separate rules would disagree the way the
 two allow-lists used to. A value no header-name rule below covers is redacted where, parsed whole as
-a url, it holds a credential, or where its text holds userinfo after `//`, `\\`, `/\` or `\/`. The
-`//` rule is v2.4.0's, so 2.5.0 redacts all v2.4.0 did. A header goes by name where its name,
+a url, it holds a credential, or where its text holds userinfo after `//`, `\\`, `/\` or `\/`, or a
+listed key after a `?` or `&`. The `//` rule is v2.4.0's, so 2.5.0 redacts all v2.4.0 did. A header goes by name where its name,
 ignoring case, matches Elastic APM's default `sanitize_field_names` (`password`, `passwd`, `pwd`,
 `secret`, `*key`, `*token*`, `*session*`, `*credit*`, `*card*`, `*auth*`, `set-cookie`,
 `*principal*`) or is `cookie`, the spec's optional addition
@@ -153,12 +153,6 @@ deprecates a breaking change in a 2.x minor first, and the leak is open now — 
 stance the query-key list already took. `REDACTED` over dropping the attribute keeps the telemetry
 reader's "was the header there?", so a false hit costs a value, never the header's presence. Valid
 while Elastic's default list is the published one.
-
-2026-10-26, the implementing agent: outside the request path and the url `log.fetch` fetched, a
-listed key was read only in a header value, kept query value or status message that parses whole as
-a url. 2.5.0 also reads one after a `?` or `&` in text no parser reads whole: a header value or
-query value records `REDACTED` whole, a status message in place of the value, and percent-encoded
-text whole. The value ends at `&`, `#` or whitespace, so nothing after it is read as part of the key.
 
 ## Every rule on credentials in a span sits in one source section
 

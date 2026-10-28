@@ -1425,11 +1425,10 @@ function decodings(text: string): string[] | undefined {
 // A parser drops a tab or newline: `si%09g` reads as `sig`.
 const withoutDropped = (text: string) => text.replace(/[\t\n\r]/g, "");
 
-// The text with each listed key's value replaced by `REDACTED`: `?token=…` in `request to …?token=… failed`,
-// a relative `location` or a scheme-less url, which no parser reads whole. A value ends at `&`, `#` or
-// whitespace, so a quote or bracket after it goes too, and a `?` inside it goes with it. A pair that
-// isn't listed is read up to its `=`, so a listed key after a `?` in its value is found. A key is
-// whatever stands between its `?` or `&` and its `=`, a space or `#` included, as a path segment's was read.
+// The text with each listed key's value replaced by `REDACTED`, in text no parser reads whole: a
+// status message such as `request to …?token=… failed`, a relative `location`, a scheme-less url. A
+// value ends at `&`, `#` or whitespace and may hold a `?`. A key is whatever stands between its `?`
+// or `&` and its `=`, a space or `#` included, so a listed key after a `?` in an unlisted value is found.
 function redactTextQueryKeys(text: string): string {
 	const opener = /[?&]([^&=?]*)=/g;
 	const valueEnd = /[&#\s]/g;
@@ -1451,7 +1450,7 @@ function redactTextQueryKeys(text: string): string {
 	return redacted + text.slice(copied);
 }
 
-// Every level, as the userinfo rules read one; `undefined` past MAX_URL_DEPTH levels, which counts as a credential.
+// `undefined` past MAX_URL_DEPTH levels counts as a change.
 const changesAtAnyLevel = (text: string, redact: (level: string) => string) => decodings(text)?.some(level => redact(level) !== level) ?? true;
 
 const textHoldsUserinfo = (text: string) => changesAtAnyLevel(text, redactTextUserinfo);
@@ -1586,7 +1585,7 @@ function redactQueryPair(key: string, value: string, depth: number, partsRead: P
 		return [key, "REDACTED"];
 	}
 
-	// A url the runtime parses has its listed keys redacted in place; a value still holding one is no url it parses whole.
+	// A url the runtime parses has its listed keys redacted in place; a listed key still left in the result is text no parser reads whole.
 	const part = redactQueryPart(value, depth, partsRead);
 
 	return [key, textHoldsQueryKey(part) ? "REDACTED" : part];
