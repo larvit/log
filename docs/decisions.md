@@ -299,7 +299,12 @@ Credentials in a captured value stops at what this library emits, and redacting 
 be a second spelling of `todo.md` item 75, which keeps credentials off `conf` from 3.0.0. Serves
 README → Goals #7. Valid until 3.0.0 keeps credentials off `log.conf` and `queue.conf`.
 
-## A credential header over plain `http:` warns once
+## Every credential header over plain `http:` will warn once
+
+2026-10-28, the maintainer: every credential header will warn, not only `Authorization`. A header
+crossing plain `http:` exposes its value whatever its name, so the check widens to every name the
+header-name rule above redacts, such as `api-key`. `todo.md` item 104 ships it; until then only
+`Authorization` warns, as the 2026-09-28 paragraph below says.
 
 2026-09-28, the maintainer: an `http:` `otlpHttpBaseURI` naming a host other than `localhost`,
 `127.0.0.0/8` or `::1` warns when a send carries an `Authorization`, from `user:pass@` or
@@ -313,10 +318,6 @@ trusts; it sits on the queue alone, which owns the endpoint. Serves README → G
 "Credentials never leave", on the wire, without spending #8. Its `stderr` route stands until
 `todo.md` item 50 settles where this library's own lines go. No expiry otherwise: the setups it
 serves are not all known.
-
-2026-10-28, the maintainer: every credential header warns, not only `Authorization`: any header
-whose name the captured-header rule redacts, such as `api-key` or `x-honeycomb-team`, crossing
-plain `http:` is the same exposure. `todo.md` item 104 ships it.
 
 ## `resolveFormatter` is exported
 
@@ -345,10 +346,10 @@ Serves README → Goals #7, "Credentials never leave", on the wire.
 ## Metrics will come with instruments that aggregate for the caller
 
 2026-10-28, the maintainer: when metrics ship, the caller records measurements and this library
-aggregates them: running totals, a stable `startTimeUnixNano` and bucket boundaries that match
-across a series are this library's, not the caller's. A caller left to aggregate needs a second
-library, which README → Goals #1 counts against. This reverses the 2026-10-03 entry, which handed
-over only aggregated points for Goals #3 and #5. Which instruments ship, and how they are collected
+aggregates them. It keeps the running totals, a stable `startTimeUnixNano` and bucket boundaries
+that match across a series. A caller left to aggregate needs a second library, which README →
+Goals #1 counts against. An earlier choice, that the caller hands over points it aggregated itself
+to keep the API and the bundle small (Goals #3 and #5), is dropped. Which instruments ship, and how they are collected
 without holding a process open (Goals #9), is `todo.md` item 56's. Valid until item 56 ships; then
 the README documents it.
 

@@ -208,11 +208,12 @@ a load failure has to suppress saving too.
 
 ### 104. Warn once about every credential header sent over plain `http:`, not only `Authorization`.
 
-Today an `api-key` or `x-honeycomb-team` in `otlpAdditionalHeaders` crosses plain `http:` with no
-warning. The decision "A credential header over plain `http:` warns once" widens the check to every
-header name the captured-header rule redacts. The opt-out, `acceptPlainHttpAuthorization`, names
-only `Authorization`; whether it needs a clearer name is part of this item. Found by the goals
-principles audit on 2026-10-26.
+Today an `api-key` in `otlpAdditionalHeaders` crosses plain `http:` with no warning. The decision
+"Every credential header over plain `http:` will warn once" widens the check to every name the
+header-name rule redacts. Part of this item: whether that rule should take, from a sourced list, a
+vendor header it misses, such as `x-honeycomb-team`; and whether the opt-out,
+`acceptPlainHttpAuthorization`, which names only `Authorization`, needs a clearer name. Found by
+the goals principles audit on 2026-10-26.
 
 ### 34. Let a consumer inject the randomness trace and span ids come from.
 
@@ -634,12 +635,11 @@ carry.
 
 ### 56. Export OTLP metrics from instruments that aggregate for the caller.
 
-The caller records measurements; this library keeps the running totals, start times and bucket
-boundaries, as the decision "Metrics will come with instruments that aggregate for the caller"
-says, and sends a metrics kind in `OtlpPayload`, batched through `Queue` and POSTed to
-`/v1/metrics`. Collecting must never hold a process open (Goals #9). It waits for the major because
+The caller records measurements, and this library aggregates them and sends a metrics kind in
+`OtlpPayload`, batched through `Queue` and POSTed to `/v1/metrics`. The decision "Metrics will come
+with instruments that aggregate for the caller" says what aggregating covers. Collecting must never hold a process open (Goals #9). It waits for the major because
 an `OtlpQueue` implementer receives the wider union. Measure what the metrics messages and the
-instruments add against the 10 KB budget before deciding.
+instruments add against the 10 KB budget before choosing which instruments ship.
 
 ### 73. Send `traceparent` cross-origin only to urls the caller lists, or record why not.
 
