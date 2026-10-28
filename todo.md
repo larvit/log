@@ -139,8 +139,8 @@ it is exported as written. Found by the goals principles audit on 2026-10-26.
 userinfo match. So `?//u:pw+x@host` exports `%2F%2Fu%3Apw+x%40host=`, `?next=//my+user:pw@cb.test/x`
 exports `pw`, and `?//u:p&a%2Fb&w@host` exports the part of a split password after the escaped
 delimiter. A parser reading the raw query keeps `+` and `%2F` inside userinfo, so each is a
-credential exported as written. The gap dates from v2.3.0; item 95's `&` split rule doesn't widen
-it. Found by the principles audits and the stability pass on 2026-10-28.
+credential exported as written. The gap dates from v2.3.0; the `&` split rule shipped in 2.5.0
+reads pairs the same way and has the same gap. Found by the principles audits and the stability pass on 2026-10-28.
 
 ### 7. Unref the batch timer, so a pending batch never holds a Node or Deno process.
 

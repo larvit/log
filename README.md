@@ -471,7 +471,7 @@ yourself included.
   among other text, and one the runtime cannot parse, such as `//user:pass@host`. A header value or
   query value records `REDACTED` whole. A query key holding such userinfo, or one where the userinfo
   runs across the `=` or the `&`, as in `?//u:p=w@host` and `?//u:p&w@host`, records `REDACTED`
-  together with its value, and so does each pair after it up to the one holding the `@`. A status
+  together with its value, and so does each pair after it up to the one holding the last `@` before a `/`, `?` or `#`. A status
   message records `REDACTED` in place: `retry https://REDACTED@h/x`. A header value, query part or
   path is also read percent-decoded, up to eight times; one encoded deeper records `REDACTED`. Only
   userinfo is found this way: a matched query key in a header value, query value or status message
