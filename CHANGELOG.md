@@ -44,18 +44,20 @@
   among other text in a status message did too. Search captured header values, status messages and
   `url.full` with `(?i)(https?:|([\\/]|%(25)*(2F|5C)){2})\S*(@|%(25)*40)` and rotate any password a
   match holds; a match reading `REDACTED` before its `@` holds none.
-- **A listed query key records `REDACTED` in a header value, a kept query key or value or a status
-  message, where the rules for a parsed url left it.** Since v2.3.0, `location: /cb?token=…`, a
-  `link: </next?access_token=…>` header, an `end({ error })` message such as node-fetch's
-  `request to …?token=… failed`, and a kept query value holding a scheme-less or protocol-relative
-  url, such as `?src=%2F%2Fcdn.test%2Fk%3Fsig%3D…`, exported the credential. Now a header value or
-  query value holding a listed key after a `?` or `&` records `REDACTED` whole, a query key with its
-  value, and a status message records `REDACTED` in place of the value, ending at `&`, `#` or
-  whitespace: `request to https://h/x?token=REDACTED failed`. Text percent-encoded is read decoded up
-  to eight times, and a status message holding a key only decoded records `REDACTED` whole. A
-  dashboard grouping on such a header or message sees it change, a `?key=` lookup included. Search
-  captured header values and status messages with the regex in the status-message entry above for a
-  match followed by anything but `REDACTED`, and rotate what it finds.
+- **A query key that names a credential has its value redacted in a header value, a kept query key
+  or value or a status message, where the rules for a parsed url left it.** Since v2.3.0,
+  `location: /cb?token=…`, a `link: </next?access_token=…>` header and a kept query value holding a
+  scheme-less or protocol-relative url, such as `?src=%2F%2Fcdn.test%2Fk%3Fsig%3D…`, exported the
+  credential; since v2.4.0, so did an `end({ error })` message such as node-fetch's
+  `request to …?token=… failed`. Now a header value or query value holding such a key after a `?` or
+  `&` records `REDACTED` whole, and a query key records it with its value. A status message records
+  `REDACTED` in place of the value, ending at `&`, `#` or whitespace:
+  `request to https://h/x?token=REDACTED failed`. Text percent-encoded is read decoded up to eight
+  times, and a status message holding a key only decoded, or encoded deeper, records `REDACTED`
+  whole. A dashboard grouping on such a header, message or `url.full` sees it change, a `?key=`
+  lookup included. Search captured header values, status messages and `url.full` with the regex in
+  the status-message entry above for a match followed by anything but `REDACTED`, and rotate what it
+  finds.
 - **`captureQuery` redacts a url a query key or value holds once decoded, at every level.** Its
   userinfo records `REDACTED` in place of the whole key or value, and a matched key's value
   `REDACTED` in place: since v2.3.0, `?next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3D…` with

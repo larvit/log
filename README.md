@@ -477,15 +477,15 @@ yourself included.
   holding one of them is exported as written, such as `pw` in `?next=//my+user:pw@cb.test/x`. A status
   message records `REDACTED` in place: `retry https://REDACTED@h/x`. A header value, query part or
   path is also read percent-decoded, up to eight times; one encoded deeper records `REDACTED`.
-- **A matched query key that the rules above left in a header value, a kept query key or value, or a
-  status message,** after a `?` or `&`: `location: /cb?token=…`, `link: </next?access_token=…>`,
-  node-fetch's `request to …?token=… failed`, and `?src=%2F%2Fcdn.test%2Fk%3Fsig%3D…`, text no
-  url parser reads whole. A header value or query value records `REDACTED` whole, and a query key
-  with its value. A status message records `REDACTED` in place of the value, which ends at `&`, `#`
-  or whitespace and holds any `?`: `request to https://h/x?token=REDACTED failed`. The text is read
-  percent-decoded up to eight times as above, and a status message holding such a key only decoded
-  records `REDACTED` whole. A credential in any other shape is exported as written. Keep credentials
-  out of error messages, or replace a message before `end({ error })`.
+- **A matched query key and its `=`, after a `?` or `&` in a header value, a kept query key or
+  value, or a status message,** where the rules above didn't reach it: `location: /cb?token=…`,
+  `link: </next?access_token=…>`, node-fetch's `request to …?token=… failed`, and
+  `?src=%2F%2Fcdn.test%2Fk%3Fsig%3D…`. A header value or query value records `REDACTED` whole, and a
+  query key records it together with its value. A status message records `REDACTED` in place of the
+  value, which ends at `&`, `#` or whitespace and may hold a `?`:
+  `request to https://h/x?token=REDACTED failed`. Text is read percent-decoded up to eight times as
+  above; a status message holding such a key only decoded, or encoded deeper, records `REDACTED`
+  whole. Keep credentials out of error messages, or replace a message before `end({ error })`.
 - **A url nested in the request path**, raw or percent-encoded, as a fetch-through or image proxy
   takes one. The path records `REDACTED` from the first segment that starts with a scheme, such as
   `https:`, and opens a url holding a credential by these rules: `/fetch/REDACTED`. It also records
