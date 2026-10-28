@@ -2016,16 +2016,32 @@ test("log.fetch captureQuery keeps the query but redacts known-sensitive keys an
 });
 
 test("log.fetch captureQuery redacts userinfo that a kept query splits across &", async t => {
+	const redacted = (count: number) => Array.from({ length: count }, () => "REDACTED=REDACTED").join("&");
+	const cases: [string, string][] = [
+		["a=1&//u:pw60&w@h.test&b=2", `a=1&${redacted(2)}&b=2`],
+		["//u:pw61&w@h.test/x&k=1", `${redacted(2)}&k=1`],
+		["//u:pw62@x&w@h.test&m=1", `${redacted(2)}&m=1`],
+		["//u:pw63&k=v&w%40h.test&m=1", `${redacted(3)}&m=1`],
+		["//u:pw64&w%2540h.test&m=1", `${redacted(2)}&m=1`],
+		["\\\\u:pw65&w@h.test&m=1", `${redacted(2)}&m=1`],
+		["x=1&//u:pw66@x&k=v&w@h.test", `x=1&${redacted(3)}`],
+		["//u:pw67&a/b&w@h.test", "%2F%2Fu%3Apw67=&a%2Fb=&w%40h.test="],
+		["//u:pw68=/x&w@h.test", "%2F%2Fu%3Apw68=%2Fx&w%40h.test="],
+		["//u:pw69&a/b//v:pw70&w@h.test&m=1", `%2F%2Fu%3Apw69=&${redacted(2)}&m=1`],
+		["e=//host&mail=a@b.test&%2F%2Fx/y&z=4", "e=%2F%2Fhost&mail=a%40b.test&%2F%2Fx%2Fy=&z=4"],
+	];
 	const { calls } = stubFetch();
 	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 
-	await log.fetch("https://api.test/x?a=1&//u:pw60&w@h.test&b=2&//u:pw62&k=v&w@h.test&e=//host&mail=a@b.test&//x/y&z=4");
+	for (const [query] of cases) {
+		await log.fetch(`https://api.test/x?${query}`);
+	}
+
 	await log.end();
 
-	const urlFull = clientSpan(calls).attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue;
+	const urls = exportedSpans(calls).filter(span => span.kind === 3).map(span => span.attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue);
 
-	t.strictEqual(urlFull, "https://api.test/x?a=1&REDACTED=REDACTED&REDACTED=REDACTED&b=2&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&e=%2F%2Fhost&mail=a%40b.test&%2F%2Fx%2Fy=&z=4", "the pairs from a key opening userinfo to the pair holding its @ record REDACTED, and a value opening a url, or a delimiter before the @, leaves the rest be");
-	t.ok(!/pw6[02]/.test(urlFull), "no password is leaked");
+	t.deepEqual(urls.sort(), cases.map(([, expected]) => `https://api.test/x?${expected}`).sort(), "the pairs from a key opening userinfo up to the last @ before a delimiter record REDACTED, and a value opening a url, or a delimiter before the @, leaves the rest be");
 	t.end();
 });
 
@@ -2077,7 +2093,7 @@ test("log.fetch redacts a long query within 250 ms", async t => {
 
 	const chain = Array.from({ length: 7 }).reduce<string>(nested => `https://a/?${encodeURIComponent(nested)}=b`, `https://t/?x=${"a".repeat(40000)}`);
 
-	for (const query of ["?u=https://a/?".repeat(16384), "?https://a/?".repeat(16384), `?${chain}`, `${"/a:".repeat(16384)}%3F`, `${deep}/https:/${deep}?q=${deep}`, `?q=${"\\".repeat(32768)} x`, `?q=//${"\\".repeat(32768)} x`, `${"%5C".repeat(32768)}%20x`]) {
+	for (const query of ["?u=https://a/?".repeat(16384), "?https://a/?".repeat(16384), `?${chain}`, `${"/a:".repeat(16384)}%3F`, `${deep}/https:/${deep}?q=${deep}`, `?q=${"\\".repeat(32768)} x`, `?q=//${"\\".repeat(32768)} x`, `${"%5C".repeat(32768)}%20x`, `?//u:p${"&a@".repeat(16384)}`, `?//u:p=/${"&a@".repeat(16384)}`, `?${"//u:p&a@&".repeat(8192)}`]) {
 		const started = performance.now();
 
 		await log.fetch(`https://proxy.test/${query}`, { headers: { "x-deep": deep } });
