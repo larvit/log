@@ -2028,6 +2028,14 @@ test("log.fetch captureQuery redacts userinfo that a kept query splits across &"
 		["//u:pw67&a/b&w@h.test", "%2F%2Fu%3Apw67=&a%2Fb=&w%40h.test="],
 		["//u:pw68=/x&w@h.test", "%2F%2Fu%3Apw68=%2Fx&w%40h.test="],
 		["//u:pw69&a/b//v:pw70&w@h.test&m=1", `%2F%2Fu%3Apw69=&${redacted(2)}&m=1`],
+		["//user:pw71=ss%2F%2Fx@h.test&m=1", `${redacted(1)}&m=1`],
+		["//u:pw72=a/b@c", "%2F%2Fu%3Apw72=a%2Fb%40c"],
+		["//u:pw73&a?b&w@h.test", "%2F%2Fu%3Apw73=&a%3Fb=&w%40h.test="],
+		["%252F%252Fu%253Apw74&w@h.test&m=1", `${redacted(2)}&m=1`],
+		["//u:pw75&q//v:pw76&w@h.test", `%2F%2Fu%3Apw75=&${redacted(2)}`],
+		[`//u:pw77&%${"25".repeat(10)}40&m=1`, `${redacted(2)}&m=1`],
+		[`%${"25".repeat(10)}41&w@h.test&m=1`, `${redacted(2)}&m=1`],
+		["//u:pw78@h.test/x=1&m=1", `${redacted(1)}&m=1`],
 		["e=//host&mail=a@b.test&%2F%2Fx/y&z=4", "e=%2F%2Fhost&mail=a%40b.test&%2F%2Fx%2Fy=&z=4"],
 	];
 	const { calls } = stubFetch();

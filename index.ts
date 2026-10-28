@@ -1436,8 +1436,8 @@ function openedUserinfo(key: string): string | undefined {
 
 // `?//u:p&w@host` splits its userinfo across the `&`, which a parser reads as part of it. A key
 // opening userinfo starts a run: each pair after it joins, up to the first holding a delimiter, and
-// the pairs up to the last `@` in the run are returned. A `\` ends no run, so a pair a backslash
-// opener holds may be redacted with its neighbour. A value opening userinfo is a url of its own, so
+// the pairs up to the last `@` in the run are returned. A `\` ends no run, so a run a backslash
+// opens may redact a pair holding no credential. A value opening userinfo is a url of its own, so
 // `?next=https://h&q=a@b` is kept.
 function splitUserinfoPairs(pairs: Array<[string, string]>): Set<number> {
 	const split = new Set<number>();
@@ -1473,6 +1473,8 @@ function splitUserinfoPairs(pairs: Array<[string, string]>): Set<number> {
 
 		if (opened !== undefined) {
 			start = index;
+			// Whole, at every decoding level: an escaped delimiter in the value hides its own userinfo from `read`.
+			end = textHoldsUserinfo(`${key}=${value}`) ? index : -1;
 			read(`${opened}=${value}`, index);
 		}
 	});
