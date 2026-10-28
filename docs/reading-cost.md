@@ -15,3 +15,7 @@ Read most (opens and searches):
 - `package.json` 2
 - `.gitignore` 1
 - `AGENTS.md` 1
+
+## Reading cost, chunk 7ee3501801b3, finished 2026-10-28T00:39:01Z
+
+81034 new input tokens before the first commit.
