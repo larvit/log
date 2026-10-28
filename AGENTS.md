@@ -35,7 +35,7 @@ In [docs/decisions.md](docs/decisions.md):
 - A v2.3.0 copy's child loses a function formatter
 - The comprehension baseline
 - A stringified `Queue` carries its `conf`, less `storage` from 2.5.0
-- A credential header over plain `http:` warns once
+- Every credential header over plain `http:` will warn once
 - `resolveFormatter` is exported
 - Both credential spellings stay, and their combination warns
 - Inherited `otlpAdditionalHeaders` follow the endpoint's origin
