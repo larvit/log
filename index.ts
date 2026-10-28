@@ -1422,16 +1422,39 @@ function decodings(text: string): string[] | undefined {
 	return levels;
 }
 
-const textHoldsUserinfo = (text: string) => decodings(text)?.some(level => redactTextUserinfo(level) !== level) ?? true;
+// A parser drops a tab or newline: `si%09g` reads as `sig`.
+const withoutDropped = (text: string) => text.replace(/[\t\n\r]/g, "");
 
-// A listed key's value in text that no url parser reads whole, `?token=…` in `request to …?token=… failed`,
-// a relative `location` or a scheme-less url. A parser drops a tab or newline inside the key. The
-// value ends at `&`, `#` or whitespace, so a quote or bracket after it goes too.
-const TEXT_QUERY_PAIR = /([?&])((?:[^&=\s?#]|[\t\n\r])*)=([^&#\s]*)/g;
-const redactTextQueryKeys = (text: string) => text.replace(TEXT_QUERY_PAIR, (pair, opener: string, key: string) => isSensitiveQueryKey(key.replace(/[\t\n\r]/g, "")) ? `${opener}${key}=REDACTED` : pair);
+// The text with each listed key's value replaced by `REDACTED`: `?token=…` in `request to …?token=… failed`,
+// a relative `location` or a scheme-less url, which no parser reads whole. A value ends at `&`, `#` or
+// whitespace, so a quote or bracket after it goes too, and a `?` inside it goes with it. A pair that
+// isn't listed is read up to its `=`, so a listed key after a `?` in its value is found.
+function redactTextQueryKeys(text: string): string {
+	const opener = /[?&]((?:[^&=\s?#]|[\t\n\r])*)=/g;
+	const valueEnd = /[&#\s]/g;
+	let redacted = "";
+	let copied = 0;
 
-// Every level, as for userinfo; one past MAX_URL_DEPTH levels counts as a credential.
-const textHoldsQueryKey = (text: string) => decodings(text)?.some(level => redactTextQueryKeys(level) !== level) ?? true;
+	for (let pair = opener.exec(text); pair !== null; pair = opener.exec(text)) {
+		if (isSensitiveQueryKey(withoutDropped(pair[1]))) {
+			valueEnd.lastIndex = opener.lastIndex;
+
+			const end = valueEnd.exec(text)?.index ?? text.length;
+
+			redacted += `${text.slice(copied, opener.lastIndex)}REDACTED`;
+			copied = end;
+			opener.lastIndex = end;
+		}
+	}
+
+	return redacted + text.slice(copied);
+}
+
+// Every level, as the userinfo rules read one; `undefined` past MAX_URL_DEPTH levels, which counts as a credential.
+const changesAtAnyLevel = (text: string, redact: (level: string) => string) => decodings(text)?.some(level => redact(level) !== level) ?? true;
+
+const textHoldsUserinfo = (text: string) => changesAtAnyLevel(text, redactTextUserinfo);
+const textHoldsQueryKey = (text: string) => changesAtAnyLevel(text, redactTextQueryKeys);
 
 const URL_DELIMITER = /[/?#\s]/;
 
@@ -1545,7 +1568,7 @@ const SCHEME_LED = /^[\0- ]*[a-z][a-z\d+.-]*:/i;
 // A key opening a url is read with its value too, as a server taking `?<url>` reads it: an `=` in its
 // password ends the key.
 function redactQueryPair(key: string, value: string, depth: number, partsRead: PartsRead): [string, string] {
-	if (SCHEME_LED.test(key.replace(/[\t\n\r]/g, ""))) {
+	if (SCHEME_LED.test(withoutDropped(key))) {
 		const joined = `${key}=${value}`;
 
 		if (depth > MAX_URL_DEPTH || redactQueryPart(key, depth, partsRead) !== key || redactQueryPart(joined, depth, partsRead) !== joined) {
@@ -1558,10 +1581,14 @@ function redactQueryPair(key: string, value: string, depth: number, partsRead: P
 		return ["REDACTED", "REDACTED"];
 	}
 
+	if (isSensitiveQueryKey(key) || textHoldsUserinfo(value)) {
+		return [key, "REDACTED"];
+	}
+
 	// A url the runtime parses has its listed keys redacted in place; a value still holding one is no url it parses whole.
 	const part = redactQueryPart(value, depth, partsRead);
 
-	return [key, isSensitiveQueryKey(key) || textHoldsUserinfo(value) || textHoldsQueryKey(part) ? "REDACTED" : part];
+	return [key, textHoldsQueryKey(part) ? "REDACTED" : part];
 }
 
 // A value the runtime's `URL` parses whole; `undefined` where it is none or holds nothing to redact.
@@ -1601,8 +1628,7 @@ function traceableUrl(input: string | URL): URL | undefined {
 	return url.protocol === "http:" || url.protocol === "https:" ? url : undefined;
 }
 
-// A url parser drops a tab or newline, so `si%09g` reads as `sig`.
-const holdsSensitiveQueryKey = (level: string) => level.split(/[?&]/).slice(1).some(pair => isSensitiveQueryKey(pair.split("=")[0].replace(/[\t\n\r]/g, "")));
+const holdsSensitiveQueryKey = (level: string) => redactTextQueryKeys(level) !== level;
 
 // Cut at the first segment whose nested url holds a credential: a later cut would leave an earlier
 // url's userinfo in the kept prefix. A url nested with no scheme, or behind other text in its segment,
