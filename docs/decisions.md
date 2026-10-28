@@ -299,7 +299,7 @@ Credentials in a captured value stops at what this library emits, and redacting 
 be a second spelling of `todo.md` item 75, which keeps credentials off `conf` from 3.0.0. Serves
 README → Goals #7. Valid until 3.0.0 keeps credentials off `log.conf` and `queue.conf`.
 
-## An `Authorization` over plain `http:` warns once
+## A credential header over plain `http:` warns once
 
 2026-09-28, the maintainer: an `http:` `otlpHttpBaseURI` naming a host other than `localhost`,
 `127.0.0.0/8` or `::1` warns when a send carries an `Authorization`, from `user:pass@` or
@@ -309,14 +309,14 @@ Log built, else the queue's `report`. The line names the host, never the credent
 spellings warn, so moving the credential never silences the exposure; refusing would break the
 in-cluster `http:` collector, a deliberate and common setup. 2026-09-30, the maintainer: a `Queue`
 given `acceptPlainHttpAuthorization: true` does not warn, the opt-out for a network the consumer
-trusts; it sits on the queue alone, which owns the endpoint. Only `Authorization` is checked;
-other credential headers are left as they are. Serves README → Goals #7,
+trusts; it sits on the queue alone, which owns the endpoint. Serves README → Goals #7,
 "Credentials never leave", on the wire, without spending #8. Its `stderr` route stands until
 `todo.md` item 50 settles where this library's own lines go. No expiry otherwise: the setups it
 serves are not all known.
 
-2026-10-26, the implementing agent: `todo.md` item 104 asks whether every credential header should
-warn.
+2026-10-28, the maintainer: every credential header warns, not only `Authorization`: any header
+whose name the captured-header rule redacts, such as `api-key` or `x-honeycomb-team`, crossing
+plain `http:` is the same exposure. `todo.md` item 104 ships it.
 
 ## `resolveFormatter` is exported
 
@@ -342,18 +342,15 @@ later is not rechecked. Serves README → Goals #3.
 fetch draws when a redirect drops `Authorization`; a new path on the same collector keeps working.
 Serves README → Goals #7, "Credentials never leave", on the wire.
 
-## Metrics will arrive aggregated, with no instruments
+## Metrics will come with instruments that aggregate for the caller
 
-2026-10-03, the maintainer: when metrics ship, any OTLP metric shape — gauge, delta or cumulative
-sum, histogram — will be handed over already aggregated, and this library will encode, batch and
-deliver it; the types will say what a valid point must carry. Keeping a running total, a stable
-`startTimeUnixNano` and bucket boundaries that match across a series is the caller's, so
-instruments, temporality conversion and periodic collection stay out. Serves README → Goals #3 and
-#5. Valid until `todo.md` item 56 ships; then the README documents it.
-
-2026-10-26, the implementing agent: Goals #1, now ranked above the #3 and #5 this entry serves,
-counts each common need that sends a user to a second library, and a caller aggregating its own
-metrics may need one; `todo.md` item 105 asks whether this entry stands.
+2026-10-28, the maintainer: when metrics ship, the caller records measurements and this library
+aggregates them: running totals, a stable `startTimeUnixNano` and bucket boundaries that match
+across a series are this library's, not the caller's. A caller left to aggregate needs a second
+library, which README → Goals #1 counts against. This reverses the 2026-10-03 entry, which handed
+over only aggregated points for Goals #3 and #5. Which instruments ship, and how they are collected
+without holding a process open (Goals #9), is `todo.md` item 56's. Valid until item 56 ships; then
+the README documents it.
 
 ## `ProtoWriter.string` uses `TextEncoder` with no fallback
 
