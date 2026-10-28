@@ -1428,9 +1428,10 @@ const withoutDropped = (text: string) => text.replace(/[\t\n\r]/g, "");
 // The text with each listed key's value replaced by `REDACTED`: `?token=…` in `request to …?token=… failed`,
 // a relative `location` or a scheme-less url, which no parser reads whole. A value ends at `&`, `#` or
 // whitespace, so a quote or bracket after it goes too, and a `?` inside it goes with it. A pair that
-// isn't listed is read up to its `=`, so a listed key after a `?` in its value is found.
+// isn't listed is read up to its `=`, so a listed key after a `?` in its value is found. A key is
+// whatever stands between its `?` or `&` and its `=`, a space or `#` included, as a path segment's was read.
 function redactTextQueryKeys(text: string): string {
-	const opener = /[?&]((?:[^&=\s?#]|[\t\n\r])*)=/g;
+	const opener = /[?&]([^&=?]*)=/g;
 	const valueEnd = /[&#\s]/g;
 	let redacted = "";
 	let copied = 0;
