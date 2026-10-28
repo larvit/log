@@ -12,7 +12,6 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 104 | 2.5.0 |  | question | **Settle whether every credential header crossing plain `http:` warns, not only `Authorization`.** | 1 | 1 | 2 | 2 | 2 |  | 0.0 |
 | 95 | 2.5.0 |  | security | **Redact userinfo a kept query splits across `&`.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
 | 100 | 2.5.0 |  | security | **Redact a listed query key's value in a url that does not parse whole: in a header value, a status message or a kept query value.** | 2 | 2 | 4 | 6 | 4 |  | 0.0 |
 | 101 | 2.5.0 |  | security | **Redact a credential in a url's fragment, such as `#access_token=…`, wherever a url is read.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
@@ -26,6 +25,7 @@
 | 8 | 2.5.0 |  | defect | **Keep a restored batch through the `maxItems` trim, so the retry promised for it holds.** | 2 | 1 | 2 | 3 | 3 | 2 by 4 | 1.0 |
 | 9 | 2.5.0 |  | defect | **Keep a batch in the persisted queue until its send settles.** | 2 | 1 | 2 | 3 | 3 | 2 by 4 | 1.0 |
 | 11 | 2.5.0 |  | defect | **Keep a transient `storage` read failure from wiping the persisted queue.** | 2 | 1 | 2 | 3 | 4 | 2 by 4 | 0.8 |
+| 104 | 2.5.0 |  | decision | **Warn once about every credential header sent over plain `http:`, not only `Authorization`.** | 2 | 2 | 2 | 4 | 2 |  | 0.0 |
 | 34 | 2.6.0 |  | principle | **Let a consumer inject the randomness trace and span ids come from.** | 1 | 1 | 1 | 1 | 2 | code health by 5 | 10.4 |
 | 37 | 2.6.0 |  | principle | **Build a span payload without writing to `log.span`.** | 1 | 1 | 1 | 1 | 2 | code health by 5 | 10.4 |
 | 44 | 2.6.0 |  | principle | **Route a `Queue`'s warnings through one explicit seam.** | 2 | 1 | 1 | 2 | 4 | code health by 9 | 9.4 |
@@ -81,7 +81,6 @@
 | 40 | 2.8.0 |  | principle | **Make `queue.conf` read back what the queue sends with.** | 2 | 1 | 1 | 2 | 4 | 3 by 4 | 0.9 |
 | 51 | 2.8.0 |  | principle | **Keep a retried export from duplicating log records, or record in `docs/decisions.md` why duplicates stand.** | 2 | 2 | 2 | 4 | 4 | 1 by 4 | 0.8 |
 | 32 | 2.8.0 |  |  | **Propagate `tracestate`.** | 3 | 2 | 2 | 5 | 5 | 1 by 4 | 0.6 |
-| 105 | 3.0.0 |  | question | **Settle whether metrics arrive aggregated by the caller, as the metrics decision says, now that Goals #1 asks for no second library.** | 1 | 1 | 1 | 1 | 1 |  | 0.0 |
 | 55 | 3.0.0 |  | principle | **Make `log.span` and `ended` read-only, and an open span carry no end time.** | 2 | 1 | 1 | 2 | 3 | code health by 4 | 5.0 |
 | 57 | 3.0.0 |  |  | **Retry only what OTLP/HTTP calls retryable: 429, 502, 503 and 504.** | 1 | 1 | 2 | 2 | 2 | 1 by 5 | 1.9 |
 | 61 | 3.0.0 |  | decision | **Remove the level-string shorthand from `Log` and `clone`.** | 1 | 1 | 2 | 2 | 1 | 3 by 4 | 1.8 |
@@ -106,17 +105,11 @@
 | 97 | 3.0.0 | 96 | decision | **Keep every OTLP option, type and encoding inside the OTLP transport, so no other code knows OTLP.** | 4 | 2 | 3 | 7 | 8 | 1 by 5, 4 by 6 | 1.0 |
 | 58 | 3.0.0 |  |  | **Give the redaction sentinel its own name — `REDACTED by @larvit/log` or similar.** | 1 | 1 | 2 | 2 | 2 | 3 by 3 | 1.0 |
 | 62 | 3.0.0 |  | decision | **Remove `entryFormatter`, the option and the `conf` alias of `format` beside it.** | 2 | 1 | 2 | 3 | 3 | 3 by 4 | 0.9 |
-| 56 | 3.0.0 | 21, 105 | decision | **Export OTLP metrics as a stateless pass-through.** | 3 | 1 | 2 | 4 | 7 | 1 by 6 | 0.8 |
+| 56 | 3.0.0 | 21 | decision | **Export OTLP metrics from instruments that aggregate for the caller.** | 3 | 2 | 2 | 5 | 8 | 1 by 7 | 0.8 |
 | 73 | 3.0.0 |  |  | **Send `traceparent` cross-origin only to urls the caller lists, or record why not.** | 2 | 2 | 3 | 5 | 3 | 2 by 4 | 0.7 |
 | 75 | 3.0.0 | 22 | decision | **Keep credentials off `log.conf` and `queue.conf`.** | 2 | 1 | 2 | 3 | 3 | 3 by 3 | 0.7 |
 
 ## Details
-
-### 104. Settle whether every credential header crossing plain `http:` warns, not only `Authorization`.
-
-The decision "An `Authorization` over plain `http:` warns once" checks only `Authorization`, so an
-`api-key` or `x-honeycomb-team` in `otlpAdditionalHeaders` crosses plain `http:` with no warning.
-Found by the goals principles audit on 2026-10-26.
 
 ### 95. Redact userinfo a kept query splits across `&`.
 
@@ -212,6 +205,14 @@ queue without it, and a process that dies then loses the batch its storage exist
 so one flaky AsyncStorage read at startup loses everything a phone held offline. The full fix is
 larger than skipping the remove: after a failed load the first `save` overwrites the key anyway, so
 a load failure has to suppress saving too.
+
+### 104. Warn once about every credential header sent over plain `http:`, not only `Authorization`.
+
+Today an `api-key` or `x-honeycomb-team` in `otlpAdditionalHeaders` crosses plain `http:` with no
+warning. The decision "A credential header over plain `http:` warns once" widens the check to every
+header name the captured-header rule redacts. The opt-out, `acceptPlainHttpAuthorization`, names
+only `Authorization`; whether it needs a clearer name is part of this item. Found by the goals
+principles audit on 2026-10-26.
 
 ### 34. Let a consumer inject the randomness trace and span ids come from.
 
@@ -520,13 +521,6 @@ not, and OTLP has no idempotency key. Principle: Idempotent data writing.
 It is invisible when unused, and the W3C rules it must hold to — 512-char limit, list-member
 ordering, the `ot` vendor key — are where the cost sits.
 
-### 105. Settle whether metrics arrive aggregated by the caller, as the metrics decision says, now that Goals #1 asks for no second library.
-
-The decision "Metrics will arrive aggregated, with no instruments" leaves aggregation to the caller,
-citing Goals #3 and #5. Goals #1's signal counts each common need that sends a user to a second
-library, and a caller aggregating its own metrics needs one. Goals #5's counter-signal, a common need
-left to user code to save bytes, argues against the decision too. Found by the goals principles audit on 2026-10-26.
-
 ### 55. Make `log.span` and `ended` read-only, and an open span carry no end time.
 
 Anyone handed a `LogInt` can rewrite what is exported, `log.ended = false` exports a span twice, and
@@ -638,12 +632,14 @@ it waits for the major.
 not: the alias is non-enumerable, so `ResolvedLogConf` declares a member a spread of a conf does not
 carry.
 
-### 56. Export OTLP metrics as a stateless pass-through.
+### 56. Export OTLP metrics from instruments that aggregate for the caller.
 
-That is a metrics kind in `OtlpPayload`, batched through `Queue` and POSTed to `/v1/metrics`, with
-the types carrying what a valid point must have. It waits for the major because an `OtlpQueue`
-implementer receives the wider union. Measure what the metrics messages add to the protobuf encoder
-against the 10 KB budget before deciding.
+The caller records measurements; this library keeps the running totals, start times and bucket
+boundaries, as the decision "Metrics will come with instruments that aggregate for the caller"
+says, and sends a metrics kind in `OtlpPayload`, batched through `Queue` and POSTed to
+`/v1/metrics`. Collecting must never hold a process open (Goals #9). It waits for the major because
+an `OtlpQueue` implementer receives the wider union. Measure what the metrics messages and the
+instruments add against the 10 KB budget before deciding.
 
 ### 73. Send `traceparent` cross-origin only to urls the caller lists, or record why not.
 

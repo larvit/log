@@ -35,11 +35,11 @@ In [docs/decisions.md](docs/decisions.md):
 - A v2.3.0 copy's child loses a function formatter
 - The comprehension baseline
 - A stringified `Queue` carries its `conf`, less `storage` from 2.5.0
-- An `Authorization` over plain `http:` warns once
+- A credential header over plain `http:` warns once
 - `resolveFormatter` is exported
 - Both credential spellings stay, and their combination warns
 - Inherited `otlpAdditionalHeaders` follow the endpoint's origin
-- Metrics will arrive aggregated, with no instruments
+- Metrics will come with instruments that aggregate for the caller
 - `ProtoWriter.string` uses `TextEncoder` with no fallback
 - The protobuf encoder stays
 
