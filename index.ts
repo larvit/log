@@ -1387,11 +1387,10 @@ const holdsUserinfo = (url: URL) => url.username !== "" || url.password !== "";
 
 // v2.4.0's `//` rule, and the same after `\\`, `/\` or `\/`: they match a url among other text, or one
 // the runtime cannot parse. After an opener holding a `\`, userinfo may not hold a `\`, so matching a
-// long run of `\` stays linear. OPENS_USERINFO matches a text ending inside userinfo that no `@` has
-// closed yet.
+// long run of `\` stays linear.
 const SLASHED_USERINFO = /(:?\/\/)[^/?#\s]*@/g;
 const BACKSLASH_OPENED_USERINFO = /(:?(?:\\[/\\]|\/\\))[^/\\?#\s]*@/g;
-const OPENS_USERINFO = /\/\/[^/?#\s@]*$|(?:\\[/\\]|\/\\)[^/\\?#\s@]*$/;
+const OPENS_USERINFO = /\/\/[^/?#\s]*$|(?:\\[/\\]|\/\\)[^/\\?#\s]*$/;
 const redactTextUserinfo = (text: string) => text.replace(SLASHED_USERINFO, "$1REDACTED@").replace(BACKSLASH_OPENED_USERINFO, "$1REDACTED@");
 
 // Run by run, never the whole string: decodeURIComponent throws on the first invalid escape.
@@ -1427,41 +1426,70 @@ const textHoldsUserinfo = (text: string) => decodings(text)?.some(level => redac
 
 const URL_DELIMITER = /[/?#\s]/;
 
-// `?//u:p&w@host` splits its userinfo across the `&`, which a parser reads as part of it: a key
-// opening userinfo, and each pair after it holding no delimiter, are read joined by `&`. The pairs
-// from the opener to the one holding the `@` record `REDACTED`. A value opening userinfo is a url of
-// its own, so `?next=https://h&q=a@b` is kept.
-function redactSplitUserinfo(pairs: Array<[string, string]>, redacted: Array<[string, string]>): void {
+// What a key holds after the `//` or `\\` that opens userinfo at its end; `undefined` where it opens
+// none. A key nested past eight decodings is read as holding an `@`.
+function openedUserinfo(key: string): string | undefined {
+	const levels = decodings(key);
+
+	return levels === undefined ? "@" : levels.map(level => OPENS_USERINFO.exec(level)?.[0].slice(2)).find(tail => tail !== undefined);
+}
+
+// `?//u:p&w@host` splits its userinfo across the `&`, which a parser reads as part of it. A key
+// opening userinfo starts a run: each pair after it joins, up to the first holding a delimiter, and
+// the pairs up to the last `@` in the run are returned. A `\` ends no run, so a pair a backslash
+// opener holds may be redacted with its neighbour. A value opening userinfo is a url of its own, so
+// `?next=https://h&q=a@b` is kept.
+function splitUserinfoPairs(pairs: Array<[string, string]>): Set<number> {
+	const split = new Set<number>();
 	let start = -1;
-	let run = "";
+	let end = -1;
+
+	const close = () => {
+		for (let index = start; index <= end; index++) {
+			split.add(index);
+		}
+
+		start = -1;
+		end = -1;
+	};
+	const read = (part: string, index: number) => {
+		const cut = part.search(URL_DELIMITER);
+
+		if (decodings(cut < 0 ? part : part.slice(0, cut))?.some(level => level.includes("@")) ?? true) {
+			end = index;
+		}
+
+		if (cut >= 0) {
+			close();
+		}
+	};
 
 	pairs.forEach(([key, value], index) => {
-		const pair = `${key}=${value}`;
-
-		if (start >= 0 && !URL_DELIMITER.test(pair)) {
-			run += `&${pair}`;
-		} else if (decodings(key)?.some(level => OPENS_USERINFO.test(level)) ?? true) {
-			start = index;
-			run = pair;
-		} else {
-			start = -1;
+		if (start >= 0) {
+			read(`${key}=${value}`, index);
 		}
 
-		// Only a pair holding an `@` can end userinfo, so a long run of pairs is not re-read at each.
-		if (start >= 0 && (decodings(pair)?.some(level => level.includes("@")) ?? true) && textHoldsUserinfo(run)) {
-			redacted.fill(["REDACTED", "REDACTED"], start, index + 1);
-			start = -1;
+		const opened = start < 0 ? openedUserinfo(key) : undefined;
+
+		if (opened !== undefined) {
+			start = index;
+			read(`${opened}=${value}`, index);
 		}
 	});
+
+	if (start >= 0) {
+		close();
+	}
+
+	return split;
 }
 
 // `undefined` where no pair changes.
 function redactedSearch(url: URL, depth: number, partsRead: PartsRead): string | undefined {
 	const pairs = [...url.searchParams];
+	const split = splitUserinfoPairs(pairs);
 	// eslint-disable-next-line @typescript-eslint/no-use-before-define
-	const redacted = pairs.map(([key, value]) => redactQueryPair(key, value, depth + 1, partsRead));
-
-	redactSplitUserinfo(pairs, redacted);
+	const redacted = pairs.map(([key, value], index): [string, string] => split.has(index) ? ["REDACTED", "REDACTED"] : redactQueryPair(key, value, depth + 1, partsRead));
 
 	return redacted.some(([key, value], index) => key !== pairs[index][0] || value !== pairs[index][1]) ? new URLSearchParams(redacted).toString() : undefined;
 }
@@ -1512,10 +1540,8 @@ function redactQueryPair(key: string, value: string, depth: number, partsRead: P
 		}
 	}
 
-	// `?//u:p=w@host` splits its userinfo across the `=`: a key ending inside userinfo is read with its value.
-	const keyOpensUserinfo = decodings(key)?.some(level => OPENS_USERINFO.test(level)) ?? true;
-
-	if (textHoldsUserinfo(key) || (keyOpensUserinfo && textHoldsUserinfo(`${key}=${value}`))) {
+	// `?//u:p=w@host`, whose userinfo runs across the `=`, is read by `splitUserinfoPairs`.
+	if (textHoldsUserinfo(key)) {
 		return ["REDACTED", "REDACTED"];
 	}
 
