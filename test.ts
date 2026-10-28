@@ -1678,6 +1678,9 @@ test("end({ error }) marks the span failed", async t => {
 	await new Log(conf).end({ error: new Error("request to https://h.test/x?si\tg=s3cr3tH failed") });
 	await new Log(conf).end({ error: new Error("request to https://h.test/x?my token=s3cr3tJ&a#token=s3cr3tK failed") });
 	await new Log(conf).end({ error: new Error("request to " + encodeURIComponentTimes("h.test/x?token=s3cr3tI", 9) + " failed") });
+	await new Log(conf).end({ error: new Error("request to https://h.test/x?iss&code=s3cr3tL&x?code=s3cr3tM failed") });
+	await new Log(conf).end({ error: new Error("request to https://h.test/x?to\nken=s3cr3tN&si\rg=s3cr3tO failed") });
+	await new Log(conf).end({ error: new Error("request to https://h.test/x?sig=a?code=s3cr3tP failed") });
 
 	t.deepEqual(exportedSpan(0).status, { code: 2, message: "refused" }, "status is ERROR with the error message");
 	t.strictEqual(attr(exportedSpan(0), "error.type"), "ECONNREFUSED", "error.type is the error's code when it has one");
@@ -1701,11 +1704,14 @@ test("end({ error }) marks the span failed", async t => {
 	t.deepEqual(exportedSpan(14).status, { code: 2, message: "db https:\\/REDACTED@h failed" }, "and userinfo after a mixed \\/");
 	t.deepEqual(exportedSpan(15).status, { code: 2, message: "request to https://api.test/x?page=2&token=REDACTED failed, retry /cb?Access_Token=REDACTED&code=REDACTED#top" }, "a listed key in free text, a relative url included, has its value redacted in place");
 	t.deepEqual(exportedSpan(16).status, { code: 2, message: "REDACTED" }, "a listed key percent-encoded in free text records REDACTED for the whole message");
-	t.deepEqual(exportedSpan(17).status, { code: 2, message: "lookup https://api.test/x?keyword=kept&q=a?b=c failed" }, "a key merely ending in no listed name leaves the message alone");
+	t.deepEqual(exportedSpan(17).status, { code: 2, message: "lookup https://api.test/x?keyword=kept&q=a?b=c failed" }, "a key that no listed name ends leaves the message alone");
 	t.deepEqual(exportedSpan(18).status, { code: 2, message: "request to https://h.test/x?next=https://i.test/y?token=REDACTED&sig=REDACTED failed" }, "a listed key after a ? in another pair's value is redacted, and a ? in a listed value goes with it");
 	t.deepEqual(exportedSpan(19).status, { code: 2, message: "request to https://h.test/x?si\tg=REDACTED failed" }, "a tab the parser drops from a key doesn't hide it");
-	t.deepEqual(exportedSpan(20).status, { code: 2, message: "request to https://h.test/x?my token=REDACTED&a#token=REDACTED failed" }, "a key holding a space or # is read whole, as a path segment's was");
+	t.deepEqual(exportedSpan(20).status, { code: 2, message: "request to https://h.test/x?my token=REDACTED&a#token=REDACTED failed" }, "a key holding a space or # is read whole");
 	t.deepEqual(exportedSpan(21).status, { code: 2, message: "REDACTED" }, "a key encoded nine times, past what is decoded, records REDACTED for the whole message");
+	t.deepEqual(exportedSpan(22).status, { code: 2, message: "request to https://h.test/x?iss&code=REDACTED&x?code=REDACTED failed" }, "a key follows a bare key's &, and a ? after the last pair's name");
+	t.deepEqual(exportedSpan(23).status, { code: 2, message: "request to https://h.test/x?to\nken=REDACTED&si\rg=REDACTED failed" }, "a newline or carriage return the parser drops from a key doesn't hide it");
+	t.deepEqual(exportedSpan(24).status, { code: 2, message: "request to https://h.test/x?sig=REDACTED failed" }, "a listed key's value holding a ? and a listed name is redacted in place");
 	t.end();
 });
 
@@ -2071,6 +2077,19 @@ test("log.fetch captureQuery redacts userinfo that a kept query splits across &"
 	t.end();
 });
 
+test("log.fetch captureQuery redacts a url key whose scheme holds a tab the parser drops", async t => {
+	const { calls } = stubFetch();
+	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+
+	await log.fetch("https://api.test/x?a=1&ht%09tps://h.test/p?code=pw90&b=2");
+	await log.end();
+
+	const urlFull = clientSpan(calls).attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue;
+
+	t.strictEqual(urlFull, "https://api.test/x?a=1&REDACTED=REDACTED&b=2", "a key opening a url once its tab is dropped is redacted with its value");
+	t.end();
+});
+
 test("log.fetch redacts credentials in a url nested in the request path", async t => {
 	const { calls } = stubFetch();
 	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
@@ -2239,10 +2258,10 @@ test("log.fetch redacts a listed query key in a header value or kept query value
 });
 
 test("log.fetch captures allow-listed request and response headers only, never a credential", async t => {
-	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ link: "<https://user:pwlink@cdn.test>; rel=preconnect", location: "https://idp.test/authorize?redirect_uri=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&state=a%b", "set-cookie": "sid=hunter2", "x-app": "myapp:///cb?access_token=hunter2", "x-callback": "https%3A%2F%2F%C5ke%3Apwenc%40cb.test%2Fx", "x-db": "db=postgres://u:pw\\db@h", "x-db2": "see <https:/\\u:pwmix1@h>; rel=x", "x-deep": "https%253A%252F%252Fu%253Apwdeep%2540h.test", "x-next": "https://api.test/page?token=hunter2", "x-resp": "rv", "x-secret": "nope" }) }) : undefined);
+	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ link: "<https://user:pwlink@cdn.test>; rel=preconnect", location: "https://idp.test/authorize?redirect_uri=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&state=a%b", "set-cookie": "sid=hunter2", "x-app": "myapp:///cb?access_token=hunter2", "x-callback": "https%3A%2F%2F%C5ke%3Apwenc%40cb.test%2Fx", "x-db": "db=postgres://u:pw\\db@h", "x-db2": "see <https:/\\u:pwmix1@h>; rel=x", "x-deep": "https%253A%252F%252Fu%253Apwdeep%2540h.test", "x-next": "https://api.test/page?token=hunter2", "x-opaque": "http:u:pwopaque@h.test/x", "x-resp": "rv", "x-slash": "https:/u:pwslash@h.test/x", "x-secret": "nope" }) }) : undefined);
 	const log = new Log({
 		captureRequestHeaders: ["Authorization", "cookie", "referer", "x-amz-security-token", "X-Api-Key", "x-keyboard", "x-password", "x-req"],
-		captureResponseHeaders: ["link", "location", "set-cookie", "x-app", "x-callback", "x-db", "x-db2", "x-deep", "x-next", "x-resp"],
+		captureResponseHeaders: ["link", "location", "set-cookie", "x-app", "x-callback", "x-db", "x-db2", "x-deep", "x-next", "x-opaque", "x-resp", "x-slash"],
 		otlpHttpBaseURI: "http://127.0.0.1:4318",
 		stderr: () => {},
 	});
@@ -2272,6 +2291,8 @@ test("log.fetch captures allow-listed request and response headers only, never a
 	t.strictEqual(attr("http.response.header.x-deep"), "REDACTED", "and one percent-encoded twice");
 	t.strictEqual(attr("http.response.header.x-db"), "REDACTED", "and one whose password holds a backslash");
 	t.strictEqual(attr("http.response.header.x-db2"), "REDACTED", "and one opened by a mixed /\\");
+	t.strictEqual(attr("http.response.header.x-opaque"), "REDACTED", "and one a parser reads as an opaque path, http:u:pw@host");
+	t.strictEqual(attr("http.response.header.x-slash"), "REDACTED", "and one with a single slash, https:/u:pw@host");
 	t.strictEqual(attr("http.response.header.set-cookie"), "REDACTED", "an allow-listed set-cookie records its presence, not its value");
 	t.ok(!JSON.stringify(calls.filter(call => call.path.startsWith("/v1/"))).includes("hunter2"), "no credential reaches the collector");
 	t.end();
