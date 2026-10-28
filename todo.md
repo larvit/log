@@ -6,7 +6,7 @@
 
 `Bar = 0.5`
 
-`Next ID = 117`
+`Next ID = 119`
 
 ## Items
 
@@ -42,11 +42,13 @@
 | 109 | 2.6.0 |  | principle | **Test without the wall clock: no sleep, no real timer and no time bound.** | 2 | 1 | 1 | 2 | 4 | code health by 4 | 4.2 |
 | 110 | 2.6.0 |  | principle | **Register one test per case where a test loops over its cases or checks many behaviours.** | 1 | 1 | 1 | 1 | 4 | code health by 3 | 3.7 |
 | 25 | 2.6.0 |  |  | **Publish the artifact the gate tested.** | 2 | 2 | 3 | 5 | 4 | code health by 5 | 3.5 |
+| 118 | 2.6.0 |  | principle | **Bring `index.ts`'s `// --- Credentials on a span ---` section within about seven things per level, or record why it holds more.** | 2 | 1 | 4 | 5 | 4 | code health by 5 | 3.5 |
 | 113 | 2.6.0 |  |  | **Make `.editorconfig` match what the files hold: spaces in `package.json`, and never tabs in YAML.** | 1 | 1 | 1 | 1 | 1 | code health by 1 | 3.1 |
 | 82 | 2.6.0 |  |  | **Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.** | 1 | 2 | 1 | 2 | 1 | 3 by 5 | 2.3 |
 | 19 | 2.6.0 |  | defect | **Leave a `Request` untraced in `log.fetch`.** | 1 | 1 | 2 | 2 | 2 | 2.1 by 6 | 2.1 |
 | 114 | 2.6.0 |  |  | **Move `package.json`'s build and test one-liners into named scripts, and let the OTLP test read its collector's port, image and container name from the environment, today's values as defaults.** | 1 | 1 | 1 | 1 | 2 | code health by 1 | 2.1 |
 | 80 | 2.6.0 |  | principle | **Run the browser suite in WebKit and Firefox as well as Chromium.** | 2 | 1 | 1 | 2 | 3 | 2 by 7 | 2.1 |
+| 117 | 2.6.0 |  |  | **Bring the built `index.js` within README → Footprint's 10 KB gzipped budget.** | 2 | 1 | 2 | 3 | 3 | 5 by 7 | 1.5 |
 | 26 | 2.6.0 |  |  | **Check the footprint budget in CI, so the numbers in README → Footprint fail a build instead of going stale.** | 2 | 1 | 1 | 2 | 5 | 5 by 8 | 1.5 |
 | 112 | 2.6.0 |  |  | **Run the suite on Deno and Bun in CI.** | 2 | 1 | 1 | 2 | 3 | 2 by 5 | 1.5 |
 | 107 | 2.6.0 |  | principle | **Run the suite on React Native's Hermes in CI.** | 3 | 1 | 1 | 3 | 5 | 2 by 7 | 1.3 |
@@ -314,6 +316,16 @@ one behaviour per test, named for it; no loops or branches in a test body, param
 the runner and publishes that, so the thing consumers install is never the thing CI proved. Build
 once, upload, publish that. Item 13, pinning the base images, is the other half of the same problem.
 
+### 118. Bring `index.ts`'s `// --- Credentials on a span ---` section within about seven things per level, or record why it holds more.
+
+The section holds about 32 flat top-level declarations: the principles audit counted 29 before the
+chunk for item 100 and 32 after. That crosses the limit of about seven things per level, with no
+recorded reason and no name order a reader could find them by. The principle asks for a grouping
+under names a reader can follow, or a recorded reason. The rules must stay in one section, as
+`docs/decisions.md` → "Every rule on credentials in a span sits in one source section" asks.
+Principle: `~/.claude/principles/technical-principles.md` → "About seven things per level". Found by
+the principles audit of the chunk for item 100 on 2026-10-28.
+
 ### 113. Make `.editorconfig` match what the files hold: spaces in `package.json`, and never tabs in YAML.
 
 `.editorconfig` asks tabs of `package.json`, which holds spaces, and of `*.yml`, where YAML forbids tabs. Found by the technical principles audit on 2026-10-26.
@@ -342,6 +354,15 @@ collector. Found by the technical principles audit on 2026-10-26.
 `scripts/run-browser-tests.mjs` launches Chromium alone, though its Playwright image ships both.
 WebKit is the only engine on an iPhone, and `failureMessage` has a Firefox branch the suite only
 fakes. `~/.claude/principles/frontend.md` → broad device support.
+
+### 117. Bring the built `index.js` within README → Footprint's 10 KB gzipped budget.
+
+README → Footprint budgets `index.js` at ≤10 KB gzipped for Goals #5, and `origin/main` builds to
+10439 bytes: `npm run build` in the repo's container image, then `gzip -9c index.js | wc -c`. The
+budget is already broken, and nothing checks it. Whether to shrink the build or re-state the
+budget is for this item to work out. Item 26 checks the budget in CI; that check fails from its
+first run until this item lands, so this item comes first. Found by the chunk for item 100 on
+2026-10-28.
 
 ### 26. Check the footprint budget in CI, so the numbers in README → Footprint fail a build instead of going stale.
 

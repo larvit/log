@@ -477,12 +477,12 @@ yourself included.
   holding one of them is exported as written, such as `pw` in `?next=//my+user:pw@cb.test/x`. A status
   message records `REDACTED` in place: `retry https://REDACTED@h/x`. A header value, query part or
   path is also read percent-decoded, up to eight times; one encoded deeper records `REDACTED`.
-- **A matched query key after a `?` or `&` in text the runtime's `URL` doesn't parse whole,** in a
-  header value, a kept query key or value, or a status message: `location: /cb?token=…`,
-  `link: </next?access_token=…>`, node-fetch's `request to …?token=… failed`, and
-  `?src=%2F%2Fcdn.test%2Fk%3Fsig%3D…`. A header value or query value records `REDACTED` whole, and a
-  query key with its value. A status message records `REDACTED` in place of the value, which ends at
-  `&`, `#` or whitespace: `request to https://h/x?token=REDACTED failed`. The text is read
+- **A matched query key that the rules above left in a header value, a kept query key or value, or a
+  status message,** after a `?` or `&`: `location: /cb?token=…`, `link: </next?access_token=…>`,
+  node-fetch's `request to …?token=… failed`, and `?src=%2F%2Fcdn.test%2Fk%3Fsig%3D…`, text no
+  url parser reads whole. A header value or query value records `REDACTED` whole, and a query key
+  with its value. A status message records `REDACTED` in place of the value, which ends at `&`, `#`
+  or whitespace and holds any `?`: `request to https://h/x?token=REDACTED failed`. The text is read
   percent-decoded up to eight times as above, and a status message holding such a key only decoded
   records `REDACTED` whole. A credential in any other shape is exported as written. Keep credentials
   out of error messages, or replace a message before `end({ error })`.
