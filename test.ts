@@ -1681,6 +1681,7 @@ test("end({ error }) marks the span failed", async t => {
 	await new Log(conf).end({ error: new Error("request to https://h.test/x?iss&code=s3cr3tL&x?code=s3cr3tM failed") });
 	await new Log(conf).end({ error: new Error("request to https://h.test/x?to\nken=s3cr3tN&si\rg=s3cr3tO failed") });
 	await new Log(conf).end({ error: new Error("request to https://h.test/x?sig=a?code=s3cr3tP failed") });
+	await new Log(conf).end({ error: new Error("redirect to https://h.test/cb#access_token=s3cr3tQ&token_type=bearer, then /cb?page=2#id_token=s3cr3tR failed") });
 
 	t.deepEqual(exportedSpan(0).status, { code: 2, message: "refused" }, "status is ERROR with the error message");
 	t.strictEqual(attr(exportedSpan(0), "error.type"), "ECONNREFUSED", "error.type is the error's code when it has one");
@@ -1712,6 +1713,7 @@ test("end({ error }) marks the span failed", async t => {
 	t.deepEqual(exportedSpan(22).status, { code: 2, message: "request to https://h.test/x?iss&code=REDACTED&x?code=REDACTED failed" }, "a key follows a bare key's &, and a ? after the last pair's name");
 	t.deepEqual(exportedSpan(23).status, { code: 2, message: "request to https://h.test/x?to\nken=REDACTED&si\rg=REDACTED failed" }, "a newline or carriage return the parser drops from a key doesn't hide it");
 	t.deepEqual(exportedSpan(24).status, { code: 2, message: "request to https://h.test/x?sig=REDACTED failed" }, "a listed key's value holding a ? and a listed name is redacted in place");
+	t.deepEqual(exportedSpan(25).status, { code: 2, message: "redirect to https://h.test/cb#access_token=REDACTED&token_type=bearer, then /cb?page=2#id_token=REDACTED failed" }, "a listed key opening a fragment, as an OAuth implicit-flow redirect has one, is redacted in place");
 	t.end();
 });
 
@@ -2103,6 +2105,19 @@ test("log.fetch captureQuery redacts a listed key after a ? in a kept value's fr
 	t.end();
 });
 
+test("log.fetch captureQuery redacts a listed key opening a kept value's fragment", async t => {
+	const { calls } = stubFetch();
+	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+
+	await log.fetch("https://api.test/x?a=1&back=https%3A%2F%2Fh.test%2Fcb%23access_token%3Dpwfrag2%26token_type%3Dbearer&b=2");
+	await log.end();
+
+	const urlFull = clientSpan(calls).attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue;
+
+	t.strictEqual(urlFull, "https://api.test/x?a=1&back=REDACTED&b=2", "a url parsing whole with the key opening its fragment records REDACTED");
+	t.end();
+});
+
 test("log.fetch redacts credentials in a url nested in the request path", async t => {
 	const { calls } = stubFetch();
 	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
@@ -2129,6 +2144,7 @@ test("log.fetch redacts credentials in a url nested in the request path", async 
 		"/q/s3.test/k%3Fpage%3D2/token": "/q/s3.test/k%3Fpage%3D2/token",
 		"/r/s3.test/k%3Fsi%09g%3Dpw19": "/r/s3.test/REDACTED",
 		"/r2/https://s3.test/k%3Fsig%3Dpw20": "/r2/REDACTED",
+		"/r3/https%3A%2F%2Fcb.test%2Fx%23access_token%3Dpw21": "/r3/REDACTED",
 		"/registry/@larvit/log/users/bob@x.test/https://cb.test/x?q=1": "/registry/@larvit/log/users/bob@x.test/https://cb.test/x",
 	};
 
@@ -2271,10 +2287,10 @@ test("log.fetch redacts a listed query key in a header value or kept query value
 });
 
 test("log.fetch captures allow-listed request and response headers only, never a credential", async t => {
-	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ link: "<https://user:pwlink@cdn.test>; rel=preconnect", location: "https://idp.test/authorize?redirect_uri=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&state=a%b", "set-cookie": "sid=hunter2", "x-app": "myapp:///cb?access_token=hunter2", "x-callback": "https%3A%2F%2F%C5ke%3Apwenc%40cb.test%2Fx", "x-db": "db=postgres://u:pw\\db@h", "x-db2": "see <https:/\\u:pwmix1@h>; rel=x", "x-deep": "https%253A%252F%252Fu%253Apwdeep%2540h.test", "x-frag": "https://h.test/x#a?token=pwfrag", "x-next": "https://api.test/page?token=hunter2", "x-opaque": "http:u:pwopaque@h.test/x", "x-resp": "rv", "x-secret": "nope", "x-slash": "https:/u:pwslash@h.test/x" }) }) : undefined);
+	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ link: "<https://user:pwlink@cdn.test>; rel=preconnect", location: "https://idp.test/authorize?redirect_uri=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&state=a%b", "set-cookie": "sid=hunter2", "x-app": "myapp:///cb?access_token=hunter2", "x-callback": "https%3A%2F%2F%C5ke%3Apwenc%40cb.test%2Fx", "x-db": "db=postgres://u:pw\\db@h", "x-db2": "see <https:/\\u:pwmix1@h>; rel=x", "x-deep": "https%253A%252F%252Fu%253Apwdeep%2540h.test", "x-frag": "https://h.test/x#a?token=pwfrag", "x-frag2": "https://h.test/cb#access_token=pwfrag2&token_type=bearer", "x-next": "https://api.test/page?token=hunter2", "x-opaque": "http:u:pwopaque@h.test/x", "x-resp": "rv", "x-secret": "nope", "x-slash": "https:/u:pwslash@h.test/x" }) }) : undefined);
 	const log = new Log({
 		captureRequestHeaders: ["Authorization", "cookie", "referer", "x-amz-security-token", "X-Api-Key", "x-keyboard", "x-password", "x-req"],
-		captureResponseHeaders: ["link", "location", "set-cookie", "x-app", "x-callback", "x-db", "x-db2", "x-deep", "x-frag", "x-next", "x-opaque", "x-resp", "x-slash"],
+		captureResponseHeaders: ["link", "location", "set-cookie", "x-app", "x-callback", "x-db", "x-db2", "x-deep", "x-frag", "x-frag2", "x-next", "x-opaque", "x-resp", "x-slash"],
 		otlpHttpBaseURI: "http://127.0.0.1:4318",
 		stderr: () => {},
 	});
@@ -2305,6 +2321,7 @@ test("log.fetch captures allow-listed request and response headers only, never a
 	t.strictEqual(attr("http.response.header.x-db"), "REDACTED", "and one whose password holds a backslash");
 	t.strictEqual(attr("http.response.header.x-db2"), "REDACTED", "and one opened by a mixed /\\");
 	t.strictEqual(attr("http.response.header.x-frag"), "REDACTED", "and one with a listed key after a ? in its fragment");
+	t.strictEqual(attr("http.response.header.x-frag2"), "REDACTED", "and one with a listed key opening its fragment");
 	t.strictEqual(attr("http.response.header.x-opaque"), "REDACTED", "and one with a single colon, http:u:pw@host");
 	t.strictEqual(attr("http.response.header.x-slash"), "REDACTED", "and one with a single slash, https:/u:pw@host");
 	t.strictEqual(attr("http.response.header.set-cookie"), "REDACTED", "an allow-listed set-cookie records its presence, not its value");
