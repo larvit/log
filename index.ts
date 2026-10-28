@@ -1424,6 +1424,15 @@ function decodings(text: string): string[] | undefined {
 
 const textHoldsUserinfo = (text: string) => decodings(text)?.some(level => redactTextUserinfo(level) !== level) ?? true;
 
+// A listed key's value in text that no url parser reads whole, `?token=…` in `request to …?token=… failed`,
+// a relative `location` or a scheme-less url. A parser drops a tab or newline inside the key. The
+// value ends at `&`, `#` or whitespace, so a quote or bracket after it goes too.
+const TEXT_QUERY_PAIR = /([?&])((?:[^&=\s?#]|[\t\n\r])*)=([^&#\s]*)/g;
+const redactTextQueryKeys = (text: string) => text.replace(TEXT_QUERY_PAIR, (pair, opener: string, key: string) => isSensitiveQueryKey(key.replace(/[\t\n\r]/g, "")) ? `${opener}${key}=REDACTED` : pair);
+
+// Every level, as for userinfo; one past MAX_URL_DEPTH levels counts as a credential.
+const textHoldsQueryKey = (text: string) => decodings(text)?.some(level => redactTextQueryKeys(level) !== level) ?? true;
+
 const URL_DELIMITER = /[/?#\s]/;
 
 // What follows the `//`, `\\`, `/\` or `\/` that opens userinfo at a key's end; `undefined` where the
@@ -1545,11 +1554,14 @@ function redactQueryPair(key: string, value: string, depth: number, partsRead: P
 	}
 
 	// Userinfo across the `=`, as in `?//u:p=w@host`, is found by `splitUserinfoPairs` and never reaches here.
-	if (textHoldsUserinfo(key)) {
+	if (textHoldsUserinfo(key) || textHoldsQueryKey(key)) {
 		return ["REDACTED", "REDACTED"];
 	}
 
-	return [key, isSensitiveQueryKey(key) || textHoldsUserinfo(value) ? "REDACTED" : redactQueryPart(value, depth, partsRead)];
+	// A url the runtime parses has its listed keys redacted in place; a value still holding one is no url it parses whole.
+	const part = redactQueryPart(value, depth, partsRead);
+
+	return [key, isSensitiveQueryKey(key) || textHoldsUserinfo(value) || textHoldsQueryKey(part) ? "REDACTED" : part];
 }
 
 // A value the runtime's `URL` parses whole; `undefined` where it is none or holds nothing to redact.
@@ -1572,7 +1584,7 @@ function redactedWholeUrl(value: string): string | undefined {
 }
 
 function redactHeaderCredential(name: string, value: string): string {
-	return SENSITIVE_HEADER_NAME.test(name.toLowerCase()) || redactedWholeUrl(value) !== undefined || textHoldsUserinfo(value) ? "REDACTED" : value;
+	return SENSITIVE_HEADER_NAME.test(name.toLowerCase()) || redactedWholeUrl(value) !== undefined || textHoldsUserinfo(value) || textHoldsQueryKey(value) ? "REDACTED" : value;
 }
 
 // The URL log.fetch traces: a scheme written without "//" parses to an opaque path, where
@@ -1651,7 +1663,9 @@ function failureMessage(error: unknown, url?: URL): string {
 		quoted = message.split(url.href).join(known.href);
 	}
 
-	return redactTextUserinfo(redactedWholeUrl(quoted) ?? quoted);
+	const keyed = redactTextQueryKeys(redactTextUserinfo(redactedWholeUrl(quoted) ?? quoted));
+
+	return textHoldsQueryKey(keyed) ? "REDACTED" : keyed;
 }
 
 // --- Resolving a Log's settings --------------------------------------------
