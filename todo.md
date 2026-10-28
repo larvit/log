@@ -15,7 +15,7 @@
 | 100 | 2.5.0 |  | security | **Redact a listed query key's value in a url that does not parse whole: in a header value, a status message or a kept query value.** | 2 | 2 | 4 | 6 | 4 |  | 0.0 |
 | 101 | 2.5.0 |  | security | **Redact a credential in a url's fragment, such as `#access_token=…`, wherever a url is read.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
 | 102 | 2.5.0 |  | security | **Redact a credential in a url nested base64-encoded in the request path, as an image proxy takes one.** | 2 | 2 | 4 | 6 | 4 |  | 0.0 |
-| 116 | 2.5.0 |  | security | **Redact userinfo a kept query holds after `+` or an escaped delimiter decodes.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
+| 116 | 2.5.0 |  | security | **Redact userinfo holding a `+`, `%2F`, `%3F` or `%23` in a kept query.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
 | 7 | 2.5.0 |  | defect | **Unref the batch timer, so a pending batch never holds a Node or Deno process.** | 2 | 2 | 2 | 4 | 4 | 9 by 9 | 7.0 |
 | 13 | 2.5.0 |  |  | **Pin every Node base image to its full patch version, so one commit builds one image on any day.** | 1 | 1 | 1 | 1 | 2 | code health by 3 | 6.2 |
 | 89 | 2.5.0 |  | defect | **Keep `enabled()` free of output: warn about an unknown `logLevel` from the level methods alone.** | 1 | 1 | 1 | 1 | 2 | 3 by 5 | 2.3 |
@@ -132,15 +132,16 @@ Found by the goals principles audit and the stability pass on 2026-10-26.
 https://s3.test/k?X-Amz-Signature=…>` exports the signature in `url.full`. README and CHANGELOG say
 it is exported as written. Found by the goals principles audit on 2026-10-26.
 
-### 116. Redact userinfo a kept query holds after `+` or an escaped delimiter decodes.
+### 116. Redact userinfo holding a `+`, `%2F`, `%3F` or `%23` in a kept query.
 
 `captureQuery` reads each query pair after `url.searchParams` has form-decoded it once. By then a
 `+` is a space and `%2F`, `%3F` and `%23` are delimiters, and a space or a delimiter ends the
 userinfo match. So `?//u:pw+x@host` exports `%2F%2Fu%3Apw+x%40host=`, `?next=//my+user:pw@cb.test/x`
-exports `pw`, and `?//u:p&a%2Fb&w@host` exports the part of a split password after the escaped
-delimiter. A parser reading the raw query keeps `+` and `%2F` inside userinfo, so each is a
-credential exported as written. The gap dates from v2.3.0; the `&` split rule shipped in 2.5.0
-reads pairs the same way and has the same gap. Found by the principles audits and the stability pass on 2026-10-28.
+exports `pw`, and `?//u:p&a%2Fb&w@host` exports the whole password, as
+`%2F%2Fu%3Ap=&a%2Fb=&w%40host=`. A parser reading the raw query keeps `+` and `%2F` inside
+userinfo, so each is a credential exported as written. The gap dates from v2.3.0, and the `&` split
+rule that v2.5.0 adds has it too. Found by the principles audits and the stability pass on
+2026-10-28.
 
 ### 7. Unref the batch timer, so a pending batch never holds a Node or Deno process.
 
