@@ -2090,6 +2090,19 @@ test("log.fetch captureQuery redacts a url key whose scheme holds a tab the pars
 	t.end();
 });
 
+test("log.fetch captureQuery redacts a listed key after a ? in a kept value's fragment", async t => {
+	const { calls } = stubFetch();
+	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+
+	await log.fetch("https://api.test/x?a=1&back=https%3A%2F%2Fh.test%2Fx%23a%3Ftoken%3Dpwfrag&b=2");
+	await log.end();
+
+	const urlFull = clientSpan(calls).attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue;
+
+	t.strictEqual(urlFull, "https://api.test/x?a=1&back=REDACTED&b=2", "a url parsing whole with the key in its fragment records REDACTED");
+	t.end();
+});
+
 test("log.fetch redacts credentials in a url nested in the request path", async t => {
 	const { calls } = stubFetch();
 	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
@@ -2258,10 +2271,10 @@ test("log.fetch redacts a listed query key in a header value or kept query value
 });
 
 test("log.fetch captures allow-listed request and response headers only, never a credential", async t => {
-	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ link: "<https://user:pwlink@cdn.test>; rel=preconnect", location: "https://idp.test/authorize?redirect_uri=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&state=a%b", "set-cookie": "sid=hunter2", "x-app": "myapp:///cb?access_token=hunter2", "x-callback": "https%3A%2F%2F%C5ke%3Apwenc%40cb.test%2Fx", "x-db": "db=postgres://u:pw\\db@h", "x-db2": "see <https:/\\u:pwmix1@h>; rel=x", "x-deep": "https%253A%252F%252Fu%253Apwdeep%2540h.test", "x-next": "https://api.test/page?token=hunter2", "x-opaque": "http:u:pwopaque@h.test/x", "x-resp": "rv", "x-slash": "https:/u:pwslash@h.test/x", "x-secret": "nope" }) }) : undefined);
+	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ link: "<https://user:pwlink@cdn.test>; rel=preconnect", location: "https://idp.test/authorize?redirect_uri=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&state=a%b", "set-cookie": "sid=hunter2", "x-app": "myapp:///cb?access_token=hunter2", "x-callback": "https%3A%2F%2F%C5ke%3Apwenc%40cb.test%2Fx", "x-db": "db=postgres://u:pw\\db@h", "x-db2": "see <https:/\\u:pwmix1@h>; rel=x", "x-deep": "https%253A%252F%252Fu%253Apwdeep%2540h.test", "x-next": "https://api.test/page?token=hunter2", "x-frag": "https://h.test/x#a?token=pwfrag", "x-opaque": "http:u:pwopaque@h.test/x", "x-resp": "rv", "x-secret": "nope", "x-slash": "https:/u:pwslash@h.test/x" }) }) : undefined);
 	const log = new Log({
 		captureRequestHeaders: ["Authorization", "cookie", "referer", "x-amz-security-token", "X-Api-Key", "x-keyboard", "x-password", "x-req"],
-		captureResponseHeaders: ["link", "location", "set-cookie", "x-app", "x-callback", "x-db", "x-db2", "x-deep", "x-next", "x-opaque", "x-resp", "x-slash"],
+		captureResponseHeaders: ["link", "location", "set-cookie", "x-app", "x-callback", "x-db", "x-db2", "x-deep", "x-frag", "x-next", "x-opaque", "x-resp", "x-slash"],
 		otlpHttpBaseURI: "http://127.0.0.1:4318",
 		stderr: () => {},
 	});
@@ -2291,7 +2304,8 @@ test("log.fetch captures allow-listed request and response headers only, never a
 	t.strictEqual(attr("http.response.header.x-deep"), "REDACTED", "and one percent-encoded twice");
 	t.strictEqual(attr("http.response.header.x-db"), "REDACTED", "and one whose password holds a backslash");
 	t.strictEqual(attr("http.response.header.x-db2"), "REDACTED", "and one opened by a mixed /\\");
-	t.strictEqual(attr("http.response.header.x-opaque"), "REDACTED", "and one a parser reads as an opaque path, http:u:pw@host");
+	t.strictEqual(attr("http.response.header.x-frag"), "REDACTED", "and one with a listed key after a ? in its fragment");
+	t.strictEqual(attr("http.response.header.x-opaque"), "REDACTED", "and one with a single colon, http:u:pw@host");
 	t.strictEqual(attr("http.response.header.x-slash"), "REDACTED", "and one with a single slash, https:/u:pw@host");
 	t.strictEqual(attr("http.response.header.set-cookie"), "REDACTED", "an allow-listed set-cookie records its presence, not its value");
 	t.ok(!JSON.stringify(calls.filter(call => call.path.startsWith("/v1/"))).includes("hunter2"), "no credential reaches the collector");

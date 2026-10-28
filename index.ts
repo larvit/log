@@ -1425,10 +1425,11 @@ function decodings(text: string): string[] | undefined {
 // A parser drops a tab or newline: `si%09g` reads as `sig`.
 const withoutDropped = (text: string) => text.replace(/[\t\n\r]/g, "");
 
-// The text with each listed key's value replaced by `REDACTED`, in text no parser reads whole: a
-// status message such as `request to …?token=… failed`, a relative `location`, a scheme-less url. A
-// value ends at `&`, `#` or whitespace and may hold a `?`. A key is whatever stands between its `?`
-// or `&` and its `=`, a space or `#` included, so a listed key after a `?` in an unlisted value is found.
+// The text with each listed key's value replaced by `REDACTED`, wherever a url's own query rules don't
+// reach it: a status message such as `request to …?token=… failed`, a relative `location`, a
+// scheme-less url, a `?` in a fragment. A value ends at `&`, `#` or whitespace and may hold a `?`. A key
+// is whatever stands between its `?` or `&` and its `=`, a space or `#` included, so a listed key after
+// a `?` in an unlisted value is found.
 function redactTextQueryKeys(text: string): string {
 	const opener = /[?&]([^&=?]*)=/g;
 	const valueEnd = /[&#\s]/g;
@@ -1585,7 +1586,7 @@ function redactQueryPair(key: string, value: string, depth: number, partsRead: P
 		return [key, "REDACTED"];
 	}
 
-	// A url the runtime parses has its listed keys redacted in place; a listed key still left in the result is text no parser reads whole.
+	// A url the runtime parses has its listed keys redacted in place; a listed key still left in the result sits where its query rules don't reach, such as a fragment.
 	const part = redactQueryPart(value, depth, partsRead);
 
 	return [key, textHoldsQueryKey(part) ? "REDACTED" : part];
