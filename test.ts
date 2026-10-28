@@ -2015,6 +2015,20 @@ test("log.fetch captureQuery keeps the query but redacts known-sensitive keys an
 	t.end();
 });
 
+test("log.fetch captureQuery redacts userinfo that a kept query splits across &", async t => {
+	const { calls } = stubFetch();
+	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+
+	await log.fetch("https://api.test/x?a=1&//u:pw60&w@h.test&b=2&//u:pw62&k=v&w@h.test&e=//host&mail=a@b.test&//x/y&z=4");
+	await log.end();
+
+	const urlFull = clientSpan(calls).attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue;
+
+	t.strictEqual(urlFull, "https://api.test/x?a=1&REDACTED=REDACTED&REDACTED=REDACTED&b=2&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&e=%2F%2Fhost&mail=a%40b.test&%2F%2Fx%2Fy=&z=4", "the pairs from a key opening userinfo to the pair holding its @ record REDACTED, and a value opening a url, or a delimiter before the @, leaves the rest be");
+	t.ok(!/pw6[02]/.test(urlFull), "no password is leaked");
+	t.end();
+});
+
 test("log.fetch redacts credentials in a url nested in the request path", async t => {
 	const { calls } = stubFetch();
 	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });

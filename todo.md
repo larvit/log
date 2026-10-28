@@ -12,7 +12,6 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 95 | 2.5.0 |  | security | **Redact userinfo a kept query splits across `&`.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
 | 100 | 2.5.0 |  | security | **Redact a listed query key's value in a url that does not parse whole: in a header value, a status message or a kept query value.** | 2 | 2 | 4 | 6 | 4 |  | 0.0 |
 | 101 | 2.5.0 |  | security | **Redact a credential in a url's fragment, such as `#access_token=…`, wherever a url is read.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
 | 102 | 2.5.0 |  | security | **Redact a credential in a url nested base64-encoded in the request path, as an image proxy takes one.** | 2 | 2 | 4 | 6 | 4 |  | 0.0 |
@@ -110,12 +109,6 @@
 | 75 | 3.0.0 | 22 | decision | **Keep credentials off `log.conf` and `queue.conf`.** | 2 | 1 | 2 | 3 | 3 | 3 by 3 | 0.7 |
 
 ## Details
-
-### 95. Redact userinfo a kept query splits across `&`.
-
-`captureQuery` exports `?//u:p&w@host` as `%2F%2Fu%3Ap=&w%40host=`: the `&` in the password ends the
-pair, so neither part holds `//…@`. Same class as the split across `=`, which is redacted. Found by
-the security pass on 2026-10-03.
 
 ### 100. Redact a listed query key's value in a url that does not parse whole: in a header value, a status message or a kept query value.
 
