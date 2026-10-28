@@ -637,9 +637,10 @@ carry.
 
 The caller records measurements, and this library aggregates them and sends a metrics kind in
 `OtlpPayload`, batched through `Queue` and POSTed to `/v1/metrics`. The decision "Metrics will come
-with instruments that aggregate for the caller" says what aggregating covers. Collecting must never hold a process open (Goals #9). It waits for the major because
-an `OtlpQueue` implementer receives the wider union. Measure what the metrics messages and the
-instruments add against the 10 KB budget before choosing which instruments ship.
+with instruments that aggregate for the caller" says what aggregating covers. Collecting must never
+hold a process open (Goals #9). It waits for the major because an `OtlpQueue` implementer receives
+the wider union. Measure what the metrics messages and the instruments add against the 10 KB budget
+before choosing which instruments ship.
 
 ### 73. Send `traceparent` cross-origin only to urls the caller lists, or record why not.
 

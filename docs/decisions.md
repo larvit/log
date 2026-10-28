@@ -347,11 +347,11 @@ Serves README → Goals #7, "Credentials never leave", on the wire.
 
 2026-10-28, the maintainer: when metrics ship, the caller records measurements and this library
 aggregates them. It keeps the running totals, a stable `startTimeUnixNano` and bucket boundaries
-that match across a series. A caller left to aggregate needs a second library, which README →
-Goals #1 counts against. An earlier choice, that the caller hands over points it aggregated itself
-to keep the API and the bundle small (Goals #3 and #5), is dropped. Which instruments ship, and how they are collected
-without holding a process open (Goals #9), is `todo.md` item 56's. Valid until item 56 ships; then
-the README documents it.
+that match across a series. A caller left to aggregate needs a second library, which README → Goals
+#1 counts against. An earlier choice, that the caller hands over points it aggregated itself to keep
+the API and the bundle small (Goals #3 and #5), is dropped. Which instruments ship, and how they are
+collected without holding a process open (Goals #9), is `todo.md` item 56's. Valid until item 56
+ships; then the README documents it.
 
 ## `ProtoWriter.string` uses `TextEncoder` with no fallback
 
