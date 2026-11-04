@@ -12,7 +12,6 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 101 | 2.5.0 |  | security | **Redact a credential in a url's fragment, such as `#access_token=…`, wherever a url is read.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
 | 102 | 2.5.0 |  | security | **Redact a credential in a url nested base64-encoded in the request path, as an image proxy takes one.** | 2 | 2 | 4 | 6 | 4 |  | 0.0 |
 | 116 | 2.5.0 |  | security | **Redact userinfo holding a `+`, `%2F`, `%3F` or `%23` in a kept query.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
 | 119 | 2.5.0 |  | security | **Redact the whole of a listed query key's value in text that isn't a whole url, a tab, newline or carriage return inside the value included.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
@@ -112,12 +111,6 @@
 | 75 | 3.0.0 | 22 | decision | **Keep credentials off `log.conf` and `queue.conf`.** | 2 | 1 | 2 | 3 | 3 | 3 by 3 | 0.7 |
 
 ## Details
-
-### 101. Redact a credential in a url's fragment, such as `#access_token=…`, wherever a url is read.
-
-A listed key opening a fragment is read nowhere, so a captured `location: …#access_token=…`, an OAuth implicit-flow
-redirect, exports the token, and so does a kept query value or a url nested in the path holding one.
-Found by the goals principles audit and the stability pass on 2026-10-26.
 
 ### 102. Redact a credential in a url nested base64-encoded in the request path, as an image proxy takes one.
 
