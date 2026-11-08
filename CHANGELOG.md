@@ -145,10 +145,10 @@
 
 ### Everything else
 
-- **A pending batch never holds a Node or Deno process open.** A queued record kept the process alive
-  for up to `batchDelayMs`, and so did a record logged while an export was in flight, after
-  `await log.flush()` had returned. A script that awaits neither `end()` nor `flush()` now exits
-  without exporting what it queued: `await end()` before exit.
+- **A pending batch no longer holds a Node, Bun or Deno process open, so `await end()` before exit.**
+  A script that awaits neither `end()` nor `flush()` now exits without exporting what it queued.
+  Before, a queued record kept the process alive for up to `batchDelayMs`, and so did a record logged
+  while a successful export was in flight, after `await log.flush()` had returned.
 - **Spans and log records export under the instrumentation scope `@larvit/log`, at this package's
   version.** A span's scope was its span name, and records had none, so a query or dashboard
   grouping on the scope name sees it change; group on the span name instead.
