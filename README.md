@@ -495,14 +495,18 @@ yourself included.
   `/fetch/s3.test/REDACTED`, and `/a/x=https:%2F%2Fcb.test%2Fx%3Fpassword%3D…` records
   `/a/REDACTED`. It also records `REDACTED` from the ninth segment starting with a scheme, whatever
   that segment holds. Where userinfo, as the bullet above reads it, remains in what the path keeps,
-  or the path is percent-encoded more than eight times, the whole path records `/REDACTED`. A url
-  nested base64-encoded, as an image proxy such as imgproxy takes one, is read by the same rules: a
-  run of eight or more base64url characters, padded or not, is decoded, and so is one inside what it
-  decodes. Standard base64 is read only where its `/` is percent-encoded, since a raw one ends the
-  segment. `/insecure/rs:fit:300/aHR0cHM6Ly9…` records `/insecure/rs:fit:300/REDACTED`.
-  A run is read wherever it sits in a segment, but one glued to a longer token with `-` or `_`, such
-  as `u-aHR0…`, is read from the token's start. A segment holding more than 64 distinct runs records
-  the whole path as `/REDACTED`.
+  or the path is percent-encoded more than eight times, the whole path records `/REDACTED`.
+- **A url nested base64-encoded in the request path**, as an image proxy such as imgproxy takes one,
+  is read by the rules above: `/insecure/rs:fit:300/aHR0cHM6Ly9…` records
+  `/insecure/rs:fit:300/REDACTED`. A *run* is eight or more characters of the base64url alphabet,
+  padded or not, starting anywhere in a segment; each run is decoded, and so is a run inside what it
+  decodes. Standard base64 is read where its `/` is percent-encoded. Consecutive segments made of
+  such characters are decoded joined, since imgproxy lets an encoded url be split with `/`, and a
+  credential found there records `REDACTED` from the first of them: `/media/v1/<chunks>` records
+  `/REDACTED`. Userinfo in the decoded text, whatever it starts with, records the whole path as
+  `/REDACTED`, and so does a segment holding more than 64 distinct runs, ids and words included. A
+  random id or signature whose decoding happens to read as a credential does too: about 1 in 2,500
+  43-character signatures.
 
 Never put credentials in the url; pass an `Authorization` header, and strip userinfo from a url you
 did not build. `log.fetch` mirrors the runtime: Node and browsers refuse such a url, while React

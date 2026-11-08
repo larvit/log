@@ -16,11 +16,16 @@
   after `//`, `\\`, `/\` or `\/`, raw or percent-encoded, such as `/users//bob@x.test`, records
   `/REDACTED` whole, and so does one percent-encoded more than eight times. A dashboard grouping on
   `url.full` sees such a path change, and some paths holding no credential too: a nested url's
-  `?key=` lookup cuts the path, and so does a ninth nested url. A url nested base64-encoded, as an
-  image proxy such as imgproxy takes one, is read by the same rules: `/insecure/rs:fit:300/aHR0cHM6Ly9…`
-  records `/insecure/rs:fit:300/REDACTED` where it holds a credential, and a segment holding more than
-  64 distinct base64 runs records the whole path as `/REDACTED`. v2.4.0's advice to rotate what such a path
-  carried, its `aHR0c` search for a base64-encoded url included, stands for spans exported before.
+  `?key=` lookup cuts the path, and so does a ninth nested url. A url nested base64-encoded,
+  as an image proxy such as imgproxy takes one, is read by the same rules, split over segments with
+  `/` included: `/insecure/rs:fit:300/aHR0cHM6Ly9…` records `/insecure/rs:fit:300/REDACTED`. It
+  records `REDACTED` from the first of the consecutive segments of letters and digits that lead to it,
+  so `/media/v1/<chunks>` records `/REDACTED`. The whole path records `/REDACTED` for userinfo in
+  the decoded text, for a segment holding more than 64 distinct runs of eight or more base64
+  characters, ids and words included, and, rarely, for a random id or signature whose decoding reads
+  as a credential: about 1 in 2,500 43-character signatures. v2.4.0's advice to rotate what such a
+  path carried stands for spans exported before, and so does its `aHR0c` search for a base64-encoded
+  url, which finds none with no scheme or inside other text.
 - **A captured header records `REDACTED` by Elastic APM's default `sanitize_field_names` rule.**
   Since v2.3.0 only `authorization`, `cookie`, `proxy-authorization` and `set-cookie` did, so a
   listed `x-api-key`, `x-auth-token` or `x-amz-security-token` exported its value. Now a name that,
