@@ -2198,6 +2198,8 @@ test("log.fetch redacts a credential in a url nested base64-encoded in the reque
 		"/a/k%3Fsig%3Dpw83/https:%2F%2Fu:pw84@cb.test": "/a/REDACTED",
 		"/i/aHR0cHM6Ly9oLztzaWc9MQ": "/REDACTED",
 		"/img.v2/aHR0cHM6Ly9oLztzaWc9MQ": "/img.v2/REDACTED",
+		"/insecure/fn:mythumbnails/aHR0cHM6dXNl/cjpwYXNzQGgudGVzdC94LnBuZw": "/insecure/fn:mythumbnails/REDACTED",
+		"/insecure/img.thumbnails/aHR0cHM6L3Vz/ZXI6cGFzc0BoLnRlc3QveC5wbmc": "/insecure/img.thumbnails/REDACTED",
 		"/insecure/rs:fit:300/x.aHR0cHM6Ly91/c2VyOnBhc3NAaC50ZXN0L3gucG5n": "/insecure/rs:fit:300/REDACTED",
 		"/m/img;sig=pw87/x.png": "/m/REDACTED",
 		[`/c/${runs.slice(0, third)}/${runs.slice(third, 2 * third)}/${runs.slice(2 * third)}`]: "/REDACTED",
