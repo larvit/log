@@ -400,9 +400,9 @@ test("respects the configured log-level threshold", t => {
 
 	const asked = capture({ colors: false, logLevel: unknownLevel });
 
-	t.strictEqual(asked.log.enabled("info"), true, "enabled() answers an unknown logLevel as info");
+	t.strictEqual(asked.log.enabled("info"), true, "enabled() treats an unknown logLevel as info");
 	t.strictEqual(asked.log.enabled("debug"), false, "and below it as disabled");
-	t.strictEqual(asked.stderr.length, 0, "enabled() writes nothing, so asking never changes what the level methods warn");
+	t.strictEqual(asked.stderr.length, 0, "enabled() never writes a warning");
 	asked.log.silly("x");
 	t.strictEqual(asked.stderr.length, 1, "a level method warns even for a call below the threshold");
 

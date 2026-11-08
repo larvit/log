@@ -2403,7 +2403,7 @@ export class Log implements LogInt {
 		return tracedFetch(this, url, init).finally(settle);
 	}
 
-	// Pure, so a library author's `if (log.enabled(...))` never writes a line. An unknown logLevel counts as "info"; log() warns of it.
+	// Never writes, so a library author's `if (log.enabled(...))` emits no line; log() warns of an unknown logLevel.
 	public enabled(logLevel: LogLevel): boolean {
 		if (this.conf.logLevel === "none") {
 			return false;
@@ -2428,7 +2428,7 @@ export class Log implements LogInt {
 			return;
 		}
 
-		// Keyed on the raw value, so only the first call builds the message.
+		// Keyed on the raw value, so only the first call per sink and value builds the message.
 		if (firstWarning(this.conf.stderr, configured)) {
 			writeStderr(this.conf, "warn", undefined, `@larvit/log: logLevel ${describeLogLevel(configured)} is not a level, logging at "info"; use error, warn, info, verbose, debug, silly or none`);
 		}

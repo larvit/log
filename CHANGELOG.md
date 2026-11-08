@@ -145,10 +145,10 @@
 
 ### Everything else
 
-- **`log.enabled(level)` writes nothing, so a library author's check never emits a line.** Before,
-  an unrecognised `logLevel` made `enabled()` write its warning, and which caller warned depended
-  on call order. Now only the level methods warn, once per `stderr` sink as before; `enabled()`
-  still answers as `info`.
+- **`log.enabled(level)` never writes, so a library author's check emits no line.** Before, an
+  unknown `logLevel` made `enabled()` write the warning, and which caller warned depended on call
+  order. Now only the level methods warn, once per `stderr` sink as before, and `enabled()` still
+  treats an unknown `logLevel` as `info`.
 - **A pending batch no longer holds a Node, Bun or Deno process open, so `await end()` before exit.**
   A script that awaits neither `end()` nor `flush()` now exits without exporting what it queued.
   Before, a queued record kept the process alive for up to `batchDelayMs`, and so did a record logged
