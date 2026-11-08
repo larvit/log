@@ -6,7 +6,7 @@
 
 `Bar = 0.5`
 
-`Next ID = 123`
+`Next ID = 124`
 
 ## Items
 
@@ -14,6 +14,7 @@
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 121 | 2.5.0 |  | security | **Redact userinfo whose user or password holds a tab, newline or carriage return, in text that isn't a whole url.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
 | 122 | 2.5.0 |  | security | **Redact a credential in standard base64 whose `/` digit is written raw in the request path.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
+| 123 | 2.5.0 |  | security | **Redact a credential in a split base64-encoded url when text in front of its scheme, or an empty segment inside it, hides it.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
 | 7 | 2.5.0 |  | defect | **Unref the batch timer, so a pending batch never holds a Node or Deno process.** | 2 | 2 | 2 | 4 | 4 | 9 by 9 | 7.0 |
 | 13 | 2.5.0 |  |  | **Pin every Node base image to its full patch version, so one commit builds one image on any day.** | 1 | 1 | 1 | 1 | 2 | code health by 3 | 6.2 |
 | 89 | 2.5.0 |  | defect | **Keep `enabled()` free of output: warn about an unknown `logLevel` from the level methods alone.** | 1 | 1 | 1 | 1 | 2 | 3 by 5 | 2.3 |
@@ -136,6 +137,25 @@ README → "A url nested base64-encoded in the request path" and the CHANGELOG 2
 standard base64 is read only where its `/` is percent-encoded. A consumer reading them takes this
 shape as not covered, but README goal 7, credentials never leave, still holds for it. Item 120 found
 it and left it out. Found on 2026-11-08.
+
+### 123. Redact a credential in a split base64-encoded url when text in front of its scheme, or an empty segment inside it, hides it.
+
+The base64-in-path reading in `index.ts` (`base64Chains`, `segmentLevels`, `redactedPath`) exports
+two shapes unchanged:
+
+1. A segment of base64 characters right before the split url joins the same chain.
+   `/insecure/thumbnails/aHR0cHM6dXNl/cjpwYXNzQGgudGVzdC94LnBuZw` decodes, after the bytes of the
+   glued `thumbnails`, to `https:user:pass@h.test/x.png`, userinfo written without `//`. The junk
+   bytes in front of `https:` keep the anchored `SCHEME_LED` from matching, and
+   `redactTextUserinfo` needs `//` or `\\` before the userinfo, so `user:pass` leaves.
+2. An empty segment ends a chain. `/insecure/rs:fit:300/aHR0cHM6Ly91//c2VyOnBhc3NAaC50ZXN0L3gucG5n`
+   is the same url split across `//`, so neither half decodes to a whole url and `user:pass`
+   leaves. No one has confirmed that a real image proxy accepts a doubled `/` inside the encoded
+   url; checking that is part of this item.
+
+Both shapes are on origin/main; item 120's chunk was verified to change neither. README goal 7,
+credentials never leave, is the goal they break. Found on 2026-11-08 by the security and stability
+passes of item 120's chunk.
 
 ### 7. Unref the batch timer, so a pending batch never holds a Node or Deno process.
 
