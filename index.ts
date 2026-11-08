@@ -1440,8 +1440,8 @@ function redactTextQueryKeys(text: string): string {
 	let copied = 0;
 
 	for (let pair = opener.exec(text); pair !== null; pair = opener.exec(text)) {
-		// A pair opened inside a value already redacted is part of it. One that only ends there, a key
-		// holding a space after a `?` in the value, is found: scanning goes on from each `=`.
+		// A pair whose `=` falls inside a value already redacted is part of it. One that only opens there,
+		// a key holding a space after a `?` in the value, is found: scanning goes on from each `=`.
 		if (opener.lastIndex > copied && isSensitiveQueryKey(withoutDropped(pair[1]))) {
 			valueEnd.lastIndex = opener.lastIndex;
 
