@@ -19,38 +19,13 @@
 	"minimumReleaseAge": "3 days",
 	"packageRules": [
 		{
-			"allowedVersions": "/^18\\./",
-			"matchCurrentVersion": "/^18\\./",
+			"description": "A matrix entry stays on its Node major.",
+			"enabled": false,
 			"matchFileNames": [
 				".github/workflows/push.yaml"
-			]
-		},
-		{
-			"allowedVersions": "/^20\\./",
-			"matchCurrentVersion": "/^20\\./",
-			"matchFileNames": [
-				".github/workflows/push.yaml"
-			]
-		},
-		{
-			"allowedVersions": "/^22\\./",
-			"matchCurrentVersion": "/^22\\./",
-			"matchFileNames": [
-				".github/workflows/push.yaml"
-			]
-		},
-		{
-			"allowedVersions": "/^24\\./",
-			"matchCurrentVersion": "/^24\\./",
-			"matchFileNames": [
-				".github/workflows/push.yaml"
-			]
-		},
-		{
-			"allowedVersions": "/^26\\./",
-			"matchCurrentVersion": "/^26\\./",
-			"matchFileNames": [
-				".github/workflows/push.yaml"
+			],
+			"matchUpdateTypes": [
+				"major"
 			]
 		}
 	]
