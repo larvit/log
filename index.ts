@@ -772,7 +772,7 @@ function isOtlpPayload(value: unknown): value is OtlpPayload {
 
 const RETRY_DELAY_MAX_MS = 30000;
 
-// A pending retry must not keep a finished Node or Deno process alive.
+// A pending batch or retry must not keep a finished Node or Deno process alive.
 function unref(timer: TimerHandle, fromSystemClock: boolean): void {
 	if (typeof timer === "object" && typeof timer.unref === "function") {
 		timer.unref();
@@ -856,13 +856,13 @@ class ExportScheduler {
 
 		const retryInMs = Math.min(this.conf.retryDelayMs * (2 ** (this.failures - 1)), RETRY_DELAY_MAX_MS);
 
-		unref(this.setTimer(true, retryInMs), this.conf.clock === systemClock);
+		this.setTimer(true, retryInMs);
 
 		return retryInMs;
 	}
 
-	// Whatever timer it replaces is cleared, so no stray callback fires.
-	private setTimer(retry: boolean, delayMs: number): TimerHandle {
+	// Whatever timer it replaces is cleared, so no stray callback fires. No timer keeps the process alive.
+	private setTimer(retry: boolean, delayMs: number): void {
 		this.conf.clock.clearTimeout(this.timer?.handle);
 		this.timer = undefined;
 
@@ -871,9 +871,8 @@ class ExportScheduler {
 			void this.flush();
 		}, delayMs);
 
+		unref(handle, this.conf.clock === systemClock);
 		this.timer = { handle, retry };
-
-		return handle;
 	}
 }
 
