@@ -123,6 +123,12 @@
   trust. On one you do, a `Log` using `otlpHttpBaseURI` moves its `otlp*` options to
   `otlpQueue: new Queue({ acceptPlainHttpAuthorization: true, otlpHttpBaseURI })`, whose report
   lines then go to that queue's `report`, `console.error` unless you pass one.
+- **Userinfo holding a tab, newline or carriage return is redacted in text that isn't a whole url.**
+  A url parser drops those three characters, so `https://admin:hun<TAB>ter2@db.test/x` has the
+  password `hunter2`, yet a status message from `end({ error })` or a failed `log.fetch`, and a
+  captured header value that isn't a whole url, exported it unchanged. Now a status message records
+  `REDACTED` in place of the userinfo, `retry https://REDACTED@db.test/x`, after `//`, `\\`, `/\` or
+  `\/`, and such a header value records `REDACTED` whole.
 
 ### Everything else
 

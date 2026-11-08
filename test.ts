@@ -1687,6 +1687,9 @@ test("end({ error }) marks the span failed", async t => {
 	await new Log(conf).end({ error: new Error("request to https://h.test/x?token=abc\nWhy? api_key=s3cr3tU failed") });
 	await new Log(conf).end({ error: new Error("request to https://h.test/x?token=abcd? token=s3cr3tV failed") });
 	await new Log(conf).end({ error: new Error("request to https://h.test/x?token=a?sig= failed") });
+	await new Log(conf).end({ error: new Error("retry https://admin:hun\tter2@db.test/x") });
+	await new Log(conf).end({ error: new Error("retry https://ad\nmin:hunter2@db.test/x and //u:p\rw@h") });
+	await new Log(conf).end({ error: new Error("db \\\\u:p\tw@h and https:\\/ad\nmin:pw@h failed") });
 
 	t.deepEqual(exportedSpan(0).status, { code: 2, message: "refused" }, "status is ERROR with the error message");
 	t.strictEqual(attr(exportedSpan(0), "error.type"), "ECONNREFUSED", "error.type is the error's code when it has one");
@@ -1724,6 +1727,9 @@ test("end({ error }) marks the span failed", async t => {
 	t.deepEqual(exportedSpan(28).status, { code: 2, message: "request to https://h.test/x?token=REDACTED api_key=REDACTED failed" }, "a ? that a listed value swallows still opens the next key, a space included");
 	t.deepEqual(exportedSpan(29).status, { code: 2, message: "request to https://h.test/x?token=REDACTED token=REDACTED failed" }, "and so does one with no tab or newline in the value");
 	t.deepEqual(exportedSpan(30).status, { code: 2, message: "request to https://h.test/x?token=REDACTED failed" }, "a listed pair that ends where the redacted value ends is part of it, and is not redacted twice");
+	t.deepEqual(exportedSpan(31).status, { code: 2, message: "retry https://REDACTED@db.test/x" }, "a tab the parser drops from a password doesn't hide the userinfo");
+	t.deepEqual(exportedSpan(32).status, { code: 2, message: "retry https://REDACTED@db.test/x and //REDACTED@h" }, "nor does a newline in a user or a carriage return in a password");
+	t.deepEqual(exportedSpan(33).status, { code: 2, message: "db \\\\REDACTED@h and https:\\/REDACTED@h failed" }, "nor does one after a backslash opener");
 	t.end();
 });
 
@@ -2376,6 +2382,23 @@ test("log.fetch redacts a listed query key in a header value or kept query value
 	t.ok(urlFull.endsWith("&w=REDACTED"), "so does one whose key holds a space");
 	t.ok(!urlFull.includes("hunter2"), "no credential is exported in url.full");
 	t.notOk(JSON.stringify(calls.filter(call => call.path.startsWith("/v1/"))).includes("hunter2"), "no credential reaches the collector");
+	t.end();
+});
+
+test("log.fetch redacts userinfo holding a tab the parser drops, wherever it reads text", async t => {
+	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ "x-tab": "retry https://admin:hun\tter2@db.test/x", "x-tab2": "db \\\\admin:hun\tter2@h" }) }) : undefined);
+	const log = new Log({ captureResponseHeaders: ["x-tab", "x-tab2"], otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+
+	await log.fetch("https://api.test/h");
+	await log.fetch("https://api.test/p/%2F%2Fusr:pa%09ssw0rd@h.test/z");
+	await log.end();
+
+	const spans = exportedSpans(calls).filter(span => span.kind === 3);
+	const attr = (span: any, key: string) => span.attributes.find((attribute: any) => attribute.key === key)?.value.stringValue;
+
+	t.strictEqual(attr(spans[0], "http.response.header.x-tab"), "REDACTED", "a captured header value holding a tab in a password is redacted");
+	t.strictEqual(attr(spans[0], "http.response.header.x-tab2"), "REDACTED", "and one opened by a backslash pair");
+	t.notOk(attr(spans[1], "url.full").includes("ssw0rd"), "a path segment opening userinfo that holds a decoded tab is redacted");
 	t.end();
 });
 

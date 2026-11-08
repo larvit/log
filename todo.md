@@ -12,7 +12,6 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 121 | 2.5.0 |  | security | **Redact userinfo whose user or password holds a tab, newline or carriage return, in text that isn't a whole url.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
 | 122 | 2.5.0 |  | security | **Redact a credential in standard base64 whose `/` digit is written raw in the request path.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
 | 123 | 2.5.0 |  | security | **Redact a credential in a split base64-encoded url when text in front of its scheme, or an empty segment inside it, hides it.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
 | 7 | 2.5.0 |  | defect | **Unref the batch timer, so a pending batch never holds a Node or Deno process.** | 2 | 2 | 2 | 4 | 4 | 9 by 9 | 7.0 |
@@ -111,21 +110,6 @@
 | 75 | 3.0.0 | 22 | decision | **Keep credentials off `log.conf` and `queue.conf`.** | 2 | 1 | 2 | 3 | 3 | 3 by 3 | 0.7 |
 
 ## Details
-
-### 121. Redact userinfo whose user or password holds a tab, newline or carriage return, in text that isn't a whole url.
-
-A url parser drops a tab, newline or carriage return, so `https://admin:hun<TAB>ter2@db.test/x`
-parses with the password `hunter2`. In text that isn't a whole url, that userinfo is exported
-unchanged. A span's status message from `end({ error })` or a failed `log.fetch`, such as
-`retry https://admin:hun<TAB>ter2@db.test/x`, exports `admin:hun<TAB>ter2`, and so does a captured
-header value that isn't a whole url.
-
-`SLASHED_USERINFO` and `BACKSLASH_OPENED_USERINFO` in `index.ts`, which `redactTextUserinfo` and
-`textHoldsUserinfo` use, match `[^/?#\s]*@` after `//` or `\\`. `\s` includes those three
-characters, so a user or password holding one isn't matched. Check the path, query-key and
-`OPENS_USERINFO` readers for the same gap. Item 119 closed it for a listed query key's value in
-`redactTextQueryKeys`, and `withoutDropped` already treats the three characters as dropped for a
-key. Found by the product-owner pass on 2026-11-08.
 
 ### 122. Redact a credential in standard base64 whose `/` digit is written raw in the request path.
 

@@ -1387,9 +1387,12 @@ const holdsUserinfo = (url: URL) => url.username !== "" || url.password !== "";
 
 // v2.4.0's `//` rule, and the same after `\\`, `/\` or `\/`: they match a url among other text, or one
 // the runtime cannot parse. After an opener holding a `\`, userinfo may not hold a `\`, so matching a
-// long run of `\` stays linear.
-const SLASHED_USERINFO = /(:?\/\/)[^/?#\s]*@/g;
-const BACKSLASH_OPENED_USERINFO = /(:?(?:\\[/\\]|\/\\))[^/\\?#\s]*@/g;
+// long run of `\` stays linear. Userinfo may hold a tab, newline or carriage return, which a parser
+// drops, so `[^…\s]` is followed by `|[\t\n\r]`: the two alternatives share no character.
+const SLASHED_USERINFO = /(:?\/\/)(?:[^/?#\s]|[\t\n\r])*@/g;
+const BACKSLASH_OPENED_USERINFO = /(:?(?:\\[/\\]|\/\\))(?:[^/\\?#\s]|[\t\n\r])*@/g;
+// Unlike the two above, a tab, newline or carriage return ends the tail, and URL_DELIMITER: the raw
+// reading of the pairs, where it is still `%09`, opens and joins the run, so no credential escapes.
 const OPENS_USERINFO = /\/\/[^/?#\s]*$|(?:\\[/\\]|\/\\)[^/\\?#\s]*$/;
 const redactTextUserinfo = (text: string) => text.replace(SLASHED_USERINFO, "$1REDACTED@").replace(BACKSLASH_OPENED_USERINFO, "$1REDACTED@");
 

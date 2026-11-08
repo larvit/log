@@ -84,3 +84,17 @@ Read most (opens and searches):
 - `index.ts` 5
 - `todo.md` 5
 - `package.json` 1
+
+## Reading cost, chunk 34a6d866a2ed, finished 2026-11-08T16:45:27Z
+
+152477 new input tokens before the first commit.
+
+Read most (opens and searches):
+
+- `test.ts` 11
+- `todo.md` 11
+- `index.ts` 10
+- `README.md` 7
+- `CHANGELOG.md` 6
+- `docs/decisions.md` 3
+- `package.json` 2
