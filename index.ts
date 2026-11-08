@@ -1750,14 +1750,15 @@ function segmentLevels(text: string, seen = new Set<string>()): string[] | undef
 // way the proxy reads it from where the url starts. A lead shorter than a run is credited to the
 // segment after it, or the `300` of `rs:fit:300` would pull that segment into the cut. Reading from
 // each piece takes time in the pieces times the characters, so a chain of more than MAX_CHAIN_PIECES
-// pieces, or of more than MAX_CHAIN_CHARS characters from its third piece on, makes this return
-// `undefined`, which counts as a credential.
+// pieces, or chains of three or more pieces holding more than MAX_CHAIN_CHARS characters together,
+// make this return `undefined`, which counts as a credential.
 function base64Chains(segments: string[]): Array<[number, string]> | undefined {
 	const chains: Array<[number, string]> = [];
 	let start = 0;
 	let lead = "";
 	let pieces: Array<{ position: number; text: string }> = [];
 	let chars = 0;
+	let chained = 0;
 
 	const joined = (from: number, joiner: string) => pieces.slice(from).map(piece => piece.text).join(joiner);
 
@@ -1785,6 +1786,10 @@ function base64Chains(segments: string[]): Array<[number, string]> | undefined {
 			}
 		}
 
+		if (pieces.length > 2) {
+			chained += chars;
+		}
+
 		lead = "";
 		pieces = [];
 		chars = 0;
@@ -1801,7 +1806,7 @@ function base64Chains(segments: string[]): Array<[number, string]> | undefined {
 			pieces.push({ position: index, text: head });
 			chars += head.length;
 
-			if (pieces.length > MAX_CHAIN_PIECES || (pieces.length > 2 && chars > MAX_CHAIN_CHARS)) {
+			if (pieces.length > MAX_CHAIN_PIECES || (pieces.length > 2 && chained + chars > MAX_CHAIN_CHARS)) {
 				return undefined;
 			}
 		}

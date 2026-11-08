@@ -515,8 +515,9 @@ yourself included.
   of fewer than eight characters, such as `x.aHR0cDo`, stays in the path. Userinfo in decoded text
   that doesn't start with a scheme, such as `//u:p@host`, records the whole path as `/REDACTED`, and
   so does a segment holding more than 64 distinct runs, ids and words included. So does a chain of
-  more than 64 such segments, counting the leading characters of the segment that ends it, or of
-  three or more with more than 8,192 characters between them, words and ids included. A random id
+  more than 64 segments made of base64 characters, counting the leading characters of the segment
+  that ends it, and so do the chains of three or more such segments in a path when they hold more
+  than 8,192 characters together, words and ids included. A random id
   or signature whose decoding happens to read as a credential does too: about 1 in 2,500
   43-character signatures.
 

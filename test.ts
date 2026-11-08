@@ -2219,6 +2219,10 @@ test("log.fetch redacts a credential in a url nested base64-encoded in the reque
 		[`/pieces/.x/${Array.from({ length: 65 }, () => "a").join("/")}`]: "/REDACTED",
 		[`/chars/.x/${"a".repeat(4096)}/${"a".repeat(4095)}/a`]: `/chars/.x/${"a".repeat(4096)}/${"a".repeat(4095)}/a`,
 		[`/chars/.x/${"a".repeat(4096)}/${"a".repeat(4096)}/a`]: "/REDACTED",
+		[`/chars/${"a".repeat(2500)}/${"a".repeat(2500)}/~/${"a".repeat(1000)}/${"a".repeat(1000)}/${"a".repeat(1187)}`]: `/chars/${"a".repeat(2500)}/${"a".repeat(2500)}/~/${"a".repeat(1000)}/${"a".repeat(1000)}/${"a".repeat(1187)}`,
+		[`/chars/${"a".repeat(2500)}/${"a".repeat(2500)}/~/${"a".repeat(1000)}/${"a".repeat(1000)}/${"a".repeat(1188)}`]: "/REDACTED",
+		[`/one/${"a".repeat(9000)}`]: `/one/${"a".repeat(9000)}`,
+		[`/two/.x/${"a".repeat(8193)}/a`]: `/two/.x/${"a".repeat(8193)}/a`,
 		[`/clean//${base64url("https://cb.test/x?q=1")}`]: `/clean//${base64url("https://cb.test/x?q=1")}`,
 		"/insecure/rs:fit:300/x.L/y91c2VyOnBhc3NAaC50ZXN0L3gucG5n": "/REDACTED",
 		"/insecure/rs:fit:300/x.aHR0cDo/vL3VzZXI6cGFzc0BoLnRlc3QveC5wbmc": "/insecure/rs:fit:300/x.aHR0cDo/REDACTED",
@@ -2283,7 +2287,7 @@ test("log.fetch redacts a long query within 250 ms", async t => {
 	const joined = Array.from({ length: 9 }, (_, index) => (index ? `%${"25".repeat(index - 1)}41` : "") + block(index)).join("");
 	const repeated = Array.from({ length: 7 }).reduce<string>(nested => `${btoa(nested).replace(/=+$/, "")}.${Array.from({ length: 8 }, (_, level) => `%${"25".repeat(level)}${(0x41 + level).toString(16)}`).join("")}`, "https://u:pw@cb.test/x");
 
-	for (const query of ["x/" + "aHR0cHM6/".repeat(16384), "x/" + "a/".repeat(16384), "x/" + "a//".repeat(16384), Array.from({ length: 64 }, (_, index) => block(index % 9).slice(0, 128)).join("/"), `x/${repeated}`, `x/${joined}`, "?u=https://a/?".repeat(16384), "?https://a/?".repeat(16384), `?${chain}`, `${"/a:".repeat(16384)}%3F`, `${deep}/https:/${deep}?q=${deep}`, `?q=${"\\".repeat(32768)} x`, `?q=//${"\\".repeat(32768)} x`, `${"%5C".repeat(32768)}%20x`, `?//u:p${"&a@".repeat(16384)}`, `?//u:p=/${"&a@".repeat(16384)}`, `?${"//u:p&a@&".repeat(8192)}`]) {
+	for (const query of ["x/" + "aHR0cHM6/".repeat(16384), "x/" + "a/".repeat(16384), "x/" + "a//".repeat(16384), Array.from({ length: 64 }, (_, index) => block(index % 9).slice(0, 128)).join("/"), Array.from({ length: 23 }, () => Array.from({ length: 64 }, (_, index) => block(index % 9).slice(0, 128)).join("/")).join("/~/"), `x/${repeated}`, `x/${joined}`, "?u=https://a/?".repeat(16384), "?https://a/?".repeat(16384), `?${chain}`, `${"/a:".repeat(16384)}%3F`, `${deep}/https:/${deep}?q=${deep}`, `?q=${"\\".repeat(32768)} x`, `?q=//${"\\".repeat(32768)} x`, `${"%5C".repeat(32768)}%20x`, `?//u:p${"&a@".repeat(16384)}`, `?//u:p=/${"&a@".repeat(16384)}`, `?${"//u:p&a@&".repeat(8192)}`]) {
 		const started = performance.now();
 
 		await log.fetch(`https://proxy.test/${query}`, { headers: { "x-deep": deep } });

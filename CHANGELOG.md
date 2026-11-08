@@ -30,8 +30,9 @@
   of fewer than eight characters stays in the path. The whole path records `/REDACTED` for userinfo
   in decoded text that doesn't start with a scheme, such as `//u:p@host`, for a segment holding more
   than 64 distinct runs of eight or more base64 characters, ids and words included, for a chain of
-  more than 64 such segments, or of three or more with more than 8,192 characters between them, and,
-  rarely, for a random id or signature whose decoding reads as a credential: about 1 in 2,500
+  more than 64 segments made of base64 characters, counting the leading characters of the segment
+  that ends it, for the chains of three or more such segments in a path holding more than 8,192
+  characters together, and, rarely, for a random id or signature whose decoding reads as a credential: about 1 in 2,500
   43-character signatures. v2.4.0's advice to rotate what such a path carried stands for spans exported before,
   and so does its `aHR0c` search for a base64-encoded url, which finds none with no scheme or inside
   other text.
