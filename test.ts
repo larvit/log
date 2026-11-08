@@ -2072,6 +2072,8 @@ test("log.fetch captureQuery redacts userinfo that a kept query splits across &"
 		["//u:pw84&a%3Fb&w@h.test&m=1", `${redacted(3)}&m=1`],
 		["//u:pw85&a%23b&w@h.test&m=1", `${redacted(3)}&m=1`],
 		["a+b=c+d&q=1+2", "a+b=c+d&q=1+2"],
+		// Read as typed, `%C2%A0` is a space that ends the match before the `@`; form-decoded, `%C2` is no space.
+		["next=//user:pw86%C2%25A0ss%2540host/x&m=1", "next=REDACTED&m=1"],
 	];
 	const { calls } = stubFetch();
 	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
