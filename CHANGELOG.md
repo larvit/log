@@ -61,8 +61,8 @@
   `location: https://app.test/cb#access_token=…`; since v2.4.0, so did an `end({ error })` message
   such as node-fetch's `request to …?token=… failed`. Now a header value or query value holding such
   a key after a `?`, `&` or `#` records `REDACTED` whole, and a query key records it with its value. A status message records
-  `REDACTED` in place of the value, ending at `&`, `#` or whitespace but not a tab, newline or
-  carriage return, which a url parser drops: `request to https://h/x?token=REDACTED failed`. Text percent-encoded is read decoded up to eight
+  `REDACTED` in place of the value, which ends at `&`, `#` or whitespace other than a tab, newline or
+  carriage return: `request to https://h/x?token=REDACTED failed`. Text percent-encoded is read decoded up to eight
   times, and a status message holding a key only decoded, or encoded deeper, records `REDACTED`
   whole. A dashboard grouping on such a header, message or `url.full` sees it change, a `?key=`
   lookup included. Search captured header values, status messages and `url.full` with the regex in
