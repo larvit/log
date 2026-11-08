@@ -1746,7 +1746,7 @@ function base64Chains(segments: string[]): Array<[number, string]> {
 	let text = "";
 
 	const end = () => {
-		// A lead alone is a run its own segment already read.
+		// A lead alone is read with its own segment, and `start + 1` below could point past the last one.
 		if (lead !== "" && text !== "") {
 			chains.push([lead.length >= MIN_RUN ? start : start + 1, lead + text]);
 		}
