@@ -12,7 +12,6 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 106 | 2.5.0 |  | defect | **Run on React Native's own `URL`, whose getters throw "not implemented", or state in README → Runtimes that an app installs a `URL` polyfill.** | 2 | 3 | 3 | 6 | 2 | 2 by 8 | 1.5 |
 | 104 | 2.5.0 |  | decision | **Warn once about every credential header sent over plain `http:`, not only `Authorization`, and give the opt-out a name that covers them all.** | 2 | 2 | 2 | 4 | 4 | 3 by 4 | 0.7 |
 | 34 | 2.6.0 |  | principle | **Let a consumer inject the randomness trace and span ids come from.** | 1 | 1 | 1 | 1 | 2 | code health by 5 | 10.4 |
 | 37 | 2.6.0 |  | principle | **Build a span payload without writing to `log.span`.** | 1 | 1 | 1 | 1 | 2 | code health by 5 | 10.4 |
@@ -101,14 +100,6 @@
 | 75 | 3.0.0 | 22 | decision | **Keep credentials off `log.conf` and `queue.conf`.** | 2 | 1 | 2 | 3 | 3 | 3 by 3 | 0.7 |
 
 ## Details
-
-### 106. Run on React Native's own `URL`, whose getters throw "not implemented", or state in README → Runtimes that an app installs a `URL` polyfill.
-
-React Native 0.74's `Libraries/Blob/URL.js` throws "not implemented" from `host`, `origin`,
-`password`, `pathname`, `protocol`, `search` and `username`. `new Queue`, `new Log({ otlpHttpBaseURI })` and
-`log.fetch` read them, so those calls throw on an app with no `URL` polyfill. README → Runtimes names
-`fetch`, `TextEncoder` and `btoa` only. Found by the goals and frontend principles audits on
-2026-10-26; the throwing getters were checked against the v0.74.0 source.
 
 ### 104. Warn once about every credential header sent over plain `http:`, not only `Authorization`, and give the opt-out a name that covers them all.
 
@@ -285,7 +276,7 @@ README → Runtimes says Deno and Bun meet the rule and are not in CI; CI provin
 ### 107. Run the suite on React Native's Hermes in CI.
 
 README → Audience calls React Native a primary target, but CI runs Node and Chromium only, so a break
-under Hermes or React Native's own globals, like item 106, ships unseen. Items 80 and 81 don't cover
+under Hermes or React Native's own globals, such as a `URL` whose getters throw, ships unseen. Items 80 and 81 don't cover
 it. `~/.claude/principles/frontend.md` → Testability and broad device support.
 
 ### 108. Keep two tabs of one web app sharing a `storage` key from sending a record twice or deleting each other's backlog.

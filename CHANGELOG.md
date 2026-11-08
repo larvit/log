@@ -145,6 +145,11 @@
 
 ### Everything else
 
+- **README → Runtimes says a React Native app installs a `URL` polyfill.** React Native's own `URL`
+  and `URLSearchParams` throw "not implemented" from the getters and methods that `new Log({
+  otlpHttpBaseURI })`, `new Queue` and `log.fetch` read, so those calls threw on an app with no
+  polyfill. Nothing in the package changed; install one such as `react-native-url-polyfill` before
+  creating either.
 - **`log.fetch(url, request)` sends a `Request` passed as `init` with its own method, body, signal and
   other settings.** Before, only its headers were kept, so `log.fetch(url, new Request(url, { method:
   "POST", body }))` sent a GET with no body, though the span named a POST. Now the request is the one
