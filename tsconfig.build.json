@@ -4,8 +4,8 @@
 		"module": "NodeNext",
 		"sourceMap": true,
 		"strict": true,
-		// The target is the floor README → Runtimes states: nothing is lowered, since lowering
-		// would grow every runtime's bundle for the few browsers older than 2021.
+		// Nothing is lowered, so the syntax index.ts uses is the browser floor README → Runtimes
+		// states; eslint.config.js bans the ES2021 syntax that would raise it.
 		"target": "ES2022",
 		"types": ["node"]
 	},
