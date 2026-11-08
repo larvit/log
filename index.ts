@@ -1050,7 +1050,7 @@ class OtlpSender {
 		}
 
 		if (this.plainHttpHost !== undefined) {
-			// Header names only: a name is no secret, and a value is the likeliest place for one.
+			// The message names the header and never its value, since a value may be the credential.
 			for (const [name] of headers) {
 				if (SENSITIVE_HEADER_NAME.test(name)) {
 					const source = name === "authorization" && !setsAuthorization(this.conf.otlpAdditionalHeaders) ? "user:pass@ in otlpHttpBaseURI" : "otlpAdditionalHeaders";
@@ -1148,7 +1148,7 @@ export class Queue implements OtlpQueue {
 
 		this.conf = {
 			...conf,
-			// Either name accepts, and both read back the one answer until 3.0.0 removes the old one.
+			// Both read back one answer until 3.0.0 removes the old name.
 			acceptPlainHttpAuthorization: accepted,
 			acceptPlainHttpCredentials: accepted,
 			batchDelayMs: conf.batchDelayMs ?? 1000,
@@ -1173,9 +1173,11 @@ export class Queue implements OtlpQueue {
 
 		this.sender = new OtlpSender(this.conf, (msg, metadata) => this.report(msg, metadata), msg => this.warnOnce(msg));
 
-		if (conf.acceptPlainHttpAuthorization !== undefined) {
+		// A conf spread from another queue's carries both names, and its writer never chose the old one.
+		if (conf.acceptPlainHttpAuthorization !== undefined && conf.acceptPlainHttpCredentials === undefined) {
 			this.warnOnce("@larvit/log: acceptPlainHttpAuthorization is deprecated and removed in 3.0.0, use acceptPlainHttpCredentials");
 		}
+
 		this.ready = conf.storage ? this.load(conf.storage) : Promise.resolve();
 		this.scheduler = new ExportScheduler(this.conf, this.ready, () => this.round());
 	}
