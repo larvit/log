@@ -1474,8 +1474,8 @@ function openedUserinfo(key: string): string | undefined {
 // first URL_DELIMITER. The pairs up to the run's last `@` are returned. Keep `\` out of
 // URL_DELIMITER, since userinfo after `//` may hold one; a run that a backslash opens may then redact
 // a pair holding no credential. A value opening userinfo is a url of its own, so
-// `?next=https://h&q=a@b` is kept. `holdsAt` says whether a pair's text holds an `@`.
-function splitUserinfoPairs(pairs: Array<[string, string]>, holdsAt: (text: string) => boolean): Set<number> {
+// `?next=https://h&q=a@b` is kept.
+function splitUserinfoPairs(pairs: Array<[string, string]>, holdsAtSign: (text: string) => boolean): Set<number> {
 	const split = new Set<number>();
 	let start = -1;
 	let end = -1;
@@ -1491,7 +1491,7 @@ function splitUserinfoPairs(pairs: Array<[string, string]>, holdsAt: (text: stri
 	const read = (part: string, index: number) => {
 		const cut = part.search(URL_DELIMITER);
 
-		if (holdsAt(cut < 0 ? part : part.slice(0, cut))) {
+		if (holdsAtSign(cut < 0 ? part : part.slice(0, cut))) {
 			end = index;
 		}
 
@@ -1523,9 +1523,9 @@ function splitUserinfoPairs(pairs: Array<[string, string]>, holdsAt: (text: stri
 	return split;
 }
 
-// The query's pairs as a parser reads them, before `searchParams` form-decodes them: userinfo keeps a
-// `+`, `%2F`, `%3F` and `%23` there, where decoding would turn them into a space or a delimiter that ends
-// the userinfo match. Like `searchParams`, it skips an empty pair, so both lists line up.
+// The query's pairs raw, as typed: a `+`, `%2F`, `%3F` and `%23` stay inside userinfo here, where
+// form-decoding turns them into a space and delimiters that end it. Like `searchParams`, it skips an
+// empty pair.
 function rawQueryPairs(url: URL): Array<[string, string]> {
 	return url.search.slice(1).split("&").filter(pair => pair !== "").map((pair): [string, string] => {
 		const equals = pair.indexOf("=");
@@ -1534,14 +1534,19 @@ function rawQueryPairs(url: URL): Array<[string, string]> {
 	});
 }
 
+const formDecoded = (text: string) => new URLSearchParams(`=${text}`).get("") ?? "";
+const holdsAtSignAtAnyLevel = (text: string) => decodings(text)?.some(level => level.includes("@")) ?? true;
+
 // `undefined` where no pair changes.
 function redactedSearch(url: URL, depth: number, partsRead: PartsRead): string | undefined {
-	const pairs = [...url.searchParams];
 	const raw = rawQueryPairs(url);
-	// Two readings of where userinfo ends, a pair redacted if either finds it: the decoded pairs, where a
-	// `%2F` ends a run and a `%40` is an `@`, and the raw ones, where only a literal one is.
+	const pairs = raw.map(([key, value]): [string, string] => [formDecoded(key), formDecoded(value)]);
+	// Where a run of userinfo ends is read two ways, and a pair is redacted if either finds it. Raw, only
+	// a literal delimiter ends a run and only a literal `@` counts: a `%2F` or `%40` there is no `/` or
+	// `@`. Percent-decoded, an escaped delimiter ends a run and an escaped `@` counts, for a consumer
+	// that decodes first; its `+` stays, since a parser takes it as part of the userinfo.
 	const split = new Set([
-		...splitUserinfoPairs(pairs, text => decodings(text)?.some(level => level.includes("@")) ?? true),
+		...splitUserinfoPairs(raw.map(([key, value]): [string, string] => [percentDecoded(key), percentDecoded(value)]), holdsAtSignAtAnyLevel),
 		...splitUserinfoPairs(raw, text => text.includes("@")),
 	]);
 	// eslint-disable-next-line @typescript-eslint/no-use-before-define
@@ -1597,7 +1602,7 @@ function redactQueryPair(key: string, value: string, [rawKey, rawValue]: [string
 	}
 
 	// Userinfo across the `=`, as in `?//u:p=w@host`, is found by `splitUserinfoPairs` and never reaches here.
-	// Both readings, as in `redactedSearch`: either one can hide userinfo from the other.
+	// Form-decoded and raw both: a `+` or an escaped delimiter ends the match in one reading, invalid UTF-8 in the other.
 	if (textHoldsUserinfo(key) || textHoldsUserinfo(rawKey) || textHoldsQueryKey(key)) {
 		return ["REDACTED", "REDACTED"];
 	}

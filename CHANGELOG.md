@@ -77,14 +77,20 @@
   `?https://t.test/x?token=…` and `?https://a@b=pw@evil.test`, whose userinfo runs across the `=`.
   `?//u:pw&w@evil.test`, whose userinfo runs across the `&`, records
   `REDACTED=REDACTED&REDACTED=REDACTED`; README → Credentials in a captured value says which pairs
-  such userinfo takes. Userinfo is also read as a parser reads the raw query, where a `+`, `%2F`, `%3F`
-  or `%23` stays inside it: since v2.3.0, `?//u:pw+x@host` and `?//u:p&a%2Fb&w@host` exported the
-  password in `url.full`, and `?next=//my+user:pw@cb.test/x` exported `pw`. They now record `REDACTED`.
+  such userinfo takes.
   Search `url.full` with
   `(?i)%(25)*(3f|26|23)[-_]*([^&=%]*(auth|authentication|authorization|consumer[-_]?id|credential|key|key[-_]?id|pass|pass[-_]?phrase|p(ass)?w(or)?d[12]?|secret|sig|sign|signature|signed|token)|code|googleaccessid|id[-_]?token[-_]?hint)[-_]*(=|%(25)*3d)`,
   and with `(?i)(^|[?&])[^&=]*%(25)*2F%(25)*2F\S*%(25)*40` for a match followed by anything
   but `REDACTED`, and rotate what it finds; a presigned SigV4 url only while unexpired, as v2.4.0
   says.
+- **`captureQuery` redacts userinfo holding a `+`, `%2F`, `%3F` or `%23` in a kept query.** Since v2.3.0,
+  `?//u:pw+x@host`, `?//u:p&a%2Fb&w@host` and `?next=//my+user:pw@cb.test/x`, with `captureQuery`
+  on, exported the password in `url.full`: the query was read form-decoded only, where those turn
+  into a space and delimiters that end userinfo. It is now read as typed too, and userinfo either
+  reading finds records `REDACTED`. Text holding a url and later an `@`, with only `+` or `%20`
+  between, records `REDACTED` too, as in `?text=Visit+https://app.test+or+mail+help@app.test`, so a
+  dashboard grouping on such a `url.full` sees it change. Search `url.full` with
+  `(?i)(//|%(25)*2F%(25)*2F)\S*(@|%(25)*40)` and rotate any password a match holds.
 - **`captureQuery` redacts the value of a query key that names a credential, by the key terms of
   Datadog's default rule.** A key's value records `REDACTED` when the key, in any casing and with
   `-` and `_` ignored, ends in a term such as `token`, `key`, `secret`, `password` or `auth`, or is
