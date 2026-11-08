@@ -77,7 +77,9 @@
   `?https://t.test/x?token=…` and `?https://a@b=pw@evil.test`, whose userinfo runs across the `=`.
   `?//u:pw&w@evil.test`, whose userinfo runs across the `&`, records
   `REDACTED=REDACTED&REDACTED=REDACTED`; README → Credentials in a captured value says which pairs
-  such userinfo takes.
+  such userinfo takes. Userinfo is also read as a parser reads the raw query, where a `+`, `%2F`, `%3F`
+  or `%23` stays inside it: since v2.3.0, `?//u:pw+x@host` and `?//u:p&a%2Fb&w@host` exported the
+  password in `url.full`, and `?next=//my+user:pw@cb.test/x` exported `pw`. They now record `REDACTED`.
   Search `url.full` with
   `(?i)%(25)*(3f|26|23)[-_]*([^&=%]*(auth|authentication|authorization|consumer[-_]?id|credential|key|key[-_]?id|pass|pass[-_]?phrase|p(ass)?w(or)?d[12]?|secret|sig|sign|signature|signed|token)|code|googleaccessid|id[-_]?token[-_]?hint)[-_]*(=|%(25)*3d)`,
   and with `(?i)(^|[?&])[^&=]*%(25)*2F%(25)*2F\S*%(25)*40` for a match followed by anything

@@ -12,7 +12,6 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 116 | 2.5.0 |  | security | **Redact userinfo holding a `+`, `%2F`, `%3F` or `%23` in a kept query.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
 | 119 | 2.5.0 |  | security | **Redact the whole of a listed query key's value in text that isn't a whole url, a tab, newline or carriage return inside the value included.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
 | 120 | 2.5.0 |  | security | **Redact a credential in a base64-encoded url in the request path when its split form opens mid-segment or its decoded text carries a `;` key such as `;sig=`.** | 2 | 2 | 4 | 6 | 4 |  | 0.0 |
 | 7 | 2.5.0 |  | defect | **Unref the batch timer, so a pending batch never holds a Node or Deno process.** | 2 | 2 | 2 | 4 | 4 | 9 by 9 | 7.0 |
@@ -111,17 +110,6 @@
 | 75 | 3.0.0 | 22 | decision | **Keep credentials off `log.conf` and `queue.conf`.** | 2 | 1 | 2 | 3 | 3 | 3 by 3 | 0.7 |
 
 ## Details
-
-### 116. Redact userinfo holding a `+`, `%2F`, `%3F` or `%23` in a kept query.
-
-`captureQuery` reads each query pair after `url.searchParams` has form-decoded it once. By then a
-`+` is a space and `%2F`, `%3F` and `%23` are delimiters, and a space or a delimiter ends the
-userinfo match. So `?//u:pw+x@host` exports `%2F%2Fu%3Apw+x%40host=`, `?next=//my+user:pw@cb.test/x`
-exports `pw`, and `?//u:p&a%2Fb&w@host` exports the whole password, as
-`%2F%2Fu%3Ap=&a%2Fb=&w%40host=`. A parser reading the raw query keeps `+` and `%2F` inside
-userinfo, so each is a credential exported as written. The gap dates from v2.3.0, and the `&` split
-rule that v2.5.0 adds has it too. Found by the principles audits and the stability pass on
-2026-10-28.
 
 ### 119. Redact the whole of a listed query key's value in text that isn't a whole url, a tab, newline or carriage return inside the value included.
 
