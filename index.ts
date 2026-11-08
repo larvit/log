@@ -1422,14 +1422,14 @@ function decodings(text: string): string[] | undefined {
 	return levels;
 }
 
-// A parser drops a tab or newline: `si%09g` reads as `sig`.
+// A parser drops a tab, newline or carriage return: `si%09g` reads as `sig`.
 const withoutDropped = (text: string) => text.replace(/[\t\n\r]/g, "");
 
 // The text with each listed key's value replaced by `REDACTED`, wherever a url's own query rules don't
 // reach it: a status message such as `request to …?token=… failed`, a relative `location`, a
 // scheme-less url, a `?` in a fragment, a fragment's own pairs such as an OAuth redirect's
-// `#access_token=…`. A value ends at `&`, `#` or whitespace and may hold a `?`; a tab, newline or carriage
-// return doesn't end it, since a parser drops those, so `ab<TAB>cd` is the value `abcd`. A key is whatever stands
+// `#access_token=…`. A value ends at `&`, `#` or whitespace other than a tab, newline or carriage return,
+// which a parser drops, and may hold a `?`. A key is whatever stands
 // between its `?`, `&` or `#` and its `=`, a space included, so a listed key after a `?` in an
 // unlisted value is found. A key starts after the nearest of the three, so `code`, which only an exact
 // name lists, is found in `?#code=…` and `?x#code=…`.
@@ -1440,14 +1440,15 @@ function redactTextQueryKeys(text: string): string {
 	let copied = 0;
 
 	for (let pair = opener.exec(text); pair !== null; pair = opener.exec(text)) {
-		if (isSensitiveQueryKey(withoutDropped(pair[1]))) {
+		// A pair opened inside a value already redacted is part of it. One that only ends there, a key
+		// holding a space after a `?` in the value, is found: scanning goes on from each `=`.
+		if (opener.lastIndex > copied && isSensitiveQueryKey(withoutDropped(pair[1]))) {
 			valueEnd.lastIndex = opener.lastIndex;
 
 			const end = valueEnd.exec(text)?.index ?? text.length;
 
 			redacted += `${text.slice(copied, opener.lastIndex)}REDACTED`;
 			copied = end;
-			opener.lastIndex = end;
 		}
 	}
 
