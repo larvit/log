@@ -2201,6 +2201,7 @@ test("log.fetch redacts a credential in a url nested base64-encoded in the reque
 		"/img.v2/aHR0cHM6Ly9oLztzaWc9MQ": "/img.v2/REDACTED",
 		"/insecure/fn:mythumbnails/aHR0cHM6dXNl/cjpwYXNzQGgudGVzdC94LnBuZw": "/insecure/fn:mythumbnails/REDACTED",
 		"/insecure/img.thumbnails/aHR0cHM6L3Vz/ZXI6cGFzc0BoLnRlc3QveC5wbmc": "/insecure/img.thumbnails/REDACTED",
+		"/insecure/rs:fit:300/x.L/y91c2VyOnBhc3NAaC50ZXN0L3gucG5n": "/REDACTED",
 		"/insecure/rs:fit:300/x.aHR0cDo/vL3VzZXI6cGFzc0BoLnRlc3QveC5wbmc": "/insecure/rs:fit:300/x.aHR0cDo/REDACTED",
 		"/insecure/rs:fit:300/x.aHR0cHM6Ly91/c2VyOnBhc3NAaC50ZXN0L3gucG5n": "/insecure/rs:fit:300/REDACTED",
 		"/m/img;sig=pw87/x.png": "/m/REDACTED",
