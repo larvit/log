@@ -361,3 +361,12 @@ React Native has it. Serves README → Goals #5. Valid while README → Audience
 2026-09-16, the maintainer: the protobuf encoder stays. Collectors that reject JSON are real, and
 the published `index.js`, encoder included, was 4.7 KB gzipped then. Serves README → Goals #6.
 Valid while `index.js` stays within README → Footprint.
+
+## In text, a plain space ends a credential and no other whitespace does
+
+2026-11-08, the maintainer: where a credential sits in text that is not a whole url, such as a span
+status message, userinfo (`SLASHED_USERINFO`, `URL_DELIMITER`) and a listed query key's value
+(`redactTextQueryKeys`) end at a plain space and at no other whitespace. A url parser keeps a
+no-break space, `\v`, `\f`, U+2028 and the like in both, so ending there would export the rest of the
+credential, and prose such as `see //host and mail a@b` stays readable. Serves README → Goals #7.
+Valid while a url parser keeps such whitespace in userinfo and a query value.
