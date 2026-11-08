@@ -12,7 +12,6 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 7 | 2.5.0 |  | defect | **Unref the batch timer, so a pending batch never holds a Node or Deno process.** | 2 | 2 | 2 | 4 | 4 | 9 by 9 | 7.0 |
 | 13 | 2.5.0 |  |  | **Pin every Node base image to its full patch version, so one commit builds one image on any day.** | 1 | 1 | 1 | 1 | 2 | code health by 3 | 6.2 |
 | 89 | 2.5.0 |  | defect | **Keep `enabled()` free of output: warn about an unknown `logLevel` from the level methods alone.** | 1 | 1 | 1 | 1 | 2 | 3 by 5 | 2.3 |
 | 79 | 2.5.0 |  | defect | **State the real runtime floor, ES2021 syntax and `BigInt`, in README → Runtimes, or build down to the floor it states.** | 2 | 2 | 3 | 5 | 2 | 2 by 8 | 1.7 |
@@ -108,17 +107,6 @@
 | 75 | 3.0.0 | 22 | decision | **Keep credentials off `log.conf` and `queue.conf`.** | 2 | 1 | 2 | 3 | 3 | 3 by 3 | 0.7 |
 
 ## Details
-
-### 7. Unref the batch timer, so a pending batch never holds a Node or Deno process.
-
-Landing it drops README → Queue exports' "Until 2.5.0" sentence. README → Goals #9 asks for it.
-Today only the retry timer is unref'd, so any pending batch holds the process for up to
-`batchDelayMs`, and `round()` clears the batch timer once, at its start, so a record logged while an
-export is in flight leaves one behind with nothing to send: measured on `node:22`, `await
-log.flush()` returned with both records delivered and the process stayed alive a further 4.7 s of a
-5 s `batchDelayMs`. 2.4.0 closes the failed-round half. A script that awaits neither `end()` nor
-`flush()` then exits without exporting what it queued, so the CHANGELOG says so, and README → Queue
-exports' "A retry timer never keeps…" covers every timer.
 
 ### 13. Pin every Node base image to its full patch version, so one commit builds one image on any day.
 

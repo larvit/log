@@ -40,11 +40,11 @@ README → Goals #4. Valid while a queue is independently constructible.
 
 2026-09-18, the implementing agent: `Clock` is `{ now, setTimeout, clearTimeout }` with an exported
 `TimerHandle`, not a `setTimeout` returning a cancel function. `unref` needs the real handle to keep
-a pending retry from holding a Node or Deno process alive, and only the retry timer is unref'd; the
-`| number` arm is what lets a browser, React Native or test clock type-check against types built
+a pending batch or retry from holding a Node or Deno process alive, and every timer the queue sets
+for them is unref'd; the `| number` arm is what lets a browser, React Native or test clock type-check against types built
 with `"types": ["node"]`. A clock that delegates to platform timers is unref'd like the system one;
 only Deno's numeric `unrefTimer` is skipped for an injected clock, whose id may not be Deno's.
-Serves README → Goals #9. Valid while a pending retry must not hold the process open.
+Serves README → Goals #9. Valid while a pending batch or retry must not hold the process open.
 
 ## `clock` is a supported option
 
