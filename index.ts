@@ -1597,11 +1597,12 @@ function redactQueryPair(key: string, value: string, [rawKey, rawValue]: [string
 	}
 
 	// Userinfo across the `=`, as in `?//u:p=w@host`, is found by `splitUserinfoPairs` and never reaches here.
-	if (textHoldsUserinfo(rawKey) || textHoldsQueryKey(key)) {
+	// Both readings, as in `redactedSearch`: either one can hide userinfo from the other.
+	if (textHoldsUserinfo(key) || textHoldsUserinfo(rawKey) || textHoldsQueryKey(key)) {
 		return ["REDACTED", "REDACTED"];
 	}
 
-	if (isSensitiveQueryKey(key) || textHoldsUserinfo(rawValue)) {
+	if (isSensitiveQueryKey(key) || textHoldsUserinfo(value) || textHoldsUserinfo(rawValue)) {
 		return [key, "REDACTED"];
 	}
 
