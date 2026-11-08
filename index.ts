@@ -714,7 +714,9 @@ export type QueueStorage = {
 };
 
 export type QueueConf = {
+	/** @deprecated Removed in 3.0.0, use acceptPlainHttpCredentials. */
 	acceptPlainHttpAuthorization?: boolean;
+	acceptPlainHttpCredentials?: boolean;
 	batchDelayMs?: number;
 	clock?: Clock;
 	key?: string;
@@ -728,7 +730,7 @@ export type QueueConf = {
 	storage?: QueueStorage;
 };
 
-export type ResolvedQueueConf = QueueConf & Required<Pick<QueueConf, "acceptPlainHttpAuthorization" | "batchDelayMs" | "clock" | "key" | "maxBatchBytes" | "maxItems" | "otlpProtocol" | "report" | "retryDelayMs">>;
+export type ResolvedQueueConf = QueueConf & Required<Pick<QueueConf, "acceptPlainHttpAuthorization" | "acceptPlainHttpCredentials" | "batchDelayMs" | "clock" | "key" | "maxBatchBytes" | "maxItems" | "otlpProtocol" | "report" | "retryDelayMs">>;
 
 type QueuedItem = { bytes: number, payload: OtlpPayload };
 
@@ -969,7 +971,7 @@ function mergePayloads(payloads: OtlpPayload[]): OtlpPayload {
 }
 
 // Read live, so a rotated otlpAdditionalHeaders reaches the next send; report is the caller's guarded one.
-type SenderConf = Pick<ResolvedQueueConf, "acceptPlainHttpAuthorization" | "clock" | "otlpAdditionalHeaders" | "otlpHttpBaseURI" | "otlpProtocol">;
+type SenderConf = Pick<ResolvedQueueConf, "acceptPlainHttpCredentials" | "clock" | "otlpAdditionalHeaders" | "otlpHttpBaseURI" | "otlpProtocol">;
 
 function setsAuthorization(headers: Record<string, string> | undefined): boolean {
 	return Object.keys(headers ?? {}).some(name => name.toLowerCase() === "authorization");
@@ -983,7 +985,7 @@ class OtlpSender {
 	private readonly url: string;
 	private readonly warn: (msg: string) => void;
 
-	// Where an Authorization would go in the clear past this machine unaccepted, else undefined.
+	// Where a credential header would go in the clear past this machine unaccepted, else undefined.
 	private readonly plainHttpHost?: string;
 
 	constructor(conf: SenderConf, report: ResolvedQueueConf["report"], warn: (msg: string) => void) {
@@ -1020,7 +1022,7 @@ class OtlpSender {
 		}
 
 		// URL has already canonicalised an IPv4 host, so 127.1 reads 127.0.0.1 here.
-		if (!conf.acceptPlainHttpAuthorization && base.protocol === "http:" && !/^(localhost|127(\.\d+){3}|\[::1\])$/.test(base.hostname)) {
+		if (!conf.acceptPlainHttpCredentials && base.protocol === "http:" && !/^(localhost|127(\.\d+){3}|\[::1\])$/.test(base.hostname)) {
 			this.plainHttpHost = base.host;
 		}
 	}
@@ -1047,10 +1049,15 @@ class OtlpSender {
 			return { message: failure, reportAs: "OTLP export headers invalid, batch dropped", retry: false };
 		}
 
-		if (this.plainHttpHost !== undefined && headers.has("Authorization")) {
-			const source = setsAuthorization(this.conf.otlpAdditionalHeaders) ? "otlpAdditionalHeaders" : "user:pass@ in otlpHttpBaseURI";
+		if (this.plainHttpHost !== undefined) {
+			// Header names only: a name is no secret, and a value is the likeliest place for one.
+			for (const [name] of headers) {
+				if (SENSITIVE_HEADER_NAME.test(name)) {
+					const source = name === "authorization" && !setsAuthorization(this.conf.otlpAdditionalHeaders) ? "user:pass@ in otlpHttpBaseURI" : "otlpAdditionalHeaders";
 
-			this.warn(`@larvit/log: an Authorization header from ${source} goes over plain http: to ${this.plainHttpHost}, readable by anything on the network path; use an https: endpoint, or on a network you trust set acceptPlainHttpAuthorization: true on the Queue`);
+					this.warn(`@larvit/log: the ${name} header from ${source} goes over plain http: to ${this.plainHttpHost}, readable by anything on the network path; use an https: endpoint, or on a network you trust set acceptPlainHttpCredentials: true on the Queue`);
+				}
+			}
 		}
 
 		let body: string | Uint8Array<ArrayBuffer>;
@@ -1137,9 +1144,13 @@ export class Queue implements OtlpQueue {
 	private unreadable = false;
 
 	constructor(conf: QueueConf) {
+		const accepted = conf.acceptPlainHttpCredentials === true || conf.acceptPlainHttpAuthorization === true;
+
 		this.conf = {
 			...conf,
-			acceptPlainHttpAuthorization: conf.acceptPlainHttpAuthorization === true,
+			// Either name accepts, and both read back the one answer until 3.0.0 removes the old one.
+			acceptPlainHttpAuthorization: accepted,
+			acceptPlainHttpCredentials: accepted,
 			batchDelayMs: conf.batchDelayMs ?? 1000,
 			clock: conf.clock ?? systemClock,
 			key: conf.key ?? "@larvit/log:otlp-queue",
@@ -1161,6 +1172,10 @@ export class Queue implements OtlpQueue {
 		}
 
 		this.sender = new OtlpSender(this.conf, (msg, metadata) => this.report(msg, metadata), msg => this.warnOnce(msg));
+
+		if (conf.acceptPlainHttpAuthorization !== undefined) {
+			this.warnOnce("@larvit/log: acceptPlainHttpAuthorization is deprecated and removed in 3.0.0, use acceptPlainHttpCredentials");
+		}
 		this.ready = conf.storage ? this.load(conf.storage) : Promise.resolve();
 		this.scheduler = new ExportScheduler(this.conf, this.ready, () => this.round());
 	}
