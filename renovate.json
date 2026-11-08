@@ -1,8 +1,57 @@
 {
 	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
 	"automerge": true,
+	"customManagers": [
+		{
+			"customType": "regex",
+			"datasourceTemplate": "docker",
+			"managerFilePatterns": [
+				"/^\\.github/workflows/push\\.yaml$/"
+			],
+			"matchStrings": [
+				"(?<depName>node):(?<currentValue>\\d+\\.\\d+\\.\\d+-bookworm-slim)"
+			]
+		}
+	],
 	"extends": [
 		"config:recommended"
 	],
-	"minimumReleaseAge": "3 days"
+	"minimumReleaseAge": "3 days",
+	"packageRules": [
+		{
+			"allowedVersions": "/^18\\./",
+			"matchCurrentVersion": "/^18\\./",
+			"matchFileNames": [
+				".github/workflows/push.yaml"
+			]
+		},
+		{
+			"allowedVersions": "/^20\\./",
+			"matchCurrentVersion": "/^20\\./",
+			"matchFileNames": [
+				".github/workflows/push.yaml"
+			]
+		},
+		{
+			"allowedVersions": "/^22\\./",
+			"matchCurrentVersion": "/^22\\./",
+			"matchFileNames": [
+				".github/workflows/push.yaml"
+			]
+		},
+		{
+			"allowedVersions": "/^24\\./",
+			"matchCurrentVersion": "/^24\\./",
+			"matchFileNames": [
+				".github/workflows/push.yaml"
+			]
+		},
+		{
+			"allowedVersions": "/^26\\./",
+			"matchCurrentVersion": "/^26\\./",
+			"matchFileNames": [
+				".github/workflows/push.yaml"
+			]
+		}
+	]
 }

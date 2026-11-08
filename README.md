@@ -578,7 +578,7 @@ needs Node 18+ on the host.
 | Command | |
 |---|---|
 | `npm test` | Node and browser suites. |
-| `npm run test-docker` | Node suite. `NODE_IMAGE=node:18-bookworm-slim npm run test-docker` picks the version; CI runs 18 to 26. |
+| `npm run test-docker` | Node suite, on the Node 26 image the `Dockerfile` pins. `NODE_IMAGE=node:18.20.8-bookworm-slim npm run test-docker` picks another; CI runs 18 to 26. |
 | `npm run test-browser` | The same suite in Chromium. |
 | `npm run test-otlp` | Export to a real OpenTelemetry Collector, JSON and protobuf. `OTLP_DEBUG=1` prints what it received. |
 | `npm run lint` | eslint. |
