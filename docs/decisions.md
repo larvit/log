@@ -69,8 +69,8 @@ which keeps a test independent of run order. A `warnOnce` message is literal: an
 breaks the once-only rule. An unknown `logLevel` is keyed on its raw value, so only the first
 level-method call builds its text; `enabled` never writes. Every such line opens with
 `@larvit/log: `, part of that literal, so an app developer can tell which dependency emitted one
-about code they may not own. A `Queue`'s failure lines through `report` carry no prefix, since they report that developer's own setup; its plain-`http:`
-`Authorization` warning is a warning, and keeps it. Serves README → Goals #3. Writing to `stderr`
+about code they may not own. A `Queue`'s failure lines through `report` carry no prefix, since they
+report that developer's own setup; its plain-`http:` `Authorization` warning is a warning, and keeps it. Serves README → Goals #3. Writing to `stderr`
 works against `~/.claude/principles/logging.md` → Infrastructure until `todo.md` item 50 settles
 where this library's own lines go. Valid while this library writes its own warnings to a `stderr`
 sink.
