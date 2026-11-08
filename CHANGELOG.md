@@ -20,7 +20,7 @@
   `?key=` lookup cuts the path, and so does a ninth nested url. A url nested base64-encoded,
   as an image proxy such as imgproxy takes one, is read by the same rules, split over segments with
   `/` included: `/insecure/rs:fit:300/aHR0cHM6Ly9…` records `/insecure/rs:fit:300/REDACTED`.
-  Standard base64 is read with its `/` raw or percent-encoded. A credential found in split pieces
+  Standard base64 is read too. A credential found in split pieces
   records `REDACTED` from the first of the consecutive segments of base64 characters that lead to it,
   so `/media/v1/<chunks>` records `/REDACTED`. The first piece may follow other text in its
   segment, as in `/insecure/rs:fit:300/x.aHR0cHM6Ly91/…`, which records
