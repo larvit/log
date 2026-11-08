@@ -2196,6 +2196,10 @@ test("log.fetch redacts a credential in a url nested base64-encoded in the reque
 	const third = Math.ceil(runs.length / 12) * 4;
 	const paths = {
 		"/a/k%3Fsig%3Dpw83/https:%2F%2Fu:pw84@cb.test": "/a/REDACTED",
+		"/i/aHR0cHM6Ly9oLztzaWc9MQ": "/REDACTED",
+		"/img.v2/aHR0cHM6Ly9oLztzaWc9MQ": "/img.v2/REDACTED",
+		"/insecure/rs:fit:300/x.aHR0cHM6Ly91/c2VyOnBhc3NAaC50ZXN0L3gucG5n": "/insecure/rs:fit:300/REDACTED",
+		"/m/img;sig=pw87/x.png": "/m/REDACTED",
 		[`/c/${runs.slice(0, third)}/${runs.slice(third, 2 * third)}/${runs.slice(2 * third)}`]: "/REDACTED",
 		[`/rs:fit:3/${base64url("//u:pw85@cb.test/i.png")}`]: "/REDACTED",
 		[`/insecure/rs:fit:300/${base64url("https://s3.test/k?X-Amz-Signature=pw70&X-Amz-Date=1")}`]: "/insecure/rs:fit:300/REDACTED",
@@ -2213,6 +2217,8 @@ test("log.fetch redacts a credential in a url nested base64-encoded in the reque
 		[`/x/${base64url("//u:pw78à@cb.test/i.png")}`]: "/REDACTED",
 		[`/json/${base64url("{\"src\":\"https://Рoot:pw79@cb.test/i.png\"}")}`]: "/REDACTED",
 		[`/short/${base64url("//u:p@")}`]: "/REDACTED",
+		[`/insecure/rs:fit:300/x.${split(base64url("https://s3.test/k?sig=pw86"), 8)}.png`]: "/insecure/rs:fit:300/REDACTED",
+		[`/insecure/rs:fit:300/x.${split(base64url("https://cb.test/x?q=1"), 8)}`]: `/insecure/rs:fit:300/x.${split(base64url("https://cb.test/x?q=1"), 8)}`,
 		[`/a/k%3Fsig%3D1/${base64url("//u:pw82@cb.test")}`]: "/a/REDACTED",
 		[`/sixty/${Array.from({ length: 64 }, (_, index) => `AAAAAA${"abcdefgh"[index >> 3]}${"abcdefgh"[index & 7]}`).join(".")}`]: `/sixty/${Array.from({ length: 64 }, (_, index) => `AAAAAA${"abcdefgh"[index >> 3]}${"abcdefgh"[index & 7]}`).join(".")}`,
 		[`/clean/${base64url("https://cb.test/x?q=1")}`]: `/clean/${base64url("https://cb.test/x?q=1")}`,
@@ -2328,10 +2334,10 @@ test("log.fetch redacts its url in a runtime's rejection that parses as a url wh
 });
 
 test("log.fetch redacts a listed query key in a header value or kept query value that no url parser reads whole", async t => {
-	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ link: "</next?page=2&access_token=hunter2>; rel=next", location: "/cb?token=hunter2", "x-cursor": "page=2&sig=hunter2", "x-enc": "cb%3Ftoken%3Dhunter2", "x-keyword": "/search?keyword=kept&q=a", "x-nested": "/login?next=/cb?token=hunter2", "x-plain": "text/html; q=0.9", "x-tab": "/cb?to\tken=hunter2" }) }) : undefined);
+	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ link: "</next?page=2&access_token=hunter2>; rel=next", location: "/cb?token=hunter2", "x-cursor": "page=2&sig=hunter2", "x-enc": "cb%3Ftoken%3Dhunter2", "x-keyword": "/search?keyword=kept&q=a", "x-matrix": "/cdn/img;sig=hunter2", "x-nested": "/login?next=/cb?token=hunter2", "x-plain": "text/html; q=0.9", "x-tab": "/cb?to\tken=hunter2" }) }) : undefined);
 	const log = new Log({
 		captureQuery: true,
-		captureResponseHeaders: ["link", "location", "x-cursor", "x-enc", "x-keyword", "x-nested", "x-plain", "x-tab"],
+		captureResponseHeaders: ["link", "location", "x-cursor", "x-enc", "x-keyword", "x-matrix", "x-nested", "x-plain", "x-tab"],
 		otlpHttpBaseURI: "http://127.0.0.1:4318",
 		stderr: () => {},
 	});
@@ -2348,6 +2354,7 @@ test("log.fetch redacts a listed query key in a header value or kept query value
 	t.strictEqual(attr("http.response.header.x-enc"), "REDACTED", "and one percent-encoded");
 	t.strictEqual(attr("http.response.header.x-nested"), "REDACTED", "and one after a ? in another pair's value");
 	t.strictEqual(attr("http.response.header.x-tab"), "REDACTED", "and one with a tab the parser drops from a key");
+	t.strictEqual(attr("http.response.header.x-matrix"), "REDACTED", "and one after a ; as a matrix parameter");
 	t.strictEqual(attr("http.response.header.x-keyword"), "/search?keyword=kept&q=a", "a key that no listed name ends is kept");
 	t.strictEqual(attr("http.response.header.x-plain"), "text/html; q=0.9", "a value with no query is kept");
 
