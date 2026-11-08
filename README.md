@@ -308,10 +308,10 @@ A send has a 3 s timeout. Any 2xx is success; a JSON response whose `partialSucc
 count is reported with the count and the collector's message, and the batch is not resent. A network
 error, timeout, 408, 429 or 5xx keeps the batch for retry; any other non-2xx drops it, a 401 or 403
 reported as `OTLP export unauthorized, batch dropped`. In a
-short-lived script, `await end()` before exit: it sends what is queued at once. No timer, batch or
-retry, keeps a Node or Deno process alive, so a script that awaits neither `end()` nor `flush()`
-exits without exporting what it queued, and one whose first attempt fails loses the batch at exit,
-`await end()` or not; give the queue a `storage` to carry it into the next run.
+short-lived script, `await end()` before exit: it sends what is queued at once. A pending batch or
+retry never keeps a Node, Bun or Deno process alive, so a script that awaits neither `end()` nor
+`flush()` exits without exporting what it queued, and one whose first attempt fails loses the batch
+at exit, `await end()` or not; give the queue a `storage` to carry it into the next run.
 
 `flush()` on `Log` or `Queue` sends everything queued, one attempt per batch, and resolves when that
 round is done. A failed batch stays queued for the retry, and until that fires `flush()` attempts
