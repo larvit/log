@@ -2090,6 +2090,8 @@ test("log.fetch captureQuery redacts userinfo that a kept query splits across &"
 		["//u:pw88&w%0Ax%40h.test&m=1", `${redacted(2)}&m=1`],
 		["\\\\us%0Der:pw89&w%40h.test&m=1", `${redacted(2)}&m=1`],
 		// A no-break space or other whitespace a parser keeps doesn't end a run, a plain space does.
+		["//&u:p@host", redacted(2)],
+		["%5C%5C&u:p@host", redacted(2)],
 		["%2F%2Fu:p%C2%A0x&w@host", redacted(2)],
 		["%5C%5Cu:p%C2%A0x&w@host", redacted(2)],
 		["//u:p&x%C2%A0y%40h", redacted(2)],
@@ -2099,7 +2101,7 @@ test("log.fetch captureQuery redacts userinfo that a kept query splits across &"
 		["%5C%5Cb/c&x@y", "%5C%5Cb%2Fc=&x%40y="],
 		["%5C%5Ca%5Cb&x@y", "%5C%5Ca%5Cb=&x%40y="],
 		["a+b=c+d&q=1+2", "a+b=c+d&q=1+2"],
-		// `%C2%25A0` is a no-break space encoded twice, and `%2540` an `@`.
+		// `%2540` is an `@` encoded twice, and `%C2%25A0` a no-break space with its second byte encoded twice.
 		["next=//user:pw86%C2%25A0ss%2540host/x&m=1", "next=REDACTED&m=1"],
 		["//u:p87+q&w%40h.test&m=1", `${redacted(2)}&m=1`],
 		["//u:pw88+x&w%2540h.test&m=1", `${redacted(2)}&m=1`],
