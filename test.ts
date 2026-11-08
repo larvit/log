@@ -1682,6 +1682,7 @@ test("end({ error }) marks the span failed", async t => {
 	await new Log(conf).end({ error: new Error("request to https://h.test/x?to\nken=s3cr3tN&si\rg=s3cr3tO failed") });
 	await new Log(conf).end({ error: new Error("request to https://h.test/x?sig=a?code=s3cr3tP failed") });
 	await new Log(conf).end({ error: new Error("redirect to https://h.test/cb#access_token=s3cr3tQ&token_type=bearer, then /cb?page=2#id_token=s3cr3tR failed") });
+	await new Log(conf).end({ error: new Error("redirect to https://h.test/cb?#code=s3cr3tS&state=a, then /cb?x#code=s3cr3tT failed") });
 
 	t.deepEqual(exportedSpan(0).status, { code: 2, message: "refused" }, "status is ERROR with the error message");
 	t.strictEqual(attr(exportedSpan(0), "error.type"), "ECONNREFUSED", "error.type is the error's code when it has one");
@@ -1714,6 +1715,7 @@ test("end({ error }) marks the span failed", async t => {
 	t.deepEqual(exportedSpan(23).status, { code: 2, message: "request to https://h.test/x?to\nken=REDACTED&si\rg=REDACTED failed" }, "a newline or carriage return the parser drops from a key doesn't hide it");
 	t.deepEqual(exportedSpan(24).status, { code: 2, message: "request to https://h.test/x?sig=REDACTED failed" }, "a listed key's value holding a ? and a listed name is redacted in place");
 	t.deepEqual(exportedSpan(25).status, { code: 2, message: "redirect to https://h.test/cb#access_token=REDACTED&token_type=bearer, then /cb?page=2#id_token=REDACTED failed" }, "a listed key opening a fragment, as an OAuth implicit-flow redirect has one, is redacted in place");
+	t.deepEqual(exportedSpan(26).status, { code: 2, message: "redirect to https://h.test/cb?#code=REDACTED&state=a, then /cb?x#code=REDACTED failed" }, "a key that only an exact name lists, `code`, is redacted opening a fragment after a bare ? or a pair");
 	t.end();
 });
 
