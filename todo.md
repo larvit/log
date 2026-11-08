@@ -6,12 +6,13 @@
 
 `Bar = 0.5`
 
-`Next ID = 127`
+`Next ID = 128`
 
 ## Items
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
+| 127 | 2.5.0 |  | question | **Settle whether 2.5.0 ships `acceptPlainHttpAuthorization` as a deprecated alias or drops it, so no release carries a name that no release ever had.** | 1 | 1 | 2 | 2 | 2 | 1 by 2, 3 by 3 | 1.8 |
 | 106 | 2.5.0 |  | defect | **Run on React Native's own `URL`, whose getters throw "not implemented", or state in README → Runtimes that an app installs a `URL` polyfill.** | 2 | 3 | 3 | 6 | 2 | 2 by 8 | 1.5 |
 | 34 | 2.6.0 |  | principle | **Let a consumer inject the randomness trace and span ids come from.** | 1 | 1 | 1 | 1 | 2 | code health by 5 | 10.4 |
 | 37 | 2.6.0 |  | principle | **Build a span payload without writing to `log.span`.** | 1 | 1 | 1 | 1 | 2 | code health by 5 | 10.4 |
@@ -101,7 +102,21 @@
 
 ## Details
 
-### 104. Warn once about every credential header sent over plain `http:`, not only `Authorization`, and give the opt-out a name that covers them all.
+### 127. Settle whether 2.5.0 ships `acceptPlainHttpAuthorization` as a deprecated alias or drops it, so no release carries a name that no release ever had.
+
+The decision "Every credential header over plain `http:` warns once, and `acceptPlainHttpCredentials`
+silences it", answered on 2026-11-08, keeps `acceptPlainHttpAuthorization` as a deprecated alias
+until item 126 removes it in 3.0.0, "as README → Goals #8 asks". That premise is false: the name
+first appears under `## Unreleased`, and `git grep` on tag v2.4.0 finds no match. No consumer has
+ever had it, so semver gives it no claim.
+
+The alias costs a second documented option for one switch, the counter-signal of Goals #1 and #3,
+plus a deprecation line, a README row and item 126. Once 2.5.0 is cut the alias is real, and only a
+major removes it. Recommendation: drop it, and amend the decision. Item 104's chunk kept the alias
+because the decision is the maintainer's. Found by the stability, product-owner and prose reviews
+of that chunk.
+
+### 106. Run on React Native's own `URL`, whose getters throw "not implemented", or state in README → Runtimes that an app installs a `URL` polyfill.
 
 React Native 0.74's `Libraries/Blob/URL.js` throws "not implemented" from `host`, `origin`,
 `password`, `pathname`, `protocol`, `search` and `username`. `new Queue`, `new Log({ otlpHttpBaseURI })` and
@@ -421,7 +436,7 @@ as possible.
 
 ### 40. Make `queue.conf` read back what the queue sends with.
 
-A write to `otlpHttpBaseURI`, `otlpProtocol` or `acceptPlainHttpCredentials` changes nothing the
+A write to `otlpHttpBaseURI`, `otlpProtocol` or `acceptPlainHttpCredentials` doesn't change anything the
 sender froze, and a replaced `storage` is saved to a store it was never loaded from. Principle:
 Don't Repeat Yourself (two spellings that can disagree).
 
