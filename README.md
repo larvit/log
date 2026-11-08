@@ -479,7 +479,7 @@ yourself included.
   records `REDACTED`. A status
   message records `REDACTED` in place: `retry https://REDACTED@h/x`. A header value, query part or
   path is also read percent-decoded, up to eight times; one encoded deeper records `REDACTED`.
-- **A matched query key and its `=`, after a `?`, `&` or `#` in a header value, a kept query key or
+- **A matched query key and its `=`, after a `?`, `&`, `#` or `;` in a header value, a kept query key or
   value, or a status message,** where the rules above didn't reach it: `location: /cb?token=…`,
   `link: </next?access_token=…>`, node-fetch's `request to …?token=… failed`,
   `?src=%2F%2Fcdn.test%2Fk%3Fsig%3D…`, and an OAuth implicit-flow redirect's
@@ -492,7 +492,7 @@ yourself included.
 - **A url nested in the request path**, raw or percent-encoded, as a fetch-through or image proxy
   takes one. The path records `REDACTED` from the first segment that starts with a scheme, such as
   `https:`, and opens a url holding a credential by these rules: `/fetch/REDACTED`. It also records
-  `REDACTED` from the first segment where a matched query key follows a `?`, `&` or `#`, raw or
+  `REDACTED` from the first segment where a matched query key follows a `?`, `&`, `#` or `;`, raw or
   percent-encoded, wherever the nested url sits: `/fetch/s3.test/k%3Fsig%3D…` records
   `/fetch/s3.test/REDACTED`, and `/a/x=https:%2F%2Fcb.test%2Fx%3Fpassword%3D…` records
   `/a/REDACTED`. It also records `REDACTED` from the ninth segment starting with a scheme, whatever
@@ -503,7 +503,8 @@ yourself included.
   `/insecure/rs:fit:300/REDACTED`. A *run* is eight or more characters of the base64url alphabet,
   padded or not, starting anywhere in a segment; each run is decoded, and so is a run inside what it
   decodes. Standard base64 is read only where its `/` is percent-encoded. Consecutive segments made
-  of such characters are decoded joined, since imgproxy lets an encoded url be split with `/`, and a
+  of such characters are decoded joined, since imgproxy lets an encoded url be split with `/`, the
+  first of them also when it opens after other text in its segment with a run, as `x.aHR0cHM6Ly91…`, and a
   credential found there records `REDACTED` from the first of them: `/media/v1/<chunks>` records
   `/REDACTED`. Userinfo in decoded text that doesn't start with a scheme, such as `//u:p@host`,
   records the whole path as `/REDACTED`, and so does a segment holding more than 64 distinct runs,

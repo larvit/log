@@ -140,7 +140,7 @@ since a url written as a bare key reaches `url.full` the same way its value woul
 credentialed url arrives by every one of those routes and separate rules would disagree the way the
 two allow-lists used to. A value no header-name rule below covers is redacted where, parsed whole as
 a url, it holds a credential, or where its text holds userinfo after `//`, `\\`, `/\` or `\/`, or a
-listed key after a `?`, `&` or `#`. The `//` rule is v2.4.0's, so 2.5.0 redacts all v2.4.0 did. A header goes by name where its name,
+listed key after a `?`, `&`, `#` or `;`. The `//` rule is v2.4.0's, so 2.5.0 redacts all v2.4.0 did. A header goes by name where its name,
 ignoring case, matches Elastic APM's default `sanitize_field_names` (`password`, `passwd`, `pwd`,
 `secret`, `*key`, `*token*`, `*session*`, `*credit*`, `*card*`, `*auth*`, `set-cookie`,
 `*principal*`) or is `cookie`, the spec's optional addition
