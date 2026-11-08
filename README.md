@@ -500,13 +500,13 @@ yourself included.
   is read by the rules above: `/insecure/rs:fit:300/aHR0cHM6Ly9…` records
   `/insecure/rs:fit:300/REDACTED`. A *run* is eight or more characters of the base64url alphabet,
   padded or not, starting anywhere in a segment; each run is decoded, and so is a run inside what it
-  decodes. Standard base64 is read where its `/` is percent-encoded. Consecutive segments made of
-  such characters are decoded joined, since imgproxy lets an encoded url be split with `/`, and a
+  decodes. Standard base64 is read only where its `/` is percent-encoded. Consecutive segments made
+  of such characters are decoded joined, since imgproxy lets an encoded url be split with `/`, and a
   credential found there records `REDACTED` from the first of them: `/media/v1/<chunks>` records
-  `/REDACTED`. Userinfo in the decoded text, whatever it starts with, records the whole path as
-  `/REDACTED`, and so does a segment holding more than 64 distinct runs, ids and words included. A
-  random id or signature whose decoding happens to read as a credential does too: about 1 in 2,500
-  43-character signatures.
+  `/REDACTED`. Userinfo in decoded text that doesn't start with a scheme, such as `//u:p@host`,
+  records the whole path as `/REDACTED`, and so does a segment holding more than 64 distinct runs,
+  ids and words included. A random id or signature whose decoding happens to read as a credential
+  does too: about 1 in 2,500 43-character signatures.
 
 Never put credentials in the url; pass an `Authorization` header, and strip userinfo from a url you
 did not build. `log.fetch` mirrors the runtime: Node and browsers refuse such a url, while React
