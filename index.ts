@@ -1673,6 +1673,8 @@ const BASE64_CHAR = /[A-Za-z\d+_-]/;
 const BASE64_HEAD = new RegExp(`^${BASE64_CHAR.source}*`);
 const BASE64_DIGITS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 const MAX_BASE64_RUNS = 64;
+const MAX_CHAIN_PIECES = 64;
+const MAX_CHAIN_CHARS = 8192;
 
 // A base64 or base64url run as text: a byte from 0x80 up is written as the control character U+0080,
 // which is no whitespace, so a stray byte such as 0xA0 can't hide userinfo and no invalid UTF-8 makes
@@ -1735,77 +1737,76 @@ function segmentLevels(text: string, seen = new Set<string>()): string[] | undef
 	return all;
 }
 
-// imgproxy lets the encoded url be split with `/` anywhere, so consecutive segments made of base64
-// characters are read joined, from the first. An empty segment, from `//`, joins the chain too: a
-// proxy behind nginx sees the slashes merged, and reading the pieces joined can only redact more. A
-// `/` between pieces may also be standard base64's digit 63, so they are read joined with it too. A
-// segment holding anything else ends the chain after its leading base64 characters, such as `anBn`
-// in `anBn.png`, and starts the next with its trailing ones, its lead, such as `aHR0cHM6Ly91` in
-// `x.aHR0cHM6Ly91`: the first piece of a split url may follow other text. A chain with a lead is
+// imgproxy lets the encoded url be split with `/` anywhere, so a chain of consecutive segments made
+// of base64 characters is read joined, from its first. An empty segment, from `//`, doesn't end a
+// chain: no one has confirmed that a proxy accepts it, and reading the pieces joined can only redact
+// more. A `/` between pieces may also be standard base64's digit 63, so they are read joined with it
+// too. A segment holding anything else ends the chain after its leading base64 characters, such as
+// `anBn` in `anBn.png`, and starts the next with its trailing ones, its lead, such as `aHR0cHM6Ly91`
+// in `x.aHR0cHM6Ly91`: the first piece of a split url may follow other text. A chain with a lead is
 // read twice, with the lead and without it, since text glued in front of the url, such as
-// `thumbnails` in `img.thumbnails`, hides the scheme it starts with. So does a segment of its own,
-// as in `/thumbnails/aHR0cHM6dXNl/…`, so the chain is also read from each later segment, the way the
-// proxy reads it from the one where the url starts. A lead shorter than a run is credited to the
-// segment after it, or the `300` of `rs:fit:300` would pull that segment into the cut. A chain of
-// more than MAX_BASE64_RUNS segments is `undefined`, which counts as a credential: reading it from
-// each segment would take time quadratic in its length.
+// `thumbnails` in `img.thumbnails`, hides the scheme it starts with. A piece in front hides it the
+// same way, as in `/thumbnails/aHR0cHM6dXNl/…`, so the chain is also read from each later piece, the
+// way the proxy reads it from where the url starts. A lead shorter than a run is credited to the
+// segment after it, or the `300` of `rs:fit:300` would pull that segment into the cut. Reading from
+// each piece takes time in the pieces times the characters, so a chain of more than MAX_CHAIN_PIECES
+// pieces, or of more than MAX_CHAIN_CHARS characters from its third piece on, makes this return
+// `undefined`, which counts as a credential.
 function base64Chains(segments: string[]): Array<[number, string]> | undefined {
 	const chains: Array<[number, string]> = [];
 	let start = 0;
 	let lead = "";
-	let heads: string[] = [];
-	let firsts: number[] = [];
+	let pieces: Array<{ position: number; text: string }> = [];
+	let chars = 0;
+
+	const joined = (from: number, joiner: string) => pieces.slice(from).map(piece => piece.text).join(joiner);
 
 	const end = () => {
 		for (const joiner of ["", "/"]) {
-			const text = heads.join(joiner);
+			const text = joined(0, joiner);
 
-			// A lead alone is read with its own segment, and `firsts[0]` below exists only with a head.
+			// A lead alone is read with its own segment, and `pieces[0]` exists only with a piece.
 			if (lead !== "" && text !== "") {
-				chains.push([lead.length >= MIN_RUN ? start : firsts[0], lead + joiner + text]);
+				chains.push([lead.length >= MIN_RUN ? start : pieces[0].position, lead + joiner + text]);
 			}
 
 			// One piece joined with `/` is itself again.
-			if (text.length >= MIN_RUN && (joiner === "" || heads.length > 1)) {
-				chains.push([firsts[0], text]);
+			if (text.length >= MIN_RUN && (joiner === "" || pieces.length > 1)) {
+				chains.push([pieces[0].position, text]);
 			}
 
 			// The last piece alone is its own segment, which `redactedPath` reads already.
-			for (let drop = 1; drop < heads.length - 1; drop++) {
-				const rest = heads.slice(drop).join(joiner);
+			for (let drop = 1; drop < pieces.length - 1; drop++) {
+				const rest = joined(drop, joiner);
 
 				if (rest.length >= MIN_RUN) {
-					chains.push([firsts[drop], rest]);
+					chains.push([pieces[drop].position, rest]);
 				}
 			}
 		}
 
 		lead = "";
-		heads = [];
-		firsts = [];
+		pieces = [];
+		chars = 0;
 	};
 
 	for (const [index, segment] of segments.entries()) {
-		if (segment === "" && (heads.length > 0 || lead !== "")) {
+		if (segment === "") {
 			continue;
 		}
 
 		const head = BASE64_HEAD.exec(segment)?.[0] ?? "";
 
-		if (heads.length === 0 && lead === "") {
-			start = index;
-		}
-
 		if (head !== "") {
-			heads.push(head);
-			firsts.push(index);
+			pieces.push({ position: index, text: head });
+			chars += head.length;
 
-			if (heads.length > MAX_BASE64_RUNS) {
+			if (pieces.length > MAX_CHAIN_PIECES || (pieces.length > 2 && chars > MAX_CHAIN_CHARS)) {
 				return undefined;
 			}
 		}
 
-		if (head === segment && head !== "") {
+		if (head === segment) {
 			continue;
 		}
 
