@@ -125,10 +125,15 @@
   lines then go to that queue's `report`, `console.error` unless you pass one.
 - **Userinfo holding a tab, newline or carriage return is redacted in text that isn't a whole url.**
   A url parser drops those three characters, so `https://admin:hun<TAB>ter2@db.test/x` has the
-  password `hunter2`, yet a status message from `end({ error })` or a failed `log.fetch`, and a
-  captured header value that isn't a whole url, exported it unchanged. Now a status message records
-  `REDACTED` in place of the userinfo, `retry https://REDACTED@db.test/x`, after `//`, `\\`, `/\` or
-  `\/`, and such a header value records `REDACTED` whole.
+  password `hunter2`. Since v2.3.0 a captured header value that isn't a whole url, and since v2.4.0 a
+  status message from `end({ error })` or a failed `log.fetch`, exported such userinfo unchanged; so
+  did `url.full` with `captureQuery`, when the tab sat in a query key and the `@` was percent-encoded.
+  Now, after `//`, `\\`, `/\` or `\/`, a status message records `REDACTED` in place of the userinfo,
+  as in `retry https://REDACTED@db.test/x`, and a header value records `REDACTED` whole. Text with no
+  credential in it is redacted too when a tab, newline or carriage return sits between its `//` and an
+  `@`: `//note`, a line break and `@mention`. Search captured header values, status messages and
+  `url.full` with `(?i)(https?:|([\\/]|%(25)*(2F|5C)){2})[^ ]*(@|%(25)*40)` and rotate any password a
+  match holds; a match reading `REDACTED` before its `@` holds none.
 
 ### Everything else
 
