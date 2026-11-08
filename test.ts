@@ -2089,8 +2089,17 @@ test("log.fetch captureQuery redacts userinfo that a kept query splits across &"
 		["//u:pw87&w%09x%40h.test&m=1", `${redacted(2)}&m=1`],
 		["//u:pw88&w%0Ax%40h.test&m=1", `${redacted(2)}&m=1`],
 		["\\\\us%0Der:pw89&w%40h.test&m=1", `${redacted(2)}&m=1`],
+		// A no-break space or other whitespace a parser keeps doesn't end a run, a plain space does.
+		["%2F%2Fu:p%C2%A0x&w@host", redacted(2)],
+		["%5C%5Cu:p%C2%A0x&w@host", redacted(2)],
+		["//u:p&x%C2%A0y%40h", redacted(2)],
+		["%2F%2Fhost&and%20mail%20a%40b", "%2F%2Fhost=&and+mail+a%40b="],
+		["%2F%2Fh&a%23b%40c", "%2F%2Fh=&a%23b%40c="],
+		["//b/c&x@y", "%2F%2Fb%2Fc=&x%40y="],
+		["%5C%5Cb/c&x@y", "%5C%5Cb%2Fc=&x%40y="],
+		["%5C%5Ca%5Cb&x@y", "%5C%5Ca%5Cb=&x%40y="],
 		["a+b=c+d&q=1+2", "a+b=c+d&q=1+2"],
-		// Only the form-decoded reading finds this userinfo: raw, `%C2%25A0` decodes to a space before the `@`.
+		// `%C2%25A0` is a no-break space encoded twice, and `%2540` an `@`.
 		["next=//user:pw86%C2%25A0ss%2540host/x&m=1", "next=REDACTED&m=1"],
 		["//u:p87+q&w%40h.test&m=1", `${redacted(2)}&m=1`],
 		["//u:pw88+x&w%2540h.test&m=1", `${redacted(2)}&m=1`],
@@ -2423,37 +2432,39 @@ test("log.fetch redacts userinfo holding a tab the parser drops, in a captured h
 	t.end();
 });
 
-test("userinfo holding a whitespace character other than a space is redacted in text that isn't a whole url", async t => {
-	// WHATWG URL's authority state ends userinfo only at `/`, `?`, `#` and, in a special url, `\`, and its
-	// userinfo percent-encode set encodes any other character, so `new URL("https://a:b c@h")` has the
-	// password `b%20c`. A plain space still ends it in text, so prose such as `//host and mail a@b` reads on.
-	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ "x-nbsp": "retry https://admin:hun ter2@db.test/x", "x-nbsp2": "db \\\\admin:hun ter2@h" }) }) : undefined);
-	const conf = { captureResponseHeaders: ["x-nbsp", "x-nbsp2"], otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} };
-	const whitespace = ["\v", "\f", " ", " ", " ", " ", " ", " ", " ", " ", "　", "﻿"];
+// A url parser keeps these in userinfo, so a status message redacts it; only a plain space ends it in text.
+for (const character of ["\v", "\f", "\u00a0", "\u1680", "\u2000", "\u200a", "\u2028", "\u2029", "\u202f", "\u205f", "\u3000", "\ufeff"]) {
+	test(`userinfo holding U+${character.charCodeAt(0).toString(16).padStart(4, "0")} is redacted in a status message`, async t => {
+		const { calls } = stubFetch();
 
-	for (const character of whitespace) {
-		await new Log(conf).end({ error: new Error(`retry https://us${character}er:pw${character}hunter2@db.test/x and \\\\us${character}er:pw${character}hunter2@h and https:\\/pw${character}hunter2@h`) });
-	}
+		await new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} }).end({ error: new Error(`retry https://us${character}er:pw${character}hunter2@db.test/x and \\\\us${character}er:pw${character}hunter2@h and https:\\/pw${character}hunter2@h`) });
 
-	await new Log(conf).end({ error: new Error("see //host and mail a@b, see \\\\host and mail a@b") });
+		t.deepEqual(exportedSpans(calls)[0].status, { code: 2, message: "retry https://REDACTED@db.test/x and \\\\REDACTED@h and https:\\/REDACTED@h" }, "after //, \\\\ and \\/");
+		t.end();
+	});
+}
 
-	const log = new Log(conf);
+test("a plain space still ends userinfo in a status message", async t => {
+	const { calls } = stubFetch();
+
+	await new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} }).end({ error: new Error("see //host and mail a@b, see \\\\host and mail a@b") });
+
+	t.deepEqual(exportedSpans(calls)[0].status, { code: 2, message: "see //host and mail a@b, see \\\\host and mail a@b" });
+	t.end();
+});
+
+test("log.fetch redacts userinfo holding a no-break space in a captured header value", async t => {
+	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ "x-nbsp": "retry https://admin:hun\u00a0ter2@db.test/x", "x-nbsp2": "db \\\\admin:hun\u00a0ter2@h" }) }) : undefined);
+	const log = new Log({ captureResponseHeaders: ["x-nbsp", "x-nbsp2"], otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 
 	await log.fetch("https://api.test/h");
 	await log.end();
 
-	const spans = exportedSpans(calls);
-	const attr = (span: any, key: string) => span.attributes.find((attribute: any) => attribute.key === key)?.value.stringValue;
+	const span = exportedSpans(calls).find(exported => exported.kind === 3);
+	const attr = (key: string) => span.attributes.find((attribute: any) => attribute.key === key)?.value.stringValue;
 
-	whitespace.forEach((character, index) => {
-		t.deepEqual(spans[index].status, { code: 2, message: "retry https://REDACTED@db.test/x and \\\\REDACTED@h and https:\\/REDACTED@h" }, `userinfo holding U+${character.charCodeAt(0).toString(16).padStart(4, "0")} is redacted, opened by //, \\\\ or \\/`);
-	});
-	t.deepEqual(spans[whitespace.length].status, { code: 2, message: "see //host and mail a@b, see \\\\host and mail a@b" }, "a plain space still ends userinfo");
-
-	const fetchSpan = spans.find(span => span.kind === 3);
-
-	t.strictEqual(attr(fetchSpan, "http.response.header.x-nbsp"), "REDACTED", "a captured header value holding a no-break space in a password is redacted");
-	t.strictEqual(attr(fetchSpan, "http.response.header.x-nbsp2"), "REDACTED", "and one opened by a backslash pair");
+	t.strictEqual(attr("http.response.header.x-nbsp"), "REDACTED", "after //");
+	t.strictEqual(attr("http.response.header.x-nbsp2"), "REDACTED", "and after a backslash pair");
 	t.end();
 });
 

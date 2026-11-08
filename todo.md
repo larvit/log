@@ -117,11 +117,11 @@ In text that isn't a whole url, such as a span status message from `end({ error 
 whitespace other than a tab, newline or carriage return (`valueEnd = /[&#]|[^\S\t\n\r]/g`). A url
 parser keeps a no-break space, `\v`, `\f`, U+2028 and other Unicode whitespace in a query value,
 percent-encoding it, so `?token=ab<NBSP>cd` exports `cd` of the credential unchanged. It breaks
-README → Goals #7, credentials never leave. It is the class of the userinfo whitespace fix item 124
-ships in `SLASHED_USERINFO` and `URL_DELIMITER`: in the WHATWG URL Standard only a plain space is
-a delimiter text can deliberately hold. README → "A matched query key and its `=`" and its CHANGELOG
-entry say "whitespace other than a tab, newline or carriage return", which this item changes. Found
-on 2026-11-08 by the security pass of item 124's chunk.
+README → Goals #7, credentials never leave. The userinfo rules in `SLASHED_USERINFO` and
+`URL_DELIMITER` already end only at a plain space, which this library chooses so prose such as
+`//host and mail a@b` stays readable; a value should end the same way. README → "A matched query key
+and its `=`" and the CHANGELOG entry for it say "whitespace other than a tab, newline or carriage
+return", which this item changes.
 
 ### 7. Unref the batch timer, so a pending batch never holds a Node or Deno process.
 

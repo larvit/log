@@ -1387,10 +1387,10 @@ const holdsUserinfo = (url: URL) => url.username !== "" || url.password !== "";
 
 // v2.4.0's `//` rule, and the same after `\\`, `/\` or `\/`: they match a url among other text, or one
 // the runtime cannot parse. After an opener holding a `\`, userinfo may not hold a `\`, so matching a
-// long run of `\` stays linear. WHATWG URL's authority state ends userinfo only at a `/`, `?`, `#` and,
-// in a special url, a `\`, and percent-encodes any other character, so `new URL("https://a:b\u00a0c@h")`
-// has the password `b%C2%A0c`: userinfo holds every whitespace character. Only a plain space ends it
-// here, so `see //host and mail a@b` stays as written. Each tail is one character class: a group of
+// long run of `\` stays linear. Only a `/`, `?` or `#` ends userinfo in WHATWG URL's authority state,
+// as does a `\` in a special url, so a parser keeps a no-break space, a `\v` or a U+2028 in a
+// password, and drops only a tab, newline or carriage return. A plain space ends it here all the same,
+// so `see //host and mail a@b` stays as written. Each tail is one character class: a group of
 // alternatives would overflow the regex stack on a message of megabytes.
 const SLASHED_USERINFO = /(:?\/\/)[^/?# ]*@/g;
 const BACKSLASH_OPENED_USERINFO = /(:?(?:\\[/\\]|\/\\))[^/\\?# ]*@/g;
@@ -1551,8 +1551,7 @@ function redactedSearch(url: URL, depth: number, partsRead: PartsRead): string |
 	// a literal delimiter ends a run and only a literal `@` counts: a `%2F` or `%40` there is no `/` or
 	// `@`. Percent-decoded, an escaped delimiter ends a run and an escaped `@` counts, for a consumer
 	// that decodes first; its `+` stays, since a parser takes it as part of the userinfo. Form-decoded,
-	// as `searchParams` reads it, invalid UTF-8 becomes U+FFFD, so it can't decode to whitespace that
-	// would hide a run from the percent-decoded reading, as `%C2%25A0` does.
+	// as `searchParams` reads it, a `+` is a space and ends a run.
 	const split = new Set([
 		...splitUserinfoPairs(pairs, holdsAtSignAtAnyLevel),
 		...splitUserinfoPairs(raw.map(([key, value]): [string, string] => [percentDecoded(key), percentDecoded(value)]), holdsAtSignAtAnyLevel),
@@ -1611,7 +1610,7 @@ function redactQueryPair(key: string, value: string, [rawKey, rawValue]: [string
 	}
 
 	// Userinfo across the `=`, as in `?//u:p=w@host`, is found by `splitUserinfoPairs` and never reaches here.
-	// Form-decoded and raw both: a `+` or an escaped delimiter ends the match in one reading, invalid UTF-8 in the other.
+	// Form-decoded and raw both: a `+` or an escaped delimiter ends the match in one reading.
 	if (textHoldsUserinfo(key) || textHoldsUserinfo(rawKey) || textHoldsQueryKey(key)) {
 		return ["REDACTED", "REDACTED"];
 	}
@@ -1677,8 +1676,7 @@ const MAX_CHAIN_PIECES = 64;
 const MAX_CHAIN_CHARS = 8192;
 
 // A base64 or base64url run as text: a byte from 0x80 up is written as the control character U+0080,
-// which no rule ends userinfo at, so a stray byte can't hide userinfo and no invalid UTF-8 makes
-// `percentDecoded` throw, as it would on a long run of `%XX`.
+// so no invalid UTF-8 makes `percentDecoded` throw, as it would on a long run of `%XX`.
 function base64Text(run: string): string {
 	let text = "";
 	let buffer = 0;

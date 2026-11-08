@@ -468,7 +468,7 @@ yourself included.
 - **Userinfo after `//`, `\\`, `/\` or `\/` in a captured header value, a kept query key or value, a
   status message or the request path:** an `@` after `//` with no `/`, `?`, `#` or space between,
   or after `\\`, `/\` or `\/` with none of those and no `\` between. Any other whitespace character,
-  such as a no-break space, stays inside the userinfo, as a url parser keeps it. This covers a url
+  a tab or a no-break space included, stays inside the userinfo. This covers a url
   among other text, and one the runtime cannot parse, such as `//user:pass@host`. A header value or
   query value records `REDACTED` whole. A query key holding such userinfo, or one where the userinfo
   runs across the `=` or an `&`, as in `?//u:p=w@host` and `?//u:p&w@host`, records `REDACTED`
