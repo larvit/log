@@ -272,8 +272,10 @@ const appLog = new Log({
 With `storage`, undelivered items are written after every change and loaded, ahead of new ones, by
 the next `Queue` created with the same `storage` and `key`. `AsyncStorage` and `localStorage` fit
 `storage` as they are; anything with `getItem`, `setItem` and `removeItem`, sync or async, does.
-Create one `Queue` per `key` per process, two would overwrite each other. Without `storage` the
-queue is in memory only.
+Create one `Queue` per `key` per process, two would overwrite each other. A batch being sent stays
+stored until the send settles. If `getItem` throws, the stored queue is left as it is and nothing is
+written to it until the next start, so a read that failed once can't cost what a phone held offline.
+Without `storage` the queue is in memory only.
 
 `new Queue(options)`. The endpoint belongs to the queue: a `Log` given `otlpQueue` rejects
 `otlpHttpBaseURI`, `otlpProtocol` and `otlpAdditionalHeaders` beside it.
@@ -412,9 +414,6 @@ rejection and the promise you see are exactly what the runtime produced. What it
 and never a success the platform would have refused. The request differs from yours only by
 `traceparent`, which is not CORS-safelisted, so a cross-origin call is preflighted and needs the
 server to list it in `Access-Control-Allow-Headers`.
-
-Until 2.5.0, a `Request` as `init` keeps only its headers: its method, body, signal and every other
-setting are dropped, though the span still names its method.
 
 Only a URL that resolves to `http:` or `https:` is traced — a relative one resolves against the
 page, so it is untraced where there is no page, as on a server, and where the page is not

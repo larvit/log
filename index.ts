@@ -1124,11 +1124,15 @@ export class Queue implements OtlpQueue {
 	private bytes = 0;
 	private dropped = 0;
 	private items: QueuedItem[] = [];
+	// The batch being sent: out of items, but kept in storage until its send settles.
+	private inflight: QueuedItem[] = [];
 
 	// Storage only: leftovers load before the first round, and saves coalesce into one writer.
 	private dirty = false;
 	private readonly ready: Promise<void>;
 	private saving?: Promise<void>;
+	// A getItem that threw: what storage holds stays untouched, since a later read may return it.
+	private unreadable = false;
 
 	constructor(conf: QueueConf) {
 		this.conf = {
@@ -1188,10 +1192,15 @@ export class Queue implements OtlpQueue {
 	private async round(): Promise<void> {
 		while (this.items.length) {
 			const batch = this.takeBatch();
+
+			this.inflight = batch;
+
 			const failure = await this.sender.send(batch);
 
+			this.inflight = [];
+
 			if (failure?.retry) {
-				this.prepend(batch);
+				this.prepend(batch, batch.length);
 				this.scheduleSave();
 
 				const retryInMs = this.scheduler.backoff();
@@ -1274,21 +1283,22 @@ export class Queue implements OtlpQueue {
 	}
 
 	// A failed or persisted batch is older than anything queued since, so it goes in front.
-	private prepend(items: QueuedItem[]): void {
+	// A failed batch is spared the trim (its first `spared` items stay), since its report promised a retry.
+	private prepend(items: QueuedItem[], spared = 0): void {
 		this.items.unshift(...items);
-		this.countAndTrim(items);
+		this.countAndTrim(items, spared);
 	}
 
-	// Drops the oldest over maxItems.
-	private countAndTrim(items: QueuedItem[]): void {
+	// Drops the oldest over maxItems after the first `spared` items. Spared items alone may exceed maxItems.
+	private countAndTrim(items: QueuedItem[], spared = 0): void {
 		for (const item of items) {
 			this.bytes += item.bytes;
 		}
 
-		const excess = this.items.length - this.conf.maxItems;
+		const excess = Math.min(this.items.length - this.conf.maxItems, this.items.length - spared);
 
 		if (excess > 0) {
-			for (const item of this.items.splice(0, excess)) {
+			for (const item of this.items.splice(spared, excess)) {
 				this.bytes -= item.bytes;
 			}
 
@@ -1297,9 +1307,18 @@ export class Queue implements OtlpQueue {
 	}
 
 	private async load(storage: QueueStorage): Promise<void> {
-		try {
-			const raw = await storage.getItem(this.conf.key);
+		let raw: string | null | undefined;
 
+		try {
+			raw = await storage.getItem(this.conf.key);
+		} catch (err) {
+			this.unreadable = true;
+			this.report("OTLP queue storage unreadable, kept and not written to", withoutUndefined({ error: stringField(err, "message"), key: this.conf.key }));
+
+			return;
+		}
+
+		try {
 			if (!raw) {
 				return;
 			}
@@ -1338,12 +1357,14 @@ export class Queue implements OtlpQueue {
 	private async save(storage: QueueStorage): Promise<void> {
 		await this.ready;
 
-		while (this.dirty) {
+		while (this.dirty && !this.unreadable) {
 			this.dirty = false;
 
 			try {
-				if (this.items.length) {
-					await storage.setItem(this.conf.key, JSON.stringify(this.items.map(item => item.payload)));
+				const persisted = [...this.inflight, ...this.items];
+
+				if (persisted.length) {
+					await storage.setItem(this.conf.key, JSON.stringify(persisted.map(item => item.payload)));
 				} else {
 					await storage.removeItem(this.conf.key);
 				}
@@ -2274,7 +2295,10 @@ async function tracedFetch(log: Pick<Log, "conf" | "context" | "sampled" | "span
 			...url.port ? { "server.port": Number(url.port) } : {},
 		});
 
-		const headers = new Headers(init?.headers);
+		// A Request's method, body, signal and other settings are prototype getters, which a spread drops:
+		// the platform builds the request from it as fetch(url, init) would, and the header goes on that.
+		const request = typeof Request === "function" && init instanceof Request ? new Request(url, init) : undefined;
+		const headers = request?.headers ?? new Headers(init?.headers);
 
 		if (!headers.has("traceparent")) {
 			headers.set("traceparent", formatTraceparent(span.traceId, span.spanId, log.sampled));
@@ -2282,7 +2306,7 @@ async function tracedFetch(log: Pick<Log, "conf" | "context" | "sampled" | "span
 
 		captureHeaders(log, "captureRequestHeaders", headers, attributes);
 
-		const res = await globalThis.fetch(url, { ...init, headers });
+		const res = await (request ? globalThis.fetch(request) : globalThis.fetch(url, { ...init, headers }));
 
 		attributes["http.response.status_code"] = res.status;
 		span.status.code = res.status >= 400 ? STATUS_CODE_ERROR : STATUS_CODE_UNSET;
