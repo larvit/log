@@ -57,6 +57,13 @@ function fakeStorage(async: boolean): QueueStorage & { data: Map<string, string>
 	};
 }
 
+// The log record bodies a storage holds under the default key, in stored order.
+function storedRecords(storage: { data: Map<string, string> }): string[] {
+	const payloads: any[] = JSON.parse(storage.data.get("@larvit/log:otlp-queue") ?? "[]");
+
+	return payloads.flatMap(payload => payload.resourceLogs?.flatMap((resourceLog: any) => resourceLog.scopeLogs.flatMap((scopeLog: any) => scopeLog.logRecords.map((rec: any) => rec.body.stringValue))) ?? []);
+}
+
 // The OTLP nanosecond spelling of a millisecond instant; ns overflows Number, so build the string.
 const nanos = (msTimestamp: number) => `${msTimestamp}000000`;
 
@@ -1241,14 +1248,68 @@ test("Queue keeps a batch it reported a retry for through the maxItems trim", as
 	log.info("e");
 	released = true;
 	await flushed;
+	log.info("f");
 	await clock.advance(1000);
 
-	t.deepEqual(exportedRecords(calls.slice(1)), ["a", "b", "e"], "the retry sends the failed batch and the newest record, the older records waiting behind it are dropped");
-	t.deepEqual(reports.lines.filter(line => line.msg === "OTLP queue full, oldest items dropped"), [{ dropped: 2, msg: "OTLP queue full, oldest items dropped" }], "the drop is reported with its count");
+	t.deepEqual(exportedRecords(calls.slice(1)), ["a", "b", "f"], "the retry sends the failed batch and the newest record, whether the queue overflowed before the retry wait or during it");
+	t.deepEqual(reports.lines.filter(line => line.msg === "OTLP queue full, oldest items dropped").map(line => line.dropped), [2, 1], "each drop is reported with its count");
 	t.end();
 });
 
-test("Queue keeps a batch in storage while it is sent, so a record logged then saves it too", async t => {
+test("Queue keeps a batch in storage when a round takes it before the first save runs", async t => {
+	const storage = fakeStorage(true);
+	let loaded = false;
+	let released = false;
+	const { getItem } = storage;
+
+	storage.getItem = async key => {
+		await waitFor(() => loaded);
+
+		return getItem(key);
+	};
+
+	const { calls } = stubFetch(async () => {
+		await waitFor(() => released);
+
+		return undefined;
+	});
+	const log = new Log({ otlpQueue: new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, storage }), stderr: () => {} });
+	const flushed = log.flush();
+
+	log.info("only");
+	loaded = true;
+	await waitFor(() => calls.length === 1);
+	await waitFor(() => storage.data.size === 1);
+	t.deepEqual(storedRecords(storage), ["only"], "the save that finds no item waiting still writes the batch in flight");
+	released = true;
+	await flushed;
+	await waitFor(() => storage.data.size === 0);
+	t.end();
+});
+
+test("Queue drops the oldest leftovers over maxItems when it loads them", async t => {
+	const storage = fakeStorage(false);
+	const reports = reportSink();
+
+	stubFetch(() => { throw new Error("offline"); });
+	const before = new Log({ otlpQueue: new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, retryDelayMs: 3600000, storage }), stderr: () => {} });
+
+	before.info("old");
+	before.info("middle");
+	before.info("new");
+	await before.flush();
+	await waitFor(() => storedRecords(storage).length === 3);
+
+	const { calls } = stubFetch();
+	const after = new Log({ otlpQueue: new Queue({ maxItems: 2, otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report, storage }), stderr: () => {} });
+
+	await after.flush();
+	t.deepEqual(exportedRecords(calls), ["middle", "new"], "the oldest leftover is dropped");
+	t.strictEqual(reports.lines.find(line => line.msg === "OTLP queue full, oldest items dropped")?.dropped, 1, "and counted");
+	t.end();
+});
+
+test("Queue keeps a batch in storage while it is sent, so a record logged meanwhile is saved behind it", async t => {
 	const storage = fakeStorage(false);
 	let released = false;
 	const { calls } = stubFetch(async () => {
@@ -1264,7 +1325,7 @@ test("Queue keeps a batch in storage while it is sent, so a record logged then s
 	await waitFor(() => calls.length === 1);
 	log.info("logged during the send");
 	await waitFor(() => (storage.data.get("@larvit/log:otlp-queue") ?? "").includes("logged during the send"));
-	t.ok(storage.data.get("@larvit/log:otlp-queue")?.includes("sending"), "the batch in flight is still persisted");
+	t.deepEqual(storedRecords(storage), ["sending", "logged during the send"], "the batch in flight is still persisted, in front of the newer record");
 	released = true;
 	await flushed;
 	await waitFor(() => storage.data.size === 0);
@@ -1295,7 +1356,7 @@ for (const async of [false, true]) {
 		await log.end();
 		t.deepEqual(exportedRecords(calls), ["new"], "new records are still delivered");
 		t.strictEqual(storage.data.get("@larvit/log:otlp-queue"), held, "the stored queue is neither removed nor overwritten");
-		t.deepEqual(reports.lines, [{ error: "flaky", key: "@larvit/log:otlp-queue", msg: "OTLP queue storage unreadable, kept and not written to" }], "the failed read is reported once");
+		t.deepEqual(reports.lines, [{ error: "flaky", key: "@larvit/log:otlp-queue", msg: "OTLP queue storage unreadable, stored queue kept and not written to" }], "the failed read is reported once");
 		t.end();
 	});
 }

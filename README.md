@@ -272,10 +272,9 @@ const appLog = new Log({
 With `storage`, undelivered items are written after every change and loaded, ahead of new ones, by
 the next `Queue` created with the same `storage` and `key`. `AsyncStorage` and `localStorage` fit
 `storage` as they are; anything with `getItem`, `setItem` and `removeItem`, sync or async, does.
-Create one `Queue` per `key` per process, two would overwrite each other. A batch being sent stays
-stored until the send settles. If `getItem` throws, the stored queue is left as it is and nothing is
-written to it until the next start, so a read that failed once can't cost what a phone held offline.
-Without `storage` the queue is in memory only.
+Create one `Queue` per `key` per process, two would overwrite each other. If `getItem` throws, the
+stored queue is left as it is and nothing is written to it until the next start. Without `storage`
+the queue is in memory only.
 
 `new Queue(options)`. The endpoint belongs to the queue: a `Log` given `otlpQueue` rejects
 `otlpHttpBaseURI`, `otlpProtocol` and `otlpAdditionalHeaders` beside it.
@@ -409,7 +408,7 @@ keeps it native. Levels map to OTLP severity through the exported `LogLevels` ta
 ## `log.fetch` in depth
 
 **`log.fetch` mirrors the runtime's `fetch`** ([Goals #2.1 and #3](#goals)). It takes a `string` or
-`URL` and an `init`. On an instance not yet ended, given a plain-object `init`, the response, the
+`URL` and an `init`. On an instance not yet ended, given an `init`, the response, the
 rejection and the promise you see are exactly what the runtime produced. What it adds is outbound trace context and a span,
 and never a success the platform would have refused. The request differs from yours only by
 `traceparent`, which is not CORS-safelisted, so a cross-origin call is preflighted and needs the

@@ -1126,6 +1126,8 @@ export class Queue implements OtlpQueue {
 	private items: QueuedItem[] = [];
 	// The batch being sent: out of items, but kept in storage until its send settles.
 	private inflight: QueuedItem[] = [];
+	// The first `retained` items are a failed batch whose retry its report promised, so the trim spares them.
+	private retained = 0;
 
 	// Storage only: leftovers load before the first round, and saves coalesce into one writer.
 	private dirty = false;
@@ -1200,7 +1202,8 @@ export class Queue implements OtlpQueue {
 			this.inflight = [];
 
 			if (failure?.retry) {
-				this.prepend(batch, batch.length);
+				this.retained = batch.length;
+				this.prepend(batch);
 				this.scheduleSave();
 
 				const retryInMs = this.scheduler.backoff();
@@ -1243,6 +1246,7 @@ export class Queue implements OtlpQueue {
 
 		this.items = this.items.filter(item => !taken.has(item));
 		this.bytes -= bytes;
+		this.retained = 0;
 
 		return batch;
 	}
@@ -1283,22 +1287,21 @@ export class Queue implements OtlpQueue {
 	}
 
 	// A failed or persisted batch is older than anything queued since, so it goes in front.
-	// A failed batch is spared the trim (its first `spared` items stay), since its report promised a retry.
-	private prepend(items: QueuedItem[], spared = 0): void {
+	private prepend(items: QueuedItem[]): void {
 		this.items.unshift(...items);
-		this.countAndTrim(items, spared);
+		this.countAndTrim(items);
 	}
 
-	// Drops the oldest over maxItems after the first `spared` items. Spared items alone may exceed maxItems.
-	private countAndTrim(items: QueuedItem[], spared = 0): void {
+	// Drops the oldest over maxItems, but not the retained batch: it came out of items, so it never exceeds maxItems.
+	private countAndTrim(items: QueuedItem[]): void {
 		for (const item of items) {
 			this.bytes += item.bytes;
 		}
 
-		const excess = Math.min(this.items.length - this.conf.maxItems, this.items.length - spared);
+		const excess = this.items.length - this.conf.maxItems;
 
 		if (excess > 0) {
-			for (const item of this.items.splice(spared, excess)) {
+			for (const item of this.items.splice(this.retained, excess)) {
 				this.bytes -= item.bytes;
 			}
 
@@ -1313,7 +1316,7 @@ export class Queue implements OtlpQueue {
 			raw = await storage.getItem(this.conf.key);
 		} catch (err) {
 			this.unreadable = true;
-			this.report("OTLP queue storage unreadable, kept and not written to", withoutUndefined({ error: stringField(err, "message"), key: this.conf.key }));
+			this.report("OTLP queue storage unreadable, stored queue kept and not written to", withoutUndefined({ error: stringField(err, "message"), key: this.conf.key }));
 
 			return;
 		}
@@ -2295,8 +2298,8 @@ async function tracedFetch(log: Pick<Log, "conf" | "context" | "sampled" | "span
 			...url.port ? { "server.port": Number(url.port) } : {},
 		});
 
-		// A Request's method, body, signal and other settings are prototype getters, which a spread drops:
-		// the platform builds the request from it as fetch(url, init) would, and the header goes on that.
+		// A spread drops a Request's method, body, signal and other settings, which are prototype getters.
+		// So the platform builds the request from it, as fetch(url, init) would, and traceparent goes on that.
 		const request = typeof Request === "function" && init instanceof Request ? new Request(url, init) : undefined;
 		const headers = request?.headers ?? new Headers(init?.headers);
 

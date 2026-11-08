@@ -152,13 +152,15 @@
 - **A batch whose retry was reported survives the `maxItems` trim.** Before, a failed batch went
   back in front of the queue and the trim dropped it first, so an offline app at `maxItems` reported
   "OTLP export failed, will retry" for items the retry then found gone. Now the trim drops the
-  oldest items behind that batch, and the batch is retried whole.
+  oldest items behind that batch, also while records are logged during the retry wait, and the
+  batch is retried whole.
 - **A batch being sent stays in `storage` until its send settles.** Before, a record logged during
   the send saved the queue without the batch, so a process that died then lost it.
 - **A `storage` whose `getItem` throws keeps what it holds.** Before, one failed read at startup
-  deleted the stored queue, and the first save overwrote it. Now one `@larvit/log:` line says
-  "OTLP queue storage unreadable, kept and not written to", and the queue stays in memory only until
-  the next start. Content that reads but isn't a list of payloads is still discarded.
+  deleted the stored queue, and the first save overwrote it. Now the queue reports "OTLP queue
+  storage unreadable, stored queue kept and not written to", leaves the stored queue as it is, and
+  writes nothing to it until the next start; new records are still sent from memory. Content that
+  reads but isn't a list of payloads is still discarded.
 - **`log.enabled(level)` never writes, so a library author's check emits no line.** Before, an
   unknown `logLevel` made `enabled()` write the warning, and which caller warned depended on call
   order. Now only the level methods warn, once per `stderr` sink as before, and `enabled()` still
