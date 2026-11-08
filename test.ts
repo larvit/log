@@ -1091,7 +1091,7 @@ test("every credential header over plain http: warns once, and either opt-out na
 	const otlpHttpBaseURI = "http://collector.test:4318";
 	const loud = reportSink();
 
-	await send(new Queue({ otlpAdditionalHeaders: { "Api-Key": "k", "X-Trace": "harmless", "X-Auth-Token": "t" }, otlpHttpBaseURI, report: loud.report }));
+	await send(new Queue({ otlpAdditionalHeaders: { "Api-Key": "k", "X-Auth-Token": "t", "X-Trace": "harmless" }, otlpHttpBaseURI, report: loud.report }));
 	t.deepEqual(loud.lines.map(line => line.msg).sort(), [warning("api-key"), warning("x-auth-token")], "one line per credential header, by its name and never its value, none for a plain one");
 
 	const quiet = reportSink();
