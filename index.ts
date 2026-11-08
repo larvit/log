@@ -1733,27 +1733,35 @@ function segmentLevels(text: string, seen = new Set<string>()): string[] | undef
 
 // imgproxy lets the encoded url be split with `/` anywhere, so consecutive segments made of base64
 // characters are read joined, from the first. A segment holding anything else ends the chain after its
-// leading base64 characters, such as `anBn` in `anBn.png`, and starts the next with its trailing ones
+// leading base64 characters, such as `anBn` in `anBn.png`, and may start the next with its trailing ones
 // where they make a run, such as `aHR0cHM6Ly91` in `x.aHR0cHM6Ly91`: the first piece of a split url
 // may follow other text. A shorter tail stays out, or the `300` of `rs:fit:300` would pull that segment
-// into the cut.
+// into the cut. Such a chain is read twice, with the tail and without it, since text glued in front
+// of the url, such as `thumbnails` in `img.thumbnails`, hides a scheme the url starts with.
 function base64Chains(segments: string[]): Array<[number, string]> {
 	const chains: Array<[number, string]> = [];
 	let start = 0;
+	let lead = "";
 	let text = "";
 
 	const end = () => {
-		if (text.length >= MIN_RUN) {
-			chains.push([start, text]);
+		// A tail alone is a run its own segment already read.
+		if (lead !== "" && text !== "") {
+			chains.push([start, lead + text]);
 		}
 
+		if (text.length >= MIN_RUN) {
+			chains.push([lead === "" ? start : start + 1, text]);
+		}
+
+		lead = "";
 		text = "";
 	};
 
 	segments.forEach((segment, index) => {
 		const head = BASE64_HEAD.exec(segment)?.[0] ?? "";
 
-		if (text === "") {
+		if (text === "" && lead === "") {
 			start = index;
 		}
 
@@ -1778,7 +1786,7 @@ function base64Chains(segments: string[]): Array<[number, string]> {
 
 		if (segment.length - tail >= MIN_RUN) {
 			start = index;
-			text = segment.slice(tail);
+			lead = segment.slice(tail);
 		}
 	});
 
