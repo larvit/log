@@ -2080,6 +2080,7 @@ test("log.fetch captureQuery redacts userinfo that a kept query splits across &"
 		["a=1&&next=//my+user:pw91@cb.test/x&m=1", "a=1&next=REDACTED&m=1"],
 		["//u:pw92+x=y&z@h.test&m=1", `${redacted(2)}&m=1`],
 		["//u:pw93=a%2Fb&w@h.test&m=1", `${redacted(2)}&m=1`],
+		["%252F%252Fuser%C2%25A0x:pw94&w%252540h.test&m=1", `${redacted(2)}&m=1`],
 	];
 	const { calls } = stubFetch();
 	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });

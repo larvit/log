@@ -472,7 +472,7 @@ yourself included.
   query value records `REDACTED` whole. A query key holding such userinfo, or one where the userinfo
   runs across the `=` or an `&`, as in `?//u:p=w@host` and `?//u:p&w@host`, records `REDACTED`
   together with its value. So does each pair after the key, up to the one holding the last `@`
-  before the next `/`, `?`, `#` or whitespace, or before the query ends. A kept query is read twice, raw and
+  before the next `/`, `?`, `#` or whitespace, or before the query ends. A kept query is read both ways, raw and
   form-decoded, and userinfo either reading finds records `REDACTED`. Raw, a `+`, `%20`, `%2F`, `%3F`
   and `%23` stay inside userinfo, as in `?next=//my+user:pw@cb.test/x` and `?//u:p&a%2Fb&w@host`;
   form-decoded, they read as a space, `/`, `?` and `#`. So `?text=Visit+https://app.test+or+mail+help@app.test`

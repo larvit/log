@@ -1541,11 +1541,14 @@ const holdsAtSignAtAnyLevel = (text: string) => decodings(text)?.some(level => l
 function redactedSearch(url: URL, depth: number, partsRead: PartsRead): string | undefined {
 	const raw = rawQueryPairs(url);
 	const pairs = raw.map(([key, value]): [string, string] => [formDecoded(key), formDecoded(value)]);
-	// Where a run of userinfo ends is read two ways, and a pair is redacted if either finds it. Raw, only
+	// Where a run of userinfo ends is read three ways, and a pair is redacted if any finds it. Raw, only
 	// a literal delimiter ends a run and only a literal `@` counts: a `%2F` or `%40` there is no `/` or
 	// `@`. Percent-decoded, an escaped delimiter ends a run and an escaped `@` counts, for a consumer
-	// that decodes first; its `+` stays, since a parser takes it as part of the userinfo.
+	// that decodes first; its `+` stays, since a parser takes it as part of the userinfo. Form-decoded,
+	// as `searchParams` reads it, invalid UTF-8 becomes U+FFFD, so it can't decode to whitespace that
+	// would hide a run from the percent-decoded reading, as `%C2%25A0` does.
 	const split = new Set([
+		...splitUserinfoPairs(pairs, holdsAtSignAtAnyLevel),
 		...splitUserinfoPairs(raw.map(([key, value]): [string, string] => [percentDecoded(key), percentDecoded(value)]), holdsAtSignAtAnyLevel),
 		...splitUserinfoPairs(raw, text => text.includes("@")),
 	]);
