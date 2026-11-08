@@ -504,9 +504,10 @@ yourself included.
   is read by the rules above: `/insecure/rs:fit:300/aHR0cHM6Ly9…` records
   `/insecure/rs:fit:300/REDACTED`. A *run* is eight or more characters of the base64url alphabet,
   padded or not, starting anywhere in a segment; each run is decoded, and so is a run inside what it
-  decodes. Standard base64 is read with its `/` raw or percent-encoded. Consecutive segments made
-  of such characters are decoded joined, with and without the `/` between them, since imgproxy lets an encoded url be split with `/`, and a
-  credential found there records `REDACTED` from the first of them: `/media/v1/<chunks>` records
+  decodes. Standard base64 is read too. Consecutive segments made of such characters are decoded
+  joined without the `/` between them, since imgproxy lets an encoded url be split with `/`, and
+  joined with it, since it may be standard base64's digit. A credential found there records
+  `REDACTED` from the first of them: `/media/v1/<chunks>` records
   `/REDACTED`. The first piece may follow other text in its segment, as in
   `/insecure/rs:fit:300/x.aHR0cHM6Ly91/…`, which records `/insecure/rs:fit:300/REDACTED`; a piece
   of fewer than eight characters, such as `x.aHR0cDo`, stays in the path. Userinfo in decoded text that doesn't start with a scheme, such as `//u:p@host`,

@@ -1666,7 +1666,7 @@ function traceableUrl(input: string | URL): URL | undefined {
 const holdsSensitiveQueryKey = (level: string) => redactTextQueryKeys(level) !== level;
 
 // A run is MIN_RUN or more base64 characters, `/` included. A chain is joined from segments, which
-// hold no `/`: base64Chains reads it joined with and without the `/` they were split on.
+// hold no `/`.
 const MIN_RUN = 8;
 const BASE64_RUN = new RegExp(`[A-Za-z\\d+/_-]{${MIN_RUN},}`, "g");
 const BASE64_CHAR = /[A-Za-z\d+_-]/;
@@ -1736,9 +1736,8 @@ function segmentLevels(text: string, seen = new Set<string>()): string[] | undef
 }
 
 // imgproxy lets the encoded url be split with `/` anywhere, so consecutive segments made of base64
-// characters are read joined, from the first. Standard base64 writes its digit 63 as `/`, so they are
-// read joined with it too: the `/` is either dropped by the split or the digit, never known which.
-// A segment holding anything else ends the chain after its
+// characters are read joined, from the first. A `/` between them may also be standard base64's digit
+// 63, so they are read joined with it too. A segment holding anything else ends the chain after its
 // leading base64 characters, such as `anBn` in `anBn.png`, and starts the next with its trailing ones,
 // its lead, such as `aHR0cHM6Ly91` in `x.aHR0cHM6Ly91`: the first piece of a split url may follow other
 // text. A chain with a lead is read twice, with the lead and without it, since text glued in front of
@@ -1752,8 +1751,7 @@ function base64Chains(segments: string[]): Array<[number, string]> {
 	let heads: string[] = [];
 
 	const end = () => {
-		// A lone piece has no `/` to put back.
-		for (const joiner of heads.length + (lead === "" ? 0 : 1) > 1 ? ["", "/"] : [""]) {
+		for (const joiner of ["", "/"]) {
 			const text = heads.join(joiner);
 
 			// A lead alone is read with its own segment, and `start + 1` below could point past the last one.
@@ -1761,7 +1759,8 @@ function base64Chains(segments: string[]): Array<[number, string]> {
 				chains.push([lead.length >= MIN_RUN ? start : start + 1, lead + joiner + text]);
 			}
 
-			if (text.length >= MIN_RUN) {
+			// One piece joined with `/` is itself again.
+			if (text.length >= MIN_RUN && (joiner === "" || heads.length > 1)) {
 				chains.push([lead === "" ? start : start + 1, text]);
 			}
 		}
