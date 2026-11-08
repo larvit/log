@@ -1428,12 +1428,11 @@ const withoutDropped = (text: string) => text.replace(/[\t\n\r]/g, "");
 // The text with each listed key's value replaced by `REDACTED`, wherever a url's own query rules don't
 // reach it: a status message such as `request to …?token=… failed`, a relative `location`, a
 // scheme-less url, a `?` in a fragment, a fragment's own pairs such as an OAuth redirect's
-// `#access_token=…`. A value ends at `&`, `#` or whitespace other than a tab, newline or carriage return,
-// which a parser drops, and may hold a `?`. A key is whatever stands
-// between its `?`, `&`, `#` or `;` and its `=`, a space included, so a listed key after a `?` in an
+// `#access_token=…`, a matrix parameter such as `/img;sig=…`. A value ends at `&`, `#` or whitespace
+// other than a tab, newline or carriage return, which a parser drops, and may hold a `?`. A key is
+// whatever stands between its `?`, `&`, `#` or `;` and its `=`, a space included, so a listed key after a `?` in an
 // unlisted value is found. A key starts after the nearest of the four, so `code`, which only an exact
-// name lists, is found in `?#code=…` and `?x#code=…`. The `;` is a matrix parameter, as in
-// `/img;sig=…`.
+// name lists, is found in `?#code=…` and `?x#code=…`.
 function redactTextQueryKeys(text: string): string {
 	const opener = /[?&#;]([^&=?#;]*)=/g;
 	const valueEnd = /[&#]|[^\S\t\n\r]/g;
@@ -1662,11 +1661,12 @@ function traceableUrl(input: string | URL): URL | undefined {
 
 const holdsSensitiveQueryKey = (level: string) => redactTextQueryKeys(level) !== level;
 
-// The length of a run, as BASE64_RUN reads it.
+// A run is MIN_RUN or more base64 characters, `/` included. A chain is joined from segments, which
+// hold no `/`.
 const MIN_RUN = 8;
-const BASE64_RUN = /[A-Za-z\d+/_-]{8,}/g;
-const BASE64_HEAD = /^[A-Za-z\d+_-]*/;
+const BASE64_RUN = new RegExp(`[A-Za-z\\d+/_-]{${MIN_RUN},}`, "g");
 const BASE64_CHAR = /[A-Za-z\d+_-]/;
+const BASE64_HEAD = new RegExp(`^${BASE64_CHAR.source}*`);
 const BASE64_DIGITS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 const MAX_BASE64_RUNS = 64;
 
@@ -1733,11 +1733,12 @@ function segmentLevels(text: string, seen = new Set<string>()): string[] | undef
 
 // imgproxy lets the encoded url be split with `/` anywhere, so consecutive segments made of base64
 // characters are read joined, from the first. A segment holding anything else ends the chain after its
-// leading base64 characters, such as `anBn` in `anBn.png`, and may start the next with its trailing ones
-// where they make a run, such as `aHR0cHM6Ly91` in `x.aHR0cHM6Ly91`: the first piece of a split url
-// may follow other text. A shorter tail stays out, or the `300` of `rs:fit:300` would pull that segment
-// into the cut. Such a chain is read twice, with the tail and without it, since text glued in front
-// of the url, such as `thumbnails` in `img.thumbnails`, hides a scheme the url starts with.
+// leading base64 characters, such as `anBn` in `anBn.png`, and starts the next with its trailing ones,
+// its lead, such as `aHR0cHM6Ly91` in `x.aHR0cHM6Ly91`: the first piece of a split url may follow other
+// text. A chain with a lead is read twice, with the lead and without it, since text glued in front of
+// the url, such as `thumbnails` in `img.thumbnails`, hides the scheme it starts with. A lead shorter
+// than a run is credited to the segment after it, or the `300` of `rs:fit:300` would pull that
+// segment into the cut.
 function base64Chains(segments: string[]): Array<[number, string]> {
 	const chains: Array<[number, string]> = [];
 	let start = 0;
@@ -1745,9 +1746,9 @@ function base64Chains(segments: string[]): Array<[number, string]> {
 	let text = "";
 
 	const end = () => {
-		// A tail alone is a run its own segment already read.
+		// A lead alone is a run its own segment already read.
 		if (lead !== "" && text !== "") {
-			chains.push([start, lead + text]);
+			chains.push([lead.length >= MIN_RUN ? start : start + 1, lead + text]);
 		}
 
 		if (text.length >= MIN_RUN) {
@@ -1773,20 +1774,16 @@ function base64Chains(segments: string[]): Array<[number, string]> {
 
 		end();
 
-		if (head === segment) {
-			return;
-		}
-
 		// Scanned back from the end: a regex anchored there would retry from every position of a long run.
-		let tail = segment.length;
+		let leadFrom = segment.length;
 
-		while (tail > 0 && BASE64_CHAR.test(segment[tail - 1])) {
-			tail--;
+		while (leadFrom > 0 && BASE64_CHAR.test(segment[leadFrom - 1])) {
+			leadFrom--;
 		}
 
-		if (segment.length - tail >= MIN_RUN) {
+		if (leadFrom < segment.length) {
 			start = index;
-			lead = segment.slice(tail);
+			lead = segment.slice(leadFrom);
 		}
 	});
 
