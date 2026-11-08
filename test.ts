@@ -1709,13 +1709,13 @@ test("end({ error }) marks the span failed", async t => {
 	t.deepEqual(exportedSpan(17).status, { code: 2, message: "lookup https://api.test/x?keyword=kept&q=a?b=c failed" }, "a key that no listed name ends leaves the message alone");
 	t.deepEqual(exportedSpan(18).status, { code: 2, message: "request to https://h.test/x?next=https://i.test/y?token=REDACTED&sig=REDACTED failed" }, "a listed key after a ? in another pair's value is redacted, and a ? in a listed value goes with it");
 	t.deepEqual(exportedSpan(19).status, { code: 2, message: "request to https://h.test/x?si\tg=REDACTED failed" }, "a tab the parser drops from a key doesn't hide it");
-	t.deepEqual(exportedSpan(20).status, { code: 2, message: "request to https://h.test/x?my token=REDACTED&a#token=REDACTED failed" }, "a key holding a space or # is read whole");
+	t.deepEqual(exportedSpan(20).status, { code: 2, message: "request to https://h.test/x?my token=REDACTED&a#token=REDACTED failed" }, "a key holding a space is read whole, and one after a # is read from it");
 	t.deepEqual(exportedSpan(21).status, { code: 2, message: "REDACTED" }, "a key encoded nine times, past what is decoded, records REDACTED for the whole message");
 	t.deepEqual(exportedSpan(22).status, { code: 2, message: "request to https://h.test/x?iss&code=REDACTED&x?code=REDACTED failed" }, "a key follows a bare key's &, and a ? after the last pair's name");
 	t.deepEqual(exportedSpan(23).status, { code: 2, message: "request to https://h.test/x?to\nken=REDACTED&si\rg=REDACTED failed" }, "a newline or carriage return the parser drops from a key doesn't hide it");
 	t.deepEqual(exportedSpan(24).status, { code: 2, message: "request to https://h.test/x?sig=REDACTED failed" }, "a listed key's value holding a ? and a listed name is redacted in place");
-	t.deepEqual(exportedSpan(25).status, { code: 2, message: "redirect to https://h.test/cb#access_token=REDACTED&token_type=bearer, then /cb?page=2#id_token=REDACTED failed" }, "a listed key opening a fragment, as an OAuth implicit-flow redirect has one, is redacted in place");
-	t.deepEqual(exportedSpan(26).status, { code: 2, message: "redirect to https://h.test/cb?#code=REDACTED&state=a, then /cb?x#code=REDACTED failed" }, "a key that only an exact name lists, `code`, is redacted opening a fragment after a bare ? or a pair");
+	t.deepEqual(exportedSpan(25).status, { code: 2, message: "redirect to https://h.test/cb#access_token=REDACTED&token_type=bearer, then /cb?page=2#id_token=REDACTED failed" }, "a listed key opening a fragment, as in an OAuth implicit-flow redirect, is redacted in place");
+	t.deepEqual(exportedSpan(26).status, { code: 2, message: "redirect to https://h.test/cb?#code=REDACTED&state=a, then /cb?x#code=REDACTED failed" }, "`code`, which only an exact name lists, is redacted opening a fragment after a bare ? or a bare key");
 	t.end();
 });
 
