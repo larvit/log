@@ -56,3 +56,18 @@ Read most (opens and searches):
 - `CHANGELOG.md` 3
 - `package.json` 2
 - `.gitignore` 1
+
+## Reading cost, chunk 1ae133a84c19, finished 2026-11-08T15:44:16Z
+
+94206 new input tokens before the first commit.
+
+Read most (opens and searches):
+
+- `index.ts` 9
+- `todo.md` 6
+- `README.md` 5
+- `test.ts` 5
+- `CHANGELOG.md` 4
+- `AGENTS.md` 2
+- `docs/decisions.md` 2
+- `package.json` 1

@@ -12,7 +12,6 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 119 | 2.5.0 |  | security | **Redact the whole of a listed query key's value in text that isn't a whole url, a tab, newline or carriage return inside the value included.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
 | 120 | 2.5.0 |  | security | **Redact a credential in a base64-encoded url in the request path when its split form opens mid-segment or its decoded text carries a `;` key such as `;sig=`.** | 2 | 2 | 4 | 6 | 4 |  | 0.0 |
 | 7 | 2.5.0 |  | defect | **Unref the batch timer, so a pending batch never holds a Node or Deno process.** | 2 | 2 | 2 | 4 | 4 | 9 by 9 | 7.0 |
 | 13 | 2.5.0 |  |  | **Pin every Node base image to its full patch version, so one commit builds one image on any day.** | 1 | 1 | 1 | 1 | 2 | code health by 3 | 6.2 |
@@ -110,18 +109,6 @@
 | 75 | 3.0.0 | 22 | decision | **Keep credentials off `log.conf` and `queue.conf`.** | 2 | 1 | 2 | 3 | 3 | 3 by 3 | 0.7 |
 
 ## Details
-
-### 119. Redact the whole of a listed query key's value in text that isn't a whole url, a tab, newline or carriage return inside the value included.
-
-A span's status message exports part of a credential. `end({ error })` and a failed `log.fetch`
-set it, and `log.span` and the OTLP export carry it. `redactTextQueryKeys` ends a listed key's
-value at the first `&`, `#` or whitespace, so a tab, newline or carriage return inside the value
-ends the redaction early. `request to https://h/x?token=ab<TAB>cd failed` exports
-`request to https://h/x?token=REDACTED<TAB>cd failed`, and `cd` leaves. A url parser drops those
-three characters, so it reads the value as `abcd`; `withoutDropped` already treats them so for a
-key. The same reader covers a header value and a kept query value, so the item checks those too.
-The gap isn't new: before v2.5.0 a listed key in a status message wasn't redacted at all unless the
-message parsed whole as a url. Found by the principles audit and the product-owner pass on 2026-10-28.
 
 ### 120. Redact a credential in a base64-encoded url in the request path when its split form opens mid-segment or its decoded text carries a `;` key such as `;sig=`.
 

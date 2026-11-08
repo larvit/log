@@ -1683,6 +1683,7 @@ test("end({ error }) marks the span failed", async t => {
 	await new Log(conf).end({ error: new Error("request to https://h.test/x?sig=a?code=s3cr3tP failed") });
 	await new Log(conf).end({ error: new Error("redirect to https://h.test/cb#access_token=s3cr3tQ&token_type=bearer, then /cb?page=2#id_token=s3cr3tR failed") });
 	await new Log(conf).end({ error: new Error("redirect to https://h.test/cb?#code=s3cr3tS&state=a, then /cb?x#code=s3cr3tT failed") });
+	await new Log(conf).end({ error: new Error("request to https://h.test/x?token=ab\tcd&sig=ef\ngh&code=ij\rkl failed") });
 
 	t.deepEqual(exportedSpan(0).status, { code: 2, message: "refused" }, "status is ERROR with the error message");
 	t.strictEqual(attr(exportedSpan(0), "error.type"), "ECONNREFUSED", "error.type is the error's code when it has one");
@@ -1716,6 +1717,7 @@ test("end({ error }) marks the span failed", async t => {
 	t.deepEqual(exportedSpan(24).status, { code: 2, message: "request to https://h.test/x?sig=REDACTED failed" }, "a listed key's value holding a ? and a listed name is redacted in place");
 	t.deepEqual(exportedSpan(25).status, { code: 2, message: "redirect to https://h.test/cb#access_token=REDACTED&token_type=bearer, then /cb?page=2#id_token=REDACTED failed" }, "a listed key opening a fragment, as in an OAuth implicit-flow redirect, is redacted in place");
 	t.deepEqual(exportedSpan(26).status, { code: 2, message: "redirect to https://h.test/cb?#code=REDACTED&state=a, then /cb?x#code=REDACTED failed" }, "`code`, which only an exact name lists, is redacted opening a fragment after a bare ? or a bare key");
+	t.deepEqual(exportedSpan(27).status, { code: 2, message: "request to https://h.test/x?token=REDACTED&sig=REDACTED&code=REDACTED failed" }, "a tab, newline or carriage return the parser drops from a listed value doesn't end its redaction");
 	t.end();
 });
 
@@ -2320,10 +2322,10 @@ test("log.fetch redacts its url in a runtime's rejection that parses as a url wh
 });
 
 test("log.fetch redacts a listed query key in a header value or kept query value that no url parser reads whole", async t => {
-	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ link: "</next?page=2&access_token=hunter2>; rel=next", location: "/cb?token=hunter2", "x-cursor": "page=2&sig=hunter2", "x-enc": "cb%3Ftoken%3Dhunter2", "x-keyword": "/search?keyword=kept&q=a", "x-nested": "/login?next=/cb?token=hunter2", "x-plain": "text/html; q=0.9", "x-tab": "/cb?to\tken=hunter2" }) }) : undefined);
+	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ link: "</next?page=2&access_token=hunter2>; rel=next", location: "/cb?token=hunter2", "x-cursor": "page=2&sig=hunter2", "x-enc": "cb%3Ftoken%3Dhunter2", "x-keyword": "/search?keyword=kept&q=a", "x-nested": "/login?next=/cb?token=hunter2", "x-plain": "text/html; q=0.9", "x-tab": "/cb?to\tken=hunter2", "x-tab-value": "/cb?token=ab\tcd" }) }) : undefined);
 	const log = new Log({
 		captureQuery: true,
-		captureResponseHeaders: ["link", "location", "x-cursor", "x-enc", "x-keyword", "x-nested", "x-plain", "x-tab"],
+		captureResponseHeaders: ["link", "location", "x-cursor", "x-enc", "x-keyword", "x-nested", "x-plain", "x-tab", "x-tab-value"],
 		otlpHttpBaseURI: "http://127.0.0.1:4318",
 		stderr: () => {},
 	});
@@ -2340,6 +2342,7 @@ test("log.fetch redacts a listed query key in a header value or kept query value
 	t.strictEqual(attr("http.response.header.x-enc"), "REDACTED", "and one percent-encoded");
 	t.strictEqual(attr("http.response.header.x-nested"), "REDACTED", "and one after a ? in another pair's value");
 	t.strictEqual(attr("http.response.header.x-tab"), "REDACTED", "and one with a tab the parser drops");
+	t.strictEqual(attr("http.response.header.x-tab-value"), "REDACTED", "and one with a tab the parser drops from the value");
 	t.strictEqual(attr("http.response.header.x-keyword"), "/search?keyword=kept&q=a", "a key that no listed name ends is kept");
 	t.strictEqual(attr("http.response.header.x-plain"), "text/html; q=0.9", "a value with no query is kept");
 

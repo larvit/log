@@ -485,9 +485,9 @@ yourself included.
   `?src=%2F%2Fcdn.test%2Fk%3Fsig%3D…`, and an OAuth implicit-flow redirect's
   `location: https://app.test/cb#access_token=…`. A header value or query value records `REDACTED`
   whole, and a query key records it together with its value. A status message records `REDACTED` in
-  place of the value, which ends at `&`, `#` or whitespace and may hold a `?`:
-  `request to https://h/x?token=REDACTED failed`. Text is read percent-decoded up to eight times as
-  above; a status message holding such a key only decoded, or encoded deeper, records `REDACTED`
+  place of the value, which ends at `&`, `#` or whitespace but not a tab, newline or carriage return,
+  which a url parser drops, and may hold a `?`: `request to https://h/x?token=REDACTED failed`. Text is
+  read percent-decoded up to eight times as above; a status message holding such a key only decoded, or encoded deeper, records `REDACTED`
   whole. Keep credentials out of error messages, or replace a message before `end({ error })`.
 - **A url nested in the request path**, raw or percent-encoded, as a fetch-through or image proxy
   takes one. The path records `REDACTED` from the first segment that starts with a scheme, such as
