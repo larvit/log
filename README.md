@@ -506,17 +506,19 @@ yourself included.
   padded or not, starting anywhere in a segment; each run is decoded, and so is a run inside what it
   decodes. Standard base64 is read too. Consecutive segments made of such characters are decoded
   joined without the `/` between them, since imgproxy lets an encoded url be split with `/`, and
-  joined with it, since it may be standard base64's digit. A credential found there records
-  `REDACTED` from the first of them: `/media/v1/<chunks>` records
-  `/REDACTED`. An empty segment, from `//`, doesn't end them, and the url may start at any of them:
-  `/insecure/thumbnails/aHR0cHM6dXNl/…` records `/insecure/thumbnails/REDACTED`. More than 64
-  consecutive such segments record the whole path as `/REDACTED`. The first piece may follow other
-  text in its segment, as in
+  joined with it, since it may be standard base64's digit. An empty segment, from `//`, doesn't end
+  them. A credential found there records `REDACTED` from the segment where the url holding it starts,
+  as `/insecure/thumbnails/aHR0cHM6dXNl/…` records `/insecure/thumbnails/REDACTED`, or from the
+  first of them where a listed query key sits in the url, as `/media/v1/<chunks>` records
+  `/REDACTED`. The first piece may follow other text in its segment, as in
   `/insecure/rs:fit:300/x.aHR0cHM6Ly91/…`, which records `/insecure/rs:fit:300/REDACTED`; a piece
-  of fewer than eight characters, such as `x.aHR0cDo`, stays in the path. Userinfo in decoded text that doesn't start with a scheme, such as `//u:p@host`,
-  records the whole path as `/REDACTED`, and so does a segment holding more than 64 distinct runs,
-  ids and words included. A random id or signature whose decoding happens to read as a credential
-  does too: about 1 in 2,500 43-character signatures.
+  of fewer than eight characters, such as `x.aHR0cDo`, stays in the path. Userinfo in decoded text
+  that doesn't start with a scheme, such as `//u:p@host`, records the whole path as `/REDACTED`, and
+  so does a segment holding more than 64 distinct runs, ids and words included. So does a chain of
+  more than 64 such segments, counting the leading characters of the segment that ends it, or of
+  three or more with more than 8,192 characters between them, words and ids included. A random id
+  or signature whose decoding happens to read as a credential does too: about 1 in 2,500
+  43-character signatures.
 
 Never put credentials in the url; pass an `Authorization` header, and strip userinfo from a url you
 did not build. `log.fetch` mirrors the runtime: Node and browsers refuse such a url, while React

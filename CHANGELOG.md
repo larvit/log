@@ -20,17 +20,19 @@
   `?key=` lookup cuts the path, and so does a ninth nested url. A url nested base64-encoded,
   as an image proxy such as imgproxy takes one, is read by the same rules, split over segments with
   `/` included: `/insecure/rs:fit:300/aHR0cHM6Ly9…` records `/insecure/rs:fit:300/REDACTED`.
-  Standard base64 is read too. A credential found in split pieces
-  records `REDACTED` from the first of the consecutive segments of base64 characters that lead to it,
-  so `/media/v1/<chunks>` records `/REDACTED`. The first piece may follow other text in its
-  segment, as in `/insecure/rs:fit:300/x.aHR0cHM6Ly91/…`, which records
-  `/insecure/rs:fit:300/REDACTED`, and so does a split url that an empty segment (`//`) cuts or
-  that follows a segment of base64 characters, as in `/insecure/thumbnails/aHR0cHM6dXNl/…`, which records
-  `/insecure/thumbnails/REDACTED`; a piece of fewer than eight characters stays in the path. The whole path records `/REDACTED` for userinfo in
-  decoded text that doesn't start with a scheme, such as `//u:p@host`, for a segment holding more
-  than 64 distinct runs of eight or more base64 characters, ids and words included, and, rarely, for
-  a random id or signature whose decoding reads as a credential: about 1 in 2,500 43-character
-  signatures. v2.4.0's advice to rotate what such a path carried stands for spans exported before,
+  Standard base64 is read too. An empty segment (`//`) doesn't end the split, and the url may start
+  at any of its segments. A credential found in split pieces records `REDACTED` from the segment
+  where the url holding it starts, so `/insecure/thumbnails/aHR0cHM6dXNl/…` records
+  `/insecure/thumbnails/REDACTED`, or from the first of the consecutive segments of base64
+  characters where a listed query key sits in the url, so `/media/v1/<chunks>` records
+  `/REDACTED`. The first piece may follow other text in its segment, as in
+  `/insecure/rs:fit:300/x.aHR0cHM6Ly91/…`, which records `/insecure/rs:fit:300/REDACTED`; a piece
+  of fewer than eight characters stays in the path. The whole path records `/REDACTED` for userinfo
+  in decoded text that doesn't start with a scheme, such as `//u:p@host`, for a segment holding more
+  than 64 distinct runs of eight or more base64 characters, ids and words included, for a chain of
+  more than 64 such segments, or of three or more with more than 8,192 characters between them, and,
+  rarely, for a random id or signature whose decoding reads as a credential: about 1 in 2,500
+  43-character signatures. v2.4.0's advice to rotate what such a path carried stands for spans exported before,
   and so does its `aHR0c` search for a base64-encoded url, which finds none with no scheme or inside
   other text.
 - **A captured header records `REDACTED` by Elastic APM's default `sanitize_field_names` rule.**
