@@ -861,7 +861,7 @@ class ExportScheduler {
 		return retryInMs;
 	}
 
-	// Whatever timer it replaces is cleared, so no stray callback fires. No timer keeps the process alive.
+	// Whatever timer it replaces is cleared, so no stray callback fires.
 	private setTimer(retry: boolean, delayMs: number): void {
 		this.conf.clock.clearTimeout(this.timer?.handle);
 		this.timer = undefined;
