@@ -12,7 +12,6 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 13 | 2.5.0 |  |  | **Pin every Node base image to its full patch version, so one commit builds one image on any day.** | 1 | 1 | 1 | 1 | 2 | code health by 3 | 6.2 |
 | 89 | 2.5.0 |  | defect | **Keep `enabled()` free of output: warn about an unknown `logLevel` from the level methods alone.** | 1 | 1 | 1 | 1 | 2 | 3 by 5 | 2.3 |
 | 79 | 2.5.0 |  | defect | **State the real runtime floor, ES2021 syntax and `BigInt`, in README → Runtimes, or build down to the floor it states.** | 2 | 2 | 3 | 5 | 2 | 2 by 8 | 1.7 |
 | 3 | 2.5.0 |  | defect | **Send a `Request` passed as `init` with its own method, body, signal and other settings.** | 2 | 1 | 2 | 3 | 3 | 2.1 by 7 | 1.7 |
@@ -107,14 +106,6 @@
 | 75 | 3.0.0 | 22 | decision | **Keep credentials off `log.conf` and `queue.conf`.** | 2 | 1 | 2 | 3 | 3 | 3 by 3 | 0.7 |
 
 ## Details
-
-### 13. Pin every Node base image to its full patch version, so one commit builds one image on any day.
-
-Three places float: `ARG BASE_IMAGE=node:24-bookworm-slim` in the `Dockerfile`,
-`${NODE_IMAGE:-node:22-bookworm-slim}` in `test-docker`, and the major-only `node-version` matrix
-`push.yaml` builds its `NODE_IMAGE` from. The first two are one default written twice at two
-versions, so drop the npm script's and leave the `ARG`. Renovate already bumps a `Dockerfile` pin; a
-matrix of patch versions needs a `customManagers` rule to get the same.
 
 ### 89. Keep `enabled()` free of output: warn about an unknown `logLevel` from the level methods alone.
 
@@ -276,7 +267,7 @@ one behaviour per test, named for it; no loops or branches in a test body, param
 
 `push.yaml` builds and tests `index.js` inside the container; `publish.yaml` builds a second one on
 the runner and publishes that, so the thing consumers install is never the thing CI proved. Build
-once, upload, publish that. Item 13, pinning the base images, is the other half of the same problem.
+once, upload, publish that.
 
 ### 118. Bring `index.ts`'s `// --- Credentials on a span ---` section within about seven things per level, or record why it holds more.
 

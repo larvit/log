@@ -5,16 +5,21 @@ jobs:
     runs-on: ubuntu-26.04
     strategy:
       matrix:
-        node-version: ["18", "20", "22", "24", "26"]
+        node-image:
+          - node:18.20.8-bookworm-slim
+          - node:20.20.2-bookworm-slim
+          - node:22.23.4-bookworm-slim
+          - node:24.22.2-bookworm-slim
+          - node:26.13.0-bookworm-slim
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
       # Deps + build + test all run inside the container, so this matches `npm run test-docker` locally.
-      - name: Test (Node ${{ matrix.node-version }}, in Docker)
+      - name: Test (${{ matrix.node-image }}, in Docker)
         run: npm run test-docker
         env:
-          NODE_IMAGE: node:${{ matrix.node-version }}-bookworm-slim
+          NODE_IMAGE: ${{ matrix.node-image }}
 
   Browser-test:
     runs-on: ubuntu-26.04
