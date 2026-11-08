@@ -6,7 +6,7 @@
 
 `Bar = 0.5`
 
-`Next ID = 124`
+`Next ID = 125`
 
 ## Items
 
@@ -14,6 +14,7 @@
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 122 | 2.5.0 |  | security | **Redact a credential in standard base64 whose `/` digit is written raw in the request path.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
 | 123 | 2.5.0 |  | security | **Redact a credential in a split base64-encoded url when text in front of its scheme, or an empty segment inside it, hides it.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
+| 124 | 2.5.0 |  | security | **Redact userinfo whose user or password holds a whitespace character other than a space, tab, newline or carriage return, in text that isn't a whole url.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
 | 7 | 2.5.0 |  | defect | **Unref the batch timer, so a pending batch never holds a Node or Deno process.** | 2 | 2 | 2 | 4 | 4 | 9 by 9 | 7.0 |
 | 13 | 2.5.0 |  |  | **Pin every Node base image to its full patch version, so one commit builds one image on any day.** | 1 | 1 | 1 | 1 | 2 | code health by 3 | 6.2 |
 | 89 | 2.5.0 |  | defect | **Keep `enabled()` free of output: warn about an unknown `logLevel` from the level methods alone.** | 1 | 1 | 1 | 1 | 2 | 3 by 5 | 2.3 |
@@ -140,6 +141,20 @@ two shapes unchanged:
 Both shapes are on origin/main; item 120's chunk was verified to change neither. README goal 7,
 credentials never leave, is the goal they break. Found on 2026-11-08 by the security and stability
 passes of item 120's chunk.
+
+### 124. Redact userinfo whose user or password holds a whitespace character other than a space, tab, newline or carriage return, in text that isn't a whole url.
+
+In text that isn't a whole url, userinfo holding `\v`, `\f`, NBSP (U+00A0), U+2028 or another
+whitespace character besides a space, tab, newline or carriage return is exported unchanged. It
+reaches the exported span status message, from `end({ error })` or a failed `log.fetch`, and a
+captured header attribute whose value isn't a whole url. A url parser keeps such a password: it
+percent-encodes the character, so `new URL("https://a:b c@h")` has the password `b%C2%A0c`.
+Item 121 covered a tab, newline and carriage return.
+
+A plain space must still end the userinfo, so text such as `see //host and mail a@b` stays
+unredacted. Working out which other whitespace characters a url in text can hold is part of this
+item, and the answer cites WHATWG URL, never a guess. README goal 7, credentials never leave, is
+the goal it breaks. Found on 2026-11-08 by the security pass of item 121's chunk.
 
 ### 7. Unref the batch timer, so a pending batch never holds a Node or Deno process.
 
