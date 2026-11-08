@@ -1662,7 +1662,7 @@ test("end({ error }) marks the span failed", async t => {
 	// The rejection a runtime hands back for a credentialed url, forwarded by the handler pattern
 	// the README documents.
 	await new Log(conf).end({ error: new TypeError("Request cannot be constructed from a URL that includes credentials: http://myuser:hunter2@api.test/x, retried against https://backup:s3cr3t@api.test/x") });
-	await new Log(conf).end({ error: new Error("GET https://api.test/mail@example.com?to=a@b failed") });
+	await new Log(conf).end({ error: new Error("GET https://api.test/mail@example.com?to=a@b failed, //h.test?to=a@b //h.test#a@b \\\\h/a@b \\\\h?a@b \\\\h#a@b") });
 	// Scheme-relative: Node cannot parse one without a base and quotes it back as given.
 	await new Log(conf).end({ error: new TypeError("Failed to parse URL from //myuser:hunter2@api.test/x?access_token=s3cr3t") });
 	await new Log(conf).end({ error: new DOMException("aborted", "AbortError") });
@@ -1689,7 +1689,7 @@ test("end({ error }) marks the span failed", async t => {
 	await new Log(conf).end({ error: new Error("request to https://h.test/x?token=a?sig= failed") });
 	await new Log(conf).end({ error: new Error("retry https://admin:hun\tter2@db.test/x") });
 	await new Log(conf).end({ error: new Error("retry https://ad\nmin:hunter2@db.test/x and //u:p\rw@h") });
-	await new Log(conf).end({ error: new Error("db \\\\u:p\tw@h and https:\\/ad\nmin:pw@h failed") });
+	await new Log(conf).end({ error: new Error("db \\\\u:p\tw@h and https:\\/ad\nmin:pw@h and /\\u:p\rw@h failed") });
 
 	t.deepEqual(exportedSpan(0).status, { code: 2, message: "refused" }, "status is ERROR with the error message");
 	t.strictEqual(attr(exportedSpan(0), "error.type"), "ECONNREFUSED", "error.type is the error's code when it has one");
@@ -1703,7 +1703,7 @@ test("end({ error }) marks the span failed", async t => {
 	t.deepEqual(exportedSpan(4).status, { code: 0 }, "end({ error: null }) leaves the span ok, for callback-style errors");
 	t.deepEqual(exportedSpan(5).status, { code: 2, message: "_OTHER" }, "a value that cannot be stringified still ends and exports the span");
 	t.deepEqual(exportedSpan(6).status, { code: 2, message: "Request cannot be constructed from a URL that includes credentials: http://REDACTED@api.test/x, retried against https://REDACTED@api.test/x" }, "a url in free text has its userinfo redacted in place");
-	t.deepEqual(exportedSpan(7).status, { code: 2, message: "GET https://api.test/mail@example.com?to=a@b failed" }, "an @ outside the userinfo position is left alone");
+	t.deepEqual(exportedSpan(7).status, { code: 2, message: "GET https://api.test/mail@example.com?to=a@b failed, //h.test?to=a@b //h.test#a@b \\\\h/a@b \\\\h?a@b \\\\h#a@b" }, "an @ outside the userinfo position is left alone");
 	t.deepEqual(exportedSpan(8).status, { code: 2, message: "Failed to parse URL from //REDACTED@api.test/x?access_token=REDACTED" }, "a url the runtime cannot parse has its userinfo and its listed keys redacted");
 	t.strictEqual(attr(exportedSpan(9), "error.type"), "AbortError", "a numeric code is skipped for the error name");
 	t.deepEqual(exportedSpan(10).status, { code: 2, message: "https://REDACTED@api.test/x?page=2&Access_Token=REDACTED&next=REDACTED#top" }, "a message that is a url has its userinfo, listed keys and nested credentials redacted, its fragment kept");
@@ -1729,7 +1729,7 @@ test("end({ error }) marks the span failed", async t => {
 	t.deepEqual(exportedSpan(30).status, { code: 2, message: "request to https://h.test/x?token=REDACTED failed" }, "a listed pair that ends where the redacted value ends is part of it, and is not redacted twice");
 	t.deepEqual(exportedSpan(31).status, { code: 2, message: "retry https://REDACTED@db.test/x" }, "a tab the parser drops from a password doesn't hide the userinfo");
 	t.deepEqual(exportedSpan(32).status, { code: 2, message: "retry https://REDACTED@db.test/x and //REDACTED@h" }, "nor does a newline in a user or a carriage return in a password");
-	t.deepEqual(exportedSpan(33).status, { code: 2, message: "db \\\\REDACTED@h and https:\\/REDACTED@h failed" }, "nor does one after a backslash opener");
+	t.deepEqual(exportedSpan(33).status, { code: 2, message: "db \\\\REDACTED@h and https:\\/REDACTED@h and /\\REDACTED@h failed" }, "nor does one after a backslash opener");
 	t.end();
 });
 
@@ -2084,6 +2084,11 @@ test("log.fetch captureQuery redacts userinfo that a kept query splits across &"
 		["//u:pw83&a%2Fb&w@h.test&m=1", `${redacted(3)}&m=1`],
 		["//u:pw84&a%3Fb&w@h.test&m=1", `${redacted(3)}&m=1`],
 		["//u:pw85&a%23b&w@h.test&m=1", `${redacted(3)}&m=1`],
+		// A tab, newline or carriage return that a consumer's decoding turns out of `%09`, `%0A` or `%0D` is dropped by its url parser.
+		["//us%09er:pw86&w%40h.test&m=1", `${redacted(2)}&m=1`],
+		["//u:pw87&w%09x%40h.test&m=1", `${redacted(2)}&m=1`],
+		["//u:pw88&w%0Ax%40h.test&m=1", `${redacted(2)}&m=1`],
+		["\\\\us%0Der:pw89&w%40h.test&m=1", `${redacted(2)}&m=1`],
 		["a+b=c+d&q=1+2", "a+b=c+d&q=1+2"],
 		// Only the form-decoded reading finds this userinfo: raw, `%C2%25A0` decodes to a space before the `@`.
 		["next=//user:pw86%C2%25A0ss%2540host/x&m=1", "next=REDACTED&m=1"],
@@ -2385,7 +2390,7 @@ test("log.fetch redacts a listed query key in a header value or kept query value
 	t.end();
 });
 
-test("log.fetch redacts userinfo holding a tab the parser drops, wherever it reads text", async t => {
+test("log.fetch redacts userinfo holding a tab the parser drops, in a captured header value and the request path", async t => {
 	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ "x-tab": "retry https://admin:hun\tter2@db.test/x", "x-tab2": "db \\\\admin:hun\tter2@h" }) }) : undefined);
 	const log = new Log({ captureResponseHeaders: ["x-tab", "x-tab2"], otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 
@@ -2398,7 +2403,7 @@ test("log.fetch redacts userinfo holding a tab the parser drops, wherever it rea
 
 	t.strictEqual(attr(spans[0], "http.response.header.x-tab"), "REDACTED", "a captured header value holding a tab in a password is redacted");
 	t.strictEqual(attr(spans[0], "http.response.header.x-tab2"), "REDACTED", "and one opened by a backslash pair");
-	t.notOk(attr(spans[1], "url.full").includes("ssw0rd"), "a path segment opening userinfo that holds a decoded tab is redacted");
+	t.strictEqual(attr(spans[1], "url.full"), "https://api.test/REDACTED", "a path segment opening userinfo that holds a decoded tab records REDACTED from it on");
 	t.end();
 });
 

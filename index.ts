@@ -1388,12 +1388,13 @@ const holdsUserinfo = (url: URL) => url.username !== "" || url.password !== "";
 // v2.4.0's `//` rule, and the same after `\\`, `/\` or `\/`: they match a url among other text, or one
 // the runtime cannot parse. After an opener holding a `\`, userinfo may not hold a `\`, so matching a
 // long run of `\` stays linear. Userinfo may hold a tab, newline or carriage return, which a parser
-// drops, so `[^…\s]` is followed by `|[\t\n\r]`: the two alternatives share no character.
-const SLASHED_USERINFO = /(:?\/\/)(?:[^/?#\s]|[\t\n\r])*@/g;
-const BACKSLASH_OPENED_USERINFO = /(:?(?:\\[/\\]|\/\\))(?:[^/\\?#\s]|[\t\n\r])*@/g;
-// Unlike the two above, a tab, newline or carriage return ends the tail, and URL_DELIMITER: the raw
-// reading of the pairs, where it is still `%09`, opens and joins the run, so no credential escapes.
-const OPENS_USERINFO = /\/\/[^/?#\s]*$|(?:\\[/\\]|\/\\)[^/\\?#\s]*$/;
+// drops, so every whitespace character but those three ends it, and so does a `/`, `?` or `#`. Each
+// tail is one character class: a group of alternatives would overflow the regex stack on a message
+// of megabytes.
+const UNDROPPED_SPACE = " \\v\\f\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff";
+const SLASHED_USERINFO = new RegExp(`(:?//)[^/?#${UNDROPPED_SPACE}]*@`, "g");
+const BACKSLASH_OPENED_USERINFO = new RegExp(`(:?(?:\\\\[/\\\\]|/\\\\))[^/\\\\?#${UNDROPPED_SPACE}]*@`, "g");
+const OPENS_USERINFO = new RegExp(`//[^/?#${UNDROPPED_SPACE}]*$|(?:\\\\[/\\\\]|/\\\\)[^/\\\\?#${UNDROPPED_SPACE}]*$`);
 const redactTextUserinfo = (text: string) => text.replace(SLASHED_USERINFO, "$1REDACTED@").replace(BACKSLASH_OPENED_USERINFO, "$1REDACTED@");
 
 // Run by run, never the whole string: decodeURIComponent throws on the first invalid escape.
@@ -1464,7 +1465,7 @@ const changesAtAnyLevel = (text: string, redact: (level: string) => string) => d
 const textHoldsUserinfo = (text: string) => changesAtAnyLevel(text, redactTextUserinfo);
 const textHoldsQueryKey = (text: string) => changesAtAnyLevel(text, redactTextQueryKeys);
 
-const URL_DELIMITER = /[/?#\s]/;
+const URL_DELIMITER = new RegExp(`[/?#${UNDROPPED_SPACE}]`);
 
 // What follows the `//`, `\\`, `/\` or `\/` that opens userinfo at a key's end; `undefined` where the
 // key doesn't open any. A key encoded more than eight times deep reads as holding an `@`.
