@@ -2174,6 +2174,8 @@ test("log.fetch redacts a credential in a url nested base64-encoded in the reque
 		"/std/aHR0cHM6Ly9zMy50ZXN0L2s%2Fc2lnPXB3NzI%3D": "/std/REDACTED",
 		[`/bare/${base64url("s3.test/k?sig=pw73")}`]: "/bare/REDACTED",
 		[`/twice/${base64url(base64url("https://u:pw74@cb.test"))}`]: "/twice/REDACTED",
+		[`/insecure/${base64url("//u:pw75@cb.test/i.png")}`]: "/REDACTED",
+		[`/json/${base64url("{\"url\":\"https://u:pw76@cb.test/i.png\"}")}`]: "/REDACTED",
 		[`/clean/${base64url("https://cb.test/x?q=1")}`]: `/clean/${base64url("https://cb.test/x?q=1")}`,
 		"/words/internationalization-and-localization/README.md": "/words/internationalization-and-localization/README.md",
 		[`/many/${Array.from({ length: 70 }, (_, index) => `run${index}abcdef`).join(".")}`]: "/REDACTED",

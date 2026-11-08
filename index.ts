@@ -1700,6 +1700,7 @@ function redactedPath(pathname: string): string {
 	const keyed = read.findIndex((segmentRead, index) => index > 0 && segmentRead.some(holdsSensitiveQueryKey));
 	const scanned = keyed === -1 ? segments : [...segments.slice(0, keyed), "REDACTED"];
 	let kept = scanned.join("/");
+	let exported = keyed === -1 ? segments.length : keyed;
 	let opened = 0;
 
 	for (let index = 1; index < scanned.length; index++) {
@@ -1713,13 +1714,15 @@ function redactedPath(pathname: string): string {
 
 		if (opened > MAX_URL_DEPTH || nested === undefined || [...nested, ...read[index]].some(level => SCHEME_LED.test(level) && (redactedWholeUrl(level) !== undefined || redactTextUserinfo(level) !== level))) {
 			kept = `${scanned.slice(0, index).join("/")}/REDACTED`;
+			exported = index;
 			break;
 		}
 	}
 
 	// Userinfo after `//`, `\\`, `/\` or `\/` needs no scheme and no query key, so both cuts can miss it.
 	// That userinfo may sit in a decoded level that maps to no raw segment, so the whole path goes.
-	return textHoldsUserinfo(kept) ? "/REDACTED" : kept;
+	// A base64 run decoding to such userinfo goes the same way, whatever it starts with.
+	return textHoldsUserinfo(kept) || read.slice(1, exported).some(segmentRead => segmentRead.some(level => redactTextUserinfo(level) !== level)) ? "/REDACTED" : kept;
 }
 
 // `url.origin` omits userinfo, which is what keeps the outer url's credentials off the span.
