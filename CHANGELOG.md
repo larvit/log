@@ -12,7 +12,8 @@
   credential, at any depth of percent-encoding: `https://proxy.test/fetch/REDACTED`. It also records
   `REDACTED` from the first segment holding a query key that names a credential, wherever the
   nested url sits: `/fetch/s3.test/k%3Fsig%3D…` records `/fetch/s3.test/REDACTED`, and
-  `/a/x=https:%2F%2Fcb.test%2Fx%3Fpassword%3D…` records `/a/REDACTED`. A path showing userinfo
+  `/a/x=https:%2F%2Fcb.test%2Fx%3Fpassword%3D…` records `/a/REDACTED`; so does a matrix
+  parameter such as `/m/img;sig=…/x.png`, which records `/m/REDACTED`. A path showing userinfo
   after `//`, `\\`, `/\` or `\/`, raw or percent-encoded, such as `/users//bob@x.test`, records
   `/REDACTED` whole, and so does one percent-encoded more than eight times. A dashboard grouping on
   `url.full` sees such a path change, and some paths holding no credential too: a nested url's
@@ -21,8 +22,9 @@
   `/` included: `/insecure/rs:fit:300/aHR0cHM6Ly9…` records `/insecure/rs:fit:300/REDACTED`.
   Standard base64 is read only where its `/` is percent-encoded. A credential found in split pieces
   records `REDACTED` from the first of the consecutive segments of base64 characters that lead to it,
-  the first also when it opens after other text in its segment with a run, as `x.aHR0cHM6Ly91…`, so
-  `/media/v1/<chunks>` records `/REDACTED`. The whole path records `/REDACTED` for userinfo in
+  so `/media/v1/<chunks>` records `/REDACTED`. The first piece may follow other text in its
+  segment, as in `/insecure/rs:fit:300/x.aHR0cHM6Ly91/…`, which records
+  `/insecure/rs:fit:300/REDACTED`; a piece of fewer than eight characters stays in the path. The whole path records `/REDACTED` for userinfo in
   decoded text that doesn't start with a scheme, such as `//u:p@host`, for a segment holding more
   than 64 distinct runs of eight or more base64 characters, ids and words included, and, rarely, for
   a random id or signature whose decoding reads as a credential: about 1 in 2,500 43-character
@@ -44,7 +46,7 @@
   records `https://REDACTED@h.test/x?access_token=REDACTED`. An `end({ error })` message that is a
   url is redacted the same way, so a `?key=` lookup or a `?token=` cursor in one records `REDACTED`
   and a dashboard grouping on status messages sees it change. Search status messages with the regex
-  `(?i)([?&#]|%(25)*(3f|26|23))[-_]*([^&=%\s]*(auth|authentication|authorization|consumer[-_]?id|credential|key|key[-_]?id|pass|pass[-_]?phrase|p(ass)?w(or)?d[12]?|secret|sig|sign|signature|signed|token)|code|googleaccessid|id[-_]?token[-_]?hint)[-_]*(=|%(25)*3d)`
+  `(?i)([?&#;]|%(25)*(3f|26|23|3b))[-_]*([^&=%\s]*(auth|authentication|authorization|consumer[-_]?id|credential|key|key[-_]?id|pass|pass[-_]?phrase|p(ass)?w(or)?d[12]?|secret|sig|sign|signature|signed|token)|code|googleaccessid|id[-_]?token[-_]?hint)[-_]*(=|%(25)*3d)`
   for a match followed by anything but `REDACTED`, and rotate what it finds.
 - **Userinfo is redacted in `\\` and mixed-slash spellings among other text, in a slashless url, and
   percent-encoded.** Since v2.3.0, a captured `location` of `https:\\u:pw@h` or `http:u:pw@h`
@@ -80,7 +82,7 @@
   `REDACTED=REDACTED&REDACTED=REDACTED`; README → Credentials in a captured value says which pairs
   such userinfo takes.
   Search `url.full` with
-  `(?i)%(25)*(3f|26|23)[-_]*([^&=%]*(auth|authentication|authorization|consumer[-_]?id|credential|key|key[-_]?id|pass|pass[-_]?phrase|p(ass)?w(or)?d[12]?|secret|sig|sign|signature|signed|token)|code|googleaccessid|id[-_]?token[-_]?hint)[-_]*(=|%(25)*3d)`,
+  `(?i)%(25)*(3f|26|23|3b)[-_]*([^&=%]*(auth|authentication|authorization|consumer[-_]?id|credential|key|key[-_]?id|pass|pass[-_]?phrase|p(ass)?w(or)?d[12]?|secret|sig|sign|signature|signed|token)|code|googleaccessid|id[-_]?token[-_]?hint)[-_]*(=|%(25)*3d)`,
   and with `(?i)(^|[?&])[^&=]*%(25)*2F%(25)*2F\S*%(25)*40` for a match followed by anything
   but `REDACTED`, and rotate what it finds; a presigned SigV4 url only while unexpired, as v2.4.0
   says.

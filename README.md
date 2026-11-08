@@ -494,8 +494,9 @@ yourself included.
   `https:`, and opens a url holding a credential by these rules: `/fetch/REDACTED`. It also records
   `REDACTED` from the first segment where a matched query key follows a `?`, `&`, `#` or `;`, raw or
   percent-encoded, wherever the nested url sits: `/fetch/s3.test/k%3Fsig%3D…` records
-  `/fetch/s3.test/REDACTED`, and `/a/x=https:%2F%2Fcb.test%2Fx%3Fpassword%3D…` records
-  `/a/REDACTED`. It also records `REDACTED` from the ninth segment starting with a scheme, whatever
+  `/fetch/s3.test/REDACTED`, `/a/x=https:%2F%2Fcb.test%2Fx%3Fpassword%3D…` records
+  `/a/REDACTED`, and a matrix parameter in the path itself, as in `/m/img;sig=…/x.png`, records
+  `/m/REDACTED`. It also records `REDACTED` from the ninth segment starting with a scheme, whatever
   that segment holds. Where userinfo, as the bullet above reads it, remains in what the path keeps,
   or the path is percent-encoded more than eight times, the whole path records `/REDACTED`.
 - **A url nested base64-encoded in the request path**, as an image proxy such as imgproxy takes one,
@@ -503,10 +504,11 @@ yourself included.
   `/insecure/rs:fit:300/REDACTED`. A *run* is eight or more characters of the base64url alphabet,
   padded or not, starting anywhere in a segment; each run is decoded, and so is a run inside what it
   decodes. Standard base64 is read only where its `/` is percent-encoded. Consecutive segments made
-  of such characters are decoded joined, since imgproxy lets an encoded url be split with `/`, the
-  first of them also when it opens after other text in its segment with a run, as `x.aHR0cHM6Ly91…`, and a
+  of such characters are decoded joined, since imgproxy lets an encoded url be split with `/`, and a
   credential found there records `REDACTED` from the first of them: `/media/v1/<chunks>` records
-  `/REDACTED`. Userinfo in decoded text that doesn't start with a scheme, such as `//u:p@host`,
+  `/REDACTED`. The first piece may follow other text in its segment, as in
+  `/insecure/rs:fit:300/x.aHR0cHM6Ly91/…`, which records `/insecure/rs:fit:300/REDACTED`; a piece
+  of fewer than eight characters, such as `x.aHR0cDo`, stays in the path. Userinfo in decoded text that doesn't start with a scheme, such as `//u:p@host`,
   records the whole path as `/REDACTED`, and so does a segment holding more than 64 distinct runs,
   ids and words included. A random id or signature whose decoding happens to read as a credential
   does too: about 1 in 2,500 43-character signatures.
