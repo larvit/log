@@ -12,11 +12,7 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 3 | 2.5.0 |  | defect | **Send a `Request` passed as `init` with its own method, body, signal and other settings.** | 2 | 1 | 2 | 3 | 3 | 2.1 by 7 | 1.7 |
 | 106 | 2.5.0 |  | defect | **Run on React Native's own `URL`, whose getters throw "not implemented", or state in README → Runtimes that an app installs a `URL` polyfill.** | 2 | 3 | 3 | 6 | 2 | 2 by 8 | 1.5 |
-| 8 | 2.5.0 |  | defect | **Keep a restored batch through the `maxItems` trim, so the retry promised for it holds.** | 2 | 1 | 2 | 3 | 3 | 2 by 4 | 1.0 |
-| 9 | 2.5.0 |  | defect | **Keep a batch in the persisted queue until its send settles.** | 2 | 1 | 2 | 3 | 3 | 2 by 4 | 1.0 |
-| 11 | 2.5.0 |  | defect | **Keep a transient `storage` read failure from wiping the persisted queue.** | 2 | 1 | 2 | 3 | 4 | 2 by 4 | 0.8 |
 | 104 | 2.5.0 |  | decision | **Warn once about every credential header sent over plain `http:`, not only `Authorization`.** | 2 | 2 | 2 | 4 | 2 |  | 0.0 |
 | 34 | 2.6.0 |  | principle | **Let a consumer inject the randomness trace and span ids come from.** | 1 | 1 | 1 | 1 | 2 | code health by 5 | 10.4 |
 | 37 | 2.6.0 |  | principle | **Build a span payload without writing to `log.span`.** | 1 | 1 | 1 | 1 | 2 | code health by 5 | 10.4 |
@@ -105,13 +101,6 @@
 
 ## Details
 
-### 3. Send a `Request` passed as `init` with its own method, body, signal and other settings.
-
-Landing it drops README → `log.fetch` in depth's "Until 2.5.0, a `Request`" sentence. `fetch(url,
-request)` is valid and TypeScript accepts it, but `{ ...init, headers }` copies own properties only,
-and a `Request`'s are prototype getters: `log.fetch(url, new Request(url, { method: "POST", body
-}))` sends a GET with no body. A `Request` as the *input* is item 19.
-
 ### 106. Run on React Native's own `URL`, whose getters throw "not implemented", or state in README → Runtimes that an app installs a `URL` polyfill.
 
 React Native 0.74's `Libraries/Blob/URL.js` throws "not implemented" from `host`, `origin`,
@@ -119,25 +108,6 @@ React Native 0.74's `Libraries/Blob/URL.js` throws "not implemented" from `host`
 `log.fetch` read them, so those calls throw on an app with no `URL` polyfill. README → Runtimes names
 `fetch`, `TextEncoder` and `btoa` only. Found by the goals and frontend principles audits on
 2026-10-26; the throwing getters were checked against the v0.74.0 source.
-
-### 8. Keep a restored batch through the `maxItems` trim, so the retry promised for it holds.
-
-README → Audience says so. `prepend(batch)` unshifts a failed batch to the front, and the `maxItems`
-trim then splices the excess off that same front. An offline phone at `maxItems` reports "OTLP
-export failed, will retry" for items it has already discarded, and the retry finds them gone — so
-the round trip and the promise are both spent on the flagship offline path.
-
-### 9. Keep a batch in the persisted queue until its send settles.
-
-`takeBatch` removes it from `items` before `send`, so a record logged during the send saves the
-queue without it, and a process that dies then loses the batch its storage exists to keep.
-
-### 11. Keep a transient `storage` read failure from wiping the persisted queue.
-
-`load()` treats an unreadable `getItem` and corrupt content identically and then calls `removeItem`,
-so one flaky AsyncStorage read at startup loses everything a phone held offline. The full fix is
-larger than skipping the remove: after a failed load the first `save` overwrites the key anyway, so
-a load failure has to suppress saving too.
 
 ### 104. Warn once about every credential header sent over plain `http:`, not only `Authorization`.
 

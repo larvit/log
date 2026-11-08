@@ -1213,6 +1213,93 @@ test("Queue is bounded: drops the oldest when full and reports the count once", 
 	t.end();
 });
 
+test("Queue keeps a batch it reported a retry for through the maxItems trim", async t => {
+	const clock = fakeClock();
+	const reports = reportSink();
+	let attempts = 0;
+	let released = false;
+	const { calls } = stubFetch(async () => {
+		attempts++;
+
+		if (attempts === 1) {
+			await waitFor(() => released);
+
+			return response({ status: 503 });
+		}
+
+		return undefined;
+	});
+	const log = new Log({ clock, otlpQueue: new Queue({ batchDelayMs: 600000, clock, maxItems: 3, otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report, retryDelayMs: 1000 }), stderr: () => {} });
+
+	log.info("a");
+	log.info("b");
+	const flushed = log.flush();
+
+	await waitFor(() => calls.length === 1);
+	log.info("c");
+	log.info("d");
+	log.info("e");
+	released = true;
+	await flushed;
+	await clock.advance(1000);
+
+	t.deepEqual(exportedRecords(calls.slice(1)), ["a", "b", "e"], "the retry sends the failed batch and the newest record, the older records waiting behind it are dropped");
+	t.deepEqual(reports.lines.filter(line => line.msg === "OTLP queue full, oldest items dropped"), [{ dropped: 2, msg: "OTLP queue full, oldest items dropped" }], "the drop is reported with its count");
+	t.end();
+});
+
+test("Queue keeps a batch in storage while it is sent, so a record logged then saves it too", async t => {
+	const storage = fakeStorage(false);
+	let released = false;
+	const { calls } = stubFetch(async () => {
+		await waitFor(() => released);
+
+		return undefined;
+	});
+	const log = new Log({ otlpQueue: new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, storage }), stderr: () => {} });
+
+	log.info("sending");
+	const flushed = log.flush();
+
+	await waitFor(() => calls.length === 1);
+	log.info("logged during the send");
+	await waitFor(() => (storage.data.get("@larvit/log:otlp-queue") ?? "").includes("logged during the send"));
+	t.ok(storage.data.get("@larvit/log:otlp-queue")?.includes("sending"), "the batch in flight is still persisted");
+	released = true;
+	await flushed;
+	await waitFor(() => storage.data.size === 0);
+	t.strictEqual(storage.data.size, 0, "storage is cleared once the send settles");
+	t.end();
+});
+
+for (const async of [false, true]) {
+	test(`Queue leaves what storage holds alone when its ${async ? "async" : "sync"} getItem throws, and stops writing to it`, async t => {
+		const storage = fakeStorage(async);
+		const reports = reportSink();
+		const held = "a queue a flaky read could not return";
+
+		storage.data.set("@larvit/log:otlp-queue", held);
+		storage.getItem = () => {
+			if (async) {
+				return Promise.reject(new Error("flaky"));
+			}
+
+			throw new Error("flaky");
+		};
+
+		const { calls } = stubFetch();
+		const log = new Log({ otlpQueue: new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report, storage }), stderr: () => {} });
+
+		log.info("new");
+		await log.flush();
+		await log.end();
+		t.deepEqual(exportedRecords(calls), ["new"], "new records are still delivered");
+		t.strictEqual(storage.data.get("@larvit/log:otlp-queue"), held, "the stored queue is neither removed nor overwritten");
+		t.deepEqual(reports.lines, [{ error: "flaky", key: "@larvit/log:otlp-queue", msg: "OTLP queue storage unreadable, kept and not written to" }], "the failed read is reported once");
+		t.end();
+	});
+}
+
 test("Queue's byte count follows its items, so a delivered or dropped record stops filling the next batch", async t => {
 	const clock = fakeClock();
 	const big = "a".repeat(5000);
@@ -2023,6 +2110,33 @@ test("log.fetch traces a successful call and drops the query by default", async 
 	t.strictEqual(attr("server.address"), "api.test", "server.address attribute");
 	t.strictEqual(attr("server.port"), "8443", "server.port attribute");
 	t.strictEqual(attr("http.response.status_code"), "200", "status_code attribute");
+	t.end();
+});
+
+test("log.fetch sends a Request passed as init with its own method, body, signal and headers", async t => {
+	const sent: Request[] = [];
+
+	// What the platform's fetch(url, init) builds from its two arguments, whichever shape init has.
+	globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
+		sent.push(new Request(input, init));
+
+		return response();
+	}) as unknown as typeof fetch;
+
+	const controller = new AbortController();
+	const log = new Log({ stderr: () => {} });
+	const request = new Request("https://api.test/x", { body: "payload", headers: { "x-keep": "kept" }, method: "POST", signal: controller.signal });
+
+	await log.fetch("https://api.test/x", request);
+	controller.abort();
+
+	t.strictEqual(sent.length, 1, "one request is sent");
+	t.strictEqual(sent[0].method, "POST", "the Request's method is kept");
+	t.strictEqual(await sent[0].text(), "payload", "the Request's body is kept");
+	t.strictEqual(sent[0].signal.aborted, true, "the Request's signal is kept");
+	t.strictEqual(sent[0].headers.get("x-keep"), "kept", "the Request's headers are kept");
+	t.strictEqual(sent[0].headers.get("traceparent")?.split("-")[1], log.span.traceId, "the request continues the log's trace");
+	await log.end();
 	t.end();
 });
 
