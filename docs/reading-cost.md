@@ -228,3 +228,18 @@ Read most (opens and searches):
 - `package.json` 1
 - `tsconfig.build.json` 1
 - `tsconfig.json` 1
+
+## Reading cost, chunk b1e5465ad747, finished 2026-11-08T22:20:05Z
+
+105195 new input tokens before the first commit.
+
+Read most (opens and searches):
+
+- `index.ts` 13
+- `test.ts` 12
+- `README.md` 10
+- `todo.md` 9
+- `CHANGELOG.md` 5
+- `docs/decisions.md` 4
+- `AGENTS.md` 1
+- `package.json` 1
