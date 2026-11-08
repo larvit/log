@@ -295,6 +295,15 @@ README → Goals #7. Valid until 3.0.0 keeps credentials off `log.conf` and `que
 
 ## Every credential header over plain `http:` will warn once
 
+2026-11-08, the maintainer, on the two questions item 104 held: the header-name rule
+`SENSITIVE_HEADER_NAME` stays as it is. It is the rule already tested for redaction, and a longer
+list of vendor names, such as `x-honeycomb-team`, needs a published source, and none has been
+chosen. The opt-out gets a new name covering every credential header, since the warning it silences
+no longer covers `Authorization` alone and an option does no more than its name says (README →
+Goals #3). `acceptPlainHttpAuthorization` stays as its deprecated alias until `todo.md` item 126
+removes it in 3.0.0, as README → Goals #8 asks. Valid while no published list of credential header
+names is chosen.
+
 2026-10-28, the maintainer: every credential header will warn, not only `Authorization`. A header
 crossing plain `http:` exposes its value whatever its name, so the check widens to every name the
 header-name rule above redacts, such as `api-key`. `todo.md` item 104 ships it; until then only
