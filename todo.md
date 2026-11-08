@@ -12,7 +12,6 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 122 | 2.5.0 |  | security | **Redact a credential in standard base64 whose `/` digit is written raw in the request path.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
 | 123 | 2.5.0 |  | security | **Redact a credential in a split base64-encoded url when text in front of its scheme, or an empty segment inside it, hides it.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
 | 124 | 2.5.0 |  | security | **Redact userinfo whose user or password holds a whitespace character other than a space, tab, newline or carriage return, in text that isn't a whole url.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
 | 7 | 2.5.0 |  | defect | **Unref the batch timer, so a pending batch never holds a Node or Deno process.** | 2 | 2 | 2 | 4 | 4 | 9 by 9 | 7.0 |
@@ -111,17 +110,6 @@
 | 75 | 3.0.0 | 22 | decision | **Keep credentials off `log.conf` and `queue.conf`.** | 2 | 1 | 2 | 3 | 3 | 3 by 3 | 0.7 |
 
 ## Details
-
-### 122. Redact a credential in standard base64 whose `/` digit is written raw in the request path.
-
-`url.full` exports `/std/aHR0cHM6Ly9zMy50ZXN0L2s/c2lnPXB3NzI=` unchanged, yet read with its `/`
-it decodes to `https://s3.test/k?sig=pw72`, so `pw72` leaves. `base64Chains` in `index.ts` joins
-consecutive segments without the `/` they were split on, which shifts every later digit.
-
-README → "A url nested base64-encoded in the request path" and the CHANGELOG 2.5.0 entry say
-standard base64 is read only where its `/` is percent-encoded. A consumer reading them takes this
-shape as not covered, but README goal 7, credentials never leave, still holds for it. Item 120 found
-it and left it out. Found on 2026-11-08.
 
 ### 123. Redact a credential in a split base64-encoded url when text in front of its scheme, or an empty segment inside it, hides it.
 
