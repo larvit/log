@@ -1736,40 +1736,60 @@ function segmentLevels(text: string, seen = new Set<string>()): string[] | undef
 }
 
 // imgproxy lets the encoded url be split with `/` anywhere, so consecutive segments made of base64
-// characters are read joined, from the first. A `/` between them may also be standard base64's digit
-// 63, so they are read joined with it too. A segment holding anything else ends the chain after its
-// leading base64 characters, such as `anBn` in `anBn.png`, and starts the next with its trailing ones,
-// its lead, such as `aHR0cHM6Ly91` in `x.aHR0cHM6Ly91`: the first piece of a split url may follow other
-// text. A chain with a lead is read twice, with the lead and without it, since text glued in front of
-// the url, such as `thumbnails` in `img.thumbnails`, hides the scheme it starts with. A lead shorter
-// than a run is credited to the segment after it, or the `300` of `rs:fit:300` would pull that
-// segment into the cut.
-function base64Chains(segments: string[]): Array<[number, string]> {
+// characters are read joined, from the first. An empty segment, from `//`, joins the chain too: a
+// proxy behind nginx sees the slashes merged, and reading the pieces joined can only redact more. A
+// `/` between pieces may also be standard base64's digit 63, so they are read joined with it too. A
+// segment holding anything else ends the chain after its leading base64 characters, such as `anBn`
+// in `anBn.png`, and starts the next with its trailing ones, its lead, such as `aHR0cHM6Ly91` in
+// `x.aHR0cHM6Ly91`: the first piece of a split url may follow other text. A chain with a lead is
+// read twice, with the lead and without it, since text glued in front of the url, such as
+// `thumbnails` in `img.thumbnails`, hides the scheme it starts with. So does a segment of its own,
+// as in `/thumbnails/aHR0cHM6dXNl/…`, so the chain is also read from each later segment, the way the
+// proxy reads it from the one where the url starts. A lead shorter than a run is credited to the
+// segment after it, or the `300` of `rs:fit:300` would pull that segment into the cut. A chain of
+// more than MAX_BASE64_RUNS segments is `undefined`, which counts as a credential: reading it from
+// each segment would take time quadratic in its length.
+function base64Chains(segments: string[]): Array<[number, string]> | undefined {
 	const chains: Array<[number, string]> = [];
 	let start = 0;
 	let lead = "";
 	let heads: string[] = [];
+	let firsts: number[] = [];
 
 	const end = () => {
 		for (const joiner of ["", "/"]) {
 			const text = heads.join(joiner);
 
-			// A lead alone is read with its own segment, and `start + 1` below could point past the last one.
+			// A lead alone is read with its own segment, and `firsts[0]` below exists only with a head.
 			if (lead !== "" && text !== "") {
-				chains.push([lead.length >= MIN_RUN ? start : start + 1, lead + joiner + text]);
+				chains.push([lead.length >= MIN_RUN ? start : firsts[0], lead + joiner + text]);
 			}
 
 			// One piece joined with `/` is itself again.
 			if (text.length >= MIN_RUN && (joiner === "" || heads.length > 1)) {
-				chains.push([lead === "" ? start : start + 1, text]);
+				chains.push([firsts[0], text]);
+			}
+
+			// The last piece alone is its own segment, which `redactedPath` reads already.
+			for (let drop = 1; drop < heads.length - 1; drop++) {
+				const rest = heads.slice(drop).join(joiner);
+
+				if (rest.length >= MIN_RUN) {
+					chains.push([firsts[drop], rest]);
+				}
 			}
 		}
 
 		lead = "";
 		heads = [];
+		firsts = [];
 	};
 
-	segments.forEach((segment, index) => {
+	for (const [index, segment] of segments.entries()) {
+		if (segment === "" && (heads.length > 0 || lead !== "")) {
+			continue;
+		}
+
 		const head = BASE64_HEAD.exec(segment)?.[0] ?? "";
 
 		if (heads.length === 0 && lead === "") {
@@ -1778,10 +1798,15 @@ function base64Chains(segments: string[]): Array<[number, string]> {
 
 		if (head !== "") {
 			heads.push(head);
+			firsts.push(index);
+
+			if (heads.length > MAX_BASE64_RUNS) {
+				return undefined;
+			}
 		}
 
 		if (head === segment && head !== "") {
-			return;
+			continue;
 		}
 
 		end();
@@ -1797,7 +1822,7 @@ function base64Chains(segments: string[]): Array<[number, string]> {
 			start = index;
 			lead = segment.slice(leadFrom);
 		}
-	});
+	}
 
 	end();
 
@@ -1815,7 +1840,13 @@ function redactedPath(pathname: string): string {
 		return "/REDACTED";
 	}
 
-	for (const [start, text] of base64Chains(segments)) {
+	const chains = base64Chains(segments);
+
+	if (chains === undefined) {
+		return "/REDACTED";
+	}
+
+	for (const [start, text] of chains) {
 		const chain = segmentLevels(text);
 
 		if (chain === undefined) {

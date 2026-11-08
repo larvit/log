@@ -12,7 +12,6 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 123 | 2.5.0 |  | security | **Redact a credential in a split base64-encoded url when text in front of its scheme, or an empty segment inside it, hides it.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
 | 124 | 2.5.0 |  | security | **Redact userinfo whose user or password holds a whitespace character other than a space, tab, newline or carriage return, in text that isn't a whole url.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
 | 7 | 2.5.0 |  | defect | **Unref the batch timer, so a pending batch never holds a Node or Deno process.** | 2 | 2 | 2 | 4 | 4 | 9 by 9 | 7.0 |
 | 13 | 2.5.0 |  |  | **Pin every Node base image to its full patch version, so one commit builds one image on any day.** | 1 | 1 | 1 | 1 | 2 | code health by 3 | 6.2 |
@@ -110,25 +109,6 @@
 | 75 | 3.0.0 | 22 | decision | **Keep credentials off `log.conf` and `queue.conf`.** | 2 | 1 | 2 | 3 | 3 | 3 by 3 | 0.7 |
 
 ## Details
-
-### 123. Redact a credential in a split base64-encoded url when text in front of its scheme, or an empty segment inside it, hides it.
-
-The base64-in-path reading in `index.ts` (`base64Chains`, `segmentLevels`, `redactedPath`) exports
-two shapes unchanged:
-
-1. A segment of base64 characters right before the split url joins the same chain.
-   `/insecure/thumbnails/aHR0cHM6dXNl/cjpwYXNzQGgudGVzdC94LnBuZw` decodes, after the bytes of the
-   glued `thumbnails`, to `https:user:pass@h.test/x.png`, userinfo written without `//`. The junk
-   bytes in front of `https:` keep the anchored `SCHEME_LED` from matching, and
-   `redactTextUserinfo` needs `//` or `\\` before the userinfo, so `user:pass` leaves.
-2. An empty segment ends a chain. `/insecure/rs:fit:300/aHR0cHM6Ly91//c2VyOnBhc3NAaC50ZXN0L3gucG5n`
-   is the same url split across `//`, so neither half decodes to a whole url and `user:pass`
-   leaves. No one has confirmed that a real image proxy accepts a doubled `/` inside the encoded
-   url; checking that is part of this item.
-
-Both shapes are on origin/main; item 120's chunk was verified to change neither. README goal 7,
-credentials never leave, is the goal they break. Found on 2026-11-08 by the security and stability
-passes of item 120's chunk.
 
 ### 124. Redact userinfo whose user or password holds a whitespace character other than a space, tab, newline or carriage return, in text that isn't a whole url.
 

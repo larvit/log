@@ -24,7 +24,9 @@
   records `REDACTED` from the first of the consecutive segments of base64 characters that lead to it,
   so `/media/v1/<chunks>` records `/REDACTED`. The first piece may follow other text in its
   segment, as in `/insecure/rs:fit:300/x.aHR0cHM6Ly91/…`, which records
-  `/insecure/rs:fit:300/REDACTED`; a piece of fewer than eight characters stays in the path. The whole path records `/REDACTED` for userinfo in
+  `/insecure/rs:fit:300/REDACTED`, and so does a split url that an empty segment (`//`) cuts or
+  that follows a segment of base64 characters, as in `/insecure/thumbnails/aHR0cHM6dXNl/…`, which records
+  `/insecure/thumbnails/REDACTED`; a piece of fewer than eight characters stays in the path. The whole path records `/REDACTED` for userinfo in
   decoded text that doesn't start with a scheme, such as `//u:p@host`, for a segment holding more
   than 64 distinct runs of eight or more base64 characters, ids and words included, and, rarely, for
   a random id or signature whose decoding reads as a credential: about 1 in 2,500 43-character
