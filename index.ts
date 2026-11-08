@@ -835,7 +835,7 @@ class ExportScheduler {
 			return this.flush();
 		};
 
-		this.pending ??= this.running.then(next, next);
+		this.pending = this.pending ?? this.running.then(next, next);
 
 		return this.pending;
 	}
@@ -1332,7 +1332,7 @@ export class Queue implements OtlpQueue {
 		}
 
 		this.dirty = true;
-		this.saving ??= this.save(this.conf.storage);
+		this.saving = this.saving ?? this.save(this.conf.storage);
 	}
 
 	private async save(storage: QueueStorage): Promise<void> {

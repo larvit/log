@@ -145,10 +145,6 @@
 
 ### Everything else
 
-- **README → Runtimes states the browser floor: Chrome 85, Firefox 79 or Safari 14.1.** `index.js`
-  has always shipped class fields, `??=` and `BigInt` as written, so an older browser threw a
-  `SyntaxError` parsing it when a bundler left `node_modules` untranspiled. Nothing in the package
-  changes; transpile it for an older browser.
 - **`log.enabled(level)` never writes, so a library author's check emits no line.** Before, an
   unknown `logLevel` made `enabled()` write the warning, and which caller warned depended on call
   order. Now only the level methods warn, once per `stderr` sink as before, and `enabled()` still
@@ -171,6 +167,10 @@
 - **An invalid name in `captureRequestHeaders` or `captureResponseHeaders` is skipped, with one
   `warn` line per `stderr`.** It rejected every traced call, or turned a response the runtime
   delivered into a rejection.
+- **Chrome 80–84 and Firefox 74–78 parse the module again, and README → Runtimes states the browser
+  floor: Chrome 80, Firefox 74 or Safari 14.1.** v2.4.0 added `??=`, which raised the floor to
+  Chrome 85 and Firefox 79, so a bundler leaving `node_modules` untranspiled gave those browsers a
+  `SyntaxError`. v2.3.0 and earlier parse there, and so does this release.
 
 ## v2.4.0
 

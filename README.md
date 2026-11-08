@@ -79,11 +79,11 @@ Public npm consumers. Three readers, in order:
 A mobile app on cellular with offline periods is a primary target, equal to a server: the export
 queue survives app restarts through a `storage` adapter, and a full one holds about 1.1 MiB.
 
-**Runtimes.** Anything with global `fetch`, `TextEncoder`, `btoa` and `BigInt` that parses class
-fields and `??=`. In a browser that is Chrome 85, Firefox 79 or Safari 14.1 and newer; on an
-older one, have your bundler transpile this package, since `index.js` ships as written. CI proves
-Node 18 to 26 and current Chromium. React Native is supported from 0.74, where Hermes gained
-`TextEncoder` and `btoa`. Deno and Bun meet the rule and are not in CI.
+**Runtimes.** Anything with global `fetch`, `TextEncoder`, `btoa` and `BigInt`, and a parser that
+takes class fields and `?.`. In a browser that means Chrome 80, Firefox 74 or Safari 14.1, or newer:
+`index.js` ships as written, so an older one throws a `SyntaxError` loading it. CI proves Node 18
+to 26 and current Chromium. React Native is supported from 0.74, where Hermes gained `TextEncoder`
+and `btoa`. Deno and Bun meet the rule and are not in CI.
 
 **Rely on** what this README documents outside Goals, under semver read strictly. A minor only adds
 — an export, an option, a value an option accepts, a field, a span attribute — where code not using
