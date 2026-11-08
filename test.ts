@@ -2423,6 +2423,40 @@ test("log.fetch redacts userinfo holding a tab the parser drops, in a captured h
 	t.end();
 });
 
+test("userinfo holding a whitespace character other than a space is redacted in text that isn't a whole url", async t => {
+	// WHATWG URL's authority state ends userinfo only at `/`, `?`, `#` and, in a special url, `\`, and its
+	// userinfo percent-encode set encodes any other character, so `new URL("https://a:b c@h")` has the
+	// password `b%20c`. A plain space still ends it in text, so prose such as `//host and mail a@b` reads on.
+	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ "x-nbsp": "retry https://admin:hun ter2@db.test/x", "x-nbsp2": "db \\\\admin:hun ter2@h" }) }) : undefined);
+	const conf = { captureResponseHeaders: ["x-nbsp", "x-nbsp2"], otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} };
+	const whitespace = ["\v", "\f", " ", " ", " ", " ", " ", " ", " ", " ", "　", "﻿"];
+
+	for (const character of whitespace) {
+		await new Log(conf).end({ error: new Error(`retry https://us${character}er:pw${character}hunter2@db.test/x and \\\\us${character}er:pw${character}hunter2@h and https:\\/pw${character}hunter2@h`) });
+	}
+
+	await new Log(conf).end({ error: new Error("see //host and mail a@b, see \\\\host and mail a@b") });
+
+	const log = new Log(conf);
+
+	await log.fetch("https://api.test/h");
+	await log.end();
+
+	const spans = exportedSpans(calls);
+	const attr = (span: any, key: string) => span.attributes.find((attribute: any) => attribute.key === key)?.value.stringValue;
+
+	whitespace.forEach((character, index) => {
+		t.deepEqual(spans[index].status, { code: 2, message: "retry https://REDACTED@db.test/x and \\\\REDACTED@h and https:\\/REDACTED@h" }, `userinfo holding U+${character.charCodeAt(0).toString(16).padStart(4, "0")} is redacted, opened by //, \\\\ or \\/`);
+	});
+	t.deepEqual(spans[whitespace.length].status, { code: 2, message: "see //host and mail a@b, see \\\\host and mail a@b" }, "a plain space still ends userinfo");
+
+	const fetchSpan = spans.find(span => span.kind === 3);
+
+	t.strictEqual(attr(fetchSpan, "http.response.header.x-nbsp"), "REDACTED", "a captured header value holding a no-break space in a password is redacted");
+	t.strictEqual(attr(fetchSpan, "http.response.header.x-nbsp2"), "REDACTED", "and one opened by a backslash pair");
+	t.end();
+});
+
 test("log.fetch captures allow-listed request and response headers only, never a credential", async t => {
 	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ link: "<https://user:pwlink@cdn.test>; rel=preconnect", location: "https://idp.test/authorize?redirect_uri=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&state=a%b", "set-cookie": "sid=hunter2", "x-app": "myapp:///cb?access_token=hunter2", "x-callback": "https%3A%2F%2F%C5ke%3Apwenc%40cb.test%2Fx", "x-db": "db=postgres://u:pw\\db@h", "x-db2": "see <https:/\\u:pwmix1@h>; rel=x", "x-deep": "https%253A%252F%252Fu%253Apwdeep%2540h.test", "x-frag": "https://h.test/x#a?token=pwfrag", "x-frag2": "https://h.test/cb#access_token=pwfrag2&token_type=bearer", "x-next": "https://api.test/page?token=hunter2", "x-opaque": "http:u:pwopaque@h.test/x", "x-resp": "rv", "x-secret": "nope", "x-slash": "https:/u:pwslash@h.test/x" }) }) : undefined);
 	const log = new Log({

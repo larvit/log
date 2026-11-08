@@ -1387,14 +1387,14 @@ const holdsUserinfo = (url: URL) => url.username !== "" || url.password !== "";
 
 // v2.4.0's `//` rule, and the same after `\\`, `/\` or `\/`: they match a url among other text, or one
 // the runtime cannot parse. After an opener holding a `\`, userinfo may not hold a `\`, so matching a
-// long run of `\` stays linear. Userinfo may hold a tab, newline or carriage return, which a parser
-// drops, so every whitespace character but those three ends it, and so does a `/`, `?` or `#`. Each
-// tail is one character class: a group of alternatives would overflow the regex stack on a message
-// of megabytes.
-const UNDROPPED_SPACE = " \\v\\f\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff";
-const SLASHED_USERINFO = new RegExp(`(:?//)[^/?#${UNDROPPED_SPACE}]*@`, "g");
-const BACKSLASH_OPENED_USERINFO = new RegExp(`(:?(?:\\\\[/\\\\]|/\\\\))[^/\\\\?#${UNDROPPED_SPACE}]*@`, "g");
-const OPENS_USERINFO = new RegExp(`//[^/?#${UNDROPPED_SPACE}]*$|(?:\\\\[/\\\\]|/\\\\)[^/\\\\?#${UNDROPPED_SPACE}]*$`);
+// long run of `\` stays linear. WHATWG URL's authority state ends userinfo only at a `/`, `?`, `#` and,
+// in a special url, a `\`, and percent-encodes any other character, so `new URL("https://a:b\u00a0c@h")`
+// has the password `b%C2%A0c`: userinfo holds every whitespace character. Only a plain space ends it
+// here, so `see //host and mail a@b` stays as written. Each tail is one character class: a group of
+// alternatives would overflow the regex stack on a message of megabytes.
+const SLASHED_USERINFO = /(:?\/\/)[^/?# ]*@/g;
+const BACKSLASH_OPENED_USERINFO = /(:?(?:\\[/\\]|\/\\))[^/\\?# ]*@/g;
+const OPENS_USERINFO = /\/\/[^/?# ]*$|(?:\\[/\\]|\/\\)[^/\\?# ]*$/;
 const redactTextUserinfo = (text: string) => text.replace(SLASHED_USERINFO, "$1REDACTED@").replace(BACKSLASH_OPENED_USERINFO, "$1REDACTED@");
 
 // Run by run, never the whole string: decodeURIComponent throws on the first invalid escape.
@@ -1465,7 +1465,7 @@ const changesAtAnyLevel = (text: string, redact: (level: string) => string) => d
 const textHoldsUserinfo = (text: string) => changesAtAnyLevel(text, redactTextUserinfo);
 const textHoldsQueryKey = (text: string) => changesAtAnyLevel(text, redactTextQueryKeys);
 
-const URL_DELIMITER = new RegExp(`[/?#${UNDROPPED_SPACE}]`);
+const URL_DELIMITER = /[/?# ]/;
 
 // What follows the `//`, `\\`, `/\` or `\/` that opens userinfo at a key's end; `undefined` where the
 // key doesn't open any. A key encoded more than eight times deep reads as holding an `@`.
@@ -1677,7 +1677,7 @@ const MAX_CHAIN_PIECES = 64;
 const MAX_CHAIN_CHARS = 8192;
 
 // A base64 or base64url run as text: a byte from 0x80 up is written as the control character U+0080,
-// which is no whitespace, so a stray byte such as 0xA0 can't hide userinfo and no invalid UTF-8 makes
+// which no rule ends userinfo at, so a stray byte can't hide userinfo and no invalid UTF-8 makes
 // `percentDecoded` throw, as it would on a long run of `%XX`.
 function base64Text(run: string): string {
 	let text = "";
