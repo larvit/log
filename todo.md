@@ -6,14 +6,14 @@
 
 `Bar = 0.5`
 
-`Next ID = 126`
+`Next ID = 127`
 
 ## Items
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 106 | 2.5.0 |  | defect | **Run on React Native's own `URL`, whose getters throw "not implemented", or state in README → Runtimes that an app installs a `URL` polyfill.** | 2 | 3 | 3 | 6 | 2 | 2 by 8 | 1.5 |
-| 104 | 2.5.0 |  | decision | **Warn once about every credential header sent over plain `http:`, not only `Authorization`.** | 2 | 2 | 2 | 4 | 2 |  | 0.0 |
+| 104 | 2.5.0 |  | decision | **Warn once about every credential header sent over plain `http:`, not only `Authorization`, and give the opt-out a name that covers them all.** | 2 | 2 | 2 | 4 | 4 | 3 by 4 | 0.7 |
 | 34 | 2.6.0 |  | principle | **Let a consumer inject the randomness trace and span ids come from.** | 1 | 1 | 1 | 1 | 2 | code health by 5 | 10.4 |
 | 37 | 2.6.0 |  | principle | **Build a span payload without writing to `log.span`.** | 1 | 1 | 1 | 1 | 2 | code health by 5 | 10.4 |
 | 44 | 2.6.0 |  | principle | **Route a `Queue`'s warnings through one explicit seam.** | 2 | 1 | 1 | 2 | 4 | code health by 9 | 9.4 |
@@ -94,6 +94,7 @@
 | 68 | 3.0.0 |  |  | **Merge a child's `context` per key with the parent's, as `clone()` does.** | 2 | 1 | 2 | 3 | 3 | 4 by 5 | 1.1 |
 | 97 | 3.0.0 | 96 | decision | **Keep every OTLP option, type and encoding inside the OTLP transport, so no other code knows OTLP.** | 4 | 2 | 3 | 7 | 8 | 1 by 5, 4 by 6 | 1.0 |
 | 58 | 3.0.0 |  |  | **Give the redaction sentinel its own name — `REDACTED by @larvit/log` or similar.** | 1 | 1 | 2 | 2 | 2 | 3 by 3 | 1.0 |
+| 126 | 3.0.0 | 104 | decision | **Remove `acceptPlainHttpAuthorization`, the deprecated name of the plain-`http:` opt-out.** | 1 | 1 | 2 | 2 | 2 | 3 by 3 | 1.0 |
 | 62 | 3.0.0 |  | decision | **Remove `entryFormatter`, the option and the `conf` alias of `format` beside it.** | 2 | 1 | 2 | 3 | 3 | 3 by 4 | 0.9 |
 | 56 | 3.0.0 | 21 | decision | **Export OTLP metrics from instruments that aggregate for the caller.** | 3 | 2 | 2 | 5 | 8 | 1 by 7 | 0.8 |
 | 73 | 3.0.0 |  |  | **Send `traceparent` cross-origin only to urls the caller lists, or record why not.** | 2 | 2 | 3 | 5 | 3 | 2 by 4 | 0.7 |
@@ -109,14 +110,17 @@ React Native 0.74's `Libraries/Blob/URL.js` throws "not implemented" from `host`
 `fetch`, `TextEncoder` and `btoa` only. Found by the goals and frontend principles audits on
 2026-10-26; the throwing getters were checked against the v0.74.0 source.
 
-### 104. Warn once about every credential header sent over plain `http:`, not only `Authorization`.
+### 104. Warn once about every credential header sent over plain `http:`, not only `Authorization`, and give the opt-out a name that covers them all.
 
-Today an `api-key` in `otlpAdditionalHeaders` crosses plain `http:` with no warning. The decision
-"Every credential header over plain `http:` will warn once" widens the check to every name the
-header-name rule redacts. Part of this item: whether that rule should take, from a sourced list, a
-vendor header it misses, such as `x-honeycomb-team`; and whether the opt-out,
-`acceptPlainHttpAuthorization`, which names only `Authorization`, needs a clearer name. Found by
-the goals principles audit on 2026-10-26.
+Today an `api-key` in `otlpAdditionalHeaders` crosses plain `http:` with no warning, and the opt-out,
+`acceptPlainHttpAuthorization`, names only `Authorization`. The decision "Every credential header
+over plain `http:` will warn once" settles the scope: the warning covers every name
+`SENSITIVE_HEADER_NAME` redacts, and that rule doesn't change. The opt-out takes a name covering
+every credential header, such as `acceptPlainHttpCredentials`, and the old name keeps working as its
+deprecated alias until item 126 removes it in 3.0.0. The alias follows "`format` is the formatter's
+one name, `entryFormatter` its alias until 3.0.0"; `ResolvedQueueConf` follows "A required
+`Resolved*Conf` key is added in a minor and removed in a major", so both keys sit in its required
+half until 3.0.0. Found by the goals principles audit on 2026-10-26.
 
 ### 34. Let a consumer inject the randomness trace and span ids come from.
 
@@ -548,6 +552,13 @@ Today one token means three things to the telemetry reader: a header redacted by
 matched a credential shape, and a value the consumer's own app had already redacted upstream.
 `REDACTED` shipped in 2.3.0 and README → Audience promises each documented span value, so renaming
 it waits for the major.
+
+### 126. Remove `acceptPlainHttpAuthorization`, the deprecated name of the plain-`http:` opt-out.
+
+Item 104 keeps it through 2.x as an alias of the opt-out's new name, per the decision "Every
+credential header over plain `http:` will warn once". Removing it from `QueueConf`, `queue.conf`
+and `ResolvedQueueConf`'s required half breaks a consumer still using it, so it waits for 3.0.0 and
+needs a `MIGRATION.md` entry.
 
 ### 62. Remove `entryFormatter`, the option and the `conf` alias of `format` beside it.
 
