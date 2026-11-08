@@ -293,30 +293,31 @@ Credentials in a captured value stops at what this library emits, and redacting 
 be a second spelling of `todo.md` item 75, which keeps credentials off `conf` from 3.0.0. Serves
 README → Goals #7. Valid until 3.0.0 keeps credentials off `log.conf` and `queue.conf`.
 
-## Every credential header over plain `http:` will warn once
+## Every credential header over plain `http:` warns once
 
 2026-11-08, the maintainer, on the two questions item 104 held: the header-name rule
 `SENSITIVE_HEADER_NAME` stays as it is. It is the rule already tested for redaction, and a longer
 list of vendor names, such as `x-honeycomb-team`, needs a published source, and none has been
 chosen. The opt-out gets a new name covering every credential header, since the warning it silences
 no longer covers `Authorization` alone and an option does no more than its name says (README →
-Goals #3). `acceptPlainHttpAuthorization` stays as its deprecated alias until `todo.md` item 126
-removes it in 3.0.0, as README → Goals #8 asks. Valid while no published list of credential header
-names is chosen.
+Goals #3). The new name is `acceptPlainHttpCredentials`. `acceptPlainHttpAuthorization` stays as
+its deprecated alias until `todo.md` item 126 removes it in 3.0.0, as README → Goals #8 asks: either
+one set to `true` accepts, both read back that answer, and a `Queue` given the old one writes one
+line saying it is deprecated. Valid while no published list of credential header names is chosen.
 
-2026-10-28, the maintainer: every credential header will warn, not only `Authorization`. A header
-crossing plain `http:` exposes its value whatever its name, so the check widens to every name the
-header-name rule above redacts, such as `api-key`. `todo.md` item 104 ships it; until then only
-`Authorization` warns, as the 2026-09-28 paragraph below says.
+2026-10-28, the maintainer: every credential header warns, not only `Authorization`. A header
+crossing plain `http:` exposes its value whatever its name, so the check covers every name the
+header-name rule above redacts, such as `api-key`, with one line per header name, and the
+2026-09-28 paragraph below holds for each of them.
 
 2026-09-28, the maintainer: an `http:` `otlpHttpBaseURI` naming a host other than `localhost`,
 `127.0.0.0/8` or `::1` warns when a send carries an `Authorization`, from `user:pass@` or
-`otlpAdditionalHeaders`, and still sends. It is checked at each send, so a header set later warns
+`otlpAdditionalHeaders` (or, from 2.5.0, any other credential header), and still sends. It is checked at each send, so a header set later warns
 too, and written once per sink, host and source: through the Log's `stderr` at `warn` for a queue a
-Log built, else the queue's `report`. The line names the host, never the credential. Both
+Log built, else the queue's `report`. The line names the host and the header, never its value. Both
 spellings warn, so moving the credential never silences the exposure; refusing would break the
 in-cluster `http:` collector, a deliberate and common setup. 2026-09-30, the maintainer: a `Queue`
-given `acceptPlainHttpAuthorization: true` does not warn, the opt-out for a network the consumer
+given `acceptPlainHttpAuthorization: true` (renamed above) does not warn, the opt-out for a network the consumer
 trusts; it sits on the queue alone, which owns the endpoint. Serves README → Goals #7,
 "Credentials never leave", on the wire, without spending #8. Its `stderr` route stands until
 `todo.md` item 50 settles where this library's own lines go. No expiry otherwise: the setups it

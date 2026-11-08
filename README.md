@@ -288,18 +288,21 @@ Credentials go either in the endpoint as `user:pass@`, which is sent as an `Auth
 header, or in `otlpAdditionalHeaders` as a token of your own. Set one: with both, the
 `otlpAdditionalHeaders` one is sent, one `@larvit/log:` line is written, and 3.0.0 throws. Over
 plain `http:` either one is readable by anything on the network path, so use `https:` unless the
-collector is local or on a network you trust. An `Authorization` from either one sent over `http:`
-to a host other than `localhost`, `127.0.0.0/8` or `::1` writes one `@larvit/log:` line naming the
-host, and still sends.
-It is written once per host and credential source to each `report` function, or to each `stderr` for
-a queue a `Log` built. On a network you trust, pass `acceptPlainHttpAuthorization: true` to the
-`Queue`; a `Log` using `otlpHttpBaseURI` moves its `otlp*` options to `otlpQueue: new Queue({
-acceptPlainHttpAuthorization: true, otlpHttpBaseURI })`, whose report lines then go to that queue's
+collector is local or on a network you trust. A credential header sent over `http:` to a host other
+than `localhost`, `127.0.0.0/8` or `::1` writes one `@larvit/log:` line naming the host and the
+header, and still sends. A header counts as a credential when its name is one `log.fetch` redacts
+(see [Credentials in a captured value](#credentials-in-a-captured-value)), such as `Authorization`
+or `api-key`; `user:pass@` is an `Authorization`.
+It is written once per host, header and credential source to each `report` function, or to each
+`stderr` for a queue a `Log` built. On a network you trust, pass `acceptPlainHttpCredentials: true`
+to the `Queue`; a `Log` using `otlpHttpBaseURI` moves its `otlp*` options to `otlpQueue: new Queue({
+acceptPlainHttpCredentials: true, otlpHttpBaseURI })`, whose report lines then go to that queue's
 `report`, `console.error` unless you pass one.
 
 | Option | Type | Default | |
 |---|---|---|---|
-| `acceptPlainHttpAuthorization` | `boolean` | `false` | Silences the line an `Authorization` over plain `http:` writes, for a collector on a network you trust. |
+| `acceptPlainHttpAuthorization` | `boolean` | `false` | Deprecated alias of `acceptPlainHttpCredentials`, removed in 3.0.0. |
+| `acceptPlainHttpCredentials` | `boolean` | `false` | Silences the line a credential header over plain `http:` writes, for a collector on a network you trust. |
 | `batchDelayMs` | `number` | `1000` | How long a queued item waits for company before a send. |
 | `clock` | `Clock` | system clock | `{ now, setTimeout, clearTimeout }` behind the batch, retry and send-timeout timers. Supply one to control time: a deterministic test, or a corrected `now()`. |
 | `key` | `string` | `"@larvit/log:otlp-queue"` | The `storage` key. |

@@ -119,15 +119,18 @@
   non-enumerable on `queue.conf`, so a `localStorage` given as one stays out of `JSON.stringify` and
   of a spread; the v2.4.0 entry says what to rotate. A `Queue` built from `{ ...queue.conf }` has no
   `storage`; pass `storage` to it by name.
-- **An `Authorization` sent over plain `http:` to a host other than `localhost`, `127.0.0.0/8` or
-  `::1` writes one `@larvit/log:` warning naming the host, unless the `Queue` sets the new
-  `acceptPlainHttpAuthorization: true`.** Either spelling warns, `user:pass@` in `otlpHttpBaseURI` or
-  `Authorization` in `otlpAdditionalHeaders`, set at any time, once per host and credential source:
-  to each `report` function, or at `warn` to each `stderr` for a queue a `Log` built. The request
-  still goes. Rotate a credential that has crossed a network you do not
-  trust. On one you do, a `Log` using `otlpHttpBaseURI` moves its `otlp*` options to
-  `otlpQueue: new Queue({ acceptPlainHttpAuthorization: true, otlpHttpBaseURI })`, whose report
-  lines then go to that queue's `report`, `console.error` unless you pass one.
+- **A credential header sent over plain `http:` to a host other than `localhost`, `127.0.0.0/8` or
+  `::1` writes one `@larvit/log:` warning naming the host and the header, unless the `Queue` sets
+  the new `acceptPlainHttpCredentials: true`.** Any header whose name `log.fetch` redacts counts,
+  such as `Authorization` or `api-key`, from `user:pass@` in `otlpHttpBaseURI` or from
+  `otlpAdditionalHeaders`, set at any time, once per host, header and credential source: to each
+  `report` function, or at `warn` to each `stderr` for a queue a `Log` built. The request still
+  goes. Rotate a credential that has crossed a network you do not trust. On one you do, a `Log`
+  using `otlpHttpBaseURI` moves its `otlp*` options to
+  `otlpQueue: new Queue({ acceptPlainHttpCredentials: true, otlpHttpBaseURI })`, whose report lines
+  then go to that queue's `report`, `console.error` unless you pass one. `acceptPlainHttpAuthorization`
+  is its deprecated alias, removed in 3.0.0: it still silences the warning, and a `Queue` given it
+  writes one line saying so.
 - **Userinfo holding any whitespace character but a space is redacted in text that isn't a whole
   url.** A url parser drops a tab, newline or carriage return, so `https://admin:hun<TAB>ter2@db.test/x`
   has the password `hunter2`, and keeps any other whitespace character percent-encoded, so
