@@ -293,17 +293,20 @@ Credentials in a captured value stops at what this library emits, and redacting 
 be a second spelling of `todo.md` item 75, which keeps credentials off `conf` from 3.0.0. Serves
 README → Goals #7. Valid until 3.0.0 keeps credentials off `log.conf` and `queue.conf`.
 
-## Every credential header over plain `http:` warns once
+## Every credential header over plain `http:` warns once, and `acceptPlainHttpCredentials` silences it
 
-2026-11-08, the maintainer, on the two questions item 104 held: the header-name rule
+2026-11-08, the maintainer, on two open questions: the header-name rule
 `SENSITIVE_HEADER_NAME` stays as it is. It is the rule already tested for redaction, and a longer
 list of vendor names, such as `x-honeycomb-team`, needs a published source, and none has been
 chosen. The opt-out gets a new name covering every credential header, since the warning it silences
 no longer covers `Authorization` alone and an option does no more than its name says (README →
 Goals #3). The new name is `acceptPlainHttpCredentials`. `acceptPlainHttpAuthorization` stays as
-its deprecated alias until `todo.md` item 126 removes it in 3.0.0, as README → Goals #8 asks: either
-one set to `true` accepts, both read back that answer, and a `Queue` given the old one writes one
-line saying it is deprecated. Valid while no published list of credential header names is chosen.
+its deprecated alias until `todo.md` item 126 removes it in 3.0.0. Either one set to `true`
+accepts, and both read back that answer. A `Queue` given only the old one writes one line saying it
+is deprecated, and one given both writes none, since a spread of another queue's `conf` carries
+both. No release has carried the old name, so Goals #8 doesn't require the alias; `todo.md` holds
+the question whether to drop it. Valid while no published list of credential header names is
+chosen.
 
 2026-10-28, the maintainer: every credential header warns, not only `Authorization`. A header
 crossing plain `http:` exposes its value whatever its name, so the check covers every name the
@@ -312,7 +315,7 @@ header-name rule above redacts, such as `api-key`, with one line per header name
 
 2026-09-28, the maintainer: an `http:` `otlpHttpBaseURI` naming a host other than `localhost`,
 `127.0.0.0/8` or `::1` warns when a send carries an `Authorization`, from `user:pass@` or
-`otlpAdditionalHeaders` (or, from 2.5.0, any other credential header), and still sends. It is checked at each send, so a header set later warns
+`otlpAdditionalHeaders`, and still sends. It is checked at each send, so a header set later warns
 too, and written once per sink, host and source: through the Log's `stderr` at `warn` for a queue a
 Log built, else the queue's `report`. The line names the host and the header, never its value. Both
 spellings warn, so moving the credential never silences the exposure; refusing would break the
