@@ -714,6 +714,7 @@ export type QueueStorage = {
 };
 
 export type QueueConf = {
+
 	/** @deprecated Removed in 3.0.0, use acceptPlainHttpCredentials. */
 	acceptPlainHttpAuthorization?: boolean;
 	acceptPlainHttpCredentials?: boolean;
@@ -973,6 +974,13 @@ function mergePayloads(payloads: OtlpPayload[]): OtlpPayload {
 // Read live, so a rotated otlpAdditionalHeaders reaches the next send; report is the caller's guarded one.
 type SenderConf = Pick<ResolvedQueueConf, "acceptPlainHttpCredentials" | "clock" | "otlpAdditionalHeaders" | "otlpHttpBaseURI" | "otlpProtocol">;
 
+// One rule for the credential headers a span redacts and a send warns of. Elastic APM's default `sanitize_field_names`, plus the spec's optional `cookie`.
+const SENSITIVE_HEADER_NAME = /^(cookie|passwd|password|pwd|secret|set-cookie)$|key$|auth|card|credit|principal|session|token/;
+
+function isCredentialHeaderName(name: string): boolean {
+	return SENSITIVE_HEADER_NAME.test(name.toLowerCase());
+}
+
 function setsAuthorization(headers: Record<string, string> | undefined): boolean {
 	return Object.keys(headers ?? {}).some(name => name.toLowerCase() === "authorization");
 }
@@ -1052,7 +1060,7 @@ class OtlpSender {
 		if (this.plainHttpHost !== undefined) {
 			// The message names the header and never its value, since a value may be the credential.
 			for (const [name] of headers) {
-				if (SENSITIVE_HEADER_NAME.test(name)) {
+				if (isCredentialHeaderName(name)) {
 					const source = name === "authorization" && !setsAuthorization(this.conf.otlpAdditionalHeaders) ? "user:pass@ in otlpHttpBaseURI" : "otlpAdditionalHeaders";
 
 					this.warn(`@larvit/log: the ${name} header from ${source} goes over plain http: to ${this.plainHttpHost}, readable by anything on the network path; use an https: endpoint, or on a network you trust set acceptPlainHttpCredentials: true on the Queue`);
@@ -1405,8 +1413,7 @@ function isSensitiveQueryKey(key: string): boolean {
 	return SENSITIVE_QUERY_KEY.test(key.toLowerCase().replace(/[-_]/g, ""));
 }
 
-// Elastic APM's default `sanitize_field_names`, plus the spec's optional `cookie`.
-const SENSITIVE_HEADER_NAME = /^(cookie|passwd|password|pwd|secret|set-cookie)$|key$|auth|card|credit|principal|session|token/;
+// `isCredentialHeaderName`, the header-name rule, sits above the queue's sender, which warns by it too.
 
 // Past it a query part that parses as a url records `REDACTED`, before the stack runs out.
 const MAX_URL_DEPTH = 8;
@@ -1686,7 +1693,7 @@ function redactedWholeUrl(value: string): string | undefined {
 }
 
 function redactHeaderCredential(name: string, value: string): string {
-	return SENSITIVE_HEADER_NAME.test(name.toLowerCase()) || redactedWholeUrl(value) !== undefined || textHoldsUserinfo(value) || textHoldsQueryKey(value) ? "REDACTED" : value;
+	return isCredentialHeaderName(name) || redactedWholeUrl(value) !== undefined || textHoldsUserinfo(value) || textHoldsQueryKey(value) ? "REDACTED" : value;
 }
 
 // The URL log.fetch traces: a scheme written without "//" parses to an opaque path, where

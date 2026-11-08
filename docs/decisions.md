@@ -162,7 +162,9 @@ with the call running upward and no comment at either end naming the other. Neit
 this entry lists the routes in: prose has nothing keeping a count true, and the
 userinfo-free-by-construction choices at the `log.fetch` call site are not rules this region holds.
 Scoped to spans because the remaining credential rules are the queue's, and the conf-redaction and
-Basic-over-`http:` items rewrite that code. Serves README → Goals #7 and code health. Valid while the source
+Basic-over-`http:` items rewrite that code. 2026-11-08, the implementing agent: the header-name rule
+`isCredentialHeaderName` sits above the queue's sender instead, since the sender's plain-`http:`
+warning reads it too and the linter forbids a use before its definition. Serves README → Goals #7 and code health. Valid while the source
 is a single `index.ts`.
 
 ## `format` is the formatter's one name, `entryFormatter` its alias until 3.0.0
