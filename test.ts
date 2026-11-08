@@ -1112,10 +1112,15 @@ test("every credential header over plain http: warns once, and either opt-out na
 	t.deepEqual(alias.lines, [{ msg: "@larvit/log: acceptPlainHttpAuthorization is deprecated and removed in 3.0.0, use acceptPlainHttpCredentials" }], "the old name still silences, and warns once that it is deprecated");
 	t.deepEqual([aliased.conf.acceptPlainHttpCredentials, aliased.conf.acceptPlainHttpAuthorization], [true, true], "both keys read back the accepted value");
 
+	const spread = reportSink();
+
+	await send(new Queue({ ...aliased.conf, report: spread.report }));
+	t.deepEqual(spread.lines, [], "a queue built from another's conf spread carries both names and doesn't warn that one is deprecated");
+
 	const unaccepted = new Queue({ acceptPlainHttpAuthorization: false, otlpHttpBaseURI, report: alias.report });
 
-	t.deepEqual([unaccepted.conf.acceptPlainHttpCredentials, unaccepted.conf.acceptPlainHttpAuthorization], [false, false], "a false alias accepts nothing");
-	t.strictEqual(calls.length, 5, "every request still goes");
+	t.deepEqual([unaccepted.conf.acceptPlainHttpCredentials, unaccepted.conf.acceptPlainHttpAuthorization], [false, false], "a false alias doesn't accept");
+	t.strictEqual(calls.length, 6, "every request still goes");
 	t.end();
 });
 
