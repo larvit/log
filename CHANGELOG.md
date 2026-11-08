@@ -4,13 +4,6 @@
 
 ### Security
 
-- **A listed key opening a url's fragment, such as `#access_token=…`, records `REDACTED` wherever a
-  url is read.** Since v2.3.0, an OAuth implicit-flow redirect captured as a `location` header, quoted
-  in a status message, held in a kept query value or nested in the request path exported its token:
-  only a key after a `?` or `&` was read. Now `location: https://app.test/cb#access_token=…` records
-  `REDACTED`, a status message records `…/cb#access_token=REDACTED&token_type=bearer`, and the path
-  and a kept query value holding one record `REDACTED` as for a key after a `?`. Rotate what such a
-  redirect carried in spans exported before.
 - **`url.full` records `REDACTED` for a url nested in the request path.** Since v2.3.0,
   `log.fetch("https://proxy.test/fetch/https://user:pass@cb.test/x")` — the shape a fetch-through,
   CORS or image proxy takes — exported the password in `url.full` with no capture option involved,
@@ -41,7 +34,7 @@
   records `https://REDACTED@h.test/x?access_token=REDACTED`. An `end({ error })` message that is a
   url is redacted the same way, so a `?key=` lookup or a `?token=` cursor in one records `REDACTED`
   and a dashboard grouping on status messages sees it change. Search status messages with the regex
-  `(?i)([?&]|%(25)*(3f|26))[-_]*([^&=%\s]*(auth|authentication|authorization|consumer[-_]?id|credential|key|key[-_]?id|pass|pass[-_]?phrase|p(ass)?w(or)?d[12]?|secret|sig|sign|signature|signed|token)|code|googleaccessid|id[-_]?token[-_]?hint)[-_]*(=|%(25)*3d)`
+  `(?i)([?&#]|%(25)*(3f|26|23))[-_]*([^&=%\s]*(auth|authentication|authorization|consumer[-_]?id|credential|key|key[-_]?id|pass|pass[-_]?phrase|p(ass)?w(or)?d[12]?|secret|sig|sign|signature|signed|token)|code|googleaccessid|id[-_]?token[-_]?hint)[-_]*(=|%(25)*3d)`
   for a match followed by anything but `REDACTED`, and rotate what it finds.
 - **Userinfo is redacted in `\\` and mixed-slash spellings among other text, in a slashless url, and
   percent-encoded.** Since v2.3.0, a captured `location` of `https:\\u:pw@h` or `http:u:pw@h`
@@ -55,9 +48,10 @@
   or value or a status message, where the rules for a parsed url left it.** Since v2.3.0,
   `location: /cb?token=…`, a `link: </next?access_token=…>` header and a kept query value holding a
   scheme-less or protocol-relative url, such as `?src=%2F%2Fcdn.test%2Fk%3Fsig%3D…`, exported the
-  credential; since v2.4.0, so did an `end({ error })` message such as node-fetch's
-  `request to …?token=… failed`. Now a header value or query value holding such a key after a `?` or
-  `&` records `REDACTED` whole, and a query key records it with its value. A status message records
+  credential, and so did a key opening a fragment, such as an OAuth implicit-flow redirect's
+  `location: https://app.test/cb#access_token=…`; since v2.4.0, so did an `end({ error })` message
+  such as node-fetch's `request to …?token=… failed`. Now a header value or query value holding such
+  a key after a `?`, `&` or `#` records `REDACTED` whole, and a query key records it with its value. A status message records
   `REDACTED` in place of the value, ending at `&`, `#` or whitespace:
   `request to https://h/x?token=REDACTED failed`. Text percent-encoded is read decoded up to eight
   times, and a status message holding a key only decoded, or encoded deeper, records `REDACTED`
@@ -76,7 +70,7 @@
   `REDACTED=REDACTED&REDACTED=REDACTED`; README → Credentials in a captured value says which pairs
   such userinfo takes.
   Search `url.full` with
-  `(?i)%(25)*(3f|26)[-_]*([^&=%]*(auth|authentication|authorization|consumer[-_]?id|credential|key|key[-_]?id|pass|pass[-_]?phrase|p(ass)?w(or)?d[12]?|secret|sig|sign|signature|signed|token)|code|googleaccessid|id[-_]?token[-_]?hint)[-_]*(=|%(25)*3d)`,
+  `(?i)%(25)*(3f|26|23)[-_]*([^&=%]*(auth|authentication|authorization|consumer[-_]?id|credential|key|key[-_]?id|pass|pass[-_]?phrase|p(ass)?w(or)?d[12]?|secret|sig|sign|signature|signed|token)|code|googleaccessid|id[-_]?token[-_]?hint)[-_]*(=|%(25)*3d)`,
   and with `(?i)(^|[?&])[^&=]*%(25)*2F%(25)*2F\S*%(25)*40` for a match followed by anything
   but `REDACTED`, and rotate what it finds; a presigned SigV4 url only while unexpired, as v2.4.0
   says.
