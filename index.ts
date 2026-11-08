@@ -1638,8 +1638,9 @@ const BASE64_HEAD = /^[A-Za-z\d+_-]*/;
 const BASE64_DIGITS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 const MAX_BASE64_RUNS = 64;
 
-// A base64 or base64url run as text: a byte from 0x80 up is written `%XX`, so `percentDecoded` reads
-// UTF-8 as it does in a percent-encoded path and no stray byte, such as 0xA0, reads as whitespace.
+// A base64 or base64url run as text: a byte from 0x80 up is written as the control character U+0080,
+// which is no whitespace, so a stray byte such as 0xA0 can't hide userinfo and no invalid UTF-8 makes
+// `percentDecoded` throw, as it would on a long run of `%XX`.
 function base64Text(run: string): string {
 	let text = "";
 	let buffer = 0;
@@ -1654,7 +1655,7 @@ function base64Text(run: string): string {
 
 			const byte = (buffer >> bits) & 255;
 
-			text += byte < 0x80 ? String.fromCharCode(byte) : `%${byte.toString(16)}`;
+			text += String.fromCharCode(Math.min(byte, 0x80));
 			buffer &= (1 << bits) - 1;
 		}
 	}

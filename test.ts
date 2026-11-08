@@ -2168,7 +2168,12 @@ test("log.fetch redacts a credential in a url nested base64-encoded in the reque
 	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 	const base64url = (text: string) => btoa(String.fromCharCode(...new TextEncoder().encode(text))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 	const split = (text: string, size: number) => text.match(new RegExp(`.{1,${size}}`, "g"))!.join("/");
+	const runs = base64url(Array.from({ length: 70 }, (_, index) => `run${index}abcdef`).join("."));
+	const third = Math.ceil(runs.length / 12) * 4;
 	const paths = {
+		"/a/k%3Fsig%3Dpw83/https:%2F%2Fu:pw84@cb.test": "/a/REDACTED",
+		[`/c/${runs.slice(0, third)}/${runs.slice(third, 2 * third)}/${runs.slice(2 * third)}`]: "/REDACTED",
+		[`/rs:fit:3/${base64url("//u:pw85@cb.test/i.png")}`]: "/REDACTED",
 		[`/insecure/rs:fit:300/${base64url("https://s3.test/k?X-Amz-Signature=pw70&X-Amz-Date=1")}`]: "/insecure/rs:fit:300/REDACTED",
 		[`/rs:fit:3/${base64url("https://u:pw71@cb.test/x")}.png`]: "/rs:fit:3/REDACTED",
 		"/rs:fit:3/aHR0cHM6Ly9jYi50ZXN0L35+fmszP3NpZz1wdzgw": "/rs:fit:3/REDACTED",
@@ -2212,9 +2217,11 @@ test("log.fetch redacts a long query within 250 ms", async t => {
 
 	const chain = Array.from({ length: 7 }).reduce<string>(nested => `https://a/?${encodeURIComponent(nested)}=b`, `https://t/?x=${"a".repeat(40000)}`);
 
+	const block = (index: number) => Array.from({ length: 3500 }, (_, offset) => "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"[Math.imul((index * 3500) + offset, 2654435761) >>> 26]).join("");
+	const joined = Array.from({ length: 9 }, (_, index) => (index ? `%${"25".repeat(index - 1)}41` : "") + block(index)).join("");
 	const repeated = Array.from({ length: 7 }).reduce<string>(nested => `${btoa(nested).replace(/=+$/, "")}.${Array.from({ length: 8 }, (_, level) => `%${"25".repeat(level)}${(0x41 + level).toString(16)}`).join("")}`, "https://u:pw@cb.test/x");
 
-	for (const query of [`x/${repeated}`, "?u=https://a/?".repeat(16384), "?https://a/?".repeat(16384), `?${chain}`, `${"/a:".repeat(16384)}%3F`, `${deep}/https:/${deep}?q=${deep}`, `?q=${"\\".repeat(32768)} x`, `?q=//${"\\".repeat(32768)} x`, `${"%5C".repeat(32768)}%20x`, `?//u:p${"&a@".repeat(16384)}`, `?//u:p=/${"&a@".repeat(16384)}`, `?${"//u:p&a@&".repeat(8192)}`]) {
+	for (const query of [`x/${repeated}`, `x/${joined}`, "?u=https://a/?".repeat(16384), "?https://a/?".repeat(16384), `?${chain}`, `${"/a:".repeat(16384)}%3F`, `${deep}/https:/${deep}?q=${deep}`, `?q=${"\\".repeat(32768)} x`, `?q=//${"\\".repeat(32768)} x`, `${"%5C".repeat(32768)}%20x`, `?//u:p${"&a@".repeat(16384)}`, `?//u:p=/${"&a@".repeat(16384)}`, `?${"//u:p&a@&".repeat(8192)}`]) {
 		const started = performance.now();
 
 		await log.fetch(`https://proxy.test/${query}`, { headers: { "x-deep": deep } });
