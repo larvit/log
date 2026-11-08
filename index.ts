@@ -1435,8 +1435,9 @@ const withoutDropped = (text: string) => text.replace(/[\t\n\r]/g, "");
 // `#access_token=…`, a matrix parameter such as `/img;sig=…`. A value ends at `&`, `#` or a plain
 // space, as userinfo does, and may hold a `?`: a parser keeps any other whitespace in it, and drops a
 // tab, newline or carriage return. A key is whatever stands between its `?`, `&`, `#` or `;` and its
-// `=`, a space included, so a listed key after a `?` in an unlisted value is found. A key starts after the nearest of the four, so `code`, which only an exact
-// name lists, is found in `?#code=…` and `?x#code=…`.
+// `=`, a space included, so a listed key after a `?` in an unlisted value is found. A key starts after the
+// nearest of the four, so `code`, which only an exact name lists, is found in `?#code=…` and
+// `?x#code=…`.
 function redactTextQueryKeys(text: string): string {
 	const opener = /[?&#;]([^&=?#;]*)=/g;
 	const valueEnd = /[&# ]/g;
