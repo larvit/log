@@ -168,9 +168,10 @@
   `warn` line per `stderr`.** It rejected every traced call, or turned a response the runtime
   delivered into a rejection.
 - **Chrome 80–84 and Firefox 74–78 parse the module again, and README → Runtimes states the browser
-  floor: Chrome 80, Firefox 74 or Safari 14.1.** v2.4.0 added `??=`, which raised the floor to
+  floor: Chrome 80, Firefox 74 or Safari 14.** v2.4.0 added `??=`, which raised the floor to
   Chrome 85 and Firefox 79, so a bundler leaving `node_modules` untranspiled gave those browsers a
-  `SyntaxError`. v2.3.0 and earlier parse there, and so does this release.
+  `SyntaxError`. The build now targets ES2020, so it lowers newer syntax and rejects newer
+  built-ins.
 
 ## v2.4.0
 
