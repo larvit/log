@@ -2163,6 +2163,35 @@ test("log.fetch redacts credentials in a url nested in the request path", async 
 	t.end();
 });
 
+test("log.fetch redacts a credential in a url nested base64-encoded in the request path", async t => {
+	const { calls } = stubFetch();
+	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+	const base64url = (text: string) => btoa(text).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+	const paths = {
+		[`/insecure/rs:fit:300/${base64url("https://s3.test/k?X-Amz-Signature=pw70&X-Amz-Date=1")}`]: "/insecure/rs:fit:300/REDACTED",
+		[`/insecure/${base64url("https://u:pw71@cb.test/x")}.png`]: "/insecure/REDACTED",
+		"/pad/aHR0cHM6Ly9zMy50ZXN0L2s_c2lnPXB3NzI%3D": "/pad/REDACTED",
+		"/std/aHR0cHM6Ly9zMy50ZXN0L2s%2Fc2lnPXB3NzI%3D": "/std/REDACTED",
+		[`/bare/${base64url("s3.test/k?sig=pw73")}`]: "/bare/REDACTED",
+		[`/twice/${base64url(base64url("https://u:pw74@cb.test"))}`]: "/twice/REDACTED",
+		[`/clean/${base64url("https://cb.test/x?q=1")}`]: `/clean/${base64url("https://cb.test/x?q=1")}`,
+		"/words/internationalization-and-localization/README.md": "/words/internationalization-and-localization/README.md",
+		[`/many/${Array.from({ length: 70 }, (_, index) => `run${index}abcdef`).join(".")}`]: "/REDACTED",
+	};
+
+	for (const path of Object.keys(paths)) {
+		await log.fetch(`https://proxy.test${path}`);
+	}
+
+	await log.end();
+
+	const urlFulls = exportedSpans(calls).filter(span => span.kind === 3).map((span: any) => span.attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue);
+
+	t.deepEqual(urlFulls, Object.values(paths).map(path => `https://proxy.test${path}`), "each path records its expected redaction");
+	t.ok(!/pw7\d/.test(JSON.stringify(calls.filter(call => call.path.startsWith("/v1/")))), "no nested credential reaches the collector");
+	t.end();
+});
+
 test("log.fetch redacts a long query within 250 ms", async t => {
 	const deep = `%${"25".repeat(16384)}41`;
 	const log = new Log({ captureQuery: true, captureRequestHeaders: ["x-deep"], otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });

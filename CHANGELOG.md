@@ -16,8 +16,10 @@
   after `//`, `\\`, `/\` or `\/`, raw or percent-encoded, such as `/users//bob@x.test`, records
   `/REDACTED` whole, and so does one percent-encoded more than eight times. A dashboard grouping on
   `url.full` sees such a path change, and some paths holding no credential too: a nested url's
-  `?key=` lookup cuts the path, and so does a ninth nested url. A url nested base64-encoded is still
-  exported as written: keep credentials out of one. v2.4.0's advice to rotate what such a path
+  `?key=` lookup cuts the path, and so does a ninth nested url. A url nested base64-encoded, as an
+  image proxy such as imgproxy takes one, is read by the same rules: `/insecure/rs:fit:300/aHR0cHM6Ly9…`
+  records `/insecure/rs:fit:300/REDACTED` where it holds a credential, and a segment holding more than
+  64 distinct base64 runs records the whole path as `/REDACTED`. v2.4.0's advice to rotate what such a path
   carried, its `aHR0c` search for a base64-encoded url included, stands for spans exported before.
 - **A captured header records `REDACTED` by Elastic APM's default `sanitize_field_names` rule.**
   Since v2.3.0 only `authorization`, `cookie`, `proxy-authorization` and `set-cookie` did, so a

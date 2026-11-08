@@ -1633,18 +1633,77 @@ function traceableUrl(input: string | URL): URL | undefined {
 
 const holdsSensitiveQueryKey = (level: string) => redactTextQueryKeys(level) !== level;
 
+const BASE64_RUN = /[A-Za-z\d+/_-]{8,}/g;
+const BASE64_DIGITS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+const MAX_BASE64_RUNS = 64;
+
+// A base64 or base64url run, padding or not, one char to a byte: only ASCII spells a url delimiter.
+function base64Text(run: string): string {
+	let text = "";
+	let buffer = 0;
+	let bits = 0;
+
+	for (const digit of run.replace(/\+/g, "-").replace(/\//g, "_")) {
+		buffer = (buffer << 6) | BASE64_DIGITS.indexOf(digit);
+		bits += 6;
+
+		if (bits >= 8) {
+			bits -= 8;
+			text += String.fromCharCode((buffer >> bits) & 255);
+			buffer &= (1 << bits) - 1;
+		}
+	}
+
+	return text;
+}
+
+// Every level of a path segment: percent-decoded, and each base64 run in a level decoded and read the
+// same way, as an image proxy takes a nested url. `undefined` past MAX_URL_DEPTH percent levels or
+// MAX_BASE64_RUNS distinct runs, which count as a credential.
+function segmentLevels(segment: string, seen = new Set<string>()): string[] | undefined {
+	const levels = decodings(segment);
+	const all = levels === undefined ? undefined : [...levels];
+
+	for (const level of levels ?? []) {
+		for (const run of level.match(BASE64_RUN) ?? []) {
+			if (seen.has(run)) {
+				continue;
+			}
+
+			seen.add(run);
+
+			const inner = seen.size > MAX_BASE64_RUNS ? undefined : segmentLevels(base64Text(run), seen);
+
+			if (inner === undefined) {
+				return undefined;
+			}
+
+			all?.push(...inner);
+		}
+	}
+
+	return all;
+}
+
 // Cut at the first segment whose nested url holds a credential: a later cut would leave an earlier
 // url's userinfo in the kept prefix. A url nested with no scheme, or behind other text in its segment,
 // still carries a query, so a segment holding a listed key cuts too.
 function redactedPath(pathname: string): string {
 	const segments = pathname.split("/");
-	const keyed = segments.findIndex((segment, index) => index > 0 && decodings(segment)?.some(holdsSensitiveQueryKey) === true);
+	const levels = segments.map((segment, index) => index > 0 ? segmentLevels(segment) : []);
+
+	if (levels.includes(undefined)) {
+		return "/REDACTED";
+	}
+
+	const read = levels as string[][];
+	const keyed = read.findIndex((segmentRead, index) => index > 0 && segmentRead.some(holdsSensitiveQueryKey));
 	const scanned = keyed === -1 ? segments : [...segments.slice(0, keyed), "REDACTED"];
 	let kept = scanned.join("/");
 	let opened = 0;
 
 	for (let index = 1; index < scanned.length; index++) {
-		if (decodings(scanned[index])?.some(level => SCHEME_LED.test(level)) !== true) {
+		if (!read[index]?.some(level => SCHEME_LED.test(level)) || index === keyed) {
 			continue;
 		}
 
@@ -1652,7 +1711,7 @@ function redactedPath(pathname: string): string {
 
 		const nested = decodings(segments.slice(index).join("/"));
 
-		if (opened > MAX_URL_DEPTH || nested === undefined || nested.some(level => SCHEME_LED.test(level) && (redactedWholeUrl(level) !== undefined || redactTextUserinfo(level) !== level))) {
+		if (opened > MAX_URL_DEPTH || nested === undefined || [...nested, ...read[index]].some(level => SCHEME_LED.test(level) && (redactedWholeUrl(level) !== undefined || redactTextUserinfo(level) !== level))) {
 			kept = `${scanned.slice(0, index).join("/")}/REDACTED`;
 			break;
 		}

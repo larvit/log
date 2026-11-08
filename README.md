@@ -495,8 +495,13 @@ yourself included.
   `/fetch/s3.test/REDACTED`, and `/a/x=https:%2F%2Fcb.test%2Fx%3Fpassword%3D…` records
   `/a/REDACTED`. It also records `REDACTED` from the ninth segment starting with a scheme, whatever
   that segment holds. Where userinfo, as the bullet above reads it, remains in what the path keeps,
-  or the path is percent-encoded more than eight times, the whole path records `/REDACTED`. A url nested base64-encoded, as an image proxy such as imgproxy takes one, is not
-  read: keep credentials out of one.
+  or the path is percent-encoded more than eight times, the whole path records `/REDACTED`. A url
+  nested base64-encoded, as an image proxy such as imgproxy takes one, is read by the same rules: a
+  run of eight or more base64 or base64url characters, padded or not, is decoded, and so is one
+  inside what it decodes. `/insecure/rs:fit:300/aHR0cHM6Ly9…` records `/insecure/rs:fit:300/REDACTED`.
+  A run is read wherever it sits in a segment, but one glued to a longer token with `-` or `_`, such
+  as `u-aHR0…`, is read from the token's start. A segment holding more than 64 distinct runs records
+  the whole path as `/REDACTED`.
 
 Never put credentials in the url; pass an `Authorization` header, and strip userinfo from a url you
 did not build. `log.fetch` mirrors the runtime: Node and browsers refuse such a url, while React
