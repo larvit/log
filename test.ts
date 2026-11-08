@@ -1225,6 +1225,7 @@ test("Queue keeps a batch it reported a retry for through the maxItems trim", as
 	const reports = reportSink();
 	let attempts = 0;
 	let released = false;
+	let retryReleased = false;
 	const { calls } = stubFetch(async () => {
 		attempts++;
 
@@ -1232,6 +1233,10 @@ test("Queue keeps a batch it reported a retry for through the maxItems trim", as
 			await waitFor(() => released);
 
 			return response({ status: 503 });
+		}
+
+		if (attempts === 2) {
+			await waitFor(() => retryReleased);
 		}
 
 		return undefined;
@@ -1250,9 +1255,18 @@ test("Queue keeps a batch it reported a retry for through the maxItems trim", as
 	await flushed;
 	log.info("f");
 	await clock.advance(1000);
+	await waitFor(() => calls.length === 2);
 
-	t.deepEqual(exportedRecords(calls.slice(1)), ["a", "b", "f"], "the retry sends the failed batch and the newest record, whether the queue overflowed before the retry wait or during it");
-	t.deepEqual(reports.lines.filter(line => line.msg === "OTLP queue full, oldest items dropped").map(line => line.dropped), [2, 1], "each drop is reported with its count");
+	// The retry is in flight, so the failed batch is no longer spared: the oldest of these goes.
+	log.info("g");
+	log.info("h");
+	log.info("i");
+	log.info("j");
+	retryReleased = true;
+	await log.flush();
+
+	t.deepEqual(exportedRecords(calls.slice(1)), ["a", "b", "f", "h", "i", "j"], "the retry sends the failed batch and the newest record, whether the queue overflowed before the retry wait or during it, and a later overflow drops the oldest");
+	t.deepEqual(reports.lines.filter(line => line.msg === "OTLP queue full, oldest items dropped").map(line => line.dropped), [2, 2], "each round reports its drops with their count");
 	t.end();
 });
 
@@ -1273,8 +1287,9 @@ test("Queue keeps a batch in storage when a round takes it before the first save
 
 		return undefined;
 	});
-	const log = new Log({ otlpQueue: new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, storage }), stderr: () => {} });
-	const flushed = log.flush();
+	const queue = new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, storage });
+	const log = new Log({ otlpQueue: queue, stderr: () => {} });
+	const flushed = queue.flush();
 
 	log.info("only");
 	loaded = true;
