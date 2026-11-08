@@ -6,13 +6,14 @@
 
 `Bar = 0.5`
 
-`Next ID = 121`
+`Next ID = 122`
 
 ## Items
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 120 | 2.5.0 |  | security | **Redact a credential in a base64-encoded url in the request path when its split form opens mid-segment or its decoded text carries a `;` key such as `;sig=`.** | 2 | 2 | 4 | 6 | 4 |  | 0.0 |
+| 121 | 2.5.0 |  | security | **Redact userinfo whose user or password holds a tab, newline or carriage return, in text that isn't a whole url.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
 | 7 | 2.5.0 |  | defect | **Unref the batch timer, so a pending batch never holds a Node or Deno process.** | 2 | 2 | 2 | 4 | 4 | 9 by 9 | 7.0 |
 | 13 | 2.5.0 |  |  | **Pin every Node base image to its full patch version, so one commit builds one image on any day.** | 1 | 1 | 1 | 1 | 2 | code health by 3 | 6.2 |
 | 89 | 2.5.0 |  | defect | **Keep `enabled()` free of output: warn about an unknown `logLevel` from the level methods alone.** | 1 | 1 | 1 | 1 | 2 | 3 by 5 | 2.3 |
@@ -129,6 +130,21 @@ Standard base64 whose `/` digit is written raw is exported unchanged too, since 
 drops the `/`: `/std/aHR0cHM6Ly9zMy50ZXN0L2s/c2lnPXB3NzI=`. README and CHANGELOG say standard base64
 is read only where its `/` is percent-encoded. All three shapes go through `redactedPath` and its
 helpers `segmentLevels`, `base64Chains` and `base64Text`. Found on 2026-11-08.
+
+### 121. Redact userinfo whose user or password holds a tab, newline or carriage return, in text that isn't a whole url.
+
+A url parser drops a tab, newline or carriage return, so `https://admin:hun<TAB>ter2@db.test/x`
+parses with the password `hunter2`. In text that isn't a whole url, that userinfo is exported
+unchanged. A span's status message from `end({ error })` or a failed `log.fetch`, such as
+`retry https://admin:hun<TAB>ter2@db.test/x`, exports `admin:hun<TAB>ter2`, and so does a captured
+header value that isn't a whole url.
+
+`SLASHED_USERINFO` and `BACKSLASH_OPENED_USERINFO` in `index.ts`, which `redactTextUserinfo` and
+`textHoldsUserinfo` use, match `[^/?#\s]*@` after `//` or `\\`. `\s` includes those three
+characters, so a user or password holding one isn't matched. Check the path, query-key and
+`OPENS_USERINFO` readers for the same gap. Item 119 closed it for a listed query key's value in
+`redactTextQueryKeys`, and `withoutDropped` already treats the three characters as dropped for a
+key. Found by the product-owner pass on 2026-11-08.
 
 ### 7. Unref the batch timer, so a pending batch never holds a Node or Deno process.
 
