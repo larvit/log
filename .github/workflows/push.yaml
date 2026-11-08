@@ -3,23 +3,26 @@ on: [push]
 jobs:
   Build-and-test:
     runs-on: ubuntu-26.04
+    # The job name keeps the branch protection's required checks, "Build-and-test (18)" and so on,
+    # stable while Renovate bumps an image's patch version.
+    name: Build-and-test (${{ matrix.node }})
     strategy:
       matrix:
-        node-image:
-          - node:18.20.8-bookworm-slim
-          - node:20.20.2-bookworm-slim
-          - node:22.23.4-bookworm-slim
-          - node:24.22.2-bookworm-slim
-          - node:26.13.0-bookworm-slim
+        include:
+          - { node: "18", image: "node:18.20.8-bookworm-slim" }
+          - { node: "20", image: "node:20.20.2-bookworm-slim" }
+          - { node: "22", image: "node:22.23.4-bookworm-slim" }
+          - { node: "24", image: "node:24.22.2-bookworm-slim" }
+          - { node: "26", image: "node:26.13.0-bookworm-slim" }
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
       # Deps + build + test all run inside the container, so this matches `npm run test-docker` locally.
-      - name: Test (${{ matrix.node-image }}, in Docker)
+      - name: Test (Node ${{ matrix.node }}, in Docker)
         run: npm run test-docker
         env:
-          NODE_IMAGE: ${{ matrix.node-image }}
+          NODE_IMAGE: ${{ matrix.image }}
 
   Browser-test:
     runs-on: ubuntu-26.04
