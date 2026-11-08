@@ -12,6 +12,7 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
+| 106 | 2.5.0 |  | defect | **Run on React Native's own `URL`, whose getters throw "not implemented", or state in README → Runtimes that an app installs a `URL` polyfill.** | 2 | 3 | 3 | 6 | 2 | 2 by 8 | 1.5 |
 | 104 | 2.5.0 |  | decision | **Warn once about every credential header sent over plain `http:`, not only `Authorization`, and give the opt-out a name that covers them all.** | 2 | 2 | 2 | 4 | 4 | 3 by 4 | 0.7 |
 | 34 | 2.6.0 |  | principle | **Let a consumer inject the randomness trace and span ids come from.** | 1 | 1 | 1 | 1 | 2 | code health by 5 | 10.4 |
 | 37 | 2.6.0 |  | principle | **Build a span payload without writing to `log.span`.** | 1 | 1 | 1 | 1 | 2 | code health by 5 | 10.4 |
@@ -100,6 +101,14 @@
 | 75 | 3.0.0 | 22 | decision | **Keep credentials off `log.conf` and `queue.conf`.** | 2 | 1 | 2 | 3 | 3 | 3 by 3 | 0.7 |
 
 ## Details
+
+### 104. Warn once about every credential header sent over plain `http:`, not only `Authorization`, and give the opt-out a name that covers them all.
+
+React Native 0.74's `Libraries/Blob/URL.js` throws "not implemented" from `host`, `origin`,
+`password`, `pathname`, `protocol`, `search` and `username`. `new Queue`, `new Log({ otlpHttpBaseURI })` and
+`log.fetch` read them, so those calls throw on an app with no `URL` polyfill. README → Runtimes names
+`fetch`, `TextEncoder` and `btoa` only. Found by the goals and frontend principles audits on
+2026-10-26; the throwing getters were checked against the v0.74.0 source.
 
 ### 104. Warn once about every credential header sent over plain `http:`, not only `Authorization`, and give the opt-out a name that covers them all.
 
