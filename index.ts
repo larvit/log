@@ -1432,9 +1432,9 @@ const withoutDropped = (text: string) => text.replace(/[\t\n\r]/g, "");
 // The text with each listed key's value replaced by `REDACTED`, wherever a url's own query rules don't
 // reach it: a status message such as `request to …?token=… failed`, a relative `location`, a
 // scheme-less url, a `?` in a fragment, a fragment's own pairs such as an OAuth redirect's
-// `#access_token=…`, a matrix parameter such as `/img;sig=…`. A value ends at `&`, `#` or a plain
-// space, as userinfo does, and may hold a `?`: a parser keeps any other whitespace in it, and drops a
-// tab, newline or carriage return. A key is whatever stands between its `?`, `&`, `#` or `;` and its
+// `#access_token=…`, a matrix parameter such as `/img;sig=…`. A value may hold a `?` and ends at
+// `&`, `#` or a plain space. A url parser ends it at no whitespace and drops a tab, newline or carriage
+// return from it; a plain space ends it here all the same, as it ends userinfo. A key is whatever stands between its `?`, `&`, `#` or `;` and its
 // `=`, a space included, so a listed key after a `?` in an unlisted value is found. A key starts after the
 // nearest of the four, so `code`, which only an exact name lists, is found in `?#code=…` and
 // `?x#code=…`.

@@ -42,6 +42,7 @@ In [docs/decisions.md](docs/decisions.md):
 - Metrics will come with instruments that aggregate for the caller
 - `ProtoWriter.string` uses `TextEncoder` with no fallback
 - The protobuf encoder stays
+- In text, a plain space ends a credential and no other whitespace does
 
 ## Working here
 
