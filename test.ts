@@ -2033,8 +2033,7 @@ test("log.fetch captureQuery keeps the query but redacts known-sensitive keys an
 	t.ok(urlFull.includes("&then=https%3A%2F%2Ft.test%2Fy%3Fsig%3DREDACTED&"), "a url nested in a query value has its listed key redacted");
 	t.ok(urlFull.includes("&n2=REDACTED&"), "userinfo holding a space is redacted");
 	t.ok(urlFull.includes("&n6=https%3A%2F%2Ft.test%2Fx%3Fnext2%3Dhttps%253A%252F%252Fu.test%252F%253Ftoken%253DREDACTED&"), "a url nested two deep has its listed key redacted");
-	t.ok(urlFull.includes("&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&") && !urlFull.includes("%3Fnext=") && !/w4[01]/.test(urlFull), "a url value under a url key is read alone too, an escaped delimiter in its userinfo included, and a url key joined with such a value records both as REDACTED");
-	t.ok(urlFull.includes("&n6=https%3A%2F%2Ft.test%2Fx%3Fnext2%3Dhttps%253A%252F%252Fu.test%252F%253Ftoken%253DREDACTED&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&flow=1&") && !/pw42|ss4[3-6]/.test(urlFull), "a url in a query key is read alone too, where its value breaks the joined reading, and a key cut short by an = in its password is read with its value, whitespace or a control character the parser drops included");
+	t.ok(urlFull.includes("&n6=https%3A%2F%2Ft.test%2Fx%3Fnext2%3Dhttps%253A%252F%252Fu.test%252F%253Ftoken%253DREDACTED&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&flow=1&") && !/w4[01]|pw42|ss4[3-6]/.test(urlFull), "a url in a query key is read alone too, where its value breaks the joined reading, and a key cut short by an = in its password is read with its value, whitespace or a control character the parser drops included");
 	t.ok(urlFull.includes("&next2=myapp%3A%2F%2F%2Fcb%3Faccess_token%3DREDACTED&q2=a%3Ab&"), "a url without a host has its listed key redacted, and a scheme alone leaves a value be");
 	t.ok(urlFull.includes("&q2=a%3Ab&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&d10=REDACTED&d9=REDACTED&") && !/pw5[0-3]/.test(urlFull), "userinfo in a key, or across its =, redacts both, and a value past eight encodings records REDACTED");
 	t.ok(urlFull.includes("&flow=1&redirect_uri=https%3A%2F%2Flocalhost%3A3000&scope=openid&login_hint=bob%40x.test&"), "an encoded url in a value leaves the pairs after it alone");
@@ -2065,15 +2064,22 @@ test("log.fetch captureQuery redacts userinfo that a kept query splits across &"
 		["//u:pw79&k=w@&m=1", `${redacted(2)}&m=1`],
 		["//u:pw80&/x@y&m=1", "%2F%2Fu%3Apw80=&%2Fx%40y=&m=1"],
 		["e=//host&mail=a@b.test&%2F%2Fx/y&z=4", "e=%2F%2Fhost&mail=a%40b.test&%2F%2Fx%2Fy=&z=4"],
-		// A parser reads the raw query, where `+`, `%2F`, `%3F` and `%23` stay inside userinfo.
+		// Raw, `+`, `%2F`, `%3F` and `%23` stay inside userinfo, which the form-decoded reading would end.
 		["//u:pw81+x@h.test&m=1", `${redacted(1)}&m=1`],
 		["next=//my+user:pw82@cb.test/x&m=1", "next=REDACTED&m=1"],
 		["//u:pw83&a%2Fb&w@h.test&m=1", `${redacted(3)}&m=1`],
 		["//u:pw84&a%3Fb&w@h.test&m=1", `${redacted(3)}&m=1`],
 		["//u:pw85&a%23b&w@h.test&m=1", `${redacted(3)}&m=1`],
 		["a+b=c+d&q=1+2", "a+b=c+d&q=1+2"],
-		// Read as typed, `%C2%A0` is a space that ends the match before the `@`; form-decoded, `%C2` is no space.
+		// Only the form-decoded reading finds this userinfo: raw, `%C2%25A0` decodes to a space before the `@`.
 		["next=//user:pw86%C2%25A0ss%2540host/x&m=1", "next=REDACTED&m=1"],
+		["//u:p87+q&w%40h.test&m=1", `${redacted(2)}&m=1`],
+		["//u:pw88+x&w%2540h.test&m=1", `${redacted(2)}&m=1`],
+		["//my+user:pw89&x%40cb.test/x", redacted(2)],
+		["&//u:pw90+x@h.test&m=1", `${redacted(1)}&m=1`],
+		["a=1&&next=//my+user:pw91@cb.test/x&m=1", "a=1&next=REDACTED&m=1"],
+		["//u:pw92+x=y&z@h.test&m=1", `${redacted(2)}&m=1`],
+		["//u:pw93=a%2Fb&w@h.test&m=1", `${redacted(2)}&m=1`],
 	];
 	const { calls } = stubFetch();
 	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
