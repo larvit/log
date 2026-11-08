@@ -2446,6 +2446,27 @@ for (const character of ["\v", "\f", "\u00a0", "\u1680", "\u2000", "\u200a", "\u
 	});
 }
 
+// A url parser keeps these in a query value, so a status message redacts the value whole; only `&`, `#` or a plain space ends it in text.
+for (const character of ["\v", "\f", "\u00a0", "\u1680", "\u2000", "\u200a", "\u2028", "\u2029", "\u202f", "\u205f", "\u3000", "\ufeff"]) {
+	test(`a listed query value holding U+${character.charCodeAt(0).toString(16).padStart(4, "0")} is redacted whole in a status message`, async t => {
+		const { calls } = stubFetch();
+
+		await new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} }).end({ error: new Error(`request to https://h.test/x?token=ab${character}cd&page=2 failed`) });
+
+		t.deepEqual(exportedSpans(calls)[0].status, { code: 2, message: "request to https://h.test/x?token=REDACTED&page=2 failed" });
+		t.end();
+	});
+}
+
+test("a plain space still ends a listed query value in a status message", async t => {
+	const { calls } = stubFetch();
+
+	await new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} }).end({ error: new Error("request to https://h.test/x?token=abcd failed, see //host and mail a@b") });
+
+	t.deepEqual(exportedSpans(calls)[0].status, { code: 2, message: "request to https://h.test/x?token=REDACTED failed, see //host and mail a@b" });
+	t.end();
+});
+
 test("a plain space still ends userinfo in a status message", async t => {
 	const { calls } = stubFetch();
 

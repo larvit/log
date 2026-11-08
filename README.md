@@ -487,9 +487,8 @@ yourself included.
   `location: https://app.test/cb#access_token=…`. A header value or query value records `REDACTED`
   whole, and a query key records it together with its value. A status message records `REDACTED` in
   place of the value: `request to https://h/x?token=REDACTED failed`. The value may hold a `?` and
-  ends at `&`, `#` or whitespace other than a tab, newline or carriage return, which a url parser
-  drops. Text is read percent-decoded up to eight times as above; a status message holding such a key
-  only decoded, or encoded deeper, records `REDACTED` whole. Keep credentials out of error messages, or replace a message before `end({ error })`.
+  ends at `&`, `#` or a plain space; any other whitespace stays in it, as in a url parser. Text is
+  read percent-decoded up to eight times as above; a status message holding such a key only decoded, or encoded deeper, records `REDACTED` whole. Keep credentials out of error messages, or replace a message before `end({ error })`.
 - **A url nested in the request path**, raw or percent-encoded, as a fetch-through or image proxy
   takes one. The path records `REDACTED` from the first segment that starts with a scheme, such as
   `https:`, and opens a url holding a credential by these rules: `/fetch/REDACTED`. It also records
