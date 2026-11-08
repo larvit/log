@@ -2166,16 +2166,26 @@ test("log.fetch redacts credentials in a url nested in the request path", async 
 test("log.fetch redacts a credential in a url nested base64-encoded in the request path", async t => {
 	const { calls } = stubFetch();
 	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
-	const base64url = (text: string) => btoa(text).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+	const base64url = (text: string) => btoa(String.fromCharCode(...new TextEncoder().encode(text))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+	const split = (text: string, size: number) => text.match(new RegExp(`.{1,${size}}`, "g"))!.join("/");
 	const paths = {
 		[`/insecure/rs:fit:300/${base64url("https://s3.test/k?X-Amz-Signature=pw70&X-Amz-Date=1")}`]: "/insecure/rs:fit:300/REDACTED",
-		[`/insecure/${base64url("https://u:pw71@cb.test/x")}.png`]: "/insecure/REDACTED",
-		"/pad/aHR0cHM6Ly9zMy50ZXN0L2s_c2lnPXB3NzI%3D": "/pad/REDACTED",
+		[`/rs:fit:3/${base64url("https://u:pw71@cb.test/x")}.png`]: "/rs:fit:3/REDACTED",
+		"/rs:fit:3/aHR0cHM6Ly9jYi50ZXN0L35+fmszP3NpZz1wdzgw": "/rs:fit:3/REDACTED",
+		"/rs:fit:3/aHR0cHM6Ly9zMy50ZXN0L2s_c2lnPXB3NzI%3D": "/rs:fit:3/REDACTED",
 		"/std/aHR0cHM6Ly9zMy50ZXN0L2s%2Fc2lnPXB3NzI%3D": "/std/REDACTED",
-		[`/bare/${base64url("s3.test/k?sig=pw73")}`]: "/bare/REDACTED",
-		[`/twice/${base64url(base64url("https://u:pw74@cb.test"))}`]: "/twice/REDACTED",
+		[`/rs:fit:3/${base64url("s3.test/k?sig=pw73")}`]: "/rs:fit:3/REDACTED",
+		[`/rs:fit:3/${base64url(base64url("https://u:pw74@cb.test"))}`]: "/rs:fit:3/REDACTED",
 		[`/insecure/${base64url("//u:pw75@cb.test/i.png")}`]: "/REDACTED",
 		[`/json/${base64url("{\"url\":\"https://u:pw76@cb.test/i.png\"}")}`]: "/REDACTED",
+		[`/insecure/rs:fit:300/${split(base64url("https://s3.test/k?X-Amz-Signature=pw70&X-Amz-Date=1"), 16)}.png`]: "/insecure/rs:fit:300/REDACTED",
+		[`/insecure/rs:fit:300/${split(base64url("https://u:pw77@cb.test/x/image.png"), 16)}`]: "/insecure/rs:fit:300/REDACTED",
+		[`/media/v1/${split(base64url("https://s3.test/k?sig=pw81"), 12)}`]: "/REDACTED",
+		[`/x/${base64url("//u:pw78à@cb.test/i.png")}`]: "/REDACTED",
+		[`/json/${base64url("{\"src\":\"https://Рoot:pw79@cb.test/i.png\"}")}`]: "/REDACTED",
+		[`/short/${base64url("//u:p@")}`]: "/REDACTED",
+		[`/a/k%3Fsig%3D1/${base64url("//u:pw82@cb.test")}`]: "/a/REDACTED",
+		[`/sixty/${Array.from({ length: 64 }, (_, index) => `AAAAAA${"abcdefgh"[index >> 3]}${"abcdefgh"[index & 7]}`).join(".")}`]: `/sixty/${Array.from({ length: 64 }, (_, index) => `AAAAAA${"abcdefgh"[index >> 3]}${"abcdefgh"[index & 7]}`).join(".")}`,
 		[`/clean/${base64url("https://cb.test/x?q=1")}`]: `/clean/${base64url("https://cb.test/x?q=1")}`,
 		"/words/internationalization-and-localization/README.md": "/words/internationalization-and-localization/README.md",
 		[`/many/${Array.from({ length: 70 }, (_, index) => `run${index}abcdef`).join(".")}`]: "/REDACTED",
@@ -2190,7 +2200,7 @@ test("log.fetch redacts a credential in a url nested base64-encoded in the reque
 	const urlFulls = exportedSpans(calls).filter(span => span.kind === 3).map((span: any) => span.attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue);
 
 	t.deepEqual(urlFulls, Object.values(paths).map(path => `https://proxy.test${path}`), "each path records its expected redaction");
-	t.ok(!/pw7\d/.test(JSON.stringify(calls.filter(call => call.path.startsWith("/v1/")))), "no nested credential reaches the collector");
+	t.ok(!/pw[78]\d/.test(JSON.stringify(calls.filter(call => call.path.startsWith("/v1/")))), "no nested credential reaches the collector");
 	t.end();
 });
 
@@ -2202,7 +2212,9 @@ test("log.fetch redacts a long query within 250 ms", async t => {
 
 	const chain = Array.from({ length: 7 }).reduce<string>(nested => `https://a/?${encodeURIComponent(nested)}=b`, `https://t/?x=${"a".repeat(40000)}`);
 
-	for (const query of ["?u=https://a/?".repeat(16384), "?https://a/?".repeat(16384), `?${chain}`, `${"/a:".repeat(16384)}%3F`, `${deep}/https:/${deep}?q=${deep}`, `?q=${"\\".repeat(32768)} x`, `?q=//${"\\".repeat(32768)} x`, `${"%5C".repeat(32768)}%20x`, `?//u:p${"&a@".repeat(16384)}`, `?//u:p=/${"&a@".repeat(16384)}`, `?${"//u:p&a@&".repeat(8192)}`]) {
+	const repeated = Array.from({ length: 7 }).reduce<string>(nested => `${btoa(nested).replace(/=+$/, "")}.${Array.from({ length: 8 }, (_, level) => `%${"25".repeat(level)}${(0x41 + level).toString(16)}`).join("")}`, "https://u:pw@cb.test/x");
+
+	for (const query of [`x/${repeated}`, "?u=https://a/?".repeat(16384), "?https://a/?".repeat(16384), `?${chain}`, `${"/a:".repeat(16384)}%3F`, `${deep}/https:/${deep}?q=${deep}`, `?q=${"\\".repeat(32768)} x`, `?q=//${"\\".repeat(32768)} x`, `${"%5C".repeat(32768)}%20x`, `?//u:p${"&a@".repeat(16384)}`, `?//u:p=/${"&a@".repeat(16384)}`, `?${"//u:p&a@&".repeat(8192)}`]) {
 		const started = performance.now();
 
 		await log.fetch(`https://proxy.test/${query}`, { headers: { "x-deep": deep } });

@@ -1634,10 +1634,12 @@ function traceableUrl(input: string | URL): URL | undefined {
 const holdsSensitiveQueryKey = (level: string) => redactTextQueryKeys(level) !== level;
 
 const BASE64_RUN = /[A-Za-z\d+/_-]{8,}/g;
+const BASE64_HEAD = /^[A-Za-z\d+_-]*/;
 const BASE64_DIGITS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 const MAX_BASE64_RUNS = 64;
 
-// A base64 or base64url run, padding or not, one char to a byte: only ASCII spells a url delimiter.
+// A base64 or base64url run as text: a byte from 0x80 up is written `%XX`, so `percentDecoded` reads
+// UTF-8 as it does in a percent-encoded path and no stray byte, such as 0xA0, reads as whitespace.
 function base64Text(run: string): string {
 	let text = "";
 	let buffer = 0;
@@ -1649,7 +1651,10 @@ function base64Text(run: string): string {
 
 		if (bits >= 8) {
 			bits -= 8;
-			text += String.fromCharCode((buffer >> bits) & 255);
+
+			const byte = (buffer >> bits) & 255;
+
+			text += byte < 0x80 ? String.fromCharCode(byte) : `%${byte.toString(16)}`;
 			buffer &= (1 << bits) - 1;
 		}
 	}
@@ -1657,14 +1662,20 @@ function base64Text(run: string): string {
 	return text;
 }
 
-// Every level of a path segment: percent-decoded, and each base64 run in a level decoded and read the
-// same way, as an image proxy takes a nested url. `undefined` past MAX_URL_DEPTH percent levels or
-// MAX_BASE64_RUNS distinct runs, which count as a credential.
-function segmentLevels(segment: string, seen = new Set<string>()): string[] | undefined {
-	const levels = decodings(segment);
-	const all = levels === undefined ? undefined : [...levels];
+// The levels of a text: percent-decoded, plus each base64 run in a level decoded and read the same
+// way, from each of the run's first four characters, since text glued in front of a run shifts its
+// alignment. `undefined` past MAX_URL_DEPTH percent levels or MAX_BASE64_RUNS distinct runs, which
+// count as a credential.
+function segmentLevels(text: string, seen = new Set<string>()): string[] | undefined {
+	const levels = decodings(text);
 
-	for (const level of levels ?? []) {
+	if (levels === undefined) {
+		return undefined;
+	}
+
+	const all = [...levels];
+
+	for (const level of levels) {
 		for (const run of level.match(BASE64_RUN) ?? []) {
 			if (seen.has(run)) {
 				continue;
@@ -1672,17 +1683,54 @@ function segmentLevels(segment: string, seen = new Set<string>()): string[] | un
 
 			seen.add(run);
 
-			const inner = seen.size > MAX_BASE64_RUNS ? undefined : segmentLevels(base64Text(run), seen);
+			for (let skip = 0; skip < 4; skip++) {
+				const inner = seen.size > MAX_BASE64_RUNS ? undefined : segmentLevels(base64Text(run.slice(skip)), seen);
 
-			if (inner === undefined) {
-				return undefined;
+				if (inner === undefined) {
+					return undefined;
+				}
+
+				all.push(...inner);
 			}
-
-			all?.push(...inner);
 		}
 	}
 
 	return all;
+}
+
+// imgproxy lets the encoded url be split with `/` anywhere, so consecutive segments made of base64
+// characters are read joined, from the first. A segment holding anything else ends the chain after its
+// leading base64 characters, such as `anBn` in `anBn.png`.
+function base64Chains(segments: string[]): Array<[number, string]> {
+	const chains: Array<[number, string]> = [];
+	let start = 0;
+	let text = "";
+
+	const end = () => {
+		if (text.length >= 8) {
+			chains.push([start, text]);
+		}
+
+		text = "";
+	};
+
+	segments.forEach((segment, index) => {
+		const head = BASE64_HEAD.exec(segment)?.[0] ?? "";
+
+		if (text === "") {
+			start = index;
+		}
+
+		text += head;
+
+		if (head !== segment || head === "") {
+			end();
+		}
+	});
+
+	end();
+
+	return chains;
 }
 
 // Cut at the first segment whose nested url holds a credential: a later cut would leave an earlier
@@ -1690,21 +1738,28 @@ function segmentLevels(segment: string, seen = new Set<string>()): string[] | un
 // still carries a query, so a segment holding a listed key cuts too.
 function redactedPath(pathname: string): string {
 	const segments = pathname.split("/");
-	const levels = segments.map((segment, index) => index > 0 ? segmentLevels(segment) : []);
+	const read = segments.map(segment => segmentLevels(segment));
 
-	if (levels.includes(undefined)) {
+	if (!read.every(segmentRead => segmentRead !== undefined)) {
 		return "/REDACTED";
 	}
 
-	const read = levels as string[][];
-	const keyed = read.findIndex((segmentRead, index) => index > 0 && segmentRead.some(holdsSensitiveQueryKey));
-	const scanned = keyed === -1 ? segments : [...segments.slice(0, keyed), "REDACTED"];
-	let kept = scanned.join("/");
-	let exported = keyed === -1 ? segments.length : keyed;
+	for (const [start, text] of base64Chains(segments)) {
+		const chain = segmentLevels(text);
+
+		if (chain === undefined) {
+			return "/REDACTED";
+		}
+
+		read[start].push(...chain);
+	}
+
+	// Segments before `cut` are kept, and `REDACTED` replaces the rest; -1 keeps all.
+	let cut = read.findIndex(segmentRead => segmentRead.some(holdsSensitiveQueryKey));
 	let opened = 0;
 
-	for (let index = 1; index < scanned.length; index++) {
-		if (!read[index]?.some(level => SCHEME_LED.test(level)) || index === keyed) {
+	for (let index = 1; index < (cut === -1 ? segments.length : cut); index++) {
+		if (!read[index].some(level => SCHEME_LED.test(level))) {
 			continue;
 		}
 
@@ -1713,16 +1768,19 @@ function redactedPath(pathname: string): string {
 		const nested = decodings(segments.slice(index).join("/"));
 
 		if (opened > MAX_URL_DEPTH || nested === undefined || [...nested, ...read[index]].some(level => SCHEME_LED.test(level) && (redactedWholeUrl(level) !== undefined || redactTextUserinfo(level) !== level))) {
-			kept = `${scanned.slice(0, index).join("/")}/REDACTED`;
-			exported = index;
+			cut = index;
 			break;
 		}
 	}
 
+	const kept = cut === -1 ? pathname : [...segments.slice(0, cut), "REDACTED"].join("/");
+
 	// Userinfo after `//`, `\\`, `/\` or `\/` needs no scheme and no query key, so both cuts can miss it.
-	// That userinfo may sit in a decoded level that maps to no raw segment, so the whole path goes.
-	// A base64 run decoding to such userinfo goes the same way, whatever it starts with.
-	return textHoldsUserinfo(kept) || read.slice(1, exported).some(segmentRead => segmentRead.some(level => redactTextUserinfo(level) !== level)) ? "/REDACTED" : kept;
+	// That userinfo may sit in a decoded level that maps to no raw segment, so the whole path goes. So
+	// does userinfo in a kept segment's base64 text, whatever the text starts with.
+	const exported = cut === -1 ? read : read.slice(0, cut);
+
+	return textHoldsUserinfo(kept) || exported.some(segmentRead => segmentRead.some(level => redactTextUserinfo(level) !== level)) ? "/REDACTED" : kept;
 }
 
 // `url.origin` omits userinfo, which is what keeps the outer url's credentials off the span.
