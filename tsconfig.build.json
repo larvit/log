@@ -4,9 +4,9 @@
 		"module": "NodeNext",
 		"sourceMap": true,
 		"strict": true,
-		// Nothing is lowered, so the syntax index.ts uses is the browser floor README → Runtimes
-		// states; eslint.config.js bans the ES2021 syntax that would raise it.
-		"target": "ES2022",
+		// The target is the browser floor README → Runtimes states: tsc lowers newer syntax and
+		// rejects newer built-ins, so the floor can't rise unnoticed.
+		"target": "ES2020",
 		"types": ["node"]
 	},
 	"files": ["index.ts"]

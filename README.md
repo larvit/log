@@ -80,8 +80,8 @@ A mobile app on cellular with offline periods is a primary target, equal to a se
 queue survives app restarts through a `storage` adapter, and a full one holds about 1.1 MiB.
 
 **Runtimes.** Anything with global `fetch`, `TextEncoder`, `btoa` and `BigInt`, and a parser that
-takes class fields and `?.`. In a browser that means Chrome 80, Firefox 74 or Safari 14.1, or newer:
-`index.js` ships as written, so an older one throws a `SyntaxError` loading it. CI proves Node 18
+takes `?.`. In a browser that means Chrome 80, Firefox 74 or Safari 14, or newer; an older one
+throws a `SyntaxError` loading `index.js`. CI proves Node 18
 to 26 and current Chromium. React Native is supported from 0.74, where Hermes gained `TextEncoder`
 and `btoa`. Deno and Bun meet the rule and are not in CI.
 
