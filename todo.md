@@ -6,12 +6,13 @@
 
 `Bar = 0.5`
 
-`Next ID = 125`
+`Next ID = 126`
 
 ## Items
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
+| 125 | 2.5.0 |  | security | **Make a listed query key's value in text end only at `&`, `#` or a plain space, so a value holding a no-break space or other Unicode whitespace is redacted whole.** | 2 | 2 | 4 | 6 | 3 |  | 0.0 |
 | 7 | 2.5.0 |  | defect | **Unref the batch timer, so a pending batch never holds a Node or Deno process.** | 2 | 2 | 2 | 4 | 4 | 9 by 9 | 7.0 |
 | 13 | 2.5.0 |  |  | **Pin every Node base image to its full patch version, so one commit builds one image on any day.** | 1 | 1 | 1 | 1 | 2 | code health by 3 | 6.2 |
 | 89 | 2.5.0 |  | defect | **Keep `enabled()` free of output: warn about an unknown `logLevel` from the level methods alone.** | 1 | 1 | 1 | 1 | 2 | 3 by 5 | 2.3 |
@@ -108,6 +109,19 @@
 | 75 | 3.0.0 | 22 | decision | **Keep credentials off `log.conf` and `queue.conf`.** | 2 | 1 | 2 | 3 | 3 | 3 by 3 | 0.7 |
 
 ## Details
+
+### 125. Make a listed query key's value in text end only at `&`, `#` or a plain space, so a value holding a no-break space or other Unicode whitespace is redacted whole.
+
+In text that isn't a whole url, such as a span status message from `end({ error })` or a failed
+`log.fetch`, `redactTextQueryKeys` in `index.ts` ends a listed key's value at `&`, `#` or any
+whitespace other than a tab, newline or carriage return (`valueEnd = /[&#]|[^\S\t\n\r]/g`). A url
+parser keeps a no-break space, `\v`, `\f`, U+2028 and other Unicode whitespace in a query value,
+percent-encoding it, so `?token=ab<NBSP>cd` exports `cd` of the credential unchanged. It breaks
+README → Goals #7, credentials never leave. It is the class of the userinfo whitespace fix item 124
+ships in `SLASHED_USERINFO` and `URL_DELIMITER`: in the WHATWG URL Standard only a plain space is
+a delimiter text can deliberately hold. README → "A matched query key and its `=`" and its CHANGELOG
+entry say "whitespace other than a tab, newline or carriage return", which this item changes. Found
+on 2026-11-08 by the security pass of item 124's chunk.
 
 ### 7. Unref the batch timer, so a pending batch never holds a Node or Deno process.
 
