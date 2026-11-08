@@ -199,3 +199,17 @@ Read most (opens and searches):
 - `docs/decisions.md` 2
 - `.github/workflows/push.yaml` 1
 - `AGENTS.md` 1
+
+## Reading cost, chunk 2c68c2c0f90e, finished 2026-11-08T20:36:46Z
+
+57973 new input tokens before the first commit.
+
+Read most (opens and searches):
+
+- `todo.md` 6
+- `CHANGELOG.md` 4
+- `README.md` 4
+- `docs/decisions.md` 3
+- `index.ts` 3
+- `test.ts` 2
+- `package.json` 1
