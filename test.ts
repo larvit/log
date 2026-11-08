@@ -2759,3 +2759,40 @@ test("log.fetch works without OTLP, still injecting a traceparent", async t => {
 	t.ok(callHeader(calls.find(call => call.path === "/x")!, "traceparent"), "traceparent is still injected for downstream continuation");
 	t.end();
 });
+
+test("a pending batch timer never holds the process, also one a mid-export record leaves behind", async t => {
+	const timers: { unrefs: number }[] = [];
+	let released = false;
+	const clock = {
+		clearTimeout: () => {},
+		now: () => Date.now(),
+		// Only a batch timer counts: the export's own 3 s abort timer runs on the clock too.
+		setTimeout: (_callback: () => void, delayMs: number) => {
+			const timer = { unref() { this.unrefs++; }, unrefs: 0 };
+
+			if (delayMs === 600000) timers.push(timer);
+
+			return timer as unknown as TimerHandle;
+		},
+	};
+	const { calls } = stubFetch(async () => {
+		await waitFor(() => released);
+
+		return response();
+	});
+	const log = new Log({ otlpQueue: new Queue({ batchDelayMs: 600000, clock, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {} }), stderr: () => {}, stdout: () => {} });
+
+	log.info("first");
+	t.strictEqual(timers.length, 1, "a record logged sets one batch timer");
+
+	const round = log.flush();
+
+	await waitFor(() => calls.length === 1);
+	log.info("second");
+	t.strictEqual(timers.length, 2, "a record logged mid-export sets a batch timer of its own");
+
+	released = true;
+	await round;
+	t.deepEqual(timers.map(timer => timer.unrefs), [1, 1], "and each batch timer is unref'd");
+	t.end();
+});
