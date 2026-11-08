@@ -1469,13 +1469,13 @@ function openedUserinfo(key: string): string | undefined {
 	return levels === undefined ? "@" : levels.map(level => OPENS_USERINFO.exec(level)?.[0].slice(2)).find(tail => tail !== undefined);
 }
 
-// A parser reads the `&` in `?//u:p&w@host` as part of the userinfo, which `searchParams` splits into
+// A parser reads the `&` in `?//u:p&w@host` as part of the userinfo, which the query splits into
 // two pairs. A key opening userinfo starts a run: its value and each later pair join it, up to the
 // first URL_DELIMITER. The pairs up to the run's last `@` are returned. Keep `\` out of
 // URL_DELIMITER, since userinfo after `//` may hold one; a run that a backslash opens may then redact
 // a pair holding no credential. A value opening userinfo is a url of its own, so
-// `?next=https://h&q=a@b` is kept.
-function splitUserinfoPairs(pairs: Array<[string, string]>): Set<number> {
+// `?next=https://h&q=a@b` is kept. `holdsAt` says whether a pair's text holds an `@`.
+function splitUserinfoPairs(pairs: Array<[string, string]>, holdsAt: (text: string) => boolean): Set<number> {
 	const split = new Set<number>();
 	let start = -1;
 	let end = -1;
@@ -1491,7 +1491,7 @@ function splitUserinfoPairs(pairs: Array<[string, string]>): Set<number> {
 	const read = (part: string, index: number) => {
 		const cut = part.search(URL_DELIMITER);
 
-		if (decodings(cut < 0 ? part : part.slice(0, cut))?.some(level => level.includes("@")) ?? true) {
+		if (holdsAt(cut < 0 ? part : part.slice(0, cut))) {
 			end = index;
 		}
 
@@ -1523,12 +1523,29 @@ function splitUserinfoPairs(pairs: Array<[string, string]>): Set<number> {
 	return split;
 }
 
+// The query's pairs as a parser reads them, before `searchParams` form-decodes them: userinfo keeps a
+// `+`, `%2F`, `%3F` and `%23` there, where decoding would turn them into a space or a delimiter that ends
+// the userinfo match. Like `searchParams`, it skips an empty pair, so both lists line up.
+function rawQueryPairs(url: URL): Array<[string, string]> {
+	return url.search.slice(1).split("&").filter(pair => pair !== "").map((pair): [string, string] => {
+		const equals = pair.indexOf("=");
+
+		return equals < 0 ? [pair, ""] : [pair.slice(0, equals), pair.slice(equals + 1)];
+	});
+}
+
 // `undefined` where no pair changes.
 function redactedSearch(url: URL, depth: number, partsRead: PartsRead): string | undefined {
 	const pairs = [...url.searchParams];
-	const split = splitUserinfoPairs(pairs);
+	const raw = rawQueryPairs(url);
+	// Two readings of where userinfo ends, a pair redacted if either finds it: the decoded pairs, where a
+	// `%2F` ends a run and a `%40` is an `@`, and the raw ones, where only a literal one is.
+	const split = new Set([
+		...splitUserinfoPairs(pairs, text => decodings(text)?.some(level => level.includes("@")) ?? true),
+		...splitUserinfoPairs(raw, text => text.includes("@")),
+	]);
 	// eslint-disable-next-line @typescript-eslint/no-use-before-define
-	const redacted = pairs.map(([key, value], index): [string, string] => split.has(index) ? ["REDACTED", "REDACTED"] : redactQueryPair(key, value, depth + 1, partsRead));
+	const redacted = pairs.map(([key, value], index): [string, string] => split.has(index) ? ["REDACTED", "REDACTED"] : redactQueryPair(key, value, raw[index], depth + 1, partsRead));
 
 	return redacted.some(([key, value], index) => key !== pairs[index][0] || value !== pairs[index][1]) ? new URLSearchParams(redacted).toString() : undefined;
 }
@@ -1570,7 +1587,7 @@ const SCHEME_LED = /^[\0- ]*[a-z][a-z\d+.-]*:/i;
 
 // A key opening a url is read with its value too, as a server taking `?<url>` reads it: an `=` in its
 // password ends the key.
-function redactQueryPair(key: string, value: string, depth: number, partsRead: PartsRead): [string, string] {
+function redactQueryPair(key: string, value: string, [rawKey, rawValue]: [string, string], depth: number, partsRead: PartsRead): [string, string] {
 	if (SCHEME_LED.test(withoutDropped(key))) {
 		const joined = `${key}=${value}`;
 
@@ -1580,11 +1597,11 @@ function redactQueryPair(key: string, value: string, depth: number, partsRead: P
 	}
 
 	// Userinfo across the `=`, as in `?//u:p=w@host`, is found by `splitUserinfoPairs` and never reaches here.
-	if (textHoldsUserinfo(key) || textHoldsQueryKey(key)) {
+	if (textHoldsUserinfo(rawKey) || textHoldsQueryKey(key)) {
 		return ["REDACTED", "REDACTED"];
 	}
 
-	if (isSensitiveQueryKey(key) || textHoldsUserinfo(value)) {
+	if (isSensitiveQueryKey(key) || textHoldsUserinfo(rawValue)) {
 		return [key, "REDACTED"];
 	}
 
