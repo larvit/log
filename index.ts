@@ -2403,21 +2403,13 @@ export class Log implements LogInt {
 		return tracedFetch(this, url, init).finally(settle);
 	}
 
+	// Pure, so a library author's `if (log.enabled(...))` never writes a line. An unknown logLevel counts as "info"; log() warns of it.
 	public enabled(logLevel: LogLevel): boolean {
 		if (this.conf.logLevel === "none") {
 			return false;
 		}
 
-		let threshold = SEVERITY_NUMBERS.get(this.conf.logLevel);
-
-		if (threshold === undefined) {
-			// Keyed on the raw value, so only the first call builds the message.
-			if (firstWarning(this.conf.stderr, this.conf.logLevel)) {
-				writeStderr(this.conf, "warn", undefined, `@larvit/log: logLevel ${describeLogLevel(this.conf.logLevel)} is not a level, logging at "info"; use error, warn, info, verbose, debug, silly or none`);
-			}
-
-			threshold = LogLevels.info.severityNumber;
-		}
+		const threshold = SEVERITY_NUMBERS.get(this.conf.logLevel) ?? LogLevels.info.severityNumber;
 
 		return (SEVERITY_NUMBERS.get(logLevel) ?? -Infinity) >= threshold;
 	}
@@ -2429,10 +2421,25 @@ export class Log implements LogInt {
 	public debug(msg: string, metadata?: MetadataInput) { this.log("debug", msg, metadata); }
 	public silly(msg: string, metadata?: MetadataInput) { this.log("silly", msg, metadata); }
 
+	private warnOfUnknownLogLevel(): void {
+		const configured = this.conf.logLevel;
+
+		if (configured === "none" || SEVERITY_NUMBERS.has(configured)) {
+			return;
+		}
+
+		// Keyed on the raw value, so only the first call builds the message.
+		if (firstWarning(this.conf.stderr, configured)) {
+			writeStderr(this.conf, "warn", undefined, `@larvit/log: logLevel ${describeLogLevel(configured)} is not a level, logging at "info"; use error, warn, info, verbose, debug, silly or none`);
+		}
+	}
+
 	private log(logLevel: LogLevel, msg: string, metadata?: MetadataInput): void {
 		if (this.ended) {
 			throw new Error("Logging instance is already ended");
 		}
+
+		this.warnOfUnknownLogLevel();
 
 		if (!this.enabled(logLevel)) return;
 

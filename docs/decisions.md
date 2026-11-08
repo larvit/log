@@ -67,10 +67,9 @@ once per `stderr` sink through the instance's formatter at `warn`, whatever `log
 sharing the default `console.error` share that one warning; a sink the caller injects gets its own,
 which keeps a test independent of run order. A `warnOnce` message is literal: anything varying in it
 breaks the once-only rule. An unknown `logLevel` is keyed on its raw value, so only the first
-`enabled` call builds its text. Every such line opens with `@larvit/log: `, part of that literal, so
-an app developer can tell which dependency emitted one about code they may not own. `enabled`
-writing anything works against CQS until `todo.md` item 89. A `Queue`'s failure lines through
-`report` carry no prefix, since they report that developer's own setup; its plain-`http:`
+level-method call builds its text; `enabled` never writes. Every such line opens with
+`@larvit/log: `, part of that literal, so an app developer can tell which dependency emitted one
+about code they may not own. A `Queue`'s failure lines through `report` carry no prefix, since they report that developer's own setup; its plain-`http:`
 `Authorization` warning is a warning, and keeps it. Serves README → Goals #3. Writing to `stderr`
 works against `~/.claude/principles/logging.md` → Infrastructure until `todo.md` item 50 settles
 where this library's own lines go. Valid while this library writes its own warnings to a `stderr`
