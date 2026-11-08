@@ -1662,7 +1662,7 @@ test("end({ error }) marks the span failed", async t => {
 	// The rejection a runtime hands back for a credentialed url, forwarded by the handler pattern
 	// the README documents.
 	await new Log(conf).end({ error: new TypeError("Request cannot be constructed from a URL that includes credentials: http://myuser:hunter2@api.test/x, retried against https://backup:s3cr3t@api.test/x") });
-	await new Log(conf).end({ error: new Error("GET https://api.test/mail@example.com?to=a@b failed, //h.test?to=a@b //h.test#a@b \\\\h/a@b \\\\h?a@b \\\\h#a@b") });
+	await new Log(conf).end({ error: new Error("GET https://api.test/mail@example.com?to=a@b failed, //h.test?to=a@b //h.test#a@b \\\\h/a@b \\\\h?a@b \\\\h#a@b \\\\h x@b") });
 	// Scheme-relative: Node cannot parse one without a base and quotes it back as given.
 	await new Log(conf).end({ error: new TypeError("Failed to parse URL from //myuser:hunter2@api.test/x?access_token=s3cr3t") });
 	await new Log(conf).end({ error: new DOMException("aborted", "AbortError") });
@@ -1703,7 +1703,7 @@ test("end({ error }) marks the span failed", async t => {
 	t.deepEqual(exportedSpan(4).status, { code: 0 }, "end({ error: null }) leaves the span ok, for callback-style errors");
 	t.deepEqual(exportedSpan(5).status, { code: 2, message: "_OTHER" }, "a value that cannot be stringified still ends and exports the span");
 	t.deepEqual(exportedSpan(6).status, { code: 2, message: "Request cannot be constructed from a URL that includes credentials: http://REDACTED@api.test/x, retried against https://REDACTED@api.test/x" }, "a url in free text has its userinfo redacted in place");
-	t.deepEqual(exportedSpan(7).status, { code: 2, message: "GET https://api.test/mail@example.com?to=a@b failed, //h.test?to=a@b //h.test#a@b \\\\h/a@b \\\\h?a@b \\\\h#a@b" }, "an @ outside the userinfo position is left alone");
+	t.deepEqual(exportedSpan(7).status, { code: 2, message: "GET https://api.test/mail@example.com?to=a@b failed, //h.test?to=a@b //h.test#a@b \\\\h/a@b \\\\h?a@b \\\\h#a@b \\\\h x@b" }, "an @ outside the userinfo position is left alone");
 	t.deepEqual(exportedSpan(8).status, { code: 2, message: "Failed to parse URL from //REDACTED@api.test/x?access_token=REDACTED" }, "a url the runtime cannot parse has its userinfo and its listed keys redacted");
 	t.strictEqual(attr(exportedSpan(9), "error.type"), "AbortError", "a numeric code is skipped for the error name");
 	t.deepEqual(exportedSpan(10).status, { code: 2, message: "https://REDACTED@api.test/x?page=2&Access_Token=REDACTED&next=REDACTED#top" }, "a message that is a url has its userinfo, listed keys and nested credentials redacted, its fragment kept");
