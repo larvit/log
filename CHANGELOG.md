@@ -128,9 +128,7 @@
   request still goes. Rotate a credential that has crossed a network you do not trust. On one you
   do, a `Log` using `otlpHttpBaseURI` moves its `otlp*` options to
   `otlpQueue: new Queue({ acceptPlainHttpCredentials: true, otlpHttpBaseURI })`, whose report lines
-  then go to that queue's `report`, `console.error` unless you pass one. The option's first name,
-  `acceptPlainHttpAuthorization`, still works as a deprecated alias, removed in 3.0.0; a `Queue`
-  given it writes one line saying it is deprecated.
+  then go to that queue's `report`, `console.error` unless you pass one.
 - **Userinfo holding any whitespace character but a space is redacted in text that isn't a whole
   url.** A url parser drops a tab, newline or carriage return, so `https://admin:hun<TAB>ter2@db.test/x`
   has the password `hunter2`, and keeps any other whitespace character percent-encoded, so
