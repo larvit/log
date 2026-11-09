@@ -302,13 +302,10 @@ README → Goals #7. Valid until 3.0.0 keeps credentials off `log.conf` and `que
 list of vendor names, such as `x-honeycomb-team`, needs a published source, and none has been
 chosen. The opt-out gets a new name covering every credential header, since the warning it silences
 no longer covers `Authorization` alone and an option does no more than its name says (README →
-Goals #3). The new name is `acceptPlainHttpCredentials`. `acceptPlainHttpAuthorization` stays as
-its deprecated alias until `todo.md` item 126 removes it in 3.0.0. Either one set to `true`
-accepts, and both read back that answer. A `Queue` given only the old one writes one line saying it
-is deprecated, and one given both writes none, since a spread of another queue's `conf` carries
-both. No release has carried the old name, so Goals #8 doesn't require the alias; `todo.md` holds
-the question whether to drop it. Valid while no published list of credential header names is
-chosen.
+Goals #3). The new name is `acceptPlainHttpCredentials`. 2026-11-09, the maintainer: the first
+name, `acceptPlainHttpAuthorization`, was never in a release, since it first appeared under 2.5.0's
+unreleased changes, so Goals #8 gives it no claim. It is dropped and never ships: no alias, no
+deprecation line. Valid while no published list of credential header names is chosen.
 
 2026-10-28, the maintainer: every credential header warns, not only `Authorization`. A header
 crossing plain `http:` exposes its value whatever its name, so the check covers every name the
@@ -322,8 +319,8 @@ too, and written once per sink, host and source: through the Log's `stderr` at `
 Log built, else the queue's `report`. The line names the host and the header, never its value. Both
 spellings warn, so moving the credential never silences the exposure; refusing would break the
 in-cluster `http:` collector, a deliberate and common setup. 2026-09-30, the maintainer: a `Queue`
-given `acceptPlainHttpAuthorization: true` (renamed above) does not warn, the opt-out for a network the consumer
-trusts; it sits on the queue alone, which owns the endpoint. Serves README → Goals #7,
+given `acceptPlainHttpCredentials: true` (the name above) does not warn, the opt-out for a network
+the consumer trusts; it sits on the queue alone, which owns the endpoint. Serves README → Goals #7,
 "Credentials never leave", on the wire, without spending #8. Its `stderr` route stands until
 `todo.md` item 50 settles where this library's own lines go. No expiry otherwise: the setups it
 serves are not all known.

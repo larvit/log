@@ -1044,7 +1044,7 @@ test("an Authorization sent over plain http: to a non-loopback host warns once p
 
 	await send(Reflect.construct(Queue, [{ acceptPlainHttpCredentials: "false", otlpHttpBaseURI: "http://u:p@other.test", report: stringly.report }]));
 	t.strictEqual(stringly.lines.length, 1, "only true accepts, never a truthy string");
-	t.deepEqual([unset.conf.acceptPlainHttpCredentials, unset.conf.acceptPlainHttpAuthorization], [false, false], "both spellings read back false when unset");
+	t.strictEqual(unset.conf.acceptPlainHttpCredentials, false, "it reads back false when unset");
 
 	let unwarned = "";
 
@@ -1078,7 +1078,7 @@ test("an Authorization sent over plain http: to a non-loopback host warns once p
 	t.end();
 });
 
-test("every credential header over plain http: warns once, and either opt-out name silences them all", async t => {
+test("every credential header over plain http: warns once, and acceptPlainHttpCredentials silences them all", async t => {
 	const { calls } = stubFetch();
 	const warning = (header: string) => `@larvit/log: the ${header} header from otlpAdditionalHeaders goes over plain http: to collector.test:4318, readable by anything on the network path; use an https: endpoint, or on a network you trust set acceptPlainHttpCredentials: true on the Queue`;
 	const send = async (queue: Queue) => {
@@ -1105,22 +1105,7 @@ test("every credential header over plain http: warns once, and either opt-out na
 	await send(new Queue({ otlpAdditionalHeaders: { "api-key": "k" }, otlpHttpBaseURI: "https://collector.test", report: loopback.report }));
 	t.deepEqual(loopback.lines, [], "a loopback host and https: stay silent");
 
-	const alias = reportSink();
-	const aliased = new Queue({ acceptPlainHttpAuthorization: true, otlpAdditionalHeaders: { "api-key": "k" }, otlpHttpBaseURI, report: alias.report });
-
-	await send(aliased);
-	t.deepEqual(alias.lines, [{ msg: "@larvit/log: acceptPlainHttpAuthorization is deprecated and removed in 3.0.0, use acceptPlainHttpCredentials" }], "the old name still silences, and warns once that it is deprecated");
-	t.deepEqual([aliased.conf.acceptPlainHttpCredentials, aliased.conf.acceptPlainHttpAuthorization], [true, true], "both keys read back the accepted value");
-
-	const spread = reportSink();
-
-	await send(new Queue({ ...aliased.conf, report: spread.report }));
-	t.deepEqual(spread.lines, [], "a queue built from another's conf spread carries both names and doesn't warn that one is deprecated");
-
-	const unaccepted = new Queue({ acceptPlainHttpAuthorization: false, otlpHttpBaseURI, report: alias.report });
-
-	t.deepEqual([unaccepted.conf.acceptPlainHttpCredentials, unaccepted.conf.acceptPlainHttpAuthorization], [false, false], "a false alias doesn't accept");
-	t.strictEqual(calls.length, 6, "every request still goes");
+	t.strictEqual(calls.length, 4, "every request still goes");
 	t.end();
 });
 

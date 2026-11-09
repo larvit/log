@@ -714,9 +714,6 @@ export type QueueStorage = {
 };
 
 export type QueueConf = {
-
-	/** @deprecated Removed in 3.0.0, use acceptPlainHttpCredentials. */
-	acceptPlainHttpAuthorization?: boolean;
 	acceptPlainHttpCredentials?: boolean;
 	batchDelayMs?: number;
 	clock?: Clock;
@@ -731,7 +728,7 @@ export type QueueConf = {
 	storage?: QueueStorage;
 };
 
-export type ResolvedQueueConf = QueueConf & Required<Pick<QueueConf, "acceptPlainHttpAuthorization" | "acceptPlainHttpCredentials" | "batchDelayMs" | "clock" | "key" | "maxBatchBytes" | "maxItems" | "otlpProtocol" | "report" | "retryDelayMs">>;
+export type ResolvedQueueConf = QueueConf & Required<Pick<QueueConf, "acceptPlainHttpCredentials" | "batchDelayMs" | "clock" | "key" | "maxBatchBytes" | "maxItems" | "otlpProtocol" | "report" | "retryDelayMs">>;
 
 type QueuedItem = { bytes: number, payload: OtlpPayload };
 
@@ -1152,13 +1149,9 @@ export class Queue implements OtlpQueue {
 	private unreadable = false;
 
 	constructor(conf: QueueConf) {
-		const accepted = conf.acceptPlainHttpCredentials === true || conf.acceptPlainHttpAuthorization === true;
-
 		this.conf = {
 			...conf,
-			// Both read back one answer until 3.0.0 removes the old name.
-			acceptPlainHttpAuthorization: accepted,
-			acceptPlainHttpCredentials: accepted,
+			acceptPlainHttpCredentials: conf.acceptPlainHttpCredentials === true,
 			batchDelayMs: conf.batchDelayMs ?? 1000,
 			clock: conf.clock ?? systemClock,
 			key: conf.key ?? "@larvit/log:otlp-queue",
@@ -1180,11 +1173,6 @@ export class Queue implements OtlpQueue {
 		}
 
 		this.sender = new OtlpSender(this.conf, (msg, metadata) => this.report(msg, metadata), msg => this.warnOnce(msg));
-
-		// A conf spread from another queue's carries both names, and its writer never chose the old one.
-		if (conf.acceptPlainHttpAuthorization !== undefined && conf.acceptPlainHttpCredentials === undefined) {
-			this.warnOnce("@larvit/log: acceptPlainHttpAuthorization is deprecated and removed in 3.0.0, use acceptPlainHttpCredentials");
-		}
 
 		this.ready = conf.storage ? this.load(conf.storage) : Promise.resolve();
 		this.scheduler = new ExportScheduler(this.conf, this.ready, () => this.round());
