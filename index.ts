@@ -18,6 +18,8 @@ const systemClock: Clock = {
 
 export type EntryFormatter = (entry: EntryFormatterConf) => string;
 
+// The two sort rules disagree on `msg` and `msTimestamp`: a type lists `msg` first, an object
+// literal `msTimestamp` first. Each follows its rule.
 export type EntryFormatterConf = {
 	// The instance's resolved `colors`. Unset means on.
 	colors?: boolean;
@@ -37,7 +39,7 @@ export type LogConf = {
 
 	/** @deprecated Removed in 3.0.0: pass `format`. On `log.conf`, read {@link resolveFormatter}`(log.conf)` instead; `log.conf.format` holds no function before 3.0.0. */
 	entryFormatter?: EntryFormatter;
-	format?: "text" | "json";
+	format?: "json" | "text";
 	logLevel?: LogLevel | "none";
 	otlpAdditionalHeaders?: Record<string, string>;
 	otlpHttpBaseURI?: string;
@@ -45,6 +47,11 @@ export type LogConf = {
 	otlpQueue?: OtlpQueue;
 	parentLog?: LogInt;
 	printTraceInfo?: boolean;
+
+	// `randomBytes(size)` returns `size` random bytes for a trace or span id. Unset, a `Log` draws from
+	// Web Crypto, else `Math.random`. Named by the audience panel of `todo.md` item 34 over `random` and
+	// `idBytes`, which two of three readers took for a `Math.random` or a fixed id.
+	randomBytes?: (size: number) => Uint8Array;
 	spanName?: string;
 	stderr?: (msg: string) => void;
 	stdout?: (msg: string) => void;
@@ -212,7 +219,8 @@ function bytesToHex(bytes: Uint8Array): string {
 	return Array.from(bytes).map(byte => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function getRandomBytes(size: number): Uint8Array {
+// The platform's randomness, which a `Log` uses unless its `randomBytes` option says otherwise.
+function platformRandomBytes(size: number): Uint8Array {
 	const bytes = new Uint8Array(size);
 	const webcrypto = globalThis.crypto;
 
@@ -228,12 +236,20 @@ function getRandomBytes(size: number): Uint8Array {
 	return bytes;
 }
 
+function spanIdFrom(randomBytes: LogConf["randomBytes"] = platformRandomBytes): string {
+	return bytesToHex(randomBytes(8));
+}
+
+function traceIdFrom(randomBytes: LogConf["randomBytes"] = platformRandomBytes): string {
+	return bytesToHex(randomBytes(16));
+}
+
 export function generateSpanId(): string {
-	return bytesToHex(getRandomBytes(8));
+	return spanIdFrom();
 }
 
 export function generateTraceId(): string {
-	return bytesToHex(getRandomBytes(16));
+	return traceIdFrom();
 }
 
 export function formatTraceparent(traceId: string, spanId: string, sampled: boolean = true): string {
@@ -433,23 +449,21 @@ function buildLogPayload(opts: {
 	};
 }
 
-// Not pure: writes the resolved attributes onto `span` before returning its payload.
+// service.name is carried on the resource scope, so it is excluded from the span attributes.
+function toSpanAttributes(attributes: Metadata): OtlpAttribute[] {
+	return Object.entries(attributes)
+		.filter(([key]) => key !== "service.name")
+		.map(([key, value]) => ({ key, value: { stringValue: String(value) } }));
+}
+
 // Unredacted: callers redact what they capture into `attributes`, and per README → Credentials in a
-// captured value the context and span name go as written.
+// captured value the context and span name go as written. `attributes` feeds the resource only; the
+// span goes out as it is, with the attributes it already holds.
 function buildSpanPayload(opts: {
 	attributes: Metadata,
 	span: OtlpSpan,
 }): OtlpSpanPayload {
 	const { attributes, span } = opts;
-
-	// service.name is carried on the resource scope below, so it is excluded from the span attributes.
-	const spanAttributes: OtlpAttribute[] = Object.entries(attributes)
-		.filter(([key]) => key !== "service.name")
-		.map(([key, value]) => ({ key, value: { stringValue: String(value) } }));
-
-	if (spanAttributes.length) {
-		span.attributes = spanAttributes;
-	}
 
 	return {
 		resourceSpans: [{
@@ -1161,6 +1175,23 @@ function isOtlpPayload(value: unknown): value is OtlpPayload {
 		&& Object.values(PAYLOAD_KEYS).some(key => Array.isArray(Reflect.get(value, key)));
 }
 
+// What a queue's storage holds: the payloads it saved, or why they can't be read.
+function parseStoredPayloads(raw: string): { error: string | undefined } | { payloads: OtlpPayload[] } {
+	let parsed: unknown;
+
+	try {
+		parsed = JSON.parse(raw);
+	} catch (err) {
+		return { error: stringField(err, "message") };
+	}
+
+	if (!Array.isArray(parsed) || !parsed.every(isOtlpPayload)) {
+		return { error: "not a list of OTLP payloads" };
+	}
+
+	return { payloads: parsed };
+}
+
 // --- OTLP export: scheduling rounds ----------------------------------------
 
 const RETRY_DELAY_MAX_MS = 30000;
@@ -1730,30 +1761,28 @@ export class Queue implements OtlpQueue {
 			return;
 		}
 
-		try {
-			if (!raw) {
-				return;
-			}
+		if (!raw) {
+			return;
+		}
 
-			const parsed: unknown = JSON.parse(raw);
+		const stored = parseStoredPayloads(raw);
 
-			if (!Array.isArray(parsed) || !parsed.every(isOtlpPayload)) {
-				throw new Error("not a list of OTLP payloads");
-			}
-
-			this.prepend(parsed.map(withBytes));
+		if ("payloads" in stored) {
+			this.prepend(stored.payloads.map(withBytes));
 
 			if (this.items.length) {
 				this.scheduler.schedule();
 			}
-		} catch (err) {
-			this.report("OTLP queue storage unreadable, discarded", withoutUndefined({ error: stringField(err, "message"), key: this.conf.key }));
 
-			try {
-				await storage.removeItem(this.conf.key);
-			} catch {
-				// The next save overwrites it.
-			}
+			return;
+		}
+
+		this.report("OTLP queue storage unreadable, discarded", withoutUndefined({ error: stored.error, key: this.conf.key }));
+
+		try {
+			await storage.removeItem(this.conf.key);
+		} catch {
+			// The next save overwrites it.
 		}
 	}
 
@@ -1816,6 +1845,7 @@ const INHERITED_BY: { [K in keyof LogConf]-?: readonly Derivation[] } = {
 	otlpQueue: CHILD_AND_CLONE,
 	parentLog: [],
 	printTraceInfo: CHILD_AND_CLONE,
+	randomBytes: CHILD_AND_CLONE,
 	// A clone is its own span.
 	spanName: ["child"],
 	stderr: CHILD_AND_CLONE,
@@ -1949,13 +1979,15 @@ function inheritSettings(conf: LogSettings, source: { conf: LogConf, context?: M
 	}
 }
 
+function rejectTwoFormatters(conf: LogSettings): void {
+	if (conf.entryFormatter !== undefined && typeof conf.format === "function" && conf.format !== conf.entryFormatter) {
+		throw new Error("entryFormatter and format are two spellings of one formatter: pass only format");
+	}
+}
+
 function entryFormatterDeprecation(conf: LogSettings): string | undefined {
 	if (conf.entryFormatter === undefined) {
 		return undefined;
-	}
-
-	if (typeof conf.format === "function" && conf.format !== conf.entryFormatter) {
-		throw new Error("entryFormatter and format are two spellings of one formatter: pass only format");
 	}
 
 	if (typeof conf.format === "string") {
@@ -2018,6 +2050,7 @@ function resolveLogConf(options: LogOptions | LogLevel | "none" | undefined): { 
 	}
 
 	rejectQueueBesideShorthand(conf);
+	rejectTwoFormatters(conf);
 
 	const formatterDeprecation = entryFormatterDeprecation(conf);
 
@@ -2051,10 +2084,10 @@ function openSpan(conf: ResolvedLogConf): { sampled: boolean, span: OtlpSpan } {
 			links: [],
 			name: conf.spanName || "unnamed-span",
 			parentSpanId: conf.parentLog?.span.spanId ?? incoming?.spanId,
-			spanId: generateSpanId(),
+			spanId: spanIdFrom(conf.randomBytes),
 			startTimeUnixNano: startedAt,
 			status: { code: STATUS_CODE_UNSET },
-			traceId: conf.parentLog?.span.traceId || incoming?.traceId || generateTraceId(),
+			traceId: conf.parentLog?.span.traceId || incoming?.traceId || traceIdFrom(conf.randomBytes),
 		},
 	};
 }
@@ -2073,7 +2106,7 @@ function childSpan(log: Pick<Log, "conf" | "span">, name: string, kind: OtlpSpan
 		links: [],
 		name,
 		parentSpanId: log.span.spanId,
-		spanId: generateSpanId(),
+		spanId: spanIdFrom(log.conf.randomBytes),
 		startTimeUnixNano: now,
 		status: { code: STATUS_CODE_UNSET },
 		traceId: log.span.traceId,
@@ -2082,6 +2115,13 @@ function childSpan(log: Pick<Log, "conf" | "span">, name: string, kind: OtlpSpan
 
 function exportSpan(log: Pick<Log, "conf" | "sampled">, span: OtlpSpan, attributes: Metadata): void {
 	if (log.sampled) {
+		const spanAttributes = toSpanAttributes(attributes);
+
+		// README → Audience: each documented span attribute is on `log.span` as on the wire.
+		if (spanAttributes.length) {
+			span.attributes = spanAttributes;
+		}
+
 		log.conf.otlpQueue?.enqueue(buildSpanPayload({ attributes, span }));
 	}
 }
@@ -2136,8 +2176,8 @@ async function tracedFetch(log: Pick<Log, "conf" | "context" | "sampled" | "span
 			"http.request.method": method,
 			"server.address": url.hostname,
 			"url.full": buildUrlFull(url, log.conf.captureQuery === true),
-			"url.scheme": url.protocol.replace(/:$/, ""),
 			...url.port ? { "server.port": Number(url.port) } : {},
+			"url.scheme": url.protocol.replace(/:$/, ""),
 		});
 
 		// A spread drops a Request's method, body, signal and other settings, which are prototype getters.

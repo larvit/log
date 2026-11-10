@@ -547,6 +547,30 @@ test("generateSpanId/generateTraceId produce valid, unique hex ids", t => {
 	t.end();
 });
 
+test("randomBytes decides every trace and span id, and children and clones inherit it", async t => {
+	const { calls } = stubFetch();
+	let counter = 0;
+	const randomBytes = (size: number): Uint8Array => new Uint8Array(size).fill(++counter);
+	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", randomBytes, stderr: () => {} });
+
+	t.strictEqual(log.span.spanId, "0101010101010101", "the first draw is the span id");
+	t.strictEqual(log.span.traceId, "02020202020202020202020202020202", "the second draw is the trace id");
+	t.strictEqual(log.conf.randomBytes, randomBytes, "log.conf reads the option back");
+
+	const child = new Log({ parentLog: log, stderr: () => {} });
+
+	t.strictEqual(child.span.spanId, "03".repeat(8), "a child draws its span id from the inherited function");
+	t.strictEqual(child.span.traceId, log.span.traceId, "a child continues its parent's trace");
+	t.strictEqual(log.clone().conf.randomBytes, randomBytes, "a clone inherits it");
+
+	await log.fetch("https://api.test/x");
+	await log.end();
+
+	t.ok(/^([0-9a-f]{2})\1{7}$/.test(clientSpan(calls).spanId), "a log.fetch span id comes from it too: eight equal bytes");
+	t.strictEqual(new Log({ stderr: () => {} }).conf.randomBytes, undefined, "unset, the platform's randomness is used");
+	t.end();
+});
+
 test("printTraceInfo appends span/trace info to output", t => {
 	const { log, stdout } = capture({ printTraceInfo: true, spanName: "my-span" });
 

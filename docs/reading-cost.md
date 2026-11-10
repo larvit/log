@@ -270,3 +270,7 @@ Read most (opens and searches):
 - `docs/decisions.md` 6
 - `package.json` 3
 - `CHANGELOG.md` 2
+
+## Reading cost, chunk 78919fa36112, finished 2026-11-10T21:51:40Z
+
+40763 new input tokens before the first commit.

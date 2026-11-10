@@ -4,6 +4,15 @@ root = true
 end_of_line = lf
 insert_final_newline = true
 
-[*.{js,json,ts,yml}]
+[*.{js,json,mjs,ts}]
 charset = utf-8
 indent_style = tab
+
+[{package.json,package-lock.json}]
+indent_style = space
+indent_size = 2
+
+[*.{yaml,yml}]
+charset = utf-8
+indent_style = space
+indent_size = 2
