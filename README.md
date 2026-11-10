@@ -63,7 +63,8 @@ for an achieve goal, and where two conflict the earlier one wins.
    - Why: a footprint kept small by pushing work onto users only moves the cost.
 6. **Maintain:** **Correct OTLP.** Leave out what cannot be done to the spec.
 7. **Maintain:** **[Credentials never leave](#credentials-in-a-captured-value)** in the shapes that
-   section lists. Text you log, and a credential you encode yourself, are exported as written.
+   section lists. Text you log, and a credential encoded other than by percent-encoding, such as
+   base64, are exported as written.
 8. **Maintain:** **[Semver, read strictly](#audience).**
 9. **Maintain:** **Never holds a process open** past the work the app asked for.
 
