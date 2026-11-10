@@ -19,6 +19,7 @@ In [docs/decisions.md](docs/decisions.md):
 - `Log` and `Queue` each own a `clock`
 - `Clock` hands back the platform's timer handle
 - `clock` is a supported option
+- A `Log` and a `Queue` default their clock and randomness
 - A required `Resolved*Conf` key is added in a minor and removed in a major
 - This library's own warnings are written once per `stderr` sink
 - `otlpHttpBaseURI` userinfo becomes an `Authorization: Basic` header
