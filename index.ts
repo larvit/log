@@ -710,8 +710,9 @@ function isCredentialHeaderName(name: string): boolean {
 	return SENSITIVE_HEADER_NAME.test(name.toLowerCase());
 }
 
-// Reading limits, each bounding the work one value costs. Past one, the value counts as holding a
-// credential, so each limit can only cost redaction, never let a credential through.
+// Reading limits, each bounding the work one value costs. Past a limit, the value counts as holding
+// a credential, so a limit can only redact more, never let a credential through.
+
 // Percent-decodings of one text.
 const MAX_PERCENT_LEVELS = 8;
 // Query parts parsed as a url, one inside the next; it also keeps the stack from running out.
@@ -724,8 +725,7 @@ const UNREADABLE = Symbol("unreadable");
 
 type Levels = string[] | typeof UNREADABLE;
 
-// Text past the limit holds whatever a reader tests for. A reader that has to act on `UNREADABLE`
-// itself, rather than test levels, checks for it directly, as `splitUserinfoPairs` and `redactedPath` do.
+// Text encoded past MAX_PERCENT_LEVELS holds whatever a reader tests for.
 const atAnyLevel = (levels: Levels, test: (level: string) => boolean) => levels === UNREADABLE || levels.some(test);
 
 // A part's reading by depth, kept for one exported value: a url key is read alone and with its
@@ -785,8 +785,6 @@ function decodings(text: string): Levels {
 // A parser drops a tab, newline or carriage return: `si%09g` reads as `sig`.
 const withoutDropped = (text: string) => text.replace(/[\t\n\r]/g, "");
 
-// The listed query keys are read three ways: `isListedQueryKey` reads a bare key; below
-// `redactTextQueryKeys`, `holdsListedKey` reads one text and `holdsListedKeyAtAnyLevel` every decoding of it.
 const SENSITIVE_QUERY_KEY = /(auth|authentication|authorization|consumerid|credential|key|keyid|pass|passphrase|p(ass)?w(or)?d[12]?|secret|sig|sign|signature|signed|token)$|^(code|googleaccessid|idtokenhint)$/;
 
 function isListedQueryKey(key: string): boolean {
@@ -796,12 +794,10 @@ function isListedQueryKey(key: string): boolean {
 // The text with each listed key's value replaced by `REDACTED`, wherever a url's own query rules don't
 // reach it: a status message such as `request to …?token=… failed`, a relative `location`, a
 // scheme-less url, a `?` in a fragment, a fragment's own pairs such as an OAuth redirect's
-// `#access_token=…`, a matrix parameter such as `/img;sig=…`. A value may hold a `?` and ends at
-// `&`, `#` or a plain space. A url parser ends it at no whitespace and drops a tab, newline or carriage
-// return from it; a plain space ends it here all the same, as it ends userinfo. A key is whatever stands between its `?`, `&`, `#` or `;` and its
-// `=`, a space included, so a listed key after a `?` in an unlisted value is found. A key starts after the
-// nearest of the four, so `code`, which only an exact name lists, is found in `?#code=…` and
-// `?x#code=…`.
+// `#access_token=…`, a matrix parameter such as `/img;sig=…`. A key is whatever stands between its
+// `?`, `&`, `#` or `;` and its `=`, a space included, so a listed key after a `?` in an unlisted value
+// is found. A key starts after the nearest of the four, so `code`, which only an exact name lists, is
+// found in `?#code=…` and `?x#code=…`. A value may hold a `?` and ends at `&`, `#` or a plain space.
 function redactTextQueryKeys(text: string): string {
 	const opener = /[?&#;]([^&=?#;]*)=/g;
 	const valueEnd = /[&# ]/g;
@@ -832,13 +828,8 @@ const holdsListedKeyAtAnyLevel = (text: string) => changesAtAnyLevel(text, redac
 
 const URL_DELIMITER = /[/?# ]/;
 
-// What follows the `//`, `\\`, `/\` or `\/` that opens userinfo at a key's end; `undefined` where the
-// key doesn't open any. A key encoded past MAX_PERCENT_LEVELS opens a run that holds an `@`.
-function openedUserinfo(key: string): string | typeof UNREADABLE | undefined {
-	const levels = decodings(key);
-
-	return levels === UNREADABLE ? UNREADABLE : levels.map(level => OPENS_USERINFO.exec(level)?.[0].slice(2)).find(tail => tail !== undefined);
-}
+// Whether a `//`, `\\`, `/\` or `\/` at the key's end, at any level, opens userinfo.
+const opensUserinfo = (key: string) => atAnyLevel(decodings(key), level => OPENS_USERINFO.test(level));
 
 // A parser reads the `&` in `?//u:p&w@host` as part of the userinfo, which the query splits into
 // two pairs. A key opening userinfo starts a run: its value and each later pair join it, up to the
@@ -876,14 +867,12 @@ function splitUserinfoPairs(pairs: Array<[string, string]>, holdsAtSign: (text: 
 			read(`${key}=${value}`, index);
 		}
 
-		const opened = start < 0 ? openedUserinfo(key) : undefined;
-
-		if (opened !== undefined) {
+		if (start < 0 && opensUserinfo(key)) {
 			start = index;
 			// The whole pair: `read` stops at the first delimiter, so it misses the `//x@` in a value such
 			// as `ss//x@h`, which `?//u:p=ss%2F%2Fx@h` decodes to.
-			end = opened === UNREADABLE || holdsUserinfoAtAnyLevel(`${key}=${value}`) ? index : -1;
-			read(`${opened === UNREADABLE ? "" : opened}=${value}`, index);
+			end = holdsUserinfoAtAnyLevel(`${key}=${value}`) ? index : -1;
+			read(value, index);
 		}
 	});
 
@@ -964,8 +953,9 @@ function readQueryPart(part: string, depth: number, partsRead: PartsRead): strin
 const SCHEME_LED = /^[\0- ]*[a-z][a-z\d+.-]*:/i;
 
 // A key opening a url is read with its value too, as a server taking `?<url>` reads it: an `=` in its
-// password ends the key. It reads one pair alone, so userinfo spanning pairs or the `=`, as in
-// `?//u:p=w@host`, is for the caller to redact first, as `redactedSearch` does with `splitUserinfoPairs`.
+// password ends the key. This function reads one pair alone, so userinfo spanning pairs or the `=`,
+// as in `?//u:p=w@host`, is for the caller to redact first, as `redactedSearch` does with
+// `splitUserinfoPairs`.
 function redactQueryPair(key: string, value: string, [rawKey, rawValue]: [string, string], depth: number, partsRead: PartsRead): [string, string] {
 	if (SCHEME_LED.test(withoutDropped(key))) {
 		const joined = `${key}=${value}`;
@@ -1253,7 +1243,7 @@ class ExportScheduler {
 		this.failures = 0;
 	}
 
-	// A record enqueued mid-round leaves a batch timer behind; the backoff takes it over.
+	// A payload enqueued mid-round leaves a batch timer behind; the backoff takes it over.
 	backoff(): number {
 		this.failures++;
 
@@ -1440,7 +1430,7 @@ class OtlpSender {
 			try {
 				headers.set(name, value);
 			} catch {
-				const failure = HEADER_NAME_TOKEN.test(name) ? `an invalid ${name} header` : `an invalid header name in entry ${index + 1}`;
+				const failure = HEADER_NAME_TOKEN.test(name) ? `an invalid ${name} header` : `an invalid header name at position ${index + 1} (counting from 1)`;
 
 				return { failure: `otlpAdditionalHeaders carries ${failure}`, headers };
 			}
@@ -1706,7 +1696,8 @@ export class Queue implements OtlpQueue {
 		this.countAndTrim(items);
 	}
 
-	// Drops the oldest over maxItems, but not the batch being retried: it came out of items, so it never exceeds maxItems.
+	// Drops the oldest over maxItems, sparing the batch being retried; it holds at most maxItems, so
+	// enough other items remain to drop.
 	private countAndTrim(items: QueuedItem[]): void {
 		for (const item of items) {
 			this.bytes += item.bytes;
