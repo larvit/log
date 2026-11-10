@@ -23,36 +23,36 @@
 | 98 | 2.6.0 | 38, 44 | decision | **Score the project against the 7.0 comprehension floor, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
 | 111 | 2.6.0 |  |  | **Name `scripts/` by what it holds: the browser and OTLP test runners and the collector config.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
 | 35 | 2.6.0 |  | principle | **Let a consumer inject what `colorsFromEnv`, `traceableUrl` and `unref` read from the platform.** | 2 | 1 | 1 | 2 | 4 | code health by 5 | 5.2 |
-| 36 | 2.6.0 |  | principle | **Reach the retry decision and a `log.fetch` span's attributes without a network call.** | 2 | 1 | 1 | 2 | 5 | code health by 5 | 4.5 |
-| 43 | 2.6.0 |  | principle | **Give `ExportScheduler` and save coalescing named states.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
-| 48 | 2.6.0 |  | principle | **Test the untested failure paths.** | 2 | 1 | 1 | 2 | 4 | code health by 4 | 4.2 |
-| 109 | 2.6.0 |  | principle | **Test without the wall clock: no sleep, no real timer and no time bound.** | 2 | 1 | 1 | 2 | 4 | code health by 4 | 4.2 |
-| 110 | 2.6.0 |  | principle | **Register one test per case where a test loops over its cases or checks many behaviours.** | 1 | 1 | 1 | 1 | 4 | code health by 3 | 3.7 |
-| 25 | 2.6.0 |  |  | **Publish the artifact the gate tested.** | 2 | 2 | 3 | 5 | 4 | code health by 5 | 3.5 |
-| 118 | 2.6.0 |  | principle | **Bring `index.ts`'s `// --- Credentials on a span ---` section within about seven things per level, or record why it holds more.** | 2 | 1 | 4 | 5 | 4 | code health by 5 | 3.5 |
-| 128 | 2.6.0 |  |  | **Give each part of the library a source module of its own, so a rule can be read and tested without the rest.** | 4 | 2 | 3 | 7 | 8 | code health by 8 | 3.3 |
-| 113 | 2.6.0 |  |  | **Make `.editorconfig` match what the files hold: spaces in `package.json`, and never tabs in YAML.** | 1 | 1 | 1 | 1 | 1 | code health by 1 | 3.1 |
-| 82 | 2.6.0 |  |  | **Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.** | 1 | 2 | 1 | 2 | 1 | 3 by 5 | 2.3 |
-| 19 | 2.6.0 |  | defect | **Leave a `Request` untraced in `log.fetch`.** | 1 | 1 | 2 | 2 | 2 | 2.1 by 6 | 2.1 |
-| 114 | 2.6.0 |  |  | **Move `package.json`'s build and test one-liners into named scripts, and let the OTLP test read its collector's port, image and container name from the environment, today's values as defaults.** | 1 | 1 | 1 | 1 | 2 | code health by 1 | 2.1 |
-| 80 | 2.6.0 |  | principle | **Run the browser suite in WebKit and Firefox as well as Chromium.** | 2 | 1 | 1 | 2 | 3 | 2 by 7 | 2.1 |
-| 117 | 2.6.0 |  |  | **Bring the built `index.js` within README → Footprint's 10 KB gzipped budget.** | 2 | 1 | 2 | 3 | 3 | 5 by 7 | 1.5 |
-| 26 | 2.6.0 |  |  | **Check the footprint budget in CI, so the numbers in README → Footprint fail a build instead of going stale.** | 2 | 1 | 1 | 2 | 5 | 5 by 8 | 1.5 |
-| 112 | 2.6.0 |  |  | **Run the suite on Deno and Bun in CI.** | 2 | 1 | 1 | 2 | 3 | 2 by 5 | 1.5 |
-| 107 | 2.6.0 |  | principle | **Run the suite on React Native's Hermes in CI.** | 3 | 1 | 1 | 3 | 5 | 2 by 7 | 1.3 |
-| 108 | 2.6.0 |  | principle | **Keep two tabs of one web app sharing a `storage` key from sending a record twice or deleting each other's backlog.** | 3 | 2 | 2 | 5 | 5 | 2 by 5 | 0.7 |
+| 36 | 2.7.0 |  | principle | **Reach the retry decision and a `log.fetch` span's attributes without a network call.** | 2 | 1 | 1 | 2 | 5 | code health by 5 | 4.5 |
+| 43 | 2.7.0 |  | principle | **Give `ExportScheduler` and save coalescing named states.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
+| 48 | 2.7.0 |  | principle | **Test the untested failure paths.** | 2 | 1 | 1 | 2 | 4 | code health by 4 | 4.2 |
+| 109 | 2.7.0 |  | principle | **Test without the wall clock: no sleep, no real timer and no time bound.** | 2 | 1 | 1 | 2 | 4 | code health by 4 | 4.2 |
+| 110 | 2.7.0 |  | principle | **Register one test per case where a test loops over its cases or checks many behaviours.** | 1 | 1 | 1 | 1 | 4 | code health by 3 | 3.7 |
+| 25 | 2.7.0 |  |  | **Publish the artifact the gate tested.** | 2 | 2 | 3 | 5 | 4 | code health by 5 | 3.5 |
+| 118 | 2.7.0 |  | principle | **Bring `index.ts`'s `// --- Credentials on a span ---` section within about seven things per level, or record why it holds more.** | 2 | 1 | 4 | 5 | 4 | code health by 5 | 3.5 |
+| 128 | 2.7.0 |  |  | **Give each part of the library a source module of its own, so a rule can be read and tested without the rest.** | 4 | 2 | 3 | 7 | 8 | code health by 8 | 3.3 |
+| 113 | 2.7.0 |  |  | **Make `.editorconfig` match what the files hold: spaces in `package.json`, and never tabs in YAML.** | 1 | 1 | 1 | 1 | 1 | code health by 1 | 3.1 |
+| 82 | 2.7.0 |  |  | **Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.** | 1 | 2 | 1 | 2 | 1 | 3 by 5 | 2.3 |
+| 19 | 2.7.0 |  | defect | **Leave a `Request` untraced in `log.fetch`.** | 1 | 1 | 2 | 2 | 2 | 2.1 by 6 | 2.1 |
+| 114 | 2.7.0 |  |  | **Move `package.json`'s build and test one-liners into named scripts, and let the OTLP test read its collector's port, image and container name from the environment, today's values as defaults.** | 1 | 1 | 1 | 1 | 2 | code health by 1 | 2.1 |
 | 18 | 2.7.0 |  |  | **Export `LogEntry` as an alias of `EntryFormatterConf`, so the 3.0.0 rename has a spelling a consumer can move to first.** | 1 | 1 | 1 | 1 | 1 | 3 by 3 | 2.1 |
+| 80 | 2.7.0 |  | principle | **Run the browser suite in WebKit and Firefox as well as Chromium.** | 2 | 1 | 1 | 2 | 3 | 2 by 7 | 2.1 |
 | 96 | 2.7.0 | 18, 128 | owner | **Add a list of transports, each handed plain log entries it encodes itself, with console and OTLP as the two this library ships and uses by default.** | 4 | 2 | 3 | 7 | 8 | 1 by 7, 4 by 8 | 1.4 |
 | 28 | 2.7.0 | 96 |  | **Export resource attributes beyond `service.name`.** | 2 | 1 | 2 | 3 | 3 | 1 by 7 | 1.8 |
+| 117 | 2.7.0 |  |  | **Bring the built `index.js` within README → Footprint's 10 KB gzipped budget.** | 2 | 1 | 2 | 3 | 3 | 5 by 7 | 1.5 |
 | 31 | 2.7.0 | 96 |  | **Set a log record's `flags` to the W3C trace flags.** | 1 | 1 | 2 | 2 | 2 | 1 by 4 | 1.5 |
 | 88 | 2.7.0 |  |  | **Parse `traceparent` as W3C Trace Context does: ignore uppercase hex, and read a higher version by its first four fields.** | 1 | 1 | 1 | 1 | 2 | 1 by 3 | 1.5 |
+| 26 | 2.7.0 |  |  | **Check the footprint budget in CI, so the numbers in README → Footprint fail a build instead of going stale.** | 2 | 1 | 1 | 2 | 5 | 5 by 8 | 1.5 |
+| 112 | 2.7.0 |  |  | **Run the suite on Deno and Bun in CI.** | 2 | 1 | 1 | 2 | 3 | 2 by 5 | 1.5 |
 | 27 | 2.7.0 |  |  | **Name a `log.fetch` span and its errors as HTTP semconv does.** | 2 | 1 | 3 | 4 | 3 | 1 by 6 | 1.3 |
+| 107 | 2.7.0 |  | principle | **Run the suite on React Native's Hermes in CI.** | 3 | 1 | 1 | 3 | 5 | 2 by 7 | 1.3 |
 | 30 | 2.7.0 |  |  | **Let a consumer sample by ratio.** | 3 | 2 | 2 | 5 | 5 | 1 by 5, 5 by 4 | 1.3 |
 | 81 | 2.7.0 |  | principle | **Test export and `log.fetch` against a real server in a browser.** | 2 | 1 | 1 | 2 | 5 | 2.1 by 6 | 1.2 |
 | 99 | 2.7.0 | 96 |  | **Honour a collector's `Retry-After` before retrying a batch.** | 2 | 1 | 2 | 3 | 2 | 1 by 4 | 1.2 |
 | 86 | 2.7.0 | 96 |  | **Set `telemetry.sdk.language` to a semconv value, `nodejs` or `webjs`.** | 1 | 1 | 2 | 2 | 2 | 1 by 3 | 1.1 |
 | 29 | 2.7.0 | 96 |  | **Export span events.** | 3 | 1 | 2 | 4 | 5 | 1 by 6 | 1.0 |
 | 87 | 2.7.0 | 96 |  | **Report a protobuf export's `partialSuccess` as the JSON transport does.** | 2 | 1 | 2 | 3 | 4 | 1 by 4 | 0.9 |
+| 108 | 2.7.0 |  | principle | **Keep two tabs of one web app sharing a `storage` key from sending a record twice or deleting each other's backlog.** | 3 | 2 | 2 | 5 | 5 | 2 by 5 | 0.7 |
 | 16 | 2.8.0 |  |  | **Warn once when `format` is a string other than `"text"` or `"json"`.** | 1 | 1 | 1 | 1 | 1 | 3 by 5 | 3.5 |
 | 41 | 2.8.0 |  | principle | **Warn once about a negative, zero or `NaN` numeric `QueueConf` option, and use the default.** | 1 | 1 | 1 | 1 | 2 | 3 by 5 | 2.3 |
 | 20 | 2.8.0 |  |  | **Announce in the README and CHANGELOG that 3.0.0 gives a `log.fetch` span `end({ error })`'s `error.type`, so a query on `"20"` for an abort or `"fetch_error"` moves first.** | 1 | 1 | 1 | 1 | 1 | 3 by 3 | 2.1 |
@@ -256,35 +256,6 @@ collector. Found by the technical principles audit on 2026-10-26.
 WebKit is the only engine on an iPhone, and `failureMessage` has a Firefox branch the suite only
 fakes. `~/.claude/principles/frontend.md` → broad device support.
 
-### 117. Bring the built `index.js` within README → Footprint's 10 KB gzipped budget.
-
-README → Footprint budgets `index.js` at ≤10 KB gzipped for Goals #5. On 2026-11-10, during the
-2.5.0 release review, the build was 11056 bytes: `npm run build` in the repo's container image, then
-`gzip -9c index.js | wc -c`. The budget is broken, and nothing checks it. Whether to shrink the
-build or re-state the budget is for this item to work out. Item 26 will check the budget in CI, and
-that check will fail from its first run until this item lands. Found on 2026-10-28, at 10439 bytes.
-
-### 26. Check the footprint budget in CI, so the numbers in README → Footprint fail a build instead of going stale.
-
-Bundle size is the easy half; the per-operation figures need a stable enough harness to not flake.
-
-### 112. Run the suite on Deno and Bun in CI.
-
-README → Runtimes says Deno and Bun meet the rule and are not in CI; CI proving more runtimes is Goals #2's signal. Found by the goals principles audit on 2026-10-26.
-
-### 107. Run the suite on React Native's Hermes in CI.
-
-README → Audience calls React Native a primary target, but CI runs Node and Chromium only, so a break
-under Hermes or React Native's own globals, such as a `URL` whose getters throw, ships unseen. Items 80 and 81 don't cover
-it. `~/.claude/principles/frontend.md` → Testability and broad device support.
-
-### 108. Keep two tabs of one web app sharing a `storage` key from sending a record twice or deleting each other's backlog.
-
-Every tab builds a `Queue` on the same `localStorage` key: each loads another tab's backlog at start,
-then overwrites or removes the key on every change, so offline records go twice and a tab that drains
-first deletes another's backlog. README's "one `Queue` per `key` per process" is advice a web app
-cannot follow. `~/.claude/principles/frontend.md` → Prefer state in the URL first, backend second.
-
 ### 96. Add a list of transports, each handed plain log entries it encodes itself, with console and OTLP as the two this library ships and uses by default.
 
 Today a `Log` writes console output through `stdout` and `stderr`, and exports through one seam,
@@ -320,6 +291,14 @@ and OTLP transports take those over, the formatter and the queue are read where 
 `service.version` and `deployment.environment` are what the telemetry reader groups on in Grafana,
 and the shape is a map on the resource we already build.
 
+### 117. Bring the built `index.js` within README → Footprint's 10 KB gzipped budget.
+
+README → Footprint budgets `index.js` at ≤10 KB gzipped for Goals #5. On 2026-11-10, during the
+2.5.0 release review, the build was 11056 bytes: `npm run build` in the repo's container image, then
+`gzip -9c index.js | wc -c`. The budget is broken, and nothing checks it. Whether to shrink the
+build or re-state the budget is for this item to work out. Item 26 will check the budget in CI, and
+that check will fail from its first run until this item lands. Found on 2026-10-28, at 10439 bytes.
+
 ### 31. Set a log record's `flags` to the W3C trace flags.
 
 An unsampled request's records export without their span, and nothing on them tells the backend that
@@ -329,11 +308,25 @@ span will never arrive.
 
 `parseTraceparent` lowercases its input and requires an exact length.
 
+### 26. Check the footprint budget in CI, so the numbers in README → Footprint fail a build instead of going stale.
+
+Bundle size is the easy half; the per-operation figures need a stable enough harness to not flake.
+
+### 112. Run the suite on Deno and Bun in CI.
+
+README → Runtimes says Deno and Bun meet the rule and are not in CI; CI proving more runtimes is Goals #2's signal. Found by the goals principles audit on 2026-10-26.
+
 ### 27. Name a `log.fetch` span and its errors as HTTP semconv does.
 
 That is `{method}` alone without a url template, where today it is `{method} {host}`; an unknown
 method as `_OTHER` with `http.request.method_original`; and `error.type` set to the status code on a
 4xx or 5xx.
+
+### 107. Run the suite on React Native's Hermes in CI.
+
+README → Audience calls React Native a primary target, but CI runs Node and Chromium only, so a break
+under Hermes or React Native's own globals, such as a `URL` whose getters throw, ships unseen. Items 80 and 81 don't cover
+it. `~/.claude/principles/frontend.md` → Testability and broad device support.
 
 ### 30. Let a consumer sample by ratio.
 
@@ -365,6 +358,13 @@ dropped-count we would owe them.
 ### 87. Report a protobuf export's `partialSuccess` as the JSON transport does.
 
 Under `http/protobuf` a partially rejected batch counts as delivered.
+
+### 108. Keep two tabs of one web app sharing a `storage` key from sending a record twice or deleting each other's backlog.
+
+Every tab builds a `Queue` on the same `localStorage` key: each loads another tab's backlog at start,
+then overwrites or removes the key on every change, so offline records go twice and a tab that drains
+first deletes another's backlog. README's "one `Queue` per `key` per process" is advice a web app
+cannot follow. `~/.claude/principles/frontend.md` → Prefer state in the URL first, backend second.
 
 ### 16. Warn once when `format` is a string other than `"text"` or `"json"`.
 
