@@ -62,8 +62,8 @@ for an achieve goal, and where two conflict the earlier one wins.
    - Counter-signal: a common need is left to user code to save bytes.
    - Why: a footprint kept small by pushing work onto users only moves the cost.
 6. **Maintain:** **Correct OTLP.** Leave out what cannot be done to the spec.
-7. **Maintain:** **[Credentials never leave](#credentials-in-a-captured-value).** Text you log is
-   exported as written.
+7. **Maintain:** **[Credentials never leave](#credentials-in-a-captured-value)** in the shapes that
+   section lists. Text you log, and a credential you encode yourself, are exported as written.
 8. **Maintain:** **[Semver, read strictly](#audience).**
 9. **Maintain:** **Never holds a process open** past the work the app asked for.
 
@@ -96,8 +96,8 @@ in a worse one. Only a major changes:
 
 - each documented option, read back under its own name, and each documented instance field;
 - each span attribute and value this README documents, on `log.span` and on the wire;
-- which values record `REDACTED`, except that a minor may redact a credential an earlier release
-  exported as written;
+- that a credential in a shape README → Credentials in a captured value lists records `REDACTED`,
+  except that a minor may add a shape;
 - the `format: "json"` output;
 - a default;
 - a supported runtime;
@@ -112,6 +112,8 @@ in a worse one. Only a major changes:
 - anything this README does not document, which may change in a minor: an undocumented key of a
   `conf`, enumerability, or what a spread or `JSON.stringify` of a `conf` carries;
 - a goal: each is an aim, and the section meeting it says what holds today;
+- a value holding no credential recording `REDACTED`, such as a path cut past a reading limit, and
+  those limits: a minor may change either, so a value it recorded as `REDACTED` may show;
 - delivery: the export queue is best-effort, it keeps what `storage` accepted and drops the oldest
   past `maxItems`, keeping a batch it has promised to retry, because telemetry is not payload data;
 - the text output line, which is written for people to read — parse `format: "json"` instead.
