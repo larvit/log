@@ -721,7 +721,8 @@ const UNREADABLE = Symbol("unreadable");
 
 type Levels = string[] | typeof UNREADABLE;
 
-// The one place deciding that text past the limit holds what a reader tests for.
+// Text past the limit holds whatever a reader tests for. A reader that has to act on `UNREADABLE`
+// itself, rather than test levels, checks for it directly, as `splitUserinfoPairs` and `redactedPath` do.
 const atAnyLevel = (levels: Levels, test: (level: string) => boolean) => levels === UNREADABLE || levels.some(test);
 
 // A part's reading by depth, kept for one exported value: a url key is read alone and with its
