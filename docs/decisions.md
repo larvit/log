@@ -52,6 +52,16 @@ Serves README → Goals #9. Valid while a pending batch or retry must not hold t
 the technical principle "Functional core, imperative shell". Valid while a delegating clock leaves
 process-exit behaviour intact.
 
+## A `Log` and a `Queue` default their clock and randomness
+
+2026-11-10, the maintainer: `new Log()` and `new Queue()` use the system clock unless `clock` says
+otherwise, and trace and span ids come from `globalThis.crypto`, else `Math.random`. This departs
+from technical-principles → "Sane defaults", which has a library ask for its clock and randomness:
+`new Log()` needing either would break Goal 1 ("useful with no config") and Goal 3 ("a very easy
+API"). The defaults still pass that principle's first test: nearly every caller wants them, and
+`clock` overrides the clock, as item 34 will let a caller override the randomness. Serves README →
+Goals #1 and #3. Valid while those goals ask for a logger that works with no config.
+
 ## A required `Resolved*Conf` key is added in a minor and removed in a major
 
 2026-09-18, the implementing agent: adding a key to `ResolvedLogConf`/`ResolvedQueueConf`'s required

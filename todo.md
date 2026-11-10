@@ -12,7 +12,6 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 129 | 2.5.0 |  | question | **Record whether a `Log` and a `Queue` keep defaulting the clock and randomness, against the principle that a library asks for them.** | 1 | 2 | 1 | 2 | 1 | code health by 2 | 4.2 |
 | 34 | 2.6.0 |  | principle | **Let a consumer inject the randomness trace and span ids come from.** | 1 | 1 | 1 | 1 | 2 | code health by 5 | 10.4 |
 | 37 | 2.6.0 |  | principle | **Build a span payload without writing to `log.span`.** | 1 | 1 | 1 | 1 | 2 | code health by 5 | 10.4 |
 | 44 | 2.6.0 |  | principle | **Route a `Queue`'s warnings through one explicit seam.** | 2 | 1 | 1 | 2 | 4 | code health by 9 | 9.4 |
@@ -100,19 +99,6 @@
 | 75 | 3.0.0 | 22 | decision | **Keep credentials off `log.conf` and `queue.conf`.** | 2 | 1 | 2 | 3 | 3 | 3 by 3 | 0.7 |
 
 ## Details
-
-### 129. Record whether a `Log` and a `Queue` keep defaulting the clock and randomness, against the principle that a library asks for them.
-
-`~/.claude/principles/technical-principles.md` → "Sane defaults" says a library asks for every input
-that can change between runs, the clock and randomness included, and only the code wiring a program
-together defaults them. `Queue` defaults `clock` to the system clock, `withDefaults` does the same
-for a `Log`, and `getRandomBytes` falls back to `globalThis.crypto`, else `Math.random`. Goal 1
-("useful with no config") and Goal 3 ("a very easy API") pull the other way: `new Log()` needing a
-clock would break both. No decision weighs the two, so each chunk touching these defaults reargues
-it. Which wins is for the maintainer: keeping the defaults asks for a `docs/decisions.md` entry that
-names the goal it serves, and either an item that ends the departure or an exception in the
-principle. Recommendation: keep the defaults, since the public constructor is the edge where a
-consumer wires the logger, and record that. Found by the 2.5.0 principles audit.
 
 ### 34. Let a consumer inject the randomness trace and span ids come from.
 
