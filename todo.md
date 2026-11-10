@@ -6,7 +6,7 @@
 
 `Bar = 0.5`
 
-`Next ID = 128`
+`Next ID = 129`
 
 ## Items
 
@@ -30,6 +30,7 @@
 | 110 | 2.6.0 |  | principle | **Register one test per case where a test loops over its cases or checks many behaviours.** | 1 | 1 | 1 | 1 | 4 | code health by 3 | 3.7 |
 | 25 | 2.6.0 |  |  | **Publish the artifact the gate tested.** | 2 | 2 | 3 | 5 | 4 | code health by 5 | 3.5 |
 | 118 | 2.6.0 |  | principle | **Bring `index.ts`'s `// --- Credentials on a span ---` section within about seven things per level, or record why it holds more.** | 2 | 1 | 4 | 5 | 4 | code health by 5 | 3.5 |
+| 128 | 2.6.0 |  |  | **Give each part of the library a source module of its own, so a rule can be read and tested without the rest.** | 4 | 2 | 3 | 7 | 8 | code health by 8 | 3.3 |
 | 113 | 2.6.0 |  |  | **Make `.editorconfig` match what the files hold: spaces in `package.json`, and never tabs in YAML.** | 1 | 1 | 1 | 1 | 1 | code health by 1 | 3.1 |
 | 82 | 2.6.0 |  |  | **Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.** | 1 | 2 | 1 | 2 | 1 | 3 by 5 | 2.3 |
 | 19 | 2.6.0 |  | defect | **Leave a `Request` untraced in `log.fetch`.** | 1 | 1 | 2 | 2 | 2 | 2.1 by 6 | 2.1 |
@@ -40,7 +41,7 @@
 | 112 | 2.6.0 |  |  | **Run the suite on Deno and Bun in CI.** | 2 | 1 | 1 | 2 | 3 | 2 by 5 | 1.5 |
 | 107 | 2.6.0 |  | principle | **Run the suite on React Native's Hermes in CI.** | 3 | 1 | 1 | 3 | 5 | 2 by 7 | 1.3 |
 | 108 | 2.6.0 |  | principle | **Keep two tabs of one web app sharing a `storage` key from sending a record twice or deleting each other's backlog.** | 3 | 2 | 2 | 5 | 5 | 2 by 5 | 0.7 |
-| 96 | 2.7.0 |  | owner | **Add a list of transports, each handed plain records it encodes itself, with console and OTLP as the two this library ships and uses by default.** | 4 | 2 | 3 | 7 | 8 | 1 by 7, 4 by 8 | 1.4 |
+| 96 | 2.7.0 | 128 | owner | **Add a list of transports, each handed plain records it encodes itself, with console and OTLP as the two this library ships and uses by default.** | 4 | 2 | 3 | 7 | 8 | 1 by 7, 4 by 8 | 1.4 |
 | 28 | 2.7.0 | 96 |  | **Export resource attributes beyond `service.name`.** | 2 | 1 | 2 | 3 | 3 | 1 by 7 | 1.8 |
 | 31 | 2.7.0 | 96 |  | **Set a log record's `flags` to the W3C trace flags.** | 1 | 1 | 2 | 2 | 2 | 1 by 4 | 1.5 |
 | 88 | 2.7.0 |  |  | **Parse `traceparent` as W3C Trace Context does: ignore uppercase hex, and read a higher version by its first four fields.** | 1 | 1 | 1 | 1 | 2 | 1 by 3 | 1.5 |
@@ -211,6 +212,15 @@ asks for a grouping under names a reader can follow, or a recorded reason. The r
 one section, as `docs/decisions.md` → "Every rule on credentials in a span sits in one source
 section" asks. Principle: `~/.claude/principles/technical-principles.md` → "About seven things per
 level". Found by the principles audit of 2026-10-28.
+
+### 128. Give each part of the library a source module of its own, so a rule can be read and tested without the rest.
+
+`index.ts` is one 2,527-line module of 16 sections, and any section can reach every module-level
+table. The pure credential rules therefore have no seam of their own: each redaction test passes
+through `Log`, `fetch`, the queue and the export, so item 96 would move all of them, and item 96's
+"no other code knows OTLP" can't be enforced within one file. On 2026-11-10 the owner approved
+adding a bundler so that the package still publishes one `index.js`; which bundler is part of this
+item. The footprint budgets in README → Footprint (see item 117) must hold.
 
 ### 113. Make `.editorconfig` match what the files hold: spaces in `package.json`, and never tabs in YAML.
 
