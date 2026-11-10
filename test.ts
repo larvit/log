@@ -2438,80 +2438,18 @@ test("log.fetch redacts credentials in a url nested in the request path", async 
 	t.end();
 });
 
-test("log.fetch redacts a credential in a url nested base64-encoded in the request path", async t => {
+test("log.fetch exports a url nested base64-encoded in the request path as written", async t => {
 	const { calls } = stubFetch();
 	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
-	const base64url = (text: string) => btoa(String.fromCharCode(...new TextEncoder().encode(text))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-	const split = (text: string, size: number) => text.match(new RegExp(`.{1,${size}}`, "g"))!.join("/");
-	const runs = base64url(Array.from({ length: 70 }, (_, index) => `run${index}abcdef`).join("."));
-	const third = Math.ceil(runs.length / 12) * 4;
-	const paths = {
-		"/a/k%3Fsig%3Dpw83/https:%2F%2Fu:pw84@cb.test": "/a/REDACTED",
-		"/i/aHR0cHM6Ly9oLztzaWc9MQ": "/REDACTED",
-		"/i/x.aHR0cHM6Ly91Pj4-/OnB3QGgudGVzdC94": "/i/REDACTED",
-		"/img.v2/aHR0cHM6Ly9oLztzaWc9MQ": "/img.v2/REDACTED",
-		"/insecure/fn:mythumbnails/aHR0cHM6dXNl/cjpwYXNzQGgudGVzdC94LnBuZw": "/insecure/fn:mythumbnails/REDACTED",
-		"/insecure/img.thumbnails/aHR0cHM6L3Vz/ZXI6cGFzc0BoLnRlc3QveC5wbmc": "/insecure/img.thumbnails/REDACTED",
-		"/insecure/plain/thumbnails/aHR0cHM6dXNl//cjpwYXNzQGgudGVzdC94LnBuZw": "/insecure/plain/thumbnails/REDACTED",
-		"/insecure/rs:fit:300/aHR0cHM6Ly91///c2VyOnBhc3NAaC50ZXN0L3gucG5n": "/insecure/rs:fit:300/REDACTED",
-		"/insecure/rs:fit:300/aHR0cHM6Ly91//c2VyOnBhc3NAaC50ZXN0L3gucG5n": "/insecure/rs:fit:300/REDACTED",
-		[`/pieces/.x/${Array.from({ length: 64 }, () => "a").join("/")}`]: `/pieces/.x/${Array.from({ length: 64 }, () => "a").join("/")}`,
-		[`/pieces/.x/${Array.from({ length: 65 }, () => "a").join("/")}`]: "/REDACTED",
-		[`/chars/.x/${"a".repeat(4096)}/${"a".repeat(4095)}/a`]: `/chars/.x/${"a".repeat(4096)}/${"a".repeat(4095)}/a`,
-		[`/chars/.x/${"a".repeat(4096)}/${"a".repeat(4096)}/a`]: "/REDACTED",
-		[`/chars/${"a".repeat(2500)}/${"a".repeat(2500)}/~/${"a".repeat(1000)}/${"a".repeat(1000)}/${"a".repeat(1187)}`]: `/chars/${"a".repeat(2500)}/${"a".repeat(2500)}/~/${"a".repeat(1000)}/${"a".repeat(1000)}/${"a".repeat(1187)}`,
-		[`/chars/${"a".repeat(2500)}/${"a".repeat(2500)}/~/${"a".repeat(1000)}/${"a".repeat(1000)}/${"a".repeat(1188)}`]: "/REDACTED",
-		[`/one/${"a".repeat(9000)}`]: `/one/${"a".repeat(9000)}`,
-		[`/two/.x/${"a".repeat(8193)}/a`]: `/two/.x/${"a".repeat(8193)}/a`,
-		[`/clean//${base64url("https://cb.test/x?q=1")}`]: `/clean//${base64url("https://cb.test/x?q=1")}`,
-		"/insecure/rs:fit:300/x.L/y91c2VyOnBhc3NAaC50ZXN0L3gucG5n": "/REDACTED",
-		"/insecure/rs:fit:300/x.aHR0cDo/vL3VzZXI6cGFzc0BoLnRlc3QveC5wbmc": "/insecure/rs:fit:300/x.aHR0cDo/REDACTED",
-		"/insecure/rs:fit:300/x.aHR0cHM6Ly91//c2VyOnBhc3NAaC50ZXN0L3gucG5n": "/insecure/rs:fit:300/REDACTED",
-		"/insecure/rs:fit:300/x.aHR0cHM6Ly91/c2VyOnBhc3NAaC50ZXN0L3gucG5n": "/insecure/rs:fit:300/REDACTED",
-		"/insecure/thumbnails/aHR0cHM6dXNl/cjpwYXNzQGgudGVzdC94LnBuZw": "/insecure/thumbnails/REDACTED",
-		"/m/img;sig=pw87/x.png": "/m/REDACTED",
-		[`/insecure/fn:mythumb/${base64url("https://s3.test/k?sig=pw88")}`]: "/insecure/fn:mythumb/REDACTED",
-		[`/insecure/my.thumb/${base64url("https://s3.test/k?sig=pw89")}`]: "/insecure/my.thumb/REDACTED",
-		[`/x.aHR0cHM6Ly9jZG4udGVzdA/abc.png./${base64url("https://s3.test/k?sig=pw90")}`]: "/x.aHR0cHM6Ly9jZG4udGVzdA/abc.png./REDACTED",
-		[`/c/${runs.slice(0, third)}/${runs.slice(third, 2 * third)}/${runs.slice(2 * third)}`]: "/REDACTED",
-		[`/rs:fit:3/${base64url("//u:pw85@cb.test/i.png")}`]: "/REDACTED",
-		[`/insecure/rs:fit:300/${base64url("https://s3.test/k?X-Amz-Signature=pw70&X-Amz-Date=1")}`]: "/insecure/rs:fit:300/REDACTED",
-		[`/rs:fit:3/${base64url("https://u:pw71@cb.test/x")}.png`]: "/rs:fit:3/REDACTED",
-		"/rs:fit:3/aHR0cHM6Ly9jYi50ZXN0L35+fmszP3NpZz1wdzgw": "/rs:fit:3/REDACTED",
-		"/rs:fit:3/aHR0cHM6Ly9zMy50ZXN0L2s_c2lnPXB3NzI%3D": "/rs:fit:3/REDACTED",
-		"/rs:fit:3/x.aHR0cHM6Ly9zMy50ZXN0L2s/c2lnPXB3NzI=": "/rs:fit:3/REDACTED",
-		"/s./Ly91/OnBA": "/REDACTED",
-		"/std/aHR0cHM6Ly9zMy50ZXN0L2s%2Fc2lnPXB3NzI%3D": "/std/REDACTED",
-		"/std/aHR0cHM6Ly9zMy50ZXN0L2s/c2lnPXB3NzI=": "/REDACTED",
-		[`/rs:fit:3/${base64url("s3.test/k?sig=pw73")}`]: "/rs:fit:3/REDACTED",
-		[`/rs:fit:3/${base64url(base64url("https://u:pw74@cb.test"))}`]: "/rs:fit:3/REDACTED",
-		[`/insecure/${base64url("//u:pw75@cb.test/i.png")}`]: "/REDACTED",
-		[`/json/${base64url("{\"url\":\"https://u:pw76@cb.test/i.png\"}")}`]: "/REDACTED",
-		[`/insecure/rs:fit:300/${split(base64url("https://s3.test/k?X-Amz-Signature=pw70&X-Amz-Date=1"), 16)}.png`]: "/insecure/rs:fit:300/REDACTED",
-		[`/insecure/rs:fit:300/${split(base64url("https://u:pw77@cb.test/x/image.png"), 16)}`]: "/insecure/rs:fit:300/REDACTED",
-		[`/media/v1/${split(base64url("https://s3.test/k?sig=pw81"), 12)}`]: "/REDACTED",
-		[`/x/${base64url("//u:pw78à@cb.test/i.png")}`]: "/REDACTED",
-		[`/json/${base64url("{\"src\":\"https://Рoot:pw79@cb.test/i.png\"}")}`]: "/REDACTED",
-		[`/short/${base64url("//u:p@")}`]: "/REDACTED",
-		[`/insecure/rs:fit:300/x.${split(base64url("https://s3.test/k?sig=pw86"), 8)}.png`]: "/insecure/rs:fit:300/REDACTED",
-		[`/insecure/rs:fit:300/x.${split(base64url("https://cb.test/x?q=1"), 8)}`]: `/insecure/rs:fit:300/x.${split(base64url("https://cb.test/x?q=1"), 8)}`,
-		[`/a/k%3Fsig%3D1/${base64url("//u:pw82@cb.test")}`]: "/a/REDACTED",
-		[`/sixty/${Array.from({ length: 64 }, (_, index) => `AAAAAA${"abcdefgh"[index >> 3]}${"abcdefgh"[index & 7]}`).join(".")}`]: `/sixty/${Array.from({ length: 64 }, (_, index) => `AAAAAA${"abcdefgh"[index >> 3]}${"abcdefgh"[index & 7]}`).join(".")}`,
-		[`/clean/${base64url("https://cb.test/x?q=1")}`]: `/clean/${base64url("https://cb.test/x?q=1")}`,
-		"/words/internationalization-and-localization/README.md": "/words/internationalization-and-localization/README.md",
-		[`/many/${Array.from({ length: 70 }, (_, index) => `run${index}abcdef`).join(".")}`]: "/REDACTED",
-	};
+	// base64url of https://s3.test/photo.jpg?sig=SECRET, as an image proxy takes it.
+	const path = "/insecure/rs:fit:300/aHR0cHM6Ly9zMy50ZXN0L3Bob3RvLmpwZz9zaWc9U0VDUkVU";
 
-	for (const path of Object.keys(paths)) {
-		await log.fetch(`https://proxy.test${path}`);
-	}
-
+	await log.fetch(`https://proxy.test${path}`);
 	await log.end();
 
-	const urlFulls = exportedSpans(calls).filter(span => span.kind === 3).map((span: any) => span.attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue);
+	const [span] = exportedSpans(calls).filter(exported => exported.kind === 3);
 
-	t.deepEqual(urlFulls, Object.values(paths).map(path => `https://proxy.test${path}`), "each path records its expected redaction");
-	t.ok(!/pw[78]\d/.test(JSON.stringify(calls.filter(call => call.path.startsWith("/v1/")))), "no nested credential reaches the collector");
+	t.strictEqual(span.attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue, `https://proxy.test${path}`, "the path records as written");
 	t.end();
 });
 
@@ -2523,11 +2461,7 @@ test("log.fetch redacts a long query within 250 ms", async t => {
 
 	const chain = Array.from({ length: 7 }).reduce<string>(nested => `https://a/?${encodeURIComponent(nested)}=b`, `https://t/?x=${"a".repeat(40000)}`);
 
-	const block = (index: number) => Array.from({ length: 3500 }, (_, offset) => "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"[Math.imul((index * 3500) + offset, 2654435761) >>> 26]).join("");
-	const joined = Array.from({ length: 9 }, (_, index) => (index ? `%${"25".repeat(index - 1)}41` : "") + block(index)).join("");
-	const repeated = Array.from({ length: 7 }).reduce<string>(nested => `${btoa(nested).replace(/=+$/, "")}.${Array.from({ length: 8 }, (_, level) => `%${"25".repeat(level)}${(0x41 + level).toString(16)}`).join("")}`, "https://u:pw@cb.test/x");
-
-	for (const query of ["x/" + "aHR0cHM6/".repeat(16384), "x/" + "a/".repeat(16384), "x/" + "a//".repeat(16384), Array.from({ length: 64 }, (_, index) => block(index % 9).slice(0, 128)).join("/"), Array.from({ length: 23 }, () => Array.from({ length: 64 }, (_, index) => block(index % 9).slice(0, 128)).join("/")).join("/~/"), `x/${repeated}`, `x/${joined}`, "?u=https://a/?".repeat(16384), "?https://a/?".repeat(16384), `?${chain}`, `${"/a:".repeat(16384)}%3F`, `${deep}/https:/${deep}?q=${deep}`, `?q=${"\\".repeat(32768)} x`, `?q=//${"\\".repeat(32768)} x`, `${"%5C".repeat(32768)}%20x`, `?//u:p${"&a@".repeat(16384)}`, `?//u:p=/${"&a@".repeat(16384)}`, `?${"//u:p&a@&".repeat(8192)}`]) {
+	for (const query of ["?u=https://a/?".repeat(16384), "?https://a/?".repeat(16384), `?${chain}`, `${"/a:".repeat(16384)}%3F`, `${deep}/https:/${deep}?q=${deep}`, `?q=${"\\".repeat(32768)} x`, `?q=//${"\\".repeat(32768)} x`, `${"%5C".repeat(32768)}%20x`, `?//u:p${"&a@".repeat(16384)}`, `?//u:p=/${"&a@".repeat(16384)}`, `?${"//u:p&a@&".repeat(8192)}`]) {
 		const started = performance.now();
 
 		await log.fetch(`https://proxy.test/${query}`, { headers: { "x-deep": deep } });

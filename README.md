@@ -255,7 +255,7 @@ instance nests under the parent instead. A malformed header is ignored and a fre
 an untrusted header is safe to pass.
 
 An unsampled header (flags `00`) is honoured: the instance and its children export no spans, and
-`log.traceparent()` and `log.fetch` pass `00` on; `log.sampled` is `false`. Log records still
+`log.traceparent()` and `log.fetch` pass `00` on; `log.sampled` is `false`. Log entries still
 export.
 
 ## Queue exports
@@ -385,7 +385,7 @@ instead. `entryFormatter` is deprecated the same way: pass the function as `form
 | `spanName` | `string` | `"unnamed-span"` | The instance's span name. Inherited from `parentLog` when set there. |
 | `stderr` | `(msg: string) => void` | `console.error` | Sink for `error` and `warn`. |
 | `stdout` | `(msg: string) => void` | `console.log` | Sink for the other levels. |
-| `traceparent` | `string` | none | Incoming W3C `traceparent` to nest under; an unsampled one (`00`) drops spans, not log records. Ignored when malformed or when `parentLog` is set. |
+| `traceparent` | `string` | none | Incoming W3C `traceparent` to nest under; an unsampled one (`00`) drops spans, not log entries. Ignored when malformed or when `parentLog` is set. |
 
 ## Output formats
 
@@ -448,7 +448,8 @@ them per call site.
 ### Credentials in a captured value
 
 Only what the bullets below name is redacted. Anything else is exported as written, text you log
-yourself included.
+yourself included, and so is a url you base64-encode into a request path, as an image proxy such as
+imgproxy takes one.
 
 - **A header, whatever you list it for,** whose name, in any casing, is `cookie`, `passwd`,
   `password`, `pwd`, `secret` or `set-cookie`, ends in `key`, or holds `auth`, `card`, `credit`,
@@ -509,26 +510,6 @@ yourself included.
   `/m/REDACTED`. It also records `REDACTED` from the ninth segment starting with a scheme, whatever
   that segment holds. Where userinfo, as the bullet above reads it, remains in what the path keeps,
   or the path is percent-encoded more than eight times, the whole path records `/REDACTED`.
-- **A url nested base64-encoded in the request path**, as an image proxy such as imgproxy takes one,
-  is read by the rules above: `/insecure/rs:fit:300/aHR0cHM6Ly9…` records
-  `/insecure/rs:fit:300/REDACTED`. A *run* is eight or more characters of the base64url alphabet,
-  padded or not, starting anywhere in a segment; each run is decoded, and so is a run inside what it
-  decodes. Standard base64 is read too. Consecutive segments made of such characters are decoded
-  joined without the `/` between them, since imgproxy lets an encoded url be split with `/`, and
-  joined with it, since it may be standard base64's digit. An empty segment, from `//`, doesn't end
-  them. A credential found there records `REDACTED` from the segment where the url holding it starts,
-  as `/insecure/thumbnails/aHR0cHM6dXNl/…` records `/insecure/thumbnails/REDACTED`, or from the
-  first of them where a listed query key sits in the url, as `/media/v1/<chunks>` records
-  `/REDACTED`. The first piece may follow other text in its segment, as in
-  `/insecure/rs:fit:300/x.aHR0cHM6Ly91/…`, which records `/insecure/rs:fit:300/REDACTED`; a piece
-  of fewer than eight characters, such as `x.aHR0cDo`, stays in the path. Userinfo in decoded text
-  that doesn't start with a scheme, such as `//u:p@host`, records the whole path as `/REDACTED`, and
-  so does a segment holding more than 64 distinct runs, ids and words included. So does a chain of
-  more than 64 segments made of base64 characters, counting the leading characters of the segment
-  that ends it, and so do the chains of three or more such segments in a path when they hold more
-  than 8,192 characters together, words and ids included. A random id
-  or signature whose decoding happens to read as a credential does too: about 1 in 2,500
-  43-character signatures.
 
 Never put credentials in the url; pass an `Authorization` header, and strip userinfo from a url you
 did not build. `log.fetch` mirrors the runtime: Node and browsers refuse such a url, while React
@@ -600,5 +581,3 @@ It needs an `NPM_TOKEN` repository secret (an npm automation token with publish 
 2. `npm version <major|minor|patch>`. Breaking changes bump the major.
 3. Merge to `main` through a PR.
 4. Create a GitHub release with tag `vX.Y.Z` matching `package.json`; the workflow fails when they differ.
-
-`npm run build-and-publish` publishes from the host instead.

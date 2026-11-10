@@ -698,6 +698,402 @@ function warnOnce(conf: ResolvedLogConf, metadata: MetadataInput | undefined, ms
 	}
 }
 
+// --- Credentials on a span -------------------------------------------------
+
+// One rule for the credential headers a span redacts and a send warns of. Elastic APM's default `sanitize_field_names`, plus the spec's optional `cookie`.
+const SENSITIVE_HEADER_NAME = /^(cookie|passwd|password|pwd|secret|set-cookie)$|key$|auth|card|credit|principal|session|token/;
+
+function isCredentialHeaderName(name: string): boolean {
+	return SENSITIVE_HEADER_NAME.test(name.toLowerCase());
+}
+
+// Reading limits, each bounding the work one value costs. Past one, the value counts as holding a
+// credential, so each limit can only cost redaction, never let a credential through.
+// Percent-decodings of one text.
+const MAX_PERCENT_LEVELS = 8;
+// Query parts parsed as a url, one inside the next; it also keeps the stack from running out.
+const MAX_NESTED_URLS = 8;
+// Path segments opening a url, each read with the rest of the path.
+const MAX_SCHEME_SEGMENTS = 8;
+
+// The levels of a text encoded past MAX_PERCENT_LEVELS: no reading is left to test.
+const UNREADABLE = Symbol("unreadable");
+
+type Levels = string[] | typeof UNREADABLE;
+
+// The one place deciding that text past the limit holds what a reader tests for.
+const atAnyLevel = (levels: Levels, test: (level: string) => boolean) => levels === UNREADABLE || levels.some(test);
+
+// A part's reading by depth, kept for one exported value: a url key is read alone and with its
+// value, so a chain of them would re-read each level.
+type PartsRead = Map<string, string>;
+
+function parsedUrl(text: string): URL | undefined {
+	try {
+		return new URL(text);
+	} catch {
+		return undefined;
+	}
+}
+
+const holdsUserinfo = (url: URL) => url.username !== "" || url.password !== "";
+
+// v2.4.0's `//` rule, and the same after `\\`, `/\` or `\/`: they match a url among other text, or one
+// the runtime cannot parse. After an opener holding a `\`, userinfo may not hold a `\`, so matching a
+// long run of `\` stays linear. Only a `/`, `?` or `#` ends userinfo in WHATWG URL's authority state,
+// as does a `\` in a special url, so a parser keeps a no-break space, a `\v` or a U+2028 in a
+// password, and drops only a tab, newline or carriage return. A plain space ends it here all the same,
+// so `see //host and mail a@b` stays as written. Each tail is one character class: a group of
+// alternatives would overflow the regex stack on a message of megabytes.
+const SLASHED_USERINFO = /(:?\/\/)[^/?# ]*@/g;
+const BACKSLASH_OPENED_USERINFO = /(:?(?:\\[/\\]|\/\\))[^/\\?# ]*@/g;
+const OPENS_USERINFO = /\/\/[^/?# ]*$|(?:\\[/\\]|\/\\)[^/\\?# ]*$/;
+const redactTextUserinfo = (text: string) => text.replace(SLASHED_USERINFO, "$1REDACTED@").replace(BACKSLASH_OPENED_USERINFO, "$1REDACTED@");
+
+// Run by run, never the whole string: decodeURIComponent throws on the first invalid escape.
+function percentDecoded(value: string): string {
+	return value.replace(/(?:%[0-9A-Fa-f]{2})+/g, run => {
+		try {
+			return decodeURIComponent(run);
+		} catch {
+			// Only ASCII spells a url delimiter, so keep a non-UTF-8 run's ASCII and leave the rest.
+			return run.replace(/%([0-9A-Fa-f]{2})/g, (escape, hex: string) => parseInt(hex, 16) < 0x80 ? String.fromCharCode(parseInt(hex, 16)) : escape);
+		}
+	});
+}
+
+// Every level: decoding a `%2F` inside userinfo puts a `/` before the `@`, so a match at one level
+// can vanish at the next.
+function decodings(text: string): Levels {
+	const levels = [text];
+
+	for (let decoded = percentDecoded(text); decoded !== levels[levels.length - 1]; decoded = percentDecoded(decoded)) {
+		if (levels.length > MAX_PERCENT_LEVELS) {
+			return UNREADABLE;
+		}
+
+		levels.push(decoded);
+	}
+
+	return levels;
+}
+
+// A parser drops a tab, newline or carriage return: `si%09g` reads as `sig`.
+const withoutDropped = (text: string) => text.replace(/[\t\n\r]/g, "");
+
+// The listed query keys are read three ways: `isListedQueryKey` reads a bare key; below
+// `redactTextQueryKeys`, `holdsListedKey` reads one text and `holdsListedKeyAtAnyLevel` every decoding of it.
+const SENSITIVE_QUERY_KEY = /(auth|authentication|authorization|consumerid|credential|key|keyid|pass|passphrase|p(ass)?w(or)?d[12]?|secret|sig|sign|signature|signed|token)$|^(code|googleaccessid|idtokenhint)$/;
+
+function isListedQueryKey(key: string): boolean {
+	return SENSITIVE_QUERY_KEY.test(key.toLowerCase().replace(/[-_]/g, ""));
+}
+
+// The text with each listed key's value replaced by `REDACTED`, wherever a url's own query rules don't
+// reach it: a status message such as `request to …?token=… failed`, a relative `location`, a
+// scheme-less url, a `?` in a fragment, a fragment's own pairs such as an OAuth redirect's
+// `#access_token=…`, a matrix parameter such as `/img;sig=…`. A value may hold a `?` and ends at
+// `&`, `#` or a plain space. A url parser ends it at no whitespace and drops a tab, newline or carriage
+// return from it; a plain space ends it here all the same, as it ends userinfo. A key is whatever stands between its `?`, `&`, `#` or `;` and its
+// `=`, a space included, so a listed key after a `?` in an unlisted value is found. A key starts after the
+// nearest of the four, so `code`, which only an exact name lists, is found in `?#code=…` and
+// `?x#code=…`.
+function redactTextQueryKeys(text: string): string {
+	const opener = /[?&#;]([^&=?#;]*)=/g;
+	const valueEnd = /[&# ]/g;
+	let redacted = "";
+	let copied = 0;
+
+	for (let pair = opener.exec(text); pair !== null; pair = opener.exec(text)) {
+		// A pair whose `=` falls inside a value already redacted is part of it. One that only opens there,
+		// a key holding a space after a `?` in the value, is found: scanning goes on from each `=`.
+		if (opener.lastIndex > copied && isListedQueryKey(withoutDropped(pair[1]))) {
+			valueEnd.lastIndex = opener.lastIndex;
+
+			const end = valueEnd.exec(text)?.index ?? text.length;
+
+			redacted += `${text.slice(copied, opener.lastIndex)}REDACTED`;
+			copied = end;
+		}
+	}
+
+	return redacted + text.slice(copied);
+}
+
+const changesAtAnyLevel = (text: string, redact: (level: string) => string) => atAnyLevel(decodings(text), level => redact(level) !== level);
+
+const holdsUserinfoAtAnyLevel = (text: string) => changesAtAnyLevel(text, redactTextUserinfo);
+const holdsListedKey = (text: string) => redactTextQueryKeys(text) !== text;
+const holdsListedKeyAtAnyLevel = (text: string) => changesAtAnyLevel(text, redactTextQueryKeys);
+
+const URL_DELIMITER = /[/?# ]/;
+
+// What follows the `//`, `\\`, `/\` or `\/` that opens userinfo at a key's end; `undefined` where the
+// key doesn't open any. A key encoded past MAX_PERCENT_LEVELS opens a run that holds an `@`.
+function openedUserinfo(key: string): string | typeof UNREADABLE | undefined {
+	const levels = decodings(key);
+
+	return levels === UNREADABLE ? UNREADABLE : levels.map(level => OPENS_USERINFO.exec(level)?.[0].slice(2)).find(tail => tail !== undefined);
+}
+
+// A parser reads the `&` in `?//u:p&w@host` as part of the userinfo, which the query splits into
+// two pairs. A key opening userinfo starts a run: its value and each later pair join it, up to the
+// first URL_DELIMITER. The pairs up to the run's last `@` are returned. Keep `\` out of
+// URL_DELIMITER, since userinfo after `//` may hold one; a run that a backslash opens may then redact
+// a pair holding no credential. A value opening userinfo is a url of its own, so
+// `?next=https://h&q=a@b` is kept.
+function splitUserinfoPairs(pairs: Array<[string, string]>, holdsAtSign: (text: string) => boolean): Set<number> {
+	const split = new Set<number>();
+	let start = -1;
+	let end = -1;
+
+	const close = () => {
+		for (let index = start; index <= end; index++) {
+			split.add(index);
+		}
+
+		start = -1;
+		end = -1;
+	};
+	const read = (part: string, index: number) => {
+		const cut = part.search(URL_DELIMITER);
+
+		if (holdsAtSign(cut < 0 ? part : part.slice(0, cut))) {
+			end = index;
+		}
+
+		if (cut >= 0) {
+			close();
+		}
+	};
+
+	pairs.forEach(([key, value], index) => {
+		if (start >= 0) {
+			read(`${key}=${value}`, index);
+		}
+
+		const opened = start < 0 ? openedUserinfo(key) : undefined;
+
+		if (opened !== undefined) {
+			start = index;
+			// The whole pair: `read` stops at the first delimiter, so it misses the `//x@` in a value such
+			// as `ss//x@h`, which `?//u:p=ss%2F%2Fx@h` decodes to.
+			end = opened === UNREADABLE || holdsUserinfoAtAnyLevel(`${key}=${value}`) ? index : -1;
+			read(`${opened === UNREADABLE ? "" : opened}=${value}`, index);
+		}
+	});
+
+	if (start >= 0) {
+		close();
+	}
+
+	return split;
+}
+
+// The query's pairs raw, as typed: a `+`, `%2F`, `%3F` and `%23` stay inside userinfo here, where
+// form-decoding turns them into a space and delimiters that end it. Like `searchParams`, it skips an
+// empty pair.
+function rawQueryPairs(url: URL): Array<[string, string]> {
+	return url.search.slice(1).split("&").filter(pair => pair !== "").map((pair): [string, string] => {
+		const equals = pair.indexOf("=");
+
+		return equals < 0 ? [pair, ""] : [pair.slice(0, equals), pair.slice(equals + 1)];
+	});
+}
+
+const formDecoded = (text: string) => new URLSearchParams(`=${text}`).get("") ?? "";
+const holdsAtSignAtAnyLevel = (text: string) => atAnyLevel(decodings(text), level => level.includes("@"));
+
+// `undefined` where no pair changes.
+function redactedSearch(url: URL, depth: number, partsRead: PartsRead): string | undefined {
+	const raw = rawQueryPairs(url);
+	const pairs = raw.map(([key, value]): [string, string] => [formDecoded(key), formDecoded(value)]);
+	// Where a run of userinfo ends is read three ways, and a pair is redacted if any finds it. Raw, only
+	// a literal delimiter ends a run and only a literal `@` counts: a `%2F` or `%40` there is no `/` or
+	// `@`. Percent-decoded, an escaped delimiter ends a run and an escaped `@` counts, for a consumer
+	// that decodes first; its `+` stays, since a parser takes it as part of the userinfo. Form-decoded,
+	// as `searchParams` reads it, a `+` is a space and ends a run.
+	const split = new Set([
+		...splitUserinfoPairs(pairs, holdsAtSignAtAnyLevel),
+		...splitUserinfoPairs(raw.map(([key, value]): [string, string] => [percentDecoded(key), percentDecoded(value)]), holdsAtSignAtAnyLevel),
+		...splitUserinfoPairs(raw, text => text.includes("@")),
+	]);
+	// eslint-disable-next-line @typescript-eslint/no-use-before-define
+	const redacted = pairs.map(([key, value], index): [string, string] => split.has(index) ? ["REDACTED", "REDACTED"] : redactQueryPair(key, value, raw[index], depth + 1, partsRead));
+
+	return redacted.some(([key, value], index) => key !== pairs[index][0] || value !== pairs[index][1]) ? new URLSearchParams(redacted).toString() : undefined;
+}
+
+function redactQueryPart(part: string, depth: number, partsRead: PartsRead): string {
+	const readKey = `${depth} ${part}`;
+	// eslint-disable-next-line @typescript-eslint/no-use-before-define
+	const read = partsRead.get(readKey) ?? readQueryPart(part, depth, partsRead);
+
+	partsRead.set(readKey, read);
+
+	return read;
+}
+
+function readQueryPart(part: string, depth: number, partsRead: PartsRead): string {
+	const url = parsedUrl(part);
+
+	if (url === undefined) {
+		return part;
+	}
+
+	if (depth > MAX_NESTED_URLS || holdsUserinfo(url)) {
+		return "REDACTED";
+	}
+
+	const search = redactedSearch(url, depth, partsRead);
+
+	if (search === undefined) {
+		return part;
+	}
+
+	url.search = search;
+
+	return url.href;
+}
+
+// A parser drops leading C0 controls and spaces, and a tab or newline anywhere.
+const SCHEME_LED = /^[\0- ]*[a-z][a-z\d+.-]*:/i;
+
+// A key opening a url is read with its value too, as a server taking `?<url>` reads it: an `=` in its
+// password ends the key.
+function redactQueryPair(key: string, value: string, [rawKey, rawValue]: [string, string], depth: number, partsRead: PartsRead): [string, string] {
+	if (SCHEME_LED.test(withoutDropped(key))) {
+		const joined = `${key}=${value}`;
+
+		if (depth > MAX_NESTED_URLS || redactQueryPart(key, depth, partsRead) !== key || redactQueryPart(joined, depth, partsRead) !== joined) {
+			return ["REDACTED", "REDACTED"];
+		}
+	}
+
+	// Userinfo across the `=`, as in `?//u:p=w@host`, is found by `splitUserinfoPairs` and never reaches here.
+	// Form-decoded and raw both: a `+` or an escaped delimiter ends the match in one reading.
+	if (holdsUserinfoAtAnyLevel(key) || holdsUserinfoAtAnyLevel(rawKey) || holdsListedKeyAtAnyLevel(key)) {
+		return ["REDACTED", "REDACTED"];
+	}
+
+	if (isListedQueryKey(key) || holdsUserinfoAtAnyLevel(value) || holdsUserinfoAtAnyLevel(rawValue)) {
+		return [key, "REDACTED"];
+	}
+
+	// A url the runtime parses has its listed keys redacted in place; a listed key still left in the result sits where its query rules don't reach, such as a fragment.
+	const part = redactQueryPart(value, depth, partsRead);
+
+	return [key, holdsListedKeyAtAnyLevel(part) ? "REDACTED" : part];
+}
+
+// A value the runtime's `URL` parses whole; `undefined` where it is none or holds nothing to redact.
+function redactedWholeUrl(value: string): string | undefined {
+	const url = parsedUrl(value);
+	const search = url === undefined ? undefined : redactedSearch(url, 0, new Map());
+
+	if (url === undefined || (!holdsUserinfo(url) && search === undefined)) {
+		return undefined;
+	}
+
+	if (holdsUserinfo(url)) {
+		url.username = "REDACTED";
+		url.password = "";
+	}
+
+	url.search = search ?? url.search;
+
+	return url.href;
+}
+
+function redactHeaderCredential(name: string, value: string): string {
+	return isCredentialHeaderName(name) || redactedWholeUrl(value) !== undefined || holdsUserinfoAtAnyLevel(value) || holdsListedKeyAtAnyLevel(value) ? "REDACTED" : value;
+}
+
+// The URL log.fetch traces: a scheme written without "//" parses to an opaque path, where
+// userinfo, or a data: payload, sits in pathname and would ride into url.full.
+function traceableUrl(input: string | URL): URL | undefined {
+	let url: URL;
+
+	try {
+		url = new URL(String(input), (globalThis as { location?: { href?: string } }).location?.href);
+	} catch {
+		return undefined;
+	}
+
+	return url.protocol === "http:" || url.protocol === "https:" ? url : undefined;
+}
+
+// Cut at the first segment whose nested url holds a credential: a later cut would leave an earlier
+// url's userinfo in the kept prefix. A url nested with no scheme, or behind other text in its segment,
+// still carries a query, so a segment holding a listed key cuts too.
+function redactedPath(pathname: string): string {
+	const segments = pathname.split("/");
+	const read = segments.map(segment => decodings(segment));
+
+	if (read.includes(UNREADABLE)) {
+		return "/REDACTED";
+	}
+
+	// Segments before `cut` are kept, and `REDACTED` replaces the rest; -1 keeps all.
+	let cut = read.findIndex(segmentRead => atAnyLevel(segmentRead, holdsListedKey));
+	let opened = 0;
+
+	for (let index = 1; index < (cut === -1 ? segments.length : cut); index++) {
+		if (!atAnyLevel(read[index], level => SCHEME_LED.test(level))) {
+			continue;
+		}
+
+		opened++;
+
+		const nested = decodings(segments.slice(index).join("/"));
+
+		if (opened > MAX_SCHEME_SEGMENTS || atAnyLevel(nested, level => SCHEME_LED.test(level) && (redactedWholeUrl(level) !== undefined || redactTextUserinfo(level) !== level))) {
+			cut = index;
+			break;
+		}
+	}
+
+	const kept = cut === -1 ? pathname : [...segments.slice(0, cut), "REDACTED"].join("/");
+
+	// Userinfo after `//`, `\\`, `/\` or `\/` needs no scheme and no query key, so both cuts can miss it.
+	// That userinfo may sit in a decoded level that maps to no raw segment, so the whole path goes.
+	return holdsUserinfoAtAnyLevel(kept) ? "/REDACTED" : kept;
+}
+
+// `url.origin` omits userinfo, which is what keeps the outer url's credentials off the span.
+function buildUrlFull(url: URL, captureQuery: boolean): string {
+	const base = url.origin + redactedPath(url.pathname);
+
+	return !captureQuery || !url.search ? base : `${base}?${redactedSearch(url, 0, new Map()) ?? url.searchParams.toString()}`;
+}
+
+// `url` is the one log.fetch handed the runtime, which quotes it back inside free text.
+function failureMessage(error: unknown, url?: URL): string {
+	let message = stringField(error, "message");
+
+	if (message === undefined) {
+		try {
+			message = String(error);
+		} catch {
+			message = "_OTHER";
+		}
+	}
+
+	// The known url first: Firefox's `Window.fetch: <url> …` parses whole, its quoted userinfo in the path.
+	let quoted = message;
+
+	if (url !== undefined) {
+		const known = new URL(redactedWholeUrl(url.href) ?? url.href);
+
+		known.pathname = redactedPath(url.pathname);
+		quoted = message.split(url.href).join(known.href);
+	}
+
+	const keyed = redactTextQueryKeys(redactTextUserinfo(redactedWholeUrl(quoted) ?? quoted));
+
+	return holdsListedKeyAtAnyLevel(keyed) ? "REDACTED" : keyed;
+}
+
 // --- OTLP export: types and queued items ----------------------------------
 
 // What Log exports through. Queue is the shipped implementation; any { enqueue, flush } will do.
@@ -970,13 +1366,6 @@ function mergePayloads(payloads: OtlpPayload[]): OtlpPayload {
 
 // Read live, so a rotated otlpAdditionalHeaders reaches the next send; report is the caller's guarded one.
 type SenderConf = Pick<ResolvedQueueConf, "acceptPlainHttpCredentials" | "clock" | "otlpAdditionalHeaders" | "otlpHttpBaseURI" | "otlpProtocol">;
-
-// One rule for the credential headers a span redacts and a send warns of. Elastic APM's default `sanitize_field_names`, plus the spec's optional `cookie`.
-const SENSITIVE_HEADER_NAME = /^(cookie|passwd|password|pwd|secret|set-cookie)$|key$|auth|card|credit|principal|session|token/;
-
-function isCredentialHeaderName(name: string): boolean {
-	return SENSITIVE_HEADER_NAME.test(name.toLowerCase());
-}
 
 function setsAuthorization(headers: Record<string, string> | undefined): boolean {
 	return Object.keys(headers ?? {}).some(name => name.toLowerCase() === "authorization");
@@ -1391,572 +1780,6 @@ export class Queue implements OtlpQueue {
 
 		this.saving = undefined;
 	}
-}
-
-// --- Credentials on a span -------------------------------------------------
-
-const SENSITIVE_QUERY_KEY = /(auth|authentication|authorization|consumerid|credential|key|keyid|pass|passphrase|p(ass)?w(or)?d[12]?|secret|sig|sign|signature|signed|token)$|^(code|googleaccessid|idtokenhint)$/;
-
-function isSensitiveQueryKey(key: string): boolean {
-	return SENSITIVE_QUERY_KEY.test(key.toLowerCase().replace(/[-_]/g, ""));
-}
-
-// `isCredentialHeaderName`, the header-name rule, sits above the queue's sender, which warns by it too.
-
-// Past it a query part that parses as a url records `REDACTED`, before the stack runs out.
-const MAX_URL_DEPTH = 8;
-
-// A part's reading by depth, kept for one exported value: a url key is read alone and with its
-// value, so a chain of them would re-read each level.
-type PartsRead = Map<string, string>;
-
-function parsedUrl(text: string): URL | undefined {
-	try {
-		return new URL(text);
-	} catch {
-		return undefined;
-	}
-}
-
-const holdsUserinfo = (url: URL) => url.username !== "" || url.password !== "";
-
-// v2.4.0's `//` rule, and the same after `\\`, `/\` or `\/`: they match a url among other text, or one
-// the runtime cannot parse. After an opener holding a `\`, userinfo may not hold a `\`, so matching a
-// long run of `\` stays linear. Only a `/`, `?` or `#` ends userinfo in WHATWG URL's authority state,
-// as does a `\` in a special url, so a parser keeps a no-break space, a `\v` or a U+2028 in a
-// password, and drops only a tab, newline or carriage return. A plain space ends it here all the same,
-// so `see //host and mail a@b` stays as written. Each tail is one character class: a group of
-// alternatives would overflow the regex stack on a message of megabytes.
-const SLASHED_USERINFO = /(:?\/\/)[^/?# ]*@/g;
-const BACKSLASH_OPENED_USERINFO = /(:?(?:\\[/\\]|\/\\))[^/\\?# ]*@/g;
-const OPENS_USERINFO = /\/\/[^/?# ]*$|(?:\\[/\\]|\/\\)[^/\\?# ]*$/;
-const redactTextUserinfo = (text: string) => text.replace(SLASHED_USERINFO, "$1REDACTED@").replace(BACKSLASH_OPENED_USERINFO, "$1REDACTED@");
-
-// Run by run, never the whole string: decodeURIComponent throws on the first invalid escape.
-function percentDecoded(value: string): string {
-	return value.replace(/(?:%[0-9A-Fa-f]{2})+/g, run => {
-		try {
-			return decodeURIComponent(run);
-		} catch {
-			// Only ASCII spells a url delimiter, so keep a non-UTF-8 run's ASCII and leave the rest.
-			return run.replace(/%([0-9A-Fa-f]{2})/g, (escape, hex: string) => parseInt(hex, 16) < 0x80 ? String.fromCharCode(parseInt(hex, 16)) : escape);
-		}
-	});
-}
-
-// Every level: decoding a `%2F` inside userinfo puts a `/` before the `@`, so a match at one level
-// can vanish at the next.
-// `undefined` past MAX_URL_DEPTH levels, which counts as a credential, as a url nested that deep does.
-function decodings(text: string): string[] | undefined {
-	const levels = [text];
-
-	for (let decoded = percentDecoded(text); decoded !== levels[levels.length - 1]; decoded = percentDecoded(decoded)) {
-		if (levels.length > MAX_URL_DEPTH) {
-			return undefined;
-		}
-
-		levels.push(decoded);
-	}
-
-	return levels;
-}
-
-// A parser drops a tab, newline or carriage return: `si%09g` reads as `sig`.
-const withoutDropped = (text: string) => text.replace(/[\t\n\r]/g, "");
-
-// The text with each listed key's value replaced by `REDACTED`, wherever a url's own query rules don't
-// reach it: a status message such as `request to …?token=… failed`, a relative `location`, a
-// scheme-less url, a `?` in a fragment, a fragment's own pairs such as an OAuth redirect's
-// `#access_token=…`, a matrix parameter such as `/img;sig=…`. A value may hold a `?` and ends at
-// `&`, `#` or a plain space. A url parser ends it at no whitespace and drops a tab, newline or carriage
-// return from it; a plain space ends it here all the same, as it ends userinfo. A key is whatever stands between its `?`, `&`, `#` or `;` and its
-// `=`, a space included, so a listed key after a `?` in an unlisted value is found. A key starts after the
-// nearest of the four, so `code`, which only an exact name lists, is found in `?#code=…` and
-// `?x#code=…`.
-function redactTextQueryKeys(text: string): string {
-	const opener = /[?&#;]([^&=?#;]*)=/g;
-	const valueEnd = /[&# ]/g;
-	let redacted = "";
-	let copied = 0;
-
-	for (let pair = opener.exec(text); pair !== null; pair = opener.exec(text)) {
-		// A pair whose `=` falls inside a value already redacted is part of it. One that only opens there,
-		// a key holding a space after a `?` in the value, is found: scanning goes on from each `=`.
-		if (opener.lastIndex > copied && isSensitiveQueryKey(withoutDropped(pair[1]))) {
-			valueEnd.lastIndex = opener.lastIndex;
-
-			const end = valueEnd.exec(text)?.index ?? text.length;
-
-			redacted += `${text.slice(copied, opener.lastIndex)}REDACTED`;
-			copied = end;
-		}
-	}
-
-	return redacted + text.slice(copied);
-}
-
-// `undefined` past MAX_URL_DEPTH levels counts as a change.
-const changesAtAnyLevel = (text: string, redact: (level: string) => string) => decodings(text)?.some(level => redact(level) !== level) ?? true;
-
-const textHoldsUserinfo = (text: string) => changesAtAnyLevel(text, redactTextUserinfo);
-const textHoldsQueryKey = (text: string) => changesAtAnyLevel(text, redactTextQueryKeys);
-
-const URL_DELIMITER = /[/?# ]/;
-
-// What follows the `//`, `\\`, `/\` or `\/` that opens userinfo at a key's end; `undefined` where the
-// key doesn't open any. A key encoded more than eight times deep reads as holding an `@`.
-function openedUserinfo(key: string): string | undefined {
-	const levels = decodings(key);
-
-	return levels === undefined ? "@" : levels.map(level => OPENS_USERINFO.exec(level)?.[0].slice(2)).find(tail => tail !== undefined);
-}
-
-// A parser reads the `&` in `?//u:p&w@host` as part of the userinfo, which the query splits into
-// two pairs. A key opening userinfo starts a run: its value and each later pair join it, up to the
-// first URL_DELIMITER. The pairs up to the run's last `@` are returned. Keep `\` out of
-// URL_DELIMITER, since userinfo after `//` may hold one; a run that a backslash opens may then redact
-// a pair holding no credential. A value opening userinfo is a url of its own, so
-// `?next=https://h&q=a@b` is kept.
-function splitUserinfoPairs(pairs: Array<[string, string]>, holdsAtSign: (text: string) => boolean): Set<number> {
-	const split = new Set<number>();
-	let start = -1;
-	let end = -1;
-
-	const close = () => {
-		for (let index = start; index <= end; index++) {
-			split.add(index);
-		}
-
-		start = -1;
-		end = -1;
-	};
-	const read = (part: string, index: number) => {
-		const cut = part.search(URL_DELIMITER);
-
-		if (holdsAtSign(cut < 0 ? part : part.slice(0, cut))) {
-			end = index;
-		}
-
-		if (cut >= 0) {
-			close();
-		}
-	};
-
-	pairs.forEach(([key, value], index) => {
-		if (start >= 0) {
-			read(`${key}=${value}`, index);
-		}
-
-		const opened = start < 0 ? openedUserinfo(key) : undefined;
-
-		if (opened !== undefined) {
-			start = index;
-			// The whole pair: `read` stops at the first delimiter, so it misses the `//x@` in a value such
-			// as `ss//x@h`, which `?//u:p=ss%2F%2Fx@h` decodes to.
-			end = textHoldsUserinfo(`${key}=${value}`) ? index : -1;
-			read(`${opened}=${value}`, index);
-		}
-	});
-
-	if (start >= 0) {
-		close();
-	}
-
-	return split;
-}
-
-// The query's pairs raw, as typed: a `+`, `%2F`, `%3F` and `%23` stay inside userinfo here, where
-// form-decoding turns them into a space and delimiters that end it. Like `searchParams`, it skips an
-// empty pair.
-function rawQueryPairs(url: URL): Array<[string, string]> {
-	return url.search.slice(1).split("&").filter(pair => pair !== "").map((pair): [string, string] => {
-		const equals = pair.indexOf("=");
-
-		return equals < 0 ? [pair, ""] : [pair.slice(0, equals), pair.slice(equals + 1)];
-	});
-}
-
-const formDecoded = (text: string) => new URLSearchParams(`=${text}`).get("") ?? "";
-const holdsAtSignAtAnyLevel = (text: string) => decodings(text)?.some(level => level.includes("@")) ?? true;
-
-// `undefined` where no pair changes.
-function redactedSearch(url: URL, depth: number, partsRead: PartsRead): string | undefined {
-	const raw = rawQueryPairs(url);
-	const pairs = raw.map(([key, value]): [string, string] => [formDecoded(key), formDecoded(value)]);
-	// Where a run of userinfo ends is read three ways, and a pair is redacted if any finds it. Raw, only
-	// a literal delimiter ends a run and only a literal `@` counts: a `%2F` or `%40` there is no `/` or
-	// `@`. Percent-decoded, an escaped delimiter ends a run and an escaped `@` counts, for a consumer
-	// that decodes first; its `+` stays, since a parser takes it as part of the userinfo. Form-decoded,
-	// as `searchParams` reads it, a `+` is a space and ends a run.
-	const split = new Set([
-		...splitUserinfoPairs(pairs, holdsAtSignAtAnyLevel),
-		...splitUserinfoPairs(raw.map(([key, value]): [string, string] => [percentDecoded(key), percentDecoded(value)]), holdsAtSignAtAnyLevel),
-		...splitUserinfoPairs(raw, text => text.includes("@")),
-	]);
-	// eslint-disable-next-line @typescript-eslint/no-use-before-define
-	const redacted = pairs.map(([key, value], index): [string, string] => split.has(index) ? ["REDACTED", "REDACTED"] : redactQueryPair(key, value, raw[index], depth + 1, partsRead));
-
-	return redacted.some(([key, value], index) => key !== pairs[index][0] || value !== pairs[index][1]) ? new URLSearchParams(redacted).toString() : undefined;
-}
-
-function redactQueryPart(part: string, depth: number, partsRead: PartsRead): string {
-	const readKey = `${depth} ${part}`;
-	// eslint-disable-next-line @typescript-eslint/no-use-before-define
-	const read = partsRead.get(readKey) ?? readQueryPart(part, depth, partsRead);
-
-	partsRead.set(readKey, read);
-
-	return read;
-}
-
-function readQueryPart(part: string, depth: number, partsRead: PartsRead): string {
-	const url = parsedUrl(part);
-
-	if (url === undefined) {
-		return part;
-	}
-
-	if (depth > MAX_URL_DEPTH || holdsUserinfo(url)) {
-		return "REDACTED";
-	}
-
-	const search = redactedSearch(url, depth, partsRead);
-
-	if (search === undefined) {
-		return part;
-	}
-
-	url.search = search;
-
-	return url.href;
-}
-
-// A parser drops leading C0 controls and spaces, and a tab or newline anywhere.
-const SCHEME_LED = /^[\0- ]*[a-z][a-z\d+.-]*:/i;
-
-// A key opening a url is read with its value too, as a server taking `?<url>` reads it: an `=` in its
-// password ends the key.
-function redactQueryPair(key: string, value: string, [rawKey, rawValue]: [string, string], depth: number, partsRead: PartsRead): [string, string] {
-	if (SCHEME_LED.test(withoutDropped(key))) {
-		const joined = `${key}=${value}`;
-
-		if (depth > MAX_URL_DEPTH || redactQueryPart(key, depth, partsRead) !== key || redactQueryPart(joined, depth, partsRead) !== joined) {
-			return ["REDACTED", "REDACTED"];
-		}
-	}
-
-	// Userinfo across the `=`, as in `?//u:p=w@host`, is found by `splitUserinfoPairs` and never reaches here.
-	// Form-decoded and raw both: a `+` or an escaped delimiter ends the match in one reading.
-	if (textHoldsUserinfo(key) || textHoldsUserinfo(rawKey) || textHoldsQueryKey(key)) {
-		return ["REDACTED", "REDACTED"];
-	}
-
-	if (isSensitiveQueryKey(key) || textHoldsUserinfo(value) || textHoldsUserinfo(rawValue)) {
-		return [key, "REDACTED"];
-	}
-
-	// A url the runtime parses has its listed keys redacted in place; a listed key still left in the result sits where its query rules don't reach, such as a fragment.
-	const part = redactQueryPart(value, depth, partsRead);
-
-	return [key, textHoldsQueryKey(part) ? "REDACTED" : part];
-}
-
-// A value the runtime's `URL` parses whole; `undefined` where it is none or holds nothing to redact.
-function redactedWholeUrl(value: string): string | undefined {
-	const url = parsedUrl(value);
-	const search = url === undefined ? undefined : redactedSearch(url, 0, new Map());
-
-	if (url === undefined || (!holdsUserinfo(url) && search === undefined)) {
-		return undefined;
-	}
-
-	if (holdsUserinfo(url)) {
-		url.username = "REDACTED";
-		url.password = "";
-	}
-
-	url.search = search ?? url.search;
-
-	return url.href;
-}
-
-function redactHeaderCredential(name: string, value: string): string {
-	return isCredentialHeaderName(name) || redactedWholeUrl(value) !== undefined || textHoldsUserinfo(value) || textHoldsQueryKey(value) ? "REDACTED" : value;
-}
-
-// The URL log.fetch traces: a scheme written without "//" parses to an opaque path, where
-// userinfo, or a data: payload, sits in pathname and would ride into url.full.
-function traceableUrl(input: string | URL): URL | undefined {
-	let url: URL;
-
-	try {
-		url = new URL(String(input), (globalThis as { location?: { href?: string } }).location?.href);
-	} catch {
-		return undefined;
-	}
-
-	return url.protocol === "http:" || url.protocol === "https:" ? url : undefined;
-}
-
-const holdsSensitiveQueryKey = (level: string) => redactTextQueryKeys(level) !== level;
-
-// A run is MIN_RUN or more base64 characters, `/` included. A chain is joined from segments, which
-// hold no `/`.
-const MIN_RUN = 8;
-const BASE64_RUN = new RegExp(`[A-Za-z\\d+/_-]{${MIN_RUN},}`, "g");
-const BASE64_CHAR = /[A-Za-z\d+_-]/;
-const BASE64_HEAD = new RegExp(`^${BASE64_CHAR.source}*`);
-const BASE64_DIGITS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-const MAX_BASE64_RUNS = 64;
-const MAX_CHAIN_PIECES = 64;
-const MAX_CHAIN_CHARS = 8192;
-
-// A base64 or base64url run as text: a byte from 0x80 up is written as the control character U+0080,
-// so no invalid UTF-8 makes `percentDecoded` throw, as it would on a long run of `%XX`.
-function base64Text(run: string): string {
-	let text = "";
-	let buffer = 0;
-	let bits = 0;
-
-	for (const digit of run.replace(/\+/g, "-").replace(/\//g, "_")) {
-		buffer = (buffer << 6) | BASE64_DIGITS.indexOf(digit);
-		bits += 6;
-
-		if (bits >= 8) {
-			bits -= 8;
-
-			const byte = (buffer >> bits) & 255;
-
-			text += String.fromCharCode(Math.min(byte, 0x80));
-			buffer &= (1 << bits) - 1;
-		}
-	}
-
-	return text;
-}
-
-// The levels of a text: percent-decoded, plus each base64 run in a level decoded and read the same
-// way, from each of the run's first four characters, since text glued in front of a run shifts its
-// alignment. `undefined` past MAX_URL_DEPTH percent levels or MAX_BASE64_RUNS distinct runs, which
-// count as a credential.
-function segmentLevels(text: string, seen = new Set<string>()): string[] | undefined {
-	const levels = decodings(text);
-
-	if (levels === undefined) {
-		return undefined;
-	}
-
-	const all = [...levels];
-
-	for (const level of levels) {
-		for (const run of level.match(BASE64_RUN) ?? []) {
-			if (seen.has(run)) {
-				continue;
-			}
-
-			seen.add(run);
-
-			for (let skip = 0; skip < 4; skip++) {
-				const inner = seen.size > MAX_BASE64_RUNS ? undefined : segmentLevels(base64Text(run.slice(skip)), seen);
-
-				if (inner === undefined) {
-					return undefined;
-				}
-
-				all.push(...inner);
-			}
-		}
-	}
-
-	return all;
-}
-
-// imgproxy lets the encoded url be split with `/` anywhere, so a chain of consecutive segments made
-// of base64 characters is read joined, from its first. An empty segment, from `//`, doesn't end a
-// chain: no one has confirmed that a proxy accepts it, and reading the pieces joined can only redact
-// more. A `/` between pieces may also be standard base64's digit 63, so they are read joined with it
-// too. A segment holding anything else ends the chain after its leading base64 characters, such as
-// `anBn` in `anBn.png`, and starts the next with its trailing ones, its lead, such as `aHR0cHM6Ly91`
-// in `x.aHR0cHM6Ly91`: the first piece of a split url may follow other text. A chain with a lead is
-// read twice, with the lead and without it, since text glued in front of the url, such as
-// `thumbnails` in `img.thumbnails`, hides the scheme it starts with. A piece in front hides it the
-// same way, as in `/thumbnails/aHR0cHM6dXNl/…`, so the chain is also read from each later piece, the
-// way the proxy reads it from where the url starts. A lead shorter than a run is credited to the
-// segment after it, or the `300` of `rs:fit:300` would pull that segment into the cut. Reading from
-// each piece takes time in the pieces times the characters, so a chain of more than MAX_CHAIN_PIECES
-// pieces, or chains of three or more pieces holding more than MAX_CHAIN_CHARS characters together,
-// make this return `undefined`, which counts as a credential.
-function base64Chains(segments: string[]): Array<[number, string]> | undefined {
-	const chains: Array<[number, string]> = [];
-	let start = 0;
-	let lead = "";
-	let pieces: Array<{ position: number; text: string }> = [];
-	let chars = 0;
-	let chained = 0;
-
-	const joined = (from: number, joiner: string) => pieces.slice(from).map(piece => piece.text).join(joiner);
-
-	const end = () => {
-		for (const joiner of ["", "/"]) {
-			const text = joined(0, joiner);
-
-			// A lead alone is read with its own segment, and `pieces[0]` exists only with a piece.
-			if (lead !== "" && text !== "") {
-				chains.push([lead.length >= MIN_RUN ? start : pieces[0].position, lead + joiner + text]);
-			}
-
-			// One piece joined with `/` is itself again.
-			if (text.length >= MIN_RUN && (joiner === "" || pieces.length > 1)) {
-				chains.push([pieces[0].position, text]);
-			}
-
-			// The last piece alone is its own segment, which `redactedPath` reads already.
-			for (let drop = 1; drop < pieces.length - 1; drop++) {
-				const rest = joined(drop, joiner);
-
-				if (rest.length >= MIN_RUN) {
-					chains.push([pieces[drop].position, rest]);
-				}
-			}
-		}
-
-		if (pieces.length > 2) {
-			chained += chars;
-		}
-
-		lead = "";
-		pieces = [];
-		chars = 0;
-	};
-
-	for (const [index, segment] of segments.entries()) {
-		if (segment === "") {
-			continue;
-		}
-
-		const head = BASE64_HEAD.exec(segment)?.[0] ?? "";
-
-		if (head !== "") {
-			pieces.push({ position: index, text: head });
-			chars += head.length;
-
-			if (pieces.length > MAX_CHAIN_PIECES || (pieces.length > 2 && chained + chars > MAX_CHAIN_CHARS)) {
-				return undefined;
-			}
-		}
-
-		if (head === segment) {
-			continue;
-		}
-
-		end();
-
-		// Scanned back from the end: a regex anchored there would retry from every position of a long run.
-		let leadFrom = segment.length;
-
-		while (leadFrom > 0 && BASE64_CHAR.test(segment[leadFrom - 1])) {
-			leadFrom--;
-		}
-
-		if (leadFrom < segment.length) {
-			start = index;
-			lead = segment.slice(leadFrom);
-		}
-	}
-
-	end();
-
-	return chains;
-}
-
-// Cut at the first segment whose nested url holds a credential: a later cut would leave an earlier
-// url's userinfo in the kept prefix. A url nested with no scheme, or behind other text in its segment,
-// still carries a query, so a segment holding a listed key cuts too.
-function redactedPath(pathname: string): string {
-	const segments = pathname.split("/");
-	const read = segments.map(segment => segmentLevels(segment));
-
-	if (!read.every(segmentRead => segmentRead !== undefined)) {
-		return "/REDACTED";
-	}
-
-	const chains = base64Chains(segments);
-
-	if (chains === undefined) {
-		return "/REDACTED";
-	}
-
-	for (const [start, text] of chains) {
-		const chain = segmentLevels(text);
-
-		if (chain === undefined) {
-			return "/REDACTED";
-		}
-
-		read[start].push(...chain);
-	}
-
-	// Segments before `cut` are kept, and `REDACTED` replaces the rest; -1 keeps all.
-	let cut = read.findIndex(segmentRead => segmentRead.some(holdsSensitiveQueryKey));
-	let opened = 0;
-
-	for (let index = 1; index < (cut === -1 ? segments.length : cut); index++) {
-		if (!read[index].some(level => SCHEME_LED.test(level))) {
-			continue;
-		}
-
-		opened++;
-
-		const nested = decodings(segments.slice(index).join("/"));
-
-		if (opened > MAX_URL_DEPTH || nested === undefined || [...nested, ...read[index]].some(level => SCHEME_LED.test(level) && (redactedWholeUrl(level) !== undefined || redactTextUserinfo(level) !== level))) {
-			cut = index;
-			break;
-		}
-	}
-
-	const kept = cut === -1 ? pathname : [...segments.slice(0, cut), "REDACTED"].join("/");
-
-	// Userinfo after `//`, `\\`, `/\` or `\/` needs no scheme and no query key, so both cuts can miss it.
-	// That userinfo may sit in a decoded level that maps to no raw segment, so the whole path goes. So
-	// does userinfo in a kept segment's base64 text, whatever the text starts with.
-	const exported = cut === -1 ? read : read.slice(0, cut);
-
-	return textHoldsUserinfo(kept) || exported.some(segmentRead => segmentRead.some(level => redactTextUserinfo(level) !== level)) ? "/REDACTED" : kept;
-}
-
-// `url.origin` omits userinfo, which is what keeps the outer url's credentials off the span.
-function buildUrlFull(url: URL, captureQuery: boolean): string {
-	const base = url.origin + redactedPath(url.pathname);
-
-	return !captureQuery || !url.search ? base : `${base}?${redactedSearch(url, 0, new Map()) ?? url.searchParams.toString()}`;
-}
-
-// `url` is the one log.fetch handed the runtime, which quotes it back inside free text.
-function failureMessage(error: unknown, url?: URL): string {
-	let message = stringField(error, "message");
-
-	if (message === undefined) {
-		try {
-			message = String(error);
-		} catch {
-			message = "_OTHER";
-		}
-	}
-
-	// The known url first: Firefox's `Window.fetch: <url> …` parses whole, its quoted userinfo in the path.
-	let quoted = message;
-
-	if (url !== undefined) {
-		const known = new URL(redactedWholeUrl(url.href) ?? url.href);
-
-		known.pathname = redactedPath(url.pathname);
-		quoted = message.split(url.href).join(known.href);
-	}
-
-	const keyed = redactTextQueryKeys(redactTextUserinfo(redactedWholeUrl(quoted) ?? quoted));
-
-	return textHoldsQueryKey(keyed) ? "REDACTED" : keyed;
 }
 
 // --- Resolving a Log's settings --------------------------------------------
