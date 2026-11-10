@@ -9,7 +9,7 @@ browsers and React Native. No OpenTelemetry SDK, no dependencies.
 
 - **One file, every runtime.** Built on the global `fetch`, so a browser and a React Native app
   export the same way a server does. No SDK, no bundler config, no native module.
-- **Exports survive a restart.** Records and spans are batched and retried with backoff; give the
+- **Exports survive a restart.** Entries and spans are batched and retried with backoff; give the
   queue a storage and an offline phone holds them until the network is back.
 - **Just log.** `log.info("msg", { key: "value" })` to stdout/stderr, text or JSON.
 - **Traces without an SDK.** Set `otlpHttpBaseURI` and every instance is a span, its logs exported
@@ -63,8 +63,8 @@ for an achieve goal, and where two conflict the earlier one wins.
    - Why: a footprint kept small by pushing work onto users only moves the cost.
 6. **Maintain:** **Correct OTLP.** Leave out what cannot be done to the spec.
 7. **Maintain:** **[Credentials never leave](#credentials-in-a-captured-value)** in the shapes that
-   section lists. Text you log, and a credential encoded other than by percent-encoding, such as
-   base64, are exported as written.
+   section lists. Text you log, and a url encoded other than by percent-encoding, such as base64,
+   are exported as written.
 8. **Maintain:** **[Semver, read strictly](#audience).**
 9. **Maintain:** **Never holds a process open** past the work the app asked for.
 
@@ -97,8 +97,9 @@ in a worse one. Only a major changes:
 
 - each documented option, read back under its own name, and each documented instance field;
 - each span attribute and value this README documents, on `log.span` and on the wire;
-- that a credential in a shape README → Credentials in a captured value lists records `REDACTED`,
-  except that a minor may add a shape;
+- that a credential records `REDACTED` in each shape
+  [Credentials in a captured value](#credentials-in-a-captured-value) lists, except that a minor may
+  add a shape;
 - the `format: "json"` output;
 - a default;
 - a supported runtime;
@@ -113,8 +114,9 @@ in a worse one. Only a major changes:
 - anything this README does not document, which may change in a minor: an undocumented key of a
   `conf`, enumerability, or what a spread or `JSON.stringify` of a `conf` carries;
 - a goal: each is an aim, and the section meeting it says what holds today;
-- a value holding no credential recording `REDACTED`, such as a path cut past a reading limit, and
-  those limits: a minor may change either, so a value it recorded as `REDACTED` may show;
+- a `REDACTED` that hides no credential, as on a value percent-encoded more than eight times or
+  holding a ninth nested url: a minor may change such a redaction and those limits, so the value may
+  show again;
 - delivery: the export queue is best-effort, it keeps what `storage` accepted and drops the oldest
   past `maxItems`, keeping a batch it has promised to retry, because telemetry is not payload data;
 - the text output line, which is written for people to read — parse `format: "json"` instead.
@@ -261,7 +263,7 @@ export.
 
 ## Queue exports
 
-Every record and span goes through an export queue. `otlpHttpBaseURI` builds one, shared by every
+Every entry and span goes through an export queue. `otlpHttpBaseURI` builds one, shared by every
 child and clone that sets no `otlp*` option of its own, so one process sends few POSTs and retries a
 batch the collector did not accept with backoff. Configure it yourself to persist the queue or to
 tune it:
@@ -309,7 +311,7 @@ acceptPlainHttpCredentials: true, otlpHttpBaseURI })`, whose report lines then g
 | `key` | `string` | `"@larvit/log:otlp-queue"` | The `storage` key. |
 | `maxBatchBytes` | `number` | `65536` | Items per POST are cut here, measured as their JSON size. The default is the browser `keepalive` limit; a batch over 64 KiB is sent without `keepalive`. |
 | `maxItems` | `number` | `1000` | Queue bound. The oldest items are dropped when exceeded, reported in one stderr line with the count. |
-| `otlpAdditionalHeaders` | `Record<string, string>` | none | Extra headers on every request, e.g. `{ Authorization: "Bearer …" }`, read afresh each send so a rotated token takes effect. The queue sets `Content-Type`, and `Authorization` when the endpoint carries `user:pass@`; a name here replaces it, matched case-insensitively. A name or value the runtime rejects drops that batch with one report line naming the header, or its position where the name isn't a valid header name, since that may be a whole pasted header line. `queue.conf` and `log.conf` keep the headers as you gave them, so don't log either. |
+| `otlpAdditionalHeaders` | `Record<string, string>` | none | Extra headers on every request, e.g. `{ Authorization: "Bearer …" }`, read afresh each send so a rotated token takes effect. The queue sets `Content-Type`, and `Authorization` when the endpoint carries `user:pass@`; a name here replaces it, matched case-insensitively. A name or value the runtime rejects drops that batch with one report line naming the header, or its position, counting from 1, where the name isn't a valid header name, since that may be a whole pasted header line. `queue.conf` and `log.conf` keep the headers as you gave them, so don't log either. |
 | `otlpHttpBaseURI` | `string` | required | OTLP/HTTP endpoint, e.g. `http://127.0.0.1:4318`. Logs go to `/v1/logs`, spans to `/v1/traces` under it; a base path is kept. `user:pass@` in it becomes an `Authorization: Basic` header, percent-decoded, and never rides in the request url — percent-encode any `/ ? #` in the password, and a literal `%` as `%25`. `queue.conf` and `log.conf` keep the URI as you gave it, so don't log either. A malformed URI, or one that is not `http:`/`https:`, throws in the constructor. |
 | `otlpProtocol` | `"http/json" \| "http/protobuf"` | `"http/json"` | Wire format. Both use the same endpoint; use protobuf for collectors that reject JSON. |
 | `report` | `(msg, metadata) => void` | `console.error` | Sink for one line per failed attempt, dropped batch, drop round, partially rejected batch or storage failure, and once per host, header and credential source for a credential header over plain `http:`. The `Log`-built queue writes through the instance's `stderr` and formatter, that last line at `warn` and the rest at `error`. |
@@ -371,7 +373,7 @@ instead. `entryFormatter` is deprecated the same way: pass the function as `form
 | `captureQuery` | `boolean` | `false` | `log.fetch` only: keep the query string in `url.full`. Not every secret in it is redacted — see [Credentials in a captured value](#credentials-in-a-captured-value). |
 | `captureRequestHeaders` | `string[]` | none | `log.fetch` only: request header names to record as `http.request.header.*`. Not every secret in one is redacted — see [Credentials in a captured value](#credentials-in-a-captured-value). An invalid name is skipped, with one `stderr` warning. |
 | `captureResponseHeaders` | `string[]` | none | `log.fetch` only: response header names to record as `http.response.header.*`. Same redaction and invalid-name handling as `captureRequestHeaders`. |
-| `clock` | `Clock` | system clock | `{ now, setTimeout, clearTimeout }` behind every span and record timestamp. Passed on to the default `Queue`; a `Queue` you build takes its own. |
+| `clock` | `Clock` | system clock | `{ now, setTimeout, clearTimeout }` behind every span and entry timestamp. Passed on to the default `Queue`; a `Queue` you build takes its own. |
 | `colors` | `boolean` | `true` | ANSI colour codes in text output. Unset in code, the env decides: `NO_COLOR` (non-empty) turns it off; otherwise `FORCE_COLOR` turns it on, except `0` or `false` which turn it off. |
 | `context` | `MetadataInput` | `{}` | Added to every entry. Wins over a per-call key of the same name. An `undefined` key is dropped, so `log.conf.context` reads back as `Metadata`. |
 | `entryFormatter` | `EntryFormatter` | none | Deprecated, removed in 3.0.0: pass the function as `format`. Wins over a `"text"`/`"json"` `format`; two different formatters, one per spelling, throw. On `log.conf` it reads the formatter in use, and writing it swaps it. |

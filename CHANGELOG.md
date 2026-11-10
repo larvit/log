@@ -2,20 +2,28 @@
 
 ## Unreleased
 
+Rotate the credentials that several Security entries name: earlier versions exported them. One
+exposure stays open: keep credentials out of a url you base64-encode into a request path.
 Fewer ways for a credential to reach a span: a url nested in the request path, a header Elastic
 APM's rule names, a query key Datadog's rule names, userinfo in more spellings, and the url in a
 span's status message all record `REDACTED`. A batch survives a failed send, a full queue and a
-throwing `storage`, and no longer holds the process open. `resolveFormatter` is new, and README →
-Audience now promises only that the credential shapes it lists record `REDACTED`.
-Read Security first: several entries ask you to rotate credentials earlier versions exported.
+throwing `storage`, and no longer holds the process open. The text format writes the time to the
+millisecond, and `resolveFormatter` is new. README → Audience now promises only that a credential
+records `REDACTED` in the shapes README → Credentials in a captured value lists.
 
 ### Security
 
-- **`url.full` records `REDACTED` for a url nested in the request path.** Since v2.3.0,
-  `log.fetch("https://proxy.test/fetch/https://user:pass@cb.test/x")` — the shape a fetch-through,
-  CORS or image proxy takes — exported the password in `url.full` with no capture option involved,
-  and a signed url percent-encoded into the path exported its signature. Now the path records
-  `REDACTED` from the first segment starting with a scheme and opening a url that holds a
+- **Keep credentials out of a url you base64-encode into a request path: `url.full` exports it as
+  written.** An image proxy such as imgproxy takes its source url this way. `log.fetch` still
+  exports any credential in that url, on every such call, as it has since v2.3.0. Send such a
+  request with the global `fetch`, which records no span, or keep the credential out of the url.
+  Search `url.full` in spans from any version for `aHR0c`, which finds such a url where the encoded
+  text starts with `http`, and rotate any credential a hit holds.
+- **`url.full` records `REDACTED` for a url nested in the request path, raw or percent-encoded.**
+  Since v2.3.0, `log.fetch("https://proxy.test/fetch/https://user:pass@cb.test/x")` — the shape a
+  fetch-through, CORS or image proxy takes — exported the password in `url.full` with no capture
+  option involved, and a signed url percent-encoded into the path exported its signature. Now the
+  path records `REDACTED` from the first segment starting with a scheme and opening a url that holds a
   credential, at any depth of percent-encoding: `https://proxy.test/fetch/REDACTED`. It also records
   `REDACTED` from the first segment holding a query key that names a credential, wherever the
   nested url sits: `/fetch/s3.test/k%3Fsig%3D…` records `/fetch/s3.test/REDACTED`, and
@@ -24,15 +32,13 @@ Read Security first: several entries ask you to rotate credentials earlier versi
   after `//`, `\\`, `/\` or `\/`, raw or percent-encoded, such as `/users//bob@x.test`, records
   `/REDACTED` whole, and so does one percent-encoded more than eight times. A dashboard grouping on
   `url.full` sees such a path change, and some paths holding no credential too: a nested url's
-  `?key=` lookup cuts the path, and so does a ninth nested url. A url nested base64-encoded,
-  as an image proxy such as imgproxy takes one, still exports as written: keeping a credential out
-  of it is yours. v2.4.0's advice to rotate what such a path carried stands for spans exported
-  before, and its `aHR0c` search finds a base64-encoded url.
+  `?key=` lookup cuts the path, and so does a ninth nested url. Rotate what such a path carried in
+  spans an earlier version exported, as v2.4.0 says.
 - **An invalid `otlpAdditionalHeaders` name is reported by its position, never by the name.** Since
   v2.4.0, a whole header line pasted as a name, such as `{ "Authorization: Bearer …": "" }`, wrote
   the token in the queue's `OTLP export headers invalid, batch dropped` report, to `stderr` or your
   `report`. Now a name that isn't a valid header name reports as
-  `otlpAdditionalHeaders carries an invalid header name in entry 1`. Search those reports for
+  `otlpAdditionalHeaders carries an invalid header name at position 1 (counting from 1)`. Search those reports for
   `carries an invalid` and rotate any credential the name shows.
 - **A captured header records `REDACTED` by Elastic APM's default `sanitize_field_names` rule.**
   Since v2.3.0 only `authorization`, `cookie`, `proxy-authorization` and `set-cookie` did, so a
@@ -148,11 +154,12 @@ Read Security first: several entries ask you to rotate credentials earlier versi
   It cut the time to whole seconds, so entries written within one second lost their order in a
   backend reading `stdout`. A parser of the text line sees it change; parse `format: "json"`
   instead, as README → Audience says.
-- **README → Audience promises that each credential shape README → Credentials in a captured value
-  lists records `REDACTED`.** A minor may add a shape. A value holding no credential may record
-  `REDACTED`, such as a path cut past a reading limit, and a minor may change that and the limits,
-  so such a value may show. A credential in any other shape exports as written, text you log and a
-  url you base64-encode into a request path included.
+- **README → Audience promises that a credential records `REDACTED` in each shape README →
+  Credentials in a captured value lists.** A minor may add a shape. A value holding no credential
+  may record `REDACTED`, as one percent-encoded more than eight times or holding a ninth nested url
+  does. A minor may change such a redaction and those limits, so the value may show again. A
+  credential in any other shape exports as written, text you log and a url you base64-encode into a
+  request path included.
 - **README → Runtimes says a React Native app installs a `URL` polyfill.** React Native's own `URL`
   and `URLSearchParams` throw "not implemented" from members that `new Log({ otlpHttpBaseURI })`,
   `new Queue` and `log.fetch` read, so those calls throw in an app with no polyfill. Nothing in the
@@ -164,23 +171,23 @@ Read Security first: several entries ask you to rotate credentials earlier versi
 - **A batch whose retry was reported survives the `maxItems` trim.** Before, a failed batch went
   back in front of the queue and the trim dropped it first, so an offline app at `maxItems` reported
   "OTLP export failed, will retry" for items the retry then found gone. Now the trim drops the
-  oldest items behind that batch, also while records are logged during the retry wait, and the
+  oldest items behind that batch, also while entries are logged during the retry wait, and the
   batch is retried whole.
-- **A batch being sent stays in `storage` until its send settles.** Before, a record logged during
+- **A batch being sent stays in `storage` until its send settles.** Before, an entry logged during
   the send saved the queue without the batch, so a process that died then lost it.
 - **A `storage` whose `getItem` throws keeps what it holds.** Before, one failed read at startup
   deleted the stored queue, and the first save overwrote it. Now the queue reports "OTLP queue
   storage unreadable, stored queue kept and not written to", leaves the stored queue as it is, and
-  writes nothing to it until the next start; new records are still sent from memory. Content that
-  reads but isn't a list of payloads is still discarded.
+  writes nothing to it until the next start; new entries and spans are still sent from memory.
+  Content that reads but isn't a list of payloads is still discarded.
 - **`log.enabled(level)` never writes, so a library author's check emits no line.** Before, an
   unknown `logLevel` made `enabled()` write the warning, and which caller warned depended on call
   order. Now only the level methods warn, once per `stderr` sink as before, and `enabled()` still
   treats an unknown `logLevel` as `info`.
 - **A pending batch no longer holds a Node, Bun or Deno process open, so `await end()` before exit.**
   A script that awaits neither `end()` nor `flush()` now exits without exporting what it queued.
-  Before, a queued record kept the process alive for up to `batchDelayMs`, and so did a record logged
-  while a successful export was in flight, after `await log.flush()` had returned.
+  Before, a queued entry or span kept the process alive for up to `batchDelayMs`, and so did an
+  entry logged while a successful export was in flight, after `await log.flush()` had returned.
 - **Spans and log records export under the instrumentation scope `@larvit/log`, at this package's
   version.** A span's scope was its span name, and records had none, so a query or dashboard
   grouping on the scope name sees it change; group on the span name instead.
