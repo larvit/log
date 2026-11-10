@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+Fewer ways for a credential to reach a span: a url nested in the request path, a header Elastic
+APM's rule names, a query key Datadog's rule names, userinfo in more spellings, and the url in a
+span's status message all record `REDACTED`. A batch survives a failed send, a full queue and a
+throwing `storage`, and no longer holds the process open. `resolveFormatter` is new, and README →
+Audience now promises only that the credential shapes it lists record `REDACTED`.
+Read Security first: several entries ask you to rotate credentials earlier versions exported.
+
 ### Security
 
 - **`url.full` records `REDACTED` for a url nested in the request path.** Since v2.3.0,
@@ -18,24 +25,9 @@
   `/REDACTED` whole, and so does one percent-encoded more than eight times. A dashboard grouping on
   `url.full` sees such a path change, and some paths holding no credential too: a nested url's
   `?key=` lookup cuts the path, and so does a ninth nested url. A url nested base64-encoded,
-  as an image proxy such as imgproxy takes one, is read by the same rules, split over segments with
-  `/` included: `/insecure/rs:fit:300/aHR0cHM6Ly9…` records `/insecure/rs:fit:300/REDACTED`.
-  Standard base64 is read too. An empty segment (`//`) doesn't end the split, and the url may start
-  at any of its segments. A credential found in split pieces records `REDACTED` from the segment
-  where the url holding it starts, so `/insecure/thumbnails/aHR0cHM6dXNl/…` records
-  `/insecure/thumbnails/REDACTED`, or from the first of the consecutive segments of base64
-  characters where a listed query key sits in the url, so `/media/v1/<chunks>` records
-  `/REDACTED`. The first piece may follow other text in its segment, as in
-  `/insecure/rs:fit:300/x.aHR0cHM6Ly91/…`, which records `/insecure/rs:fit:300/REDACTED`; a piece
-  of fewer than eight characters stays in the path. The whole path records `/REDACTED` for userinfo
-  in decoded text that doesn't start with a scheme, such as `//u:p@host`, for a segment holding more
-  than 64 distinct runs of eight or more base64 characters, ids and words included, for a chain of
-  more than 64 segments made of base64 characters, counting the leading characters of the segment
-  that ends it, for the chains of three or more such segments in a path holding more than 8,192
-  characters together, and, rarely, for a random id or signature whose decoding reads as a credential: about 1 in 2,500
-  43-character signatures. v2.4.0's advice to rotate what such a path carried stands for spans exported before,
-  and so does its `aHR0c` search for a base64-encoded url, which finds none with no scheme or inside
-  other text.
+  as an image proxy such as imgproxy takes one, still exports as written: keeping a credential out
+  of it is yours. v2.4.0's advice to rotate what such a path carried stands for spans exported
+  before, and its `aHR0c` search finds a base64-encoded url.
 - **A captured header records `REDACTED` by Elastic APM's default `sanitize_field_names` rule.**
   Since v2.3.0 only `authorization`, `cookie`, `proxy-authorization` and `set-cookie` did, so a
   listed `x-api-key`, `x-auth-token` or `x-amz-security-token` exported its value. Now a name that,
@@ -146,6 +138,11 @@
 
 ### Everything else
 
+- **README → Audience promises that each credential shape README → Credentials in a captured value
+  lists records `REDACTED`.** A minor may add a shape. A value holding no credential may record
+  `REDACTED`, such as a path cut past a reading limit, and a minor may change that and the limits,
+  so such a value may show. A credential in any other shape exports as written, text you log and a
+  url you base64-encode into a request path included.
 - **README → Runtimes says a React Native app installs a `URL` polyfill.** React Native's own `URL`
   and `URLSearchParams` throw "not implemented" from members that `new Log({ otlpHttpBaseURI })`,
   `new Queue` and `log.fetch` read, so those calls throw in an app with no polyfill. Nothing in the

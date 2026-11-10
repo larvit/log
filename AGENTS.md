@@ -61,3 +61,15 @@ In [docs/decisions.md](docs/decisions.md):
 - Tests-first. The suite (`test.ts`) injects `stdout`/`stderr` and stubs the global `fetch`, so the same tests cover console + OTLP in both Node and the browser.
 - See [README](README.md) for build/test/release commands.
 - Don't wait on CodeRabbit: under 10 stars it reviews only when triggered by hand.
+
+## Words
+
+One word per concept, in code, docs and the plan alike:
+
+- **entry**: what one call to a level method, such as `log.info("…")`, makes. OTLP calls it a log
+  record; say "log record" only of that wire shape.
+- **span**: one timed operation in a trace, such as a `log.fetch` request.
+- **payload**: an OTLP `resourceLogs` or `resourceSpans` body, holding entries or spans.
+- **queue**: the `Queue`, or any `OtlpQueue`, that a `Log` hands payloads to for export.
+- **transport**: a destination a `Log` hands entries to, as item 96 plans; console and OTLP are the
+  two it ships.

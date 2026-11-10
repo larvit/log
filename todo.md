@@ -41,7 +41,8 @@
 | 112 | 2.6.0 |  |  | **Run the suite on Deno and Bun in CI.** | 2 | 1 | 1 | 2 | 3 | 2 by 5 | 1.5 |
 | 107 | 2.6.0 |  | principle | **Run the suite on React Native's Hermes in CI.** | 3 | 1 | 1 | 3 | 5 | 2 by 7 | 1.3 |
 | 108 | 2.6.0 |  | principle | **Keep two tabs of one web app sharing a `storage` key from sending a record twice or deleting each other's backlog.** | 3 | 2 | 2 | 5 | 5 | 2 by 5 | 0.7 |
-| 96 | 2.7.0 | 128 | owner | **Add a list of transports, each handed plain records it encodes itself, with console and OTLP as the two this library ships and uses by default.** | 4 | 2 | 3 | 7 | 8 | 1 by 7, 4 by 8 | 1.4 |
+| 18 | 2.7.0 |  |  | **Export `LogEntry` as an alias of `EntryFormatterConf`, so the 3.0.0 rename has a spelling a consumer can move to first.** | 1 | 1 | 1 | 1 | 1 | 3 by 3 | 2.1 |
+| 96 | 2.7.0 | 18, 128 | owner | **Add a list of transports, each handed plain log entries it encodes itself, with console and OTLP as the two this library ships and uses by default.** | 4 | 2 | 3 | 7 | 8 | 1 by 7, 4 by 8 | 1.4 |
 | 28 | 2.7.0 | 96 |  | **Export resource attributes beyond `service.name`.** | 2 | 1 | 2 | 3 | 3 | 1 by 7 | 1.8 |
 | 31 | 2.7.0 | 96 |  | **Set a log record's `flags` to the W3C trace flags.** | 1 | 1 | 2 | 2 | 2 | 1 by 4 | 1.5 |
 | 88 | 2.7.0 |  |  | **Parse `traceparent` as W3C Trace Context does: ignore uppercase hex, and read a higher version by its first four fields.** | 1 | 1 | 1 | 1 | 2 | 1 by 3 | 1.5 |
@@ -54,7 +55,6 @@
 | 87 | 2.7.0 | 96 |  | **Report a protobuf export's `partialSuccess` as the JSON transport does.** | 2 | 1 | 2 | 3 | 4 | 1 by 4 | 0.9 |
 | 16 | 2.8.0 |  |  | **Warn once when `format` is a string other than `"text"` or `"json"`.** | 1 | 1 | 1 | 1 | 1 | 3 by 5 | 3.5 |
 | 41 | 2.8.0 |  | principle | **Warn once about a negative, zero or `NaN` numeric `QueueConf` option, and use the default.** | 1 | 1 | 1 | 1 | 2 | 3 by 5 | 2.3 |
-| 18 | 2.8.0 |  |  | **Export `LogEntry` as an alias of `EntryFormatterConf`, so the 3.0.0 rename has a spelling a consumer can move to first.** | 1 | 1 | 1 | 1 | 1 | 3 by 3 | 2.1 |
 | 20 | 2.8.0 |  |  | **Announce in the README and CHANGELOG that 3.0.0 gives a `log.fetch` span `end({ error })`'s `error.type`, so a query on `"20"` for an abort or `"fetch_error"` moves first.** | 1 | 1 | 1 | 1 | 1 | 3 by 3 | 2.1 |
 | 23 | 2.8.0 |  |  | **Settle one marker for a CHANGELOG entry a consumer must act on, and record it in the `AGENTS.md` line beside `### Security`.** | 1 | 1 | 1 | 1 | 1 | 3 by 3 | 2.1 |
 | 21 | 2.8.0 |  |  | **Announce in the README that 3.0.0 adds a metrics kind to `OtlpPayload`, so an `OtlpQueue` implementer handles one before it arrives.** | 1 | 1 | 1 | 1 | 1 | 4 by 3 | 2.0 |
@@ -253,13 +253,11 @@ fakes. `~/.claude/principles/frontend.md` → broad device support.
 
 ### 117. Bring the built `index.js` within README → Footprint's 10 KB gzipped budget.
 
-README → Footprint budgets `index.js` at ≤10 KB gzipped for Goals #5, and `origin/main` builds to
-10439 bytes: `npm run build` in the repo's container image, then `gzip -9c index.js | wc -c`. The
-budget is already broken, and nothing checks it. Whether to shrink the build or re-state the
-budget is for this item to work out. Item 26 checks the budget in CI, and that check fails from its
-first run until this item lands. Found on 2026-10-28. Base64 path decoding in v2.5.0 grew the
-gzipped build by about 340 bytes, from 10614 to about 10957 (+367 by another measure), so the gap
-to the budget widened.
+README → Footprint budgets `index.js` at ≤10 KB gzipped for Goals #5. On 2026-11-10 the 2.5.0
+release review builds to 10963 bytes: `npm run build` in the repo's container image, then
+`gzip -9c index.js | wc -c`. The budget is broken, and nothing checks it. Whether to shrink the
+build or re-state the budget is for this item to work out. Item 26 checks the budget in CI, and that
+check fails from its first run until this item lands. Found on 2026-10-28, at 10439 bytes.
 
 ### 26. Check the footprint budget in CI, so the numbers in README → Footprint fail a build instead of going stale.
 
@@ -282,14 +280,14 @@ then overwrites or removes the key on every change, so offline records go twice 
 first deletes another's backlog. README's "one `Queue` per `key` per process" is advice a web app
 cannot follow. `~/.claude/principles/frontend.md` → Prefer state in the URL first, backend second.
 
-### 96. Add a list of transports, each handed plain records it encodes itself, with console and OTLP as the two this library ships and uses by default.
+### 96. Add a list of transports, each handed plain log entries it encodes itself, with console and OTLP as the two this library ships and uses by default.
 
 Today a `Log` writes console output through `stdout` and `stderr`, and exports through one seam,
 `otlpQueue`, that takes OTLP payloads. Serving README → Goals #1 and #4 means a consumer sends to
 any set of destinations without a second library. Settled by the maintainer on 2026-10-26:
 
 - Console output is a transport like any other.
-- A transport is handed plain records, and encodes them itself, so writing a new one is easy and
+- A transport is handed plain log entries, and encodes them itself, so writing a new one is easy and
   intuitive.
 - The OTLP options, injecting the `fetch` the OTLP transport sends with among them, belong to the
   OTLP transport. That `fetch` was item 12: the queue reaches for the global `fetch`, so a React
