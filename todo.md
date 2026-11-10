@@ -12,18 +12,12 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 34 | 2.6.0 |  | principle | **Let a consumer inject the randomness trace and span ids come from.** | 1 | 1 | 1 | 1 | 2 | code health by 5 | 10.4 |
-| 37 | 2.6.0 |  | principle | **Build a span payload without writing to `log.span`.** | 1 | 1 | 1 | 1 | 2 | code health by 5 | 10.4 |
 | 44 | 2.6.0 |  | principle | **Route a `Queue`'s warnings through one explicit seam.** | 2 | 1 | 1 | 2 | 4 | code health by 9 | 9.4 |
-| 49 | 2.6.0 |  | principle | **Sort what carries no order.** | 1 | 1 | 1 | 1 | 1 | code health by 3 | 9.4 |
-| 47 | 2.6.0 |  | principle | **Collapse `entryFormatterDeprecation` and `load()` to one error channel each.** | 1 | 1 | 1 | 1 | 2 | code health by 4 | 8.3 |
 | 38 | 2.6.0 |  | principle | **Resolve a `Log`'s conf in steps that each return a new value, with no cast at the end.** | 3 | 1 | 2 | 4 | 5 | code health by 9 | 6.2 |
 | 39 | 2.6.0 |  | principle | **Keep a `Queue`'s items and their byte count in one structure.** | 2 | 1 | 1 | 2 | 3 | code health by 5 | 6.2 |
 | 45 | 2.6.0 |  | principle | **Build the shared parts of a span and of a payload's attributes once.** | 2 | 1 | 1 | 2 | 3 | code health by 5 | 6.2 |
 | 98 | 2.6.0 | 38, 44 | decision | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
-| 111 | 2.6.0 |  |  | **Name `scripts/` by what it holds: the browser and OTLP test runners and the collector config.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
 | 35 | 2.6.0 |  | principle | **Let a consumer inject what `colorsFromEnv`, `traceableUrl` and `unref` read from the platform.** | 2 | 1 | 1 | 2 | 4 | code health by 5 | 5.2 |
-| 113 | 2.6.0 |  |  | **Make `.editorconfig` match what the files hold: spaces in `package.json`, and never tabs in YAML.** | 1 | 1 | 1 | 1 | 1 | code health by 1 | 3.1 |
 | 36 | 2.7.0 |  | principle | **Reach the retry decision and a `log.fetch` span's attributes without a network call.** | 2 | 1 | 1 | 2 | 5 | code health by 5 | 4.5 |
 | 43 | 2.7.0 |  | principle | **Give `ExportScheduler` and save coalescing named states.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
 | 48 | 2.7.0 |  | principle | **Test the untested failure paths.** | 2 | 1 | 1 | 2 | 4 | code health by 4 | 4.2 |
@@ -100,15 +94,6 @@
 
 ## Details
 
-### 34. Let a consumer inject the randomness trace and span ids come from.
-
-`getRandomBytes` reads `globalThis.crypto`, else `Math.random`, so a test checks ids by regex and
-"differs" only. Principle: Functional core, imperative shell.
-
-### 37. Build a span payload without writing to `log.span`.
-
-`buildSpanPayload` sets `span.attributes` as it builds. Principle: One owner per value.
-
 ### 44. Route a `Queue`'s warnings through one explicit seam.
 
 `logWarningOfReport` finds a Log's warner by the identity of its `report` function, and
@@ -118,17 +103,6 @@ Command–query separation. Found by the 2.5.0 principles audit.
 
 Every seat of the 2026-10-03 run named the module-level tables `warned` and `logWarningOfReport`, so
 it lifts Locality, the lowest dimension at 5.5.
-
-### 49. Sort what carries no order.
-
-`format`'s `"text" | "json"`, `msg`/`msTimestamp`, and `server.port` after `url.scheme` in a
-`log.fetch` span, and `package.json`'s `scripts` and `files`, which the 2.5.0 principles audit
-found unsorted. Principle: Deterministic order wherever order carries no meaning.
-
-### 47. Collapse `entryFormatterDeprecation` and `load()` to one error channel each.
-
-One returns a warning and throws; the other throws into its own catch as a goto. Principle: Handle
-errors explicitly, as values.
 
 ### 38. Resolve a `Log`'s conf in steps that each return a new value, with no cast at the end.
 
@@ -159,19 +133,11 @@ chunk runs the four-seat scoring run. Where a dimension or the overall stays und
 for the places the seats name, lowest dimension first, and a copy of this item blocked by them.
 Where every score reaches 7.0, it files nothing, and the run replaces the comprehension baseline.
 
-### 111. Name `scripts/` by what it holds: the browser and OTLP test runners and the collector config.
-
-`~/.claude/CLAUDE.md` → "Naming files & folders" bans `scripts`.
-
 ### 35. Let a consumer inject what `colorsFromEnv`, `traceableUrl` and `unref` read from the platform.
 
 They read `process.env`, `globalThis.location` and `globalThis.Deno`, and the suite swaps
 `globalThis.process` and `console.error` to reach them. Principle: Functional core, imperative
 shell.
-
-### 113. Make `.editorconfig` match what the files hold: spaces in `package.json`, and never tabs in YAML.
-
-`.editorconfig` asks tabs of `package.json`, which holds spaces, and of `*.yml`, where YAML forbids tabs. Found by the technical principles audit on 2026-10-26.
 
 ### 36. Reach the retry decision and a `log.fetch` span's attributes without a network call.
 

@@ -61,8 +61,8 @@ API"). This departs from the technical principle "Sane defaults", which has a li
 clock and randomness. Item 291 of the plan that keeps the technical principles will give "Sane
 defaults" an exception for a library whose goals ask that it work with no config, where a
 documented option overrides each default. The documented `clock` option already changes the clock,
-so item 291 ends the clock's departure; the randomness's ends once `todo.md` item 34 gives it an
-option too. Serves README → Goals #1 and #3. Valid while Goal 1 asks for a logger useful with no
+so item 291 ends the clock's departure; the documented `randomBytes` option, from 2.6.0, ends the
+randomness's. Serves README → Goals #1 and #3. Valid while Goal 1 asks for a logger useful with no
 config.
 
 ## A required `Resolved*Conf` key is added in a minor and removed in a major

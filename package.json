@@ -11,15 +11,15 @@
     "build": "rm -f index.js index.d.ts index.js.map && tsc -p tsconfig.build.json && uglifyjs index.js -m -o index.js && npm run replace-version-string",
     "build-tests": "npm run build && rm -rf .tmp/test && tsc -p tsconfig.test.json && cp index.js .tmp/test/index.js",
     "ci": "npm run build-tests && npm run test-node",
-    "ci-browser": "npm run build-tests && node scripts/run-browser-tests.mjs",
-    "lint-fix": "eslint --fix index.ts tap.ts test.ts",
+    "ci-browser": "npm run build-tests && node e2e-tests/run-browser-tests.mjs",
     "lint": "eslint index.ts tap.ts test.ts",
+    "lint-fix": "eslint --fix index.ts tap.ts test.ts",
     "replace-version-string": "grep -o '\"version\": \"[^\"]*\"' package.json | cut -d'\"' -f4 | xargs -I {} sed -i.bak 's/__version__/{}/g' index.js && rm -f index.js.bak",
-    "test-node": "node .tmp/test/test.js",
-    "test-otlp": "docker build -t larvit-log-test-node . && docker run --rm larvit-log-test-node sh -c \"npm run build >/dev/null && cat index.js\" > index.js && node scripts/run-otlp-tests.mjs",
-    "test-docker": "docker build -t larvit-log-test-node ${NODE_IMAGE:+--build-arg BASE_IMAGE=\"$NODE_IMAGE\"} . && docker run --rm larvit-log-test-node npm run ci",
+    "test": "npm run test-docker && npm run test-browser",
     "test-browser": "docker build -t larvit-log-test-browser --build-arg BASE_IMAGE=mcr.microsoft.com/playwright:v$(node -p \"require('./package.json').devDependencies.playwright\")-noble . && docker run --rm --init --ipc=host larvit-log-test-browser npm run ci-browser",
-    "test": "npm run test-docker && npm run test-browser"
+    "test-docker": "docker build -t larvit-log-test-node ${NODE_IMAGE:+--build-arg BASE_IMAGE=\"$NODE_IMAGE\"} . && docker run --rm larvit-log-test-node npm run ci",
+    "test-node": "node .tmp/test/test.js",
+    "test-otlp": "docker build -t larvit-log-test-node . && docker run --rm larvit-log-test-node sh -c \"npm run build >/dev/null && cat index.js\" > index.js && node e2e-tests/run-otlp-tests.mjs"
   },
   "devDependencies": {
     "@larvit/eslint-config-typescript-esm": "2.0.0",
@@ -49,8 +49,8 @@
   "sideEffects": false,
   "files": [
     "index.d.ts",
-    "index.js.map",
     "index.js",
+    "index.js.map",
     "LICENSE",
     "package.json",
     "README.md"
