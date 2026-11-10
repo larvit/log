@@ -58,12 +58,12 @@ process-exit behaviour intact.
 says otherwise, and a `Log` draws trace and span ids from `globalThis.crypto`, else `Math.random`.
 Asking the caller for either would break Goal 1 ("Useful with no config") and Goal 3 ("A very easy
 API"). This departs from the technical principle "Sane defaults", which has a library ask for its
-clock and randomness. The departure ends with item 291 of the plan that keeps the technical
-principles: it gives "Sane defaults" an exception for a library whose goals ask that it work with
-no config, where a documented option overrides each default. Nearly every caller wants both
-defaults, and the documented `clock` option changes the clock; no option changes the randomness
-until `todo.md` item 34 ships. Serves README → Goals #1 and #3. Valid while Goal 1 asks for a
-logger useful with no config.
+clock and randomness. Item 291 of the plan that keeps the technical principles gives "Sane
+defaults" an exception for a library whose goals ask that it work with no config, where a
+documented option overrides each default. The documented `clock` option already changes the clock,
+so item 291 ends the clock's departure; the randomness's ends once `todo.md` item 34 gives it an
+option too. Serves README → Goals #1 and #3. Valid while Goal 1 asks for a logger useful with no
+config.
 
 ## A required `Resolved*Conf` key is added in a minor and removed in a major
 
