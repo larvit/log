@@ -1137,7 +1137,7 @@ test("otlpAdditionalHeaders is read per send, and an invalid one fails the expor
 
 	pasted.info("z");
 	await pasted.flush();
-	t.deepEqual(pastedReports.lines.map(line => line.error), ["otlpAdditionalHeaders carries an invalid header name in entry 1"], "a name that is no RFC 9110 token is reported by its position");
+	t.deepEqual(pastedReports.lines.map(line => line.error), ["otlpAdditionalHeaders carries an invalid header name at position 1 (counting from 1)"], "a name that is no RFC 9110 token is reported by its position");
 	t.notOk(JSON.stringify(pastedReports.lines).includes("s3cr3t"), "the pasted token stays out of the report");
 	t.end();
 });
@@ -2290,6 +2290,28 @@ test("log.fetch captureQuery keeps the query but redacts known-sensitive keys an
 	t.ok(urlFull.includes("&next2=myapp%3A%2F%2F%2Fcb%3Faccess_token%3DREDACTED&q2=a%3Ab&"), "a url without a host has its listed key redacted, and a scheme alone leaves a value be");
 	t.ok(urlFull.includes("&q2=a%3Ab&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&d10=REDACTED&d9=REDACTED&") && !/pw5[0-3]/.test(urlFull), "userinfo in a key, or across its =, redacts both, and a value past eight encodings records REDACTED");
 	t.ok(urlFull.includes("&flow=1&redirect_uri=https%3A%2F%2Flocalhost%3A3000&scope=openid&login_hint=bob%40x.test&"), "an encoded url in a value leaves the pairs after it alone");
+	t.end();
+});
+
+test("log.fetch captureQuery reads a value up to eight encodings and eight nested urls deep", async t => {
+	const { calls } = stubFetch();
+	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+	let encoded = "a/b";
+
+	for (let i = 0; i < 8; i++) encoded = encodeURIComponent(encoded);
+
+	const chain = (depth: number) => `${"https://h.test/?n=".repeat(depth - 1)}https://h.test/?q=1`;
+
+	await log.fetch(`https://api.test/x?v8=${encoded}&v9=${encodeURIComponent(encoded)}`);
+	await log.fetch(`https://api.test/x?n=${chain(8)}`);
+	await log.fetch(`https://api.test/x?n=${chain(9)}`);
+	await log.end();
+
+	const urlFulls = exportedSpans(calls).filter(span => span.kind === 3).map(span => span.attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue);
+
+	t.strictEqual(urlFulls[0], `https://api.test/x?v8=${encoded}&v9=REDACTED`, "a value percent-encoded eight times is kept, and nine times records REDACTED");
+	t.strictEqual(urlFulls[1], `https://api.test/x?n=${encodeURIComponent(chain(8))}`, "a url nested eight deep is kept, percent-encoded as a query value");
+	t.ok(/%(?:25)*3DREDACTED$/.test(urlFulls[2]) && !urlFulls[2].includes("q%"), "the url nested ninth records REDACTED whole");
 	t.end();
 });
 
