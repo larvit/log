@@ -23,6 +23,7 @@
 | 98 | 2.6.0 | 38, 44 | decision | **Score the project against the 7.0 comprehension floor, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
 | 111 | 2.6.0 |  |  | **Name `scripts/` by what it holds: the browser and OTLP test runners and the collector config.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
 | 35 | 2.6.0 |  | principle | **Let a consumer inject what `colorsFromEnv`, `traceableUrl` and `unref` read from the platform.** | 2 | 1 | 1 | 2 | 4 | code health by 5 | 5.2 |
+| 113 | 2.6.0 |  |  | **Make `.editorconfig` match what the files hold: spaces in `package.json`, and never tabs in YAML.** | 1 | 1 | 1 | 1 | 1 | code health by 1 | 3.1 |
 | 36 | 2.7.0 |  | principle | **Reach the retry decision and a `log.fetch` span's attributes without a network call.** | 2 | 1 | 1 | 2 | 5 | code health by 5 | 4.5 |
 | 43 | 2.7.0 |  | principle | **Give `ExportScheduler` and save coalescing named states.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
 | 48 | 2.7.0 |  | principle | **Test the untested failure paths.** | 2 | 1 | 1 | 2 | 4 | code health by 4 | 4.2 |
@@ -31,7 +32,6 @@
 | 25 | 2.7.0 |  |  | **Publish the artifact the gate tested.** | 2 | 2 | 3 | 5 | 4 | code health by 5 | 3.5 |
 | 118 | 2.7.0 |  | principle | **Bring `index.ts`'s `// --- Credentials on a span ---` section within about seven things per level, or record why it holds more.** | 2 | 1 | 4 | 5 | 4 | code health by 5 | 3.5 |
 | 128 | 2.7.0 |  |  | **Give each part of the library a source module of its own, so a rule can be read and tested without the rest.** | 4 | 2 | 3 | 7 | 8 | code health by 8 | 3.3 |
-| 113 | 2.7.0 |  |  | **Make `.editorconfig` match what the files hold: spaces in `package.json`, and never tabs in YAML.** | 1 | 1 | 1 | 1 | 1 | code health by 1 | 3.1 |
 | 82 | 2.7.0 |  |  | **Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.** | 1 | 2 | 1 | 2 | 1 | 3 by 5 | 2.3 |
 | 19 | 2.7.0 |  | defect | **Leave a `Request` untraced in `log.fetch`.** | 1 | 1 | 2 | 2 | 2 | 2.1 by 6 | 2.1 |
 | 114 | 2.7.0 |  |  | **Move `package.json`'s build and test one-liners into named scripts, and let the OTLP test read its collector's port, image and container name from the environment, today's values as defaults.** | 1 | 1 | 1 | 1 | 2 | code health by 1 | 2.1 |
@@ -169,6 +169,10 @@ They read `process.env`, `globalThis.location` and `globalThis.Deno`, and the su
 `globalThis.process` and `console.error` to reach them. Principle: Functional core, imperative
 shell.
 
+### 113. Make `.editorconfig` match what the files hold: spaces in `package.json`, and never tabs in YAML.
+
+`.editorconfig` asks tabs of `package.json`, which holds spaces, and of `*.yml`, where YAML forbids tabs. Found by the technical principles audit on 2026-10-26.
+
 ### 36. Reach the retry decision and a `log.fetch` span's attributes without a network call.
 
 `OtlpSender.send` holds the plain-http warning, encoding, the send and the status decision in one
@@ -226,10 +230,6 @@ credential rules therefore have no seam of their own: each redaction test passes
 knows OTLP" can't be enforced within one file. On 2026-11-10 the maintainer approved
 adding a bundler so that the package still publishes one `index.js`; which bundler is part of this
 item. The footprint budgets in README → Footprint (see item 117) must hold.
-
-### 113. Make `.editorconfig` match what the files hold: spaces in `package.json`, and never tabs in YAML.
-
-`.editorconfig` asks tabs of `package.json`, which holds spaces, and of `*.yml`, where YAML forbids tabs. Found by the technical principles audit on 2026-10-26.
 
 ### 82. Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.
 
