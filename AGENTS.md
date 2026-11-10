@@ -29,7 +29,7 @@ In [docs/decisions.md](docs/decisions.md):
 - `format` is the formatter's one name, `entryFormatter` its alias until 3.0.0
 - `ResolvedLogConf` keeps `entryFormatter` required
 - A query key is redacted by Datadog's suffix rule
-- An unsampled `traceparent` drops the span, never the log records
+- An unsampled `traceparent` drops the span, never the entries
 - An empty `logLevel` logs at `info` and warns
 - The default `Queue` lives in `conf.otlpQueue`
 - A v2.3.0 copy's child loses a function formatter
@@ -69,7 +69,7 @@ One word per concept, in code, docs and the plan alike:
 - **entry**: what one call to a level method, such as `log.info("…")`, makes. OTLP calls it a log
   record; say "log record" only of that wire shape.
 - **span**: one timed operation in a trace, such as a `log.fetch` request.
-- **payload**: an OTLP `resourceLogs` or `resourceSpans` body, holding entries or spans.
+- **payload**: an OTLP `resourceLogs` or `resourceSpans` body, holding log records or spans.
 - **queue**: the `Queue`, or any `OtlpQueue`, that a `Log` hands payloads to for export.
-- **transport**: a destination a `Log` hands entries to, as item 96 plans; console and OTLP are the
-  two it ships.
+- **transport**: a destination a `Log` hands entries to; this library ships two, console and OTLP,
+  and item 96 makes them a list.

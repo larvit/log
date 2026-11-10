@@ -229,10 +229,10 @@ reads to explain a 403.
 Serves README → Goals #7; over-redaction in a minor stands on the 2026-09-20 captured-value entry.
 Valid while Datadog's default and semconv's list stay within these terms.
 
-## An unsampled `traceparent` drops the span, never the log records
+## An unsampled `traceparent` drops the span, never the entries
 
 2026-09-25, the maintainer: an incoming `traceparent` with the sampled flag off drops the span,
-never the log records. OTel's stable logs spec defines no sampling; a record links to its trace by
+never the entries. OTel's stable logs spec defines no sampling; a record links to its trace by
 id, so an unsampled request's `log.error` still reaches the log store. Serves README → Goals #6.
 Valid until OTel's trace-based log filtering is stable and on by default.
 
