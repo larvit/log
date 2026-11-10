@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v2.5.0
 
 Rotate the credentials that several Security entries name: earlier versions exported them. One
 exposure stays open: keep credentials out of a url you base64-encode into a request path.
