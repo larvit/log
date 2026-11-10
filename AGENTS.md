@@ -73,3 +73,14 @@ One word per concept, in code, docs and the plan alike:
 - **queue**: the `Queue`, or any `OtlpQueue`, that a `Log` hands payloads to for export.
 - **transport**: a destination a `Log` hands entries to; this library ships two, console and OTLP,
   and item 96 makes them a list.
+
+## Scoring run
+
+The project values for `~/.claude/skills/comprehension-panel/seat-prompts.md`:
+
+- `{language}`: TypeScript
+- `{kind}`: a zero-dependency logging and tracing library with an OTLP exporter
+- `{domain}`: OpenTelemetry logs and traces exported over OTLP/HTTP
+- `{domain docs}`: the OpenTelemetry specification
+- `{3am question}`: a mobile app's entries stopped reaching the collector overnight and its queue
+  dropped batches, or a password showed up in an exported span's `url.full`
