@@ -112,7 +112,7 @@ clock would break both. No decision weighs the two, so each chunk touching these
 it. Which wins is for the maintainer: keeping the defaults asks for a `docs/decisions.md` entry that
 names the goal it serves, and either an item that ends the departure or an exception in the
 principle. Recommendation: keep the defaults, since the public constructor is the edge where a
-consumer wires the logger, and record that. Found by the 2.5.0 principles audit (P-6).
+consumer wires the logger, and record that. Found by the 2.5.0 principles audit.
 
 ### 34. Let a consumer inject the randomness trace and span ids come from.
 
@@ -127,9 +127,8 @@ consumer wires the logger, and record that. Found by the 2.5.0 principles audit 
 
 `logWarningOfReport` finds a Log's warner by the identity of its `report` function, and
 `warnOnce(conf)` and `Queue.warnOnce` are two once-only rules. Principle: Explicit over implicit.
-`firstWarning(sink, key)` reads as a query but also records the warning, against Command–query
-separation; the 2.5.0 principles audit asks the seam to split the test from the mark.
-
+`firstWarning(sink, key)` reads as a query but also records that the warning was written, against
+Command–query separation. Found by the 2.5.0 principles audit.
 
 Every seat of the 2026-10-03 run named the module-level tables `warned` and `logWarningOfReport`, so
 it lifts Locality, the lowest dimension at 5.5.
@@ -152,7 +151,6 @@ object in an order that carries meaning, and `conf as ResolvedLogConf` hides wha
 Principle: Compose, do not entangle; validate data and build DTOs as early as possible. The 2.5.0
 principles audit found two more casts in `inheritSettings`: `Object.keys(INHERITED_BY) as (keyof
 LogConf)[]` and `as never`.
-
 
 Every seat of the 2026-10-03 run named this order-dependent mutation in `resolveLogConf`, so it
 lifts Locality, the lowest dimension at 5.5.
@@ -230,16 +228,16 @@ a reader could find them by. That crosses the limit of about seven things per le
 asks for a grouping under names a reader can follow, or a recorded reason. The rules must stay in
 one section, as `docs/decisions.md` → "Every rule on credentials in a span sits in one source
 section" asks. Principle: `~/.claude/principles/technical-principles.md` → "About seven things per
-level". Found by the principles audit of 2026-10-28. The 2.5.0 audit adds `splitUserinfoPairs`:
-its closures `close` and `read` mutate `start`, `end` and `split`, more interacting values than
-four or five, so a pure function returning the runs would read better.
+level". Found by the principles audit of 2026-10-28. `splitUserinfoPairs` is hard to read too: its
+closures `close` and `read` mutate `start`, `end` and `split`, more interacting values than four or
+five. Found by the 2.5.0 principles audit.
 
 ### 128. Give each part of the library a source module of its own, so a rule can be read and tested without the rest.
 
-`index.ts` is one 2,527-line module of 16 sections, and any section can reach every module-level
-table. The pure credential rules therefore have no seam of their own: each redaction test passes
-through `Log`, `fetch`, the queue and the export, so item 96 would move all of them, and item 96's
-"no other code knows OTLP" can't be enforced within one file. On 2026-11-10 the owner approved
+`index.ts` is one module, and any of its sections can reach every module-level table. The pure
+credential rules therefore have no seam of their own: each redaction test passes through `Log`,
+`fetch`, the queue and the export, so item 96 would move all of them, and item 96's "no other code
+knows OTLP" can't be enforced within one file. On 2026-11-10 the maintainer approved
 adding a bundler so that the package still publishes one `index.js`; which bundler is part of this
 item. The footprint budgets in README → Footprint (see item 117) must hold.
 
@@ -274,11 +272,11 @@ fakes. `~/.claude/principles/frontend.md` → broad device support.
 
 ### 117. Bring the built `index.js` within README → Footprint's 10 KB gzipped budget.
 
-README → Footprint budgets `index.js` at ≤10 KB gzipped for Goals #5. On 2026-11-10 the 2.5.0
-release review builds to 11093 bytes: `npm run build` in the repo's container image, then
+README → Footprint budgets `index.js` at ≤10 KB gzipped for Goals #5. On 2026-11-10, during the
+2.5.0 release review, the build was 11056 bytes: `npm run build` in the repo's container image, then
 `gzip -9c index.js | wc -c`. The budget is broken, and nothing checks it. Whether to shrink the
-build or re-state the budget is for this item to work out. Item 26 checks the budget in CI, and that
-check fails from its first run until this item lands. Found on 2026-10-28, at 10439 bytes.
+build or re-state the budget is for this item to work out. Item 26 will check the budget in CI, and
+that check will fail from its first run until this item lands. Found on 2026-10-28, at 10439 bytes.
 
 ### 26. Check the footprint budget in CI, so the numbers in README → Footprint fail a build instead of going stale.
 
@@ -326,7 +324,6 @@ spelling is benched with the README's audience before it is shown.
 
 Let a transport skip a record kind it does not handle, so a new kind, such as item 56's metrics,
 ships in a minor instead of waiting for a major.
-
 
 Every seat of the 2026-10-03 comprehension run named `formatFunctions` and `defaultQueues`, two
 module-level tables a reader must trace to know a `Log`'s formatter and queue. Where the console
