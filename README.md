@@ -154,7 +154,7 @@ same message aggregate in your log backend:
 
 ```javascript
 log.info("Order placed", { orderId, total: 199, express: true });
-// 2022-09-24T23:40:39Z [inf] Order placed {"orderId":"…","total":199,"express":true}
+// 2022-09-24T23:40:39.123Z [inf] Order placed {"orderId":"…","total":199,"express":true}
 ```
 
 Metadata values are `string`, `number` or `boolean`. A key whose value is `undefined` is dropped, so
@@ -309,7 +309,7 @@ acceptPlainHttpCredentials: true, otlpHttpBaseURI })`, whose report lines then g
 | `key` | `string` | `"@larvit/log:otlp-queue"` | The `storage` key. |
 | `maxBatchBytes` | `number` | `65536` | Items per POST are cut here, measured as their JSON size. The default is the browser `keepalive` limit; a batch over 64 KiB is sent without `keepalive`. |
 | `maxItems` | `number` | `1000` | Queue bound. The oldest items are dropped when exceeded, reported in one stderr line with the count. |
-| `otlpAdditionalHeaders` | `Record<string, string>` | none | Extra headers on every request, e.g. `{ Authorization: "Bearer …" }`, read afresh each send so a rotated token takes effect. The queue sets `Content-Type`, and `Authorization` when the endpoint carries `user:pass@`; a name here replaces it, matched case-insensitively. A name or value the runtime rejects drops that batch with one report line naming it. `queue.conf` and `log.conf` keep the headers as you gave them, so don't log either. |
+| `otlpAdditionalHeaders` | `Record<string, string>` | none | Extra headers on every request, e.g. `{ Authorization: "Bearer …" }`, read afresh each send so a rotated token takes effect. The queue sets `Content-Type`, and `Authorization` when the endpoint carries `user:pass@`; a name here replaces it, matched case-insensitively. A name or value the runtime rejects drops that batch with one report line naming the header, or its position where the name isn't a valid header name, since that may be a whole pasted header line. `queue.conf` and `log.conf` keep the headers as you gave them, so don't log either. |
 | `otlpHttpBaseURI` | `string` | required | OTLP/HTTP endpoint, e.g. `http://127.0.0.1:4318`. Logs go to `/v1/logs`, spans to `/v1/traces` under it; a base path is kept. `user:pass@` in it becomes an `Authorization: Basic` header, percent-decoded, and never rides in the request url — percent-encode any `/ ? #` in the password, and a literal `%` as `%25`. `queue.conf` and `log.conf` keep the URI as you gave it, so don't log either. A malformed URI, or one that is not `http:`/`https:`, throws in the constructor. |
 | `otlpProtocol` | `"http/json" \| "http/protobuf"` | `"http/json"` | Wire format. Both use the same endpoint; use protobuf for collectors that reject JSON. |
 | `report` | `(msg, metadata) => void` | `console.error` | Sink for one line per failed attempt, dropped batch, drop round, partially rejected batch or storage failure, and once per host, header and credential source for a credential header over plain `http:`. The `Log`-built queue writes through the instance's `stderr` and formatter, that last line at `warn` and the rest at `error`. |
@@ -394,7 +394,7 @@ Text (default). The level is a three-letter tag, `err`/`war`/`inf`/`ver`/`deb`/`
 ANSI colour codes when `colors` is on; parse `format: "json"` instead of this:
 
 ```
-2022-09-24T23:40:39Z [inf] Order placed {"orderId":"…","total":199}
+2022-09-24T23:40:39.123Z [inf] Order placed {"orderId":"…","total":199}
 ```
 
 JSON (`format: "json"`), one object per line. `logLevel`, `msg` and `time` win over metadata keys of

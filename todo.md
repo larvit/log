@@ -6,12 +6,13 @@
 
 `Bar = 0.5`
 
-`Next ID = 129`
+`Next ID = 130`
 
 ## Items
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
+| 129 | 2.5.0 |  | question | **Record whether a `Log` and a `Queue` keep defaulting the clock and randomness, against the principle that a library asks for them.** | 1 | 2 | 1 | 2 | 1 | code health by 2 | 4.2 |
 | 34 | 2.6.0 |  | principle | **Let a consumer inject the randomness trace and span ids come from.** | 1 | 1 | 1 | 1 | 2 | code health by 5 | 10.4 |
 | 37 | 2.6.0 |  | principle | **Build a span payload without writing to `log.span`.** | 1 | 1 | 1 | 1 | 2 | code health by 5 | 10.4 |
 | 44 | 2.6.0 |  | principle | **Route a `Queue`'s warnings through one explicit seam.** | 2 | 1 | 1 | 2 | 4 | code health by 9 | 9.4 |
@@ -100,6 +101,19 @@
 
 ## Details
 
+### 129. Record whether a `Log` and a `Queue` keep defaulting the clock and randomness, against the principle that a library asks for them.
+
+`~/.claude/principles/technical-principles.md` → "Sane defaults" says a library asks for every input
+that can change between runs, the clock and randomness included, and only the code wiring a program
+together defaults them. `Queue` defaults `clock` to the system clock, `withDefaults` does the same
+for a `Log`, and `getRandomBytes` falls back to `globalThis.crypto`, else `Math.random`. Goal 1
+("useful with no config") and Goal 3 ("a very easy API") pull the other way: `new Log()` needing a
+clock would break both. No decision weighs the two, so each chunk touching these defaults reargues
+it. Which wins is for the maintainer: keeping the defaults asks for a `docs/decisions.md` entry that
+names the goal it serves, and either an item that ends the departure or an exception in the
+principle. Recommendation: keep the defaults, since the public constructor is the edge where a
+consumer wires the logger, and record that. Found by the 2.5.0 principles audit (P-6).
+
 ### 34. Let a consumer inject the randomness trace and span ids come from.
 
 `getRandomBytes` reads `globalThis.crypto`, else `Math.random`, so a test checks ids by regex and
@@ -113,6 +127,8 @@
 
 `logWarningOfReport` finds a Log's warner by the identity of its `report` function, and
 `warnOnce(conf)` and `Queue.warnOnce` are two once-only rules. Principle: Explicit over implicit.
+`firstWarning(sink, key)` reads as a query but also records the warning, against Command–query
+separation; the 2.5.0 principles audit asks the seam to split the test from the mark.
 
 
 Every seat of the 2026-10-03 run named the module-level tables `warned` and `logWarningOfReport`, so
@@ -121,7 +137,8 @@ it lifts Locality, the lowest dimension at 5.5.
 ### 49. Sort what carries no order.
 
 `format`'s `"text" | "json"`, `msg`/`msTimestamp`, and `server.port` after `url.scheme` in a
-`log.fetch` span. Principle: Deterministic order wherever order carries no meaning.
+`log.fetch` span, and `package.json`'s `scripts` and `files`, which the 2.5.0 principles audit
+found unsorted. Principle: Deterministic order wherever order carries no meaning.
 
 ### 47. Collapse `entryFormatterDeprecation` and `load()` to one error channel each.
 
@@ -132,7 +149,9 @@ errors explicitly, as values.
 
 `confFromOptions`, `inheritSettings`, `rejectQueueBesideShorthand` and `withDefaults` mutate one
 object in an order that carries meaning, and `conf as ResolvedLogConf` hides what they miss.
-Principle: Compose, do not entangle; validate data and build DTOs as early as possible.
+Principle: Compose, do not entangle; validate data and build DTOs as early as possible. The 2.5.0
+principles audit found two more casts in `inheritSettings`: `Object.keys(INHERITED_BY) as (keyof
+LogConf)[]` and `as never`.
 
 
 Every seat of the 2026-10-03 run named this order-dependent mutation in `resolveLogConf`, so it
@@ -211,7 +230,9 @@ a reader could find them by. That crosses the limit of about seven things per le
 asks for a grouping under names a reader can follow, or a recorded reason. The rules must stay in
 one section, as `docs/decisions.md` → "Every rule on credentials in a span sits in one source
 section" asks. Principle: `~/.claude/principles/technical-principles.md` → "About seven things per
-level". Found by the principles audit of 2026-10-28.
+level". Found by the principles audit of 2026-10-28. The 2.5.0 audit adds `splitUserinfoPairs`:
+its closures `close` and `read` mutate `start`, `end` and `split`, more interacting values than
+four or five, so a pure function returning the runs would read better.
 
 ### 128. Give each part of the library a source module of its own, so a rule can be read and tested without the rest.
 
@@ -254,7 +275,7 @@ fakes. `~/.claude/principles/frontend.md` → broad device support.
 ### 117. Bring the built `index.js` within README → Footprint's 10 KB gzipped budget.
 
 README → Footprint budgets `index.js` at ≤10 KB gzipped for Goals #5. On 2026-11-10 the 2.5.0
-release review builds to 10963 bytes: `npm run build` in the repo's container image, then
+release review builds to 11093 bytes: `npm run build` in the repo's container image, then
 `gzip -9c index.js | wc -c`. The budget is broken, and nothing checks it. Whether to shrink the
 build or re-state the budget is for this item to work out. Item 26 checks the budget in CI, and that
 check fails from its first run until this item lands. Found on 2026-10-28, at 10439 bytes.

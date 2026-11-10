@@ -28,6 +28,12 @@ Read Security first: several entries ask you to rotate credentials earlier versi
   as an image proxy such as imgproxy takes one, still exports as written: keeping a credential out
   of it is yours. v2.4.0's advice to rotate what such a path carried stands for spans exported
   before, and its `aHR0c` search finds a base64-encoded url.
+- **An invalid `otlpAdditionalHeaders` name is reported by its position, never by the name.** Since
+  v2.4.0, a whole header line pasted as a name, such as `{ "Authorization: Bearer …": "" }`, wrote
+  the token in the queue's `OTLP export headers invalid, batch dropped` report, to `stderr` or your
+  `report`. Now a name that isn't a valid header name reports as
+  `otlpAdditionalHeaders carries an invalid header name in entry 1`. Search those reports for
+  `carries an invalid` and rotate any credential the name shows.
 - **A captured header records `REDACTED` by Elastic APM's default `sanitize_field_names` rule.**
   Since v2.3.0 only `authorization`, `cookie`, `proxy-authorization` and `set-cookie` did, so a
   listed `x-api-key`, `x-auth-token` or `x-amz-security-token` exported its value. Now a name that,
@@ -138,6 +144,10 @@ Read Security first: several entries ask you to rotate credentials earlier versi
 
 ### Everything else
 
+- **The text format writes the time to the millisecond, as `2022-09-24T23:40:39.123Z [inf] …`.**
+  It cut the time to whole seconds, so entries written within one second lost their order in a
+  backend reading `stdout`. A parser of the text line sees it change; parse `format: "json"`
+  instead, as README → Audience says.
 - **README → Audience promises that each credential shape README → Credentials in a captured value
   lists records `REDACTED`.** A minor may add a shape. A value holding no credential may record
   `REDACTED`, such as a path cut past a reading limit, and a minor may change that and the limits,

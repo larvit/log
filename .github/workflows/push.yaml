@@ -1,5 +1,8 @@
 name: Push
 on: [push]
+# The jobs only read the repo, so a dependency's install script gets no write scope.
+permissions:
+  contents: read
 jobs:
   Build-and-test:
     runs-on: ubuntu-26.04

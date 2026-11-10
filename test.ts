@@ -315,14 +315,15 @@ test("each level writes its colored token to the right stream", t => {
 		const cap = capture({ colors: true, logLevel: "silly" }); // silly passes every level through the filter
 
 		cap.log[level]("msg");
-		t.strictEqual(cap[stream][0]?.substring(19), `Z [${token}] msg`, `${level} -> ${stream} with its token`);
+		t.strictEqual(cap[stream][0]?.substring(23), `Z [${token}] msg`, `${level} -> ${stream} with its token`);
 	}
 
 	const plain = capture({ colors: false });
 
 	plain.log.info("msg");
-	t.strictEqual(plain.stdout[0]?.substring(19), "Z [inf] msg", "colors: false writes the bare tag");
+	t.strictEqual(plain.stdout[0]?.substring(23), "Z [inf] msg", "colors: false writes the bare tag");
 	t.ok(msgTextFormatter({ logLevel: "info", msg: "msg" }).includes("\x1b[1;32minf\x1b[0m"), "msgTextFormatter colours unless colors is false");
+	t.strictEqual(msgTextFormatter({ colors: false, logLevel: "info", msTimestamp: Date.UTC(2022, 8, 24, 23, 40, 39, 7), msg: "msg" }), "2022-09-24T23:40:39.007Z [inf] msg", "the time keeps its milliseconds, so entries within a second keep their order");
 	t.end();
 });
 
@@ -1122,13 +1123,22 @@ test("otlpAdditionalHeaders is read per send, and an invalid one fails the expor
 	t.deepEqual(calls.map(call => callHeader(call, "Authorization")), ["Bearer first", "Bearer second"], "a rotated token reaches the next send without a new queue");
 
 	const reports = reportSink();
-	const invalid = new Log({ otlpQueue: new Queue({ otlpAdditionalHeaders: { "X-Bad Name": "s3cr3t" }, otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report }), stderr: () => {} });
+	const invalid = new Log({ otlpQueue: new Queue({ otlpAdditionalHeaders: { "X-Bad": "s3\ncr3t" }, otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report }), stderr: () => {} });
 
 	invalid.info("z");
 	await invalid.flush();
 	t.strictEqual(calls.length, 2, "nothing is sent with a header the runtime rejects");
-	t.deepEqual(reports.lines, [{ error: "otlpAdditionalHeaders carries an invalid X-Bad Name header", items: 1, msg: "OTLP export headers invalid, batch dropped", path: "/v1/logs", url: "http://127.0.0.1:4318/v1/logs" }], "the batch is dropped under its own message, naming the header but never its value");
+	t.deepEqual(reports.lines, [{ error: "otlpAdditionalHeaders carries an invalid X-Bad header", items: 1, msg: "OTLP export headers invalid, batch dropped", path: "/v1/logs", url: "http://127.0.0.1:4318/v1/logs" }], "the batch is dropped under its own message, naming the header but never its value");
 	t.notOk(JSON.stringify(reports.lines).includes("s3cr3t"), "the rejected header value is not reported");
+
+	// A whole header line pasted as a name holds the token, so only its position is reported.
+	const pastedReports = reportSink();
+	const pasted = new Log({ otlpQueue: new Queue({ otlpAdditionalHeaders: { "Authorization: Bearer s3cr3t": "", "X-Ok": "a" }, otlpHttpBaseURI: "http://127.0.0.1:4318", report: pastedReports.report }), stderr: () => {} });
+
+	pasted.info("z");
+	await pasted.flush();
+	t.deepEqual(pastedReports.lines.map(line => line.error), ["otlpAdditionalHeaders carries an invalid header name in entry 1"], "a name that is no RFC 9110 token is reported by its position");
+	t.notOk(JSON.stringify(pastedReports.lines).includes("s3cr3t"), "the pasted token stays out of the report");
 	t.end();
 });
 

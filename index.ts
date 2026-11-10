@@ -119,6 +119,9 @@ export const LogLevels = {
 	/* eslint-enable sort-keys */
 };
 
+// The level an unset logLevel resolves to, and the one an unknown logLevel logs at.
+const DEFAULT_LOG_LEVEL: LogLevel = "info";
+
 // A Map, so a JavaScript caller's `"constructor"` finds no level and `["debug"]` is never coerced into one.
 const SEVERITY_NUMBERS = new Map<unknown, number>(Object.entries(LogLevels).map(([logLevel, { severityNumber }]) => [logLevel, severityNumber]));
 
@@ -182,7 +185,7 @@ export function msgTextFormatter(conf: EntryFormatterConf) {
 
 	const levelOut = conf.colors === false ? level.tag : `\x1b[1;${level.ansi}m${level.tag}\x1b[0m`;
 	const date = new Date(conf.msTimestamp ?? Date.now());
-	let str = `${date.toISOString().substring(0, 19)}Z [${levelOut}] ${conf.msg}`;
+	let str = `${date.toISOString()} [${levelOut}] ${conf.msg}`;
 	const metadataStr = JSON.stringify(conf.metadata ?? {});
 	if (metadataStr !== "{}") {
 		str += ` ${metadataStr}`;
@@ -961,7 +964,8 @@ function readQueryPart(part: string, depth: number, partsRead: PartsRead): strin
 const SCHEME_LED = /^[\0- ]*[a-z][a-z\d+.-]*:/i;
 
 // A key opening a url is read with its value too, as a server taking `?<url>` reads it: an `=` in its
-// password ends the key.
+// password ends the key. It reads one pair alone, so userinfo spanning pairs or the `=`, as in
+// `?//u:p=w@host`, is for the caller to redact first, as `redactedSearch` does with `splitUserinfoPairs`.
 function redactQueryPair(key: string, value: string, [rawKey, rawValue]: [string, string], depth: number, partsRead: PartsRead): [string, string] {
 	if (SCHEME_LED.test(withoutDropped(key))) {
 		const joined = `${key}=${value}`;
@@ -971,7 +975,6 @@ function redactQueryPair(key: string, value: string, [rawKey, rawValue]: [string
 		}
 	}
 
-	// Userinfo across the `=`, as in `?//u:p=w@host`, is found by `splitUserinfoPairs` and never reaches here.
 	// Form-decoded and raw both: a `+` or an escaped delimiter ends the match in one reading.
 	if (holdsUserinfoAtAnyLevel(key) || holdsUserinfoAtAnyLevel(rawKey) || holdsListedKeyAtAnyLevel(key)) {
 		return ["REDACTED", "REDACTED"];
@@ -1133,6 +1136,9 @@ type SendFailure = { message: string, reportAs?: string, retry: boolean, status?
 
 // Browsers reject a keepalive request whose body is over 64 KiB.
 const KEEPALIVE_MAX_BYTES = 65536;
+
+// A queue's protocol when its conf sets none, which a Log also reads to recognise its own default queue.
+const DEFAULT_OTLP_PROTOCOL = "http/json";
 
 function utf8Length(str: string): number {
 	let bytes = 0;
@@ -1365,6 +1371,9 @@ function mergePayloads(payloads: OtlpPayload[]): OtlpPayload {
 	});
 }
 
+// RFC 9110 § 5.6.2: the grammar every valid header name follows.
+const HEADER_NAME_TOKEN = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
+
 // Read live, so a rotated otlpAdditionalHeaders reaches the next send; report is the caller's guarded one.
 type SenderConf = Pick<ResolvedQueueConf, "acceptPlainHttpCredentials" | "clock" | "otlpAdditionalHeaders" | "otlpHttpBaseURI" | "otlpProtocol">;
 
@@ -1422,15 +1431,18 @@ class OtlpSender {
 		}
 	}
 
-	// The value never joins the message; it is the likeliest place for a credential.
+	// The value never joins the message; it is the likeliest place for a credential. A name that is
+	// no RFC 9110 token may be a whole header line, value and all, so its position stands in for it.
 	private buildHeaders(): { failure?: string, headers: Headers } {
 		const headers = new Headers(this.headers);
 
-		for (const [name, value] of Object.entries(this.conf.otlpAdditionalHeaders ?? {})) {
+		for (const [index, [name, value]] of Object.entries(this.conf.otlpAdditionalHeaders ?? {}).entries()) {
 			try {
 				headers.set(name, value);
 			} catch {
-				return { failure: `otlpAdditionalHeaders carries an invalid ${name} header`, headers };
+				const failure = HEADER_NAME_TOKEN.test(name) ? `an invalid ${name} header` : `an invalid header name in entry ${index + 1}`;
+
+				return { failure: `otlpAdditionalHeaders carries ${failure}`, headers };
 			}
 		}
 
@@ -1528,8 +1540,8 @@ export class Queue implements OtlpQueue {
 	private items: QueuedItem[] = [];
 	// The batch being sent: out of items, but kept in storage until its send settles.
 	private inflight: QueuedItem[] = [];
-	// The first `retained` items are a failed batch whose retry its report promised, so the trim spares them.
-	private retained = 0;
+	// A failed batch whose retry its report promised, so the trim spares it. Only `round` sets it.
+	private retrying: ReadonlySet<QueuedItem> = new Set();
 
 	// Storage only: leftovers load before the first round, and saves coalesce into one writer.
 	private dirty = false;
@@ -1547,7 +1559,7 @@ export class Queue implements OtlpQueue {
 			key: conf.key ?? "@larvit/log:otlp-queue",
 			maxBatchBytes: conf.maxBatchBytes ?? KEEPALIVE_MAX_BYTES,
 			maxItems: conf.maxItems ?? 1000,
-			otlpProtocol: conf.otlpProtocol ?? "http/json",
+			otlpProtocol: conf.otlpProtocol ?? DEFAULT_OTLP_PROTOCOL,
 			report: conf.report ?? console.error,
 			retryDelayMs: conf.retryDelayMs ?? 1000,
 		};
@@ -1603,9 +1615,9 @@ export class Queue implements OtlpQueue {
 			const failure = await this.sender.send(batch);
 
 			this.inflight = [];
+			this.retrying = new Set(failure?.retry ? batch : []);
 
 			if (failure?.retry) {
-				this.retained = batch.length;
 				this.prepend(batch);
 				this.scheduleSave();
 
@@ -1649,7 +1661,6 @@ export class Queue implements OtlpQueue {
 
 		this.items = this.items.filter(item => !taken.has(item));
 		this.bytes -= bytes;
-		this.retained = 0;
 
 		return batch;
 	}
@@ -1695,7 +1706,7 @@ export class Queue implements OtlpQueue {
 		this.countAndTrim(items);
 	}
 
-	// Drops the oldest over maxItems, but not the retained batch: it came out of items, so it never exceeds maxItems.
+	// Drops the oldest over maxItems, but not the batch being retried: it came out of items, so it never exceeds maxItems.
 	private countAndTrim(items: QueuedItem[]): void {
 		for (const item of items) {
 			this.bytes += item.bytes;
@@ -1704,7 +1715,11 @@ export class Queue implements OtlpQueue {
 		const excess = this.items.length - this.conf.maxItems;
 
 		if (excess > 0) {
-			for (const item of this.items.splice(this.retained, excess)) {
+			const dropping = new Set(this.items.filter(item => !this.retrying.has(item)).slice(0, excess));
+
+			this.items = this.items.filter(item => !dropping.has(item));
+
+			for (const item of dropping) {
 				this.bytes -= item.bytes;
 			}
 
@@ -1851,7 +1866,7 @@ function isDefaultQueueFor(queue: OtlpQueue, conf: LogSettings): boolean {
 	return defaultQueues.has(queue)
 		&& queue instanceof Queue
 		&& queue.conf.otlpHttpBaseURI === conf.otlpHttpBaseURI
-		&& queue.conf.otlpProtocol === (conf.otlpProtocol ?? "http/json")
+		&& queue.conf.otlpProtocol === (conf.otlpProtocol ?? DEFAULT_OTLP_PROTOCOL)
 		&& queue.conf.otlpAdditionalHeaders === conf.otlpAdditionalHeaders;
 }
 
@@ -1961,7 +1976,7 @@ function entryFormatterDeprecation(conf: LogSettings): string | undefined {
 
 function withDefaults(conf: LogSettings): ResolvedLogConf {
 	if (conf.logLevel === undefined) {
-		conf.logLevel = "info";
+		conf.logLevel = DEFAULT_LOG_LEVEL;
 	}
 
 	if (conf.clock === undefined) {
@@ -2215,9 +2230,7 @@ export class Log implements LogInt {
 	}
 
 	public async end(options?: { error?: unknown }): Promise<void> {
-		if (this.ended) {
-			throw new Error("Logging instance is already ended");
-		}
+		this.throwIfEnded();
 		this.ended = true;
 
 		// What is already queued is delivered even when the span's own close throws.
@@ -2247,9 +2260,7 @@ export class Log implements LogInt {
 	}
 
 	public fetch(input: string | URL, init?: RequestInit): Promise<Response> {
-		if (this.ended) {
-			throw new Error("Logging instance is already ended");
-		}
+		this.throwIfEnded();
 
 		const url = traceableUrl(input);
 
@@ -2259,11 +2270,12 @@ export class Log implements LogInt {
 
 		// Registered synchronously, so a later await log.flush() delivers a fire-and-forget log.fetch().
 		// Settled on the caller's promise, never tracked from it: a handler there would mark its rejection handled.
-		let settle!: () => void;
+		// The executor runs at once, so `settle` is always set by the time the fetch settles.
+		let settle: (() => void) | undefined;
 
 		this.track(new Promise<void>(resolve => { settle = resolve; }));
 
-		return tracedFetch(this, url, init).finally(settle);
+		return tracedFetch(this, url, init).finally(() => settle?.());
 	}
 
 	// Never writes, so a library author's `if (log.enabled(...))` emits no line; log() warns of an unknown logLevel.
@@ -2272,7 +2284,7 @@ export class Log implements LogInt {
 			return false;
 		}
 
-		const threshold = SEVERITY_NUMBERS.get(this.conf.logLevel) ?? LogLevels.info.severityNumber;
+		const threshold = SEVERITY_NUMBERS.get(this.conf.logLevel) ?? LogLevels[DEFAULT_LOG_LEVEL].severityNumber;
 
 		return (SEVERITY_NUMBERS.get(logLevel) ?? -Infinity) >= threshold;
 	}
@@ -2293,14 +2305,18 @@ export class Log implements LogInt {
 
 		// Keyed on the raw value, so only the first call per sink and value builds the message.
 		if (firstWarning(this.conf.stderr, configured)) {
-			writeStderr(this.conf, "warn", undefined, `@larvit/log: logLevel ${describeLogLevel(configured)} is not a level, logging at "info"; use error, warn, info, verbose, debug, silly or none`);
+			writeStderr(this.conf, "warn", undefined, `@larvit/log: logLevel ${describeLogLevel(configured)} is not a level, logging at "${DEFAULT_LOG_LEVEL}"; use error, warn, info, verbose, debug, silly or none`);
+		}
+	}
+
+	private throwIfEnded(): void {
+		if (this.ended) {
+			throw new Error("Logging instance is already ended");
 		}
 	}
 
 	private log(logLevel: LogLevel, msg: string, metadata?: MetadataInput): void {
-		if (this.ended) {
-			throw new Error("Logging instance is already ended");
-		}
+		this.throwIfEnded();
 
 		this.warnOfUnknownLogLevel();
 
