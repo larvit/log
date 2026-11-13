@@ -400,6 +400,7 @@ Valid while a url parser keeps such whitespace in userinfo and a query value.
 read, and `processEnv`, `pageHref` and `denoUnrefTimer` read it at their callers. No option is added
 for these reads: a consumer already injects through `colors`, which beats the env, through `clock`,
 whose timers `unref` handles, and through an absolute url, which needs no page address. A further
-option would grow the documented surface for what only a default reads. Applies the technical
+option would grow the documented surface for what only a default reads. The suite still swaps
+`globalThis.process` and `Deno` to reach those defaults; that cost stays. Applies the technical
 principle "Functional core, imperative shell"; serves README → Goals #1 and #5. Valid while no
 consumer needs the page address or the env injected apart from these.
