@@ -855,6 +855,12 @@ test("conf.entryFormatter reads and writes the formatter until 3.0.0", t => {
 	live.log.info("live");
 	t.strictEqual(JSON.parse(live.stdout[0]).msg, "live", "format is read where a line is written, like logLevel and the sinks");
 
+	const liveChild = new Log({ parentLog: live.log });
+
+	liveChild.conf.format = "text";
+	liveChild.info("child");
+	t.ok(live.stdout[1].endsWith("child"), "a child of a Log with a built-in formatter follows its own format, as no function came with it");
+
 	// Only a hand-written LogInt's conf carries the deprecated name as a key of its own.
 	const handBuilt = capture({ format: (entry: EntryFormatterConf) => `parent ${entry.msg}` });
 
