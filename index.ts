@@ -659,7 +659,7 @@ function encodeOtlpProtobuf(payload: OtlpPayload): Uint8Array<ArrayBuffer> {
 const warned = new WeakMap<object, Set<unknown>>();
 
 // The one once-only rule: runs `write` the first time `key` is seen for `sink`. The key is marked
-// before `write` runs, so a sink that itself uses the deprecated spelling cannot recurse.
+// before `write` runs, so a `write` that warns again of the same thing cannot recurse.
 function writeOnce(sink: object, key: unknown, write: () => void): void {
 	let keys = warned.get(sink);
 
@@ -1560,9 +1560,9 @@ class ItemBuffer {
 		return this.list;
 	}
 
-	append(items: QueuedItem[]): void {
-		this.list.push(...items);
-		this.total += sumBytes(items);
+	append(item: QueuedItem): void {
+		this.list.push(item);
+		this.total += item.bytes;
 	}
 
 	// Not unshift(...items): a long stored list would overflow the call stack.
@@ -1590,7 +1590,7 @@ export class Queue implements OtlpQueue {
 
 	private readonly buffer = new ItemBuffer();
 	private dropped = 0;
-	// The batch being sent: out of items, but kept in storage until its send settles.
+	// The batch being sent: out of the buffer, but kept in storage until its send settles.
 	private inflight: QueuedItem[] = [];
 	// A failed batch whose retry its report promised, so the trim spares it. Only `round` sets it.
 	private retrying: ReadonlySet<QueuedItem> = new Set();
@@ -1602,9 +1602,10 @@ export class Queue implements OtlpQueue {
 	// A getItem that threw: what storage holds stays untouched, since a later read may return it.
 	private unreadable = false;
 
-	// `warn` takes this queue's warnings, once per message, where a caller owns a better sink than
-	// `report`: a Log passes the queue it builds its own, so they land once per stderr, at warn. Else
-	// they go through `report`, once per function and message.
+	/**
+	 * @param warn Not part of the API: a `Log` passes the queue it builds the function that writes its
+	 * warnings through its own `stderr`, at warn. Set `report` instead.
+	 */
 	constructor(conf: QueueConf, private readonly warn?: (msg: string) => void) {
 		this.conf = {
 			...conf,
@@ -1642,7 +1643,8 @@ export class Queue implements OtlpQueue {
 			return;
 		}
 
-		this.append([withBytes(payload)]);
+		this.buffer.append(withBytes(payload));
+		this.trim();
 		this.scheduleSave();
 
 		if (this.buffer.bytes >= this.conf.maxBatchBytes) {
@@ -1721,11 +1723,8 @@ export class Queue implements OtlpQueue {
 		const { report } = this.conf;
 
 		try {
-			if (this.warn) {
-				this.warn(msg);
-			} else {
-				writeOnce(report, msg, () => report(msg, {}));
-			}
+			// Once per message for each warning sink: the `warn` a Log passed, else `report`.
+			writeOnce(this.warn ?? report, msg, () => this.warn ? this.warn(msg) : report(msg, {}));
 		} catch {
 			// A sink that throws must not break the export loop.
 		}
@@ -1746,19 +1745,14 @@ export class Queue implements OtlpQueue {
 		}
 	}
 
-	private append(items: QueuedItem[]): void {
-		this.buffer.append(items);
-		this.trim();
-	}
-
 	// A failed or persisted batch is older than anything queued since, so it goes in front.
 	private prepend(items: QueuedItem[]): void {
 		this.buffer.prepend(items);
 		this.trim();
 	}
 
-	// Drops the oldest over maxItems, sparing the batch being retried; it holds at most maxItems, so
-	// enough other items remain to drop.
+	// Drops the oldest over maxItems, sparing the batch being retried. That batch holds at most
+	// maxItems, so enough other items remain to drop.
 	private trim(): void {
 		const excess = this.buffer.items.length - this.conf.maxItems;
 
@@ -2089,7 +2083,7 @@ function resolveLogConf(options: LogOptions | LogLevel | "none" | undefined): { 
 
 // --- A Log's spans ---------------------------------------------------------
 
-// A span just opened: it starts and ends now, and carries nothing yet.
+// A span just opened: it starts and ends now, and doesn't carry any attributes, events or links yet.
 function newSpan(fields: Pick<OtlpSpan, "kind" | "name" | "parentSpanId" | "spanId" | "traceId">, nowMs: number): OtlpSpan {
 	const startedAt = getNsTimestamp(nowMs);
 

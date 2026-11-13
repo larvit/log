@@ -1265,6 +1265,80 @@ test("Queue batches by time and by size, with keepalive under the browser cap", 
 	t.end();
 });
 
+// The payload a record of this text makes, as the queue is handed it, and the bytes it counts for.
+function recordPayload(text: string): { bytes: number, payload: OtlpPayload } {
+	let payload: OtlpPayload | undefined;
+	const log = new Log({ clock: fakeClock(), otlpQueue: { enqueue: handed => { payload = handed; }, flush: async () => {} }, stderr: () => {} });
+
+	log.info(text);
+
+	return { bytes: new TextEncoder().encode(JSON.stringify(payload)).length, payload: payload as OtlpPayload };
+}
+
+test("Queue sends at once when its bytes reach maxBatchBytes, whatever batches and loads came before", async t => {
+	const { calls } = stubFetch();
+	const clock = fakeClock();
+	const { bytes, payload } = recordPayload("abc");
+	const queueFor = (storage?: QueueStorage) => new Queue({ batchDelayMs: 10000, clock, maxBatchBytes: 2 * bytes, otlpHttpBaseURI: "http://127.0.0.1:4318", storage });
+	const logTo = (queue: Queue) => new Log({ clock, otlpQueue: queue, stderr: () => {} });
+
+	const exact = logTo(queueFor());
+
+	exact.info("abc");
+	await clock.settle();
+	t.strictEqual(calls.length, 0, "one record under maxBatchBytes waits for the timer");
+	exact.info("abc");
+	await clock.settle();
+	t.strictEqual(calls.length, 1, "bytes exactly at maxBatchBytes send now");
+
+	calls.length = 0;
+
+	const batched = logTo(queueFor());
+
+	for (let i = 0; i < 3; i++) {
+		batched.info("abc");
+	}
+
+	await clock.settle();
+	t.deepEqual(calls.map(call => call.body.resourceLogs[0].scopeLogs[0].logRecords.length), [2, 1], "three records go out as a batch that fits and the one left behind");
+
+	calls.length = 0;
+	batched.info("abc");
+	await clock.settle();
+	t.strictEqual(calls.length, 0, "what the batches took no longer counts, so one record waits for the timer");
+
+	const storage = fakeStorage(true);
+
+	storage.data.set("@larvit/log:otlp-queue", JSON.stringify([payload]));
+
+	const loaded = logTo(queueFor(storage));
+
+	await clock.settle();
+	calls.length = 0;
+	loaded.info("abc");
+	await clock.settle();
+	t.strictEqual(calls.length, 1, "a record loaded from storage counts toward maxBatchBytes");
+	t.end();
+});
+
+test("Queue hands its warnings to the warn function it is given, once per message", async t => {
+	stubFetch();
+
+	const reports = reportSink();
+	const warned: string[] = [];
+	const queue = new Queue({ otlpHttpBaseURI: "http://u:p@collector.test:4318", report: reports.report }, msg => { warned.push(msg); });
+	const log = new Log({ otlpQueue: queue, stderr: () => {} });
+
+	for (const text of ["x", "y"]) {
+		log.info(text);
+		await log.flush();
+	}
+
+	t.strictEqual(warned.length, 1, "the credential warning goes to warn, once");
+	t.deepEqual(reports.lines, [], "and not to report");
+	t.end();
+});
+
 test("Queue is bounded: drops the oldest when full and reports the count once", async t => {
 	const { calls } = stubFetch();
 	const reports = reportSink();
