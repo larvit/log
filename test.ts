@@ -174,7 +174,7 @@ function clientSpan(calls: { body: any, path: string }[]) {
 
 // --- protobuf decode (test-only, zero-dep) ---------------------------------
 // Independent reader (own varint/fixed64 logic) that decodes the hand-rolled OTLP protobuf back into
-// the JSON transport's shape, so an encoder bug can't hide behind symmetric reuse. Field numbers
+// the JSON encoding's shape, so an encoder bug can't hide behind symmetric reuse. Field numbers
 // mirror the OTLP proto definitions.
 
 function pbReadVarint(buf: Uint8Array, pos: number): [bigint, number] {
@@ -1814,7 +1814,7 @@ test("otlpQueue and the otlp* options are two spellings of one endpoint; inherit
 
 	const proto = new Log({ otlpProtocol: "http/json", parentLog: parent });
 
-	t.strictEqual(proto.conf.otlpHttpBaseURI, parent.conf.otlpHttpBaseURI, "overriding one transport option still inherits the others");
+	t.strictEqual(proto.conf.otlpHttpBaseURI, parent.conf.otlpHttpBaseURI, "overriding one endpoint option still inherits the others");
 	t.notStrictEqual(proto.conf.otlpQueue, parent.conf.otlpQueue, "into a queue of its own");
 
 	const custom = new Log({ otlpQueue: queue, parentLog: parent });
@@ -3111,5 +3111,27 @@ test("a pending batch timer never holds the process, including one set by a reco
 	released = true;
 	await round;
 	t.ok(timers.every(timer => timer.unrefs === 1), "every batch timer set is unref'd once");
+	t.end();
+});
+
+test("an injected clock's numeric timer id is never handed to Deno's unrefTimer", async t => {
+	const unrefed: unknown[] = [];
+	const original: unknown = Reflect.get(globalThis, "Deno");
+	const clock = { clearTimeout: () => {}, now: () => Date.now(), setTimeout: () => 7 };
+
+	Reflect.set(globalThis, "Deno", { unrefTimer: (id: unknown) => { unrefed.push(id); } });
+	try {
+		const log = new Log({ otlpQueue: new Queue({ batchDelayMs: 600000, clock, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {} }), stderr: () => {}, stdout: () => {} });
+
+		log.info("first");
+	} finally {
+		if (original === undefined) {
+			Reflect.deleteProperty(globalThis, "Deno");
+		} else {
+			Reflect.set(globalThis, "Deno", original);
+		}
+	}
+
+	t.deepEqual(unrefed, [], "a stranger's timer id is left alone");
 	t.end();
 });

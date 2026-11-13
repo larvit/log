@@ -62,7 +62,7 @@ export type Logger = { [level in LogLevel]: (msg: string, metadata?: MetadataInp
 	enabled: (logLevel: LogLevel) => boolean;
 };
 
-// An older LogInt, whose fetch, enabled and conf may be missing or narrower, stays assignable until 3.0.0.
+// An older LogInt, which lacks enabled, flush or sampled, stays assignable until 3.0.0.
 export type LogInt = { [level in LogLevel]: LogShorthand } & {
 	conf: LogConf;
 	enabled?: Logger["enabled"];
@@ -159,9 +159,8 @@ const TEXT_LEVEL_TAGS: Record<LogLevel, { ansi: number, tag: string }> = {
 	warn: { ansi: 33, tag: "war" },
 };
 
-// Platform reads (processEnv, pageHref and denoUnrefTimer) happen at the caller,
-// which hands the value to a function that touches no global. A consumer injects through the `colors`
-// and `clock` options; a further option would grow the documented surface for a default.
+// The platform reads below (processEnv, pageHref, denoUnrefTimer) sit at their callers: a function takes
+// the value it needs, never the global. See docs/decisions.md → "A platform read stays a default".
 // The process global's env, or undefined where there is none (browsers) or a permission-gated one throws.
 function processEnv(): unknown {
 	try {
@@ -211,11 +210,12 @@ export function msgTextFormatter(conf: EntryFormatterConf) {
 
 // The formatter goes by these names:
 // - `format`: the option, "json" or "text"; a function passed there becomes a function formatter.
-// - `entryFormatter`: the deprecated option holding a function formatter, and on a resolved conf an
-//   alias of `format` (ENTRY_FORMATTER_ALIAS).
+// - `entryFormatter`: the deprecated option holding a function formatter; on a resolved conf, a read
+//   and write alias of the formatter in use (ENTRY_FORMATTER_ALIAS).
 // - `formatFunction`: a function formatter in LogSettings, while a conf is being resolved.
 // - `formatFunctions`: the table below, which holds a function formatter once a conf exists.
 // - `formatterOf`: the formatter a conf uses; `resolveFormatter` is its exported form.
+
 // A conf's function formatter, which `conf.format` cannot hold before 3.0.0, or the one a clone hands
 // the constructor, keyed by its options.
 const formatFunctions = new WeakMap<object, EntryFormatter>();
@@ -732,7 +732,7 @@ function warnOnceToStderr(conf: ResolvedLogConf, metadata: MetadataInput | undef
 // 5. Userinfo after `//` or its backslash forms: redactTextUserinfo in text, splitUserinfoPairs in a query.
 // 6. A listed key after `?`, `&`, `#` or `;` in text: redactTextQueryKeys.
 // 7. A url nested in the path: redactedPath.
-// buildUrlFull assembles url.full from 3 and 7, and failureMessage a span's status from 4 to 6.
+// buildUrlFull assembles url.full from 3 and 7, and failureMessage a span's status from 4 to 7.
 
 // One rule for the credential headers a span redacts and a send warns of. Elastic APM's default `sanitize_field_names`, plus the spec's optional `cookie`.
 const SENSITIVE_HEADER_NAME = /^(cookie|passwd|password|pwd|secret|set-cookie)$|key$|auth|card|credit|principal|session|token/;
@@ -760,7 +760,7 @@ type Decodings = string[] | typeof UNREADABLE;
 const inAnyDecoding = (readings: Decodings, test: (decoding: string) => boolean) => readings === UNREADABLE || readings.some(test);
 
 // A part's reading by depth, kept for one exported value: a url key is read alone and with its
-// value, so a chain of them would re-read each decoding.
+// value, so a chain of them would re-read each level.
 type PartsRead = Map<string, string>;
 
 function parsedUrl(text: string): URL | undefined {
@@ -773,7 +773,7 @@ function parsedUrl(text: string): URL | undefined {
 
 const holdsUserinfo = (url: URL) => url.username !== "" || url.password !== "";
 
-// The `//` rule, and the same after `\\`, `/\` or `\/`: they match a url among other text, or one
+// Userinfo after `//`, and the same after `\\`, `/\` or `\/`: the patterns match a url among other text, or one
 // the runtime cannot parse. After an opener holding a `\`, userinfo may not hold a `\`, so matching a
 // long run of `\` stays linear. Only a `/`, `?` or `#` ends userinfo in WHATWG URL's authority state,
 // as does a `\` in a special url, so a parser keeps a no-break space, a `\v` or a U+2028 in a
@@ -853,13 +853,13 @@ function redactTextQueryKeys(text: string): string {
 
 const changesInAnyDecoding = (text: string, redact: (decoding: string) => string) => inAnyDecoding(decodings(text), decoding => redact(decoding) !== decoding);
 
-const holdsUserinfoAtAnyLevel = (text: string) => changesInAnyDecoding(text, redactTextUserinfo);
+const holdsUserinfoInAnyDecoding = (text: string) => changesInAnyDecoding(text, redactTextUserinfo);
 const holdsListedKey = (text: string) => redactTextQueryKeys(text) !== text;
-const holdsListedKeyAtAnyLevel = (text: string) => changesInAnyDecoding(text, redactTextQueryKeys);
+const holdsListedKeyInAnyDecoding = (text: string) => changesInAnyDecoding(text, redactTextQueryKeys);
 
 const URL_DELIMITER = /[/?# ]/;
 
-// Whether a `//`, `\\`, `/\` or `\/` at the key's end, at any level, opens userinfo.
+// Whether a `//`, `\\`, `/\` or `\/` at the key's end, in any decoding, opens userinfo.
 const opensUserinfo = (key: string) => inAnyDecoding(decodings(key), decoding => OPENS_USERINFO.test(decoding));
 
 // A parser reads the `&` in `?//u:p&w@host` as part of the userinfo, which the query splits into
@@ -902,7 +902,7 @@ function splitUserinfoPairs(pairs: Array<[string, string]>, holdsAtSign: (text: 
 			start = index;
 			// The whole pair: `read` stops at the first delimiter, so it misses the `//x@` in a value such
 			// as `ss//x@h`, which `?//u:p=ss%2F%2Fx@h` decodes to.
-			end = holdsUserinfoAtAnyLevel(`${key}=${value}`) ? index : -1;
+			end = holdsUserinfoInAnyDecoding(`${key}=${value}`) ? index : -1;
 			read(value, index);
 		}
 	});
@@ -926,7 +926,7 @@ function rawQueryPairs(url: URL): Array<[string, string]> {
 }
 
 const formDecoded = (text: string) => new URLSearchParams(`=${text}`).get("") ?? "";
-const holdsAtSignAtAnyLevel = (text: string) => inAnyDecoding(decodings(text), decoding => decoding.includes("@"));
+const holdsAtSignInAnyDecoding = (text: string) => inAnyDecoding(decodings(text), decoding => decoding.includes("@"));
 
 // `undefined` where no pair changes.
 function redactedSearch(url: URL, depth: number, partsRead: PartsRead): string | undefined {
@@ -938,8 +938,8 @@ function redactedSearch(url: URL, depth: number, partsRead: PartsRead): string |
 	// that decodes first; its `+` stays, since a parser takes it as part of the userinfo. Form-decoded,
 	// as `searchParams` reads it, a `+` is a space and ends a run.
 	const split = new Set([
-		...splitUserinfoPairs(pairs, holdsAtSignAtAnyLevel),
-		...splitUserinfoPairs(raw.map(([key, value]): [string, string] => [percentDecoded(key), percentDecoded(value)]), holdsAtSignAtAnyLevel),
+		...splitUserinfoPairs(pairs, holdsAtSignInAnyDecoding),
+		...splitUserinfoPairs(raw.map(([key, value]): [string, string] => [percentDecoded(key), percentDecoded(value)]), holdsAtSignInAnyDecoding),
 		...splitUserinfoPairs(raw, text => text.includes("@")),
 	]);
 	// eslint-disable-next-line @typescript-eslint/no-use-before-define
@@ -997,18 +997,18 @@ function redactQueryPair(key: string, value: string, [rawKey, rawValue]: [string
 	}
 
 	// Form-decoded and raw both: a `+` or an escaped delimiter ends the match in one reading.
-	if (holdsUserinfoAtAnyLevel(key) || holdsUserinfoAtAnyLevel(rawKey) || holdsListedKeyAtAnyLevel(key)) {
+	if (holdsUserinfoInAnyDecoding(key) || holdsUserinfoInAnyDecoding(rawKey) || holdsListedKeyInAnyDecoding(key)) {
 		return ["REDACTED", "REDACTED"];
 	}
 
-	if (isListedQueryKey(key) || holdsUserinfoAtAnyLevel(value) || holdsUserinfoAtAnyLevel(rawValue)) {
+	if (isListedQueryKey(key) || holdsUserinfoInAnyDecoding(value) || holdsUserinfoInAnyDecoding(rawValue)) {
 		return [key, "REDACTED"];
 	}
 
 	// A url the runtime parses has its listed keys redacted in place; a listed key still left in the result sits where its query rules don't reach, such as a fragment.
 	const part = redactQueryPart(value, depth, partsRead);
 
-	return [key, holdsListedKeyAtAnyLevel(part) ? "REDACTED" : part];
+	return [key, holdsListedKeyInAnyDecoding(part) ? "REDACTED" : part];
 }
 
 // A value the runtime's `URL` parses whole; `undefined` where it is none or holds nothing to redact.
@@ -1031,7 +1031,7 @@ function redactedWholeUrl(value: string): string | undefined {
 }
 
 function redactHeaderCredential(name: string, value: string): string {
-	return isCredentialHeaderName(name) || redactedWholeUrl(value) !== undefined || holdsUserinfoAtAnyLevel(value) || holdsListedKeyAtAnyLevel(value) ? "REDACTED" : value;
+	return isCredentialHeaderName(name) || redactedWholeUrl(value) !== undefined || holdsUserinfoInAnyDecoding(value) || holdsListedKeyInAnyDecoding(value) ? "REDACTED" : value;
 }
 
 // The page's address, which a relative url resolves against; undefined outside a browser, or where the getter throws.
@@ -1090,8 +1090,8 @@ function redactedPath(pathname: string): string {
 	const kept = cut === -1 ? pathname : [...segments.slice(0, cut), "REDACTED"].join("/");
 
 	// Userinfo after `//`, `\\`, `/\` or `\/` needs no scheme and no query key, so both cuts can miss it.
-	// That userinfo may sit in a decoded level that maps to no raw segment, so the whole path goes.
-	return holdsUserinfoAtAnyLevel(kept) ? "/REDACTED" : kept;
+	// That userinfo may sit in a decoding that maps to no raw segment, so the whole path goes.
+	return holdsUserinfoInAnyDecoding(kept) ? "/REDACTED" : kept;
 }
 
 // `url.origin` omits userinfo, which is what keeps the outer url's credentials off the span.
@@ -1125,7 +1125,7 @@ function failureMessage(error: unknown, url?: URL): string {
 
 	const keyed = redactTextQueryKeys(redactTextUserinfo(redactedWholeUrl(quoted) ?? quoted));
 
-	return holdsListedKeyAtAnyLevel(keyed) ? "REDACTED" : keyed;
+	return holdsListedKeyInAnyDecoding(keyed) ? "REDACTED" : keyed;
 }
 
 // --- OTLP export: types and queued items ----------------------------------
@@ -1320,7 +1320,7 @@ class ExportScheduler {
 			void this.flush();
 		}, delayMs);
 
-		// An injected clock's number may not be a Deno timer id, and unrefing a stranger's is worse.
+		// An injected clock's number may not be a Deno timer id, and unrefing a stranger's timer could stop an unrelated one.
 		unref(handle, this.conf.clock === systemClock ? denoUnrefTimer() : undefined);
 		this.timer = { handle, retry };
 	}
@@ -1387,7 +1387,7 @@ function groupBy<T>(items: T[], keyOf: (item: T) => string, join: (group: T[]) =
 
 const resourceKey = (entry: { resource: unknown }) => JSON.stringify(entry.resource);
 
-// A payload an older version stored carries no scope on its logs, and its span name as its spans' scope; both merge by this key.
+// A payload an older version stored carries no scope on its logs, and its span name as its spans' scope; payloads merge by this key.
 const scopeKey = (entry: { scope?: OtlpScope }) => JSON.stringify([entry.scope?.name, entry.scope?.version]);
 
 function mergeLogPayloads(payloads: OtlpLogPayload[]): OtlpLogPayload {
@@ -1629,7 +1629,7 @@ export class Queue implements OtlpQueue {
 
 	private readonly buffer = new ItemBuffer();
 	private dropped = 0;
-	// The batch being sent: out of the buffer, but kept in storage until its send settles.
+	// Out of the buffer, but kept in storage until its send settles.
 	private batchBeingSent: QueuedItem[] = [];
 	// A failed batch whose retry its report promised, so the trim spares it. Only `round` sets it.
 	private retrying: ReadonlySet<QueuedItem> = new Set();
@@ -2005,7 +2005,7 @@ function optionsFromSettings({ formatFunction, ...options }: LogSettings): LogOp
 	return options;
 }
 
-// One this module did not store — another copy of it, or an older LogInt — shows only as
+// A conf this module did not store — another copy of it, or an older LogInt's — shows only as
 // entryFormatter, which wins over its format.
 function sourceFormatFunction(sourceConf: LogConf): EntryFormatter | undefined {
 	const stored = formatFunctions.get(sourceConf);
@@ -2268,7 +2268,7 @@ async function tracedFetch(log: Pick<Log, "conf" | "context" | "sampled" | "span
 		return res;
 	} catch (err) {
 		span.status = { code: STATUS_CODE_ERROR, message: failureMessage(err, url) };
-		// The value this library has always documented; semconv's rule, as end() applies it, waits for 3.0.0.
+		// README's value: the error's code, else its name, else fetch_error. end() applies semconv's `_OTHER` fallback instead; that waits for 3.0.0.
 		attributes["error.type"] = stringField(err, "code") ?? numberFieldAsString(err, "code") ?? stringField(err, "name") ?? "fetch_error";
 
 		throw err;
