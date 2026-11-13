@@ -12,9 +12,10 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 130 | 2.6.0 |  |  | **Let a reader follow how a `Log`'s formatter, default queue and once-only warnings pass between functions, without tracing module-level tables across sections.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
-| 131 | 2.6.0 |  |  | **Let a reader check each query, path and text redaction routine in `// --- Credentials on a span ---` on one read: its state, its recursion and the order of its checks plain where they act.** | 2 | 2 | 4 | 6 | 5 | code health by 7 | 4.0 |
-| 134 | 2.6.0 |  |  | **Lower the reading cost of the files a chunk reads most before its first commit.** | 2 | 2 | 1 | 3 | 4 | code health by 3 | 2.7 |
+| 128 | 2.6.0 |  |  | **Give each part of the library a source module of its own, so a rule can be read and tested without the rest.** | 4 | 2 | 3 | 7 | 8 | code health by 8 | 3.3 |
+| 130 | 2.6.0 | 128 |  | **Let a reader follow how a `Log`'s formatter, default queue and once-only warnings pass between functions, without tracing module-level tables across sections.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
+| 131 | 2.6.0 | 128 |  | **Let a reader check each query, path and text redaction routine in `// --- Credentials on a span ---` on one read: its state, its recursion and the order of its checks plain where they act.** | 2 | 2 | 4 | 6 | 5 | code health by 7 | 4.0 |
+| 134 | 2.6.0 | 128 |  | **Lower the reading cost of the files a chunk reads most before its first commit.** | 2 | 2 | 1 | 3 | 4 | code health by 3 | 2.7 |
 | 135 | 2.7.0 | 130, 131 | decision | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
 | 36 | 2.7.0 |  | principle | **Reach the retry decision and a `log.fetch` span's attributes without a network call.** | 2 | 1 | 1 | 2 | 5 | code health by 5 | 4.5 |
 | 43 | 2.7.0 |  | principle | **Give `ExportScheduler` and save coalescing named states.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
@@ -22,8 +23,7 @@
 | 109 | 2.7.0 |  | principle | **Test without the wall clock: no sleep, no real timer and no time bound.** | 2 | 1 | 1 | 2 | 4 | code health by 4 | 4.2 |
 | 110 | 2.7.0 |  | principle | **Register one test per case where a test loops over its cases or checks many behaviours.** | 1 | 1 | 1 | 1 | 4 | code health by 3 | 3.7 |
 | 25 | 2.7.0 |  |  | **Publish the artifact the gate tested.** | 2 | 2 | 3 | 5 | 4 | code health by 5 | 3.5 |
-| 118 | 2.7.0 |  | principle | **Bring `index.ts`'s `// --- Credentials on a span ---` section within about seven things per level, or record why it holds more.** | 2 | 1 | 4 | 5 | 4 | code health by 5 | 3.5 |
-| 128 | 2.7.0 |  |  | **Give each part of the library a source module of its own, so a rule can be read and tested without the rest.** | 4 | 2 | 3 | 7 | 8 | code health by 8 | 3.3 |
+| 118 | 2.7.0 | 128 | principle | **Bring `index.ts`'s `// --- Credentials on a span ---` section within about seven things per level, or record why it holds more.** | 2 | 1 | 4 | 5 | 4 | code health by 5 | 3.5 |
 | 82 | 2.7.0 |  |  | **Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.** | 1 | 2 | 1 | 2 | 1 | 3 by 5 | 2.3 |
 | 19 | 2.7.0 |  | defect | **Leave a `Request` untraced in `log.fetch`.** | 1 | 1 | 2 | 2 | 2 | 2.1 by 6 | 2.1 |
 | 114 | 2.7.0 |  |  | **Move `package.json`'s build and test one-liners into named scripts, and let the OTLP test read its collector's port, image and container name from the environment, today's values as defaults.** | 1 | 1 | 1 | 1 | 2 | code health by 1 | 2.1 |
@@ -92,6 +92,22 @@
 
 ## Details
 
+### 128. Give each part of the library a source module of its own, so a rule can be read and tested without the rest.
+
+`index.ts` is one module, and any of its sections can reach every module-level table. The pure
+credential rules therefore have no seam of their own: each redaction test passes through `Log`,
+`fetch`, the queue and the export, so item 96 would move all of them, and item 96's "no other code
+knows OTLP" can't be enforced within one file. No decision ever asked for one source file: the
+library began as one in 2022, and README's "One file, every runtime" only restated that. On
+2026-11-13 the maintainer asked for the parts to live in files in folders, with `// --- name ---`
+banners only where a technical limit stops a split, and for an entry point a newcomer finds at
+once: `index.ts` and few other files in the root, so `tap.ts` and `test.ts` move too. Whether the
+package publishes one bundled `index.js` or the compiler's modules, which import each other as
+native ESM in every runtime this library supports, is part of this item; the 2026-11-10 approval of
+a bundler allows one without asking for it. The footprint budgets in README → Footprint (see item
+117) must hold. Reword README's "One file" bullet, and AGENTS.md's rule on `index.ts` sections, to
+match. Items 118, 130, 131 and 134 wait for this, since each reworks code it moves.
+
 ### 130. Let a reader follow how a `Log`'s formatter, default queue and once-only warnings pass between functions, without tracing module-level tables across sections.
 
 The 2026-11-13 comprehension run ranked these places hard for Locality: `formatFunctions`, a
@@ -137,8 +153,7 @@ The last 5 chunks read a median of 91574 new input tokens before their first com
 them read 52550. Over the last 5 chunks, the files read most, counting opens and searches, were
 `index.ts` 97 times, `test.ts` 35, `README.md` 33, `todo.md` 20, `docs/decisions.md` 17,
 `package.json` 11, `CHANGELOG.md` 5, `AGENTS.md` 4, `eslint.config.js` 3 and `tap.ts` 2. The
-figures live in `docs/reading-cost.md`. Item 128 splits `index.ts` into modules; this item doesn't
-wait for it.
+figures live in `docs/reading-cost.md`.
 
 ### 135. Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.
 
@@ -197,15 +212,6 @@ section" asks. Principle: `~/.claude/principles/technical-principles.md` → "Ab
 level". Found by the principles audit of 2026-10-28. `splitUserinfoPairs` is hard to read too: its
 closures `close` and `read` mutate `start`, `end` and `split`, more interacting values than four or
 five. Found by the 2.5.0 principles audit.
-
-### 128. Give each part of the library a source module of its own, so a rule can be read and tested without the rest.
-
-`index.ts` is one module, and any of its sections can reach every module-level table. The pure
-credential rules therefore have no seam of their own: each redaction test passes through `Log`,
-`fetch`, the queue and the export, so item 96 would move all of them, and item 96's "no other code
-knows OTLP" can't be enforced within one file. On 2026-11-10 the maintainer approved
-adding a bundler so that the package still publishes one `index.js`; which bundler is part of this
-item. The footprint budgets in README → Footprint (see item 117) must hold.
 
 ### 82. Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.
 
