@@ -2039,6 +2039,13 @@ function orDefault<T>(value: T | undefined, fallback: T): T {
 	return value === undefined ? fallback : value;
 }
 
+// Adds the alias to a conf that lacks it. Writing entryFormatter into the conf first and redefining it
+// turns a data property into an accessor, which drops every conf into V8's slow dictionary mode and
+// past README → Footprint.
+function addFormatterAlias<T extends object>(conf: T): asserts conf is T & Pick<ResolvedLogConf, "entryFormatter"> {
+	Object.defineProperty(conf, "entryFormatter", ENTRY_FORMATTER_ALIAS);
+}
+
 function withDefaults(settings: LogSettings): ResolvedLogConf {
 	const { entryFormatter, format, formatFunction, ...rest } = settings;
 	// A function and an entryFormatter that differ never meet here: a caller's entryFormatter stops
@@ -2059,10 +2066,9 @@ function withDefaults(settings: LogSettings): ResolvedLogConf {
 		formatFunctions.set(conf, formatter);
 	}
 
-	// The one cast left, and it claims only the alias: TypeScript can't type a property defineProperty
-	// adds. Writing entryFormatter into the literal instead, then redefining it, turns a data property
-	// into an accessor, which drops every conf into V8's slow dictionary mode and past README → Footprint.
-	return Object.defineProperty(conf, "entryFormatter", ENTRY_FORMATTER_ALIAS) as typeof conf & Pick<ResolvedLogConf, "entryFormatter">;
+	addFormatterAlias(conf);
+
+	return conf;
 }
 
 // Defaults come last, since inherited() takes only the keys still unset.
