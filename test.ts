@@ -566,8 +566,8 @@ test("randomBytes decides every trace and span id, and children and clones inher
 	await log.fetch("https://api.test/x");
 	await log.end();
 
-	t.ok(/^([0-9a-f]{2})\1{7}$/.test(clientSpan(calls).spanId), "a log.fetch span id comes from it too: eight equal bytes");
-	t.strictEqual(new Log({ stderr: () => {} }).conf.randomBytes, undefined, "unset, the platform's randomness is used");
+	t.strictEqual(clientSpan(calls).spanId, "06".repeat(8), "a log.fetch span id comes from it too, after the clone's span and trace id");
+	t.strictEqual(typeof new Log({ stderr: () => {} }).conf.randomBytes, "function", "unset, log.conf holds the platform's randomness");
 	t.end();
 });
 
@@ -1639,7 +1639,8 @@ test("Queue with storage survives a restart: leftovers go first and storage empt
 		t.strictEqual(storage.data.size, 1, `${label}: the undelivered records and span are persisted under the default key`);
 
 		const { calls } = stubFetch();
-		const after = new Log({ otlpQueue: new Queue({ otlpHttpBaseURI, report: () => {}, storage }), stderr: () => {} });
+		const afterReports = reportSink();
+		const after = new Log({ otlpQueue: new Queue({ otlpHttpBaseURI, report: afterReports.report, storage }), stderr: () => {} });
 
 		after.info("after restart");
 		await after.flush();
@@ -1647,6 +1648,7 @@ test("Queue with storage survives a restart: leftovers go first and storage empt
 		t.strictEqual(exportedSpans(calls).length, 1, `${label}: the persisted span is delivered too`);
 		await waitFor(() => storage.data.size === 0);
 		t.strictEqual(storage.data.size, 0, `${label}: storage is cleared once everything is delivered`);
+		t.deepEqual(afterReports.lines, [], `${label}: a readable store is reported nowhere`);
 	}
 
 	const corrupt = fakeStorage(false);
@@ -1661,6 +1663,7 @@ test("Queue with storage survives a restart: leftovers go first and storage empt
 	await log.flush();
 	t.deepEqual(exportedRecords(calls), ["still works"], "corrupt stored data does not block new records");
 	t.deepEqual(reports.lines.map(line => line.msg), ["OTLP queue storage unreadable, discarded"], "corrupt data is reported once");
+	t.strictEqual(typeof reports.lines[0]?.error, "string", "and says why");
 
 	Reflect.apply(queue.enqueue, queue, [{ resourceMetrics: [] }]);
 	await queue.flush();
@@ -1668,6 +1671,21 @@ test("Queue with storage survives a restart: leftovers go first and storage empt
 	t.deepEqual(reports.lines.slice(1), [{ msg: "OTLP payload of unknown kind, dropped" }], "and is reported by the same rule stored data meets");
 	await waitFor(() => corrupt.data.size === 0);
 	t.strictEqual(corrupt.data.size, 0, "the custom key is cleared");
+
+	const notAList = fakeStorage(false);
+	const notAListReports = reportSink();
+
+	notAList.data.set("@larvit/log:otlp-queue", JSON.stringify({ not: "a list" }));
+	new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", report: notAListReports.report, storage: notAList });
+	await waitFor(() => notAList.data.size === 0);
+	t.deepEqual(notAListReports.lines, [{ error: "not a list of OTLP payloads", key: "@larvit/log:otlp-queue", msg: "OTLP queue storage unreadable, discarded" }], "stored JSON that is not a list of payloads is reported and cleared");
+
+	const long = fakeStorage(false);
+	const longReports = reportSink();
+
+	long.data.set("@larvit/log:otlp-queue", JSON.stringify(Array.from({ length: 150000 }, () => ({ resourceLogs: [] }))));
+	await new Queue({ maxItems: 150000, otlpHttpBaseURI: "http://127.0.0.1:4318", report: longReports.report, storage: long }).flush();
+	t.deepEqual(longReports.lines, [], "a stored list too long to pass as call arguments loads without a report");
 
 	const broken = fakeStorage(false);
 	const brokenReports = reportSink();

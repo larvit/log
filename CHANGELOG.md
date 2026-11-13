@@ -2,9 +2,10 @@
 
 ## Unreleased
 
-- **Pass `randomBytes` to control the random bytes behind every trace and span id.** A test can hand
-  back fixed bytes and check the ids exactly. Unset, ids come from Web Crypto, else `Math.random`, as
-  before; a child and a clone inherit the option.
+- **Pass `randomBytes` to control the random bytes behind each trace and span id a `Log` makes.** A
+  test can hand back fixed bytes and check the ids exactly. Unset, ids come from Web Crypto, else
+  `Math.random`, as before; a child and a clone inherit the option, and `log.conf.randomBytes` reads
+  back the function in use. `generateTraceId()` and `generateSpanId()` don't use it.
 
 ## v2.5.0
 
