@@ -409,10 +409,11 @@ consumer needs the page address or the env injected apart from these.
 2026-11-13, the implementing agent, on the maintainer's request for source files in folders: the
 source is `index.ts`, holding only the public exports, and one module per part under `log/`,
 `otlp/`, `primitives/` and `tracing/`. esbuild bundles them into the one `index.js` the package has
-always published, and `uglifyjs -m` minifies it as before. Publishing the compiler's modules
-instead would stop a minifier shortening any name one module exports to another, and a browser
-without a bundler would fetch 22 files. Measured in the repo's container image, the bundle is
-11514 bytes gzipped against 11480 for the single source file. Declarations are not bundled:
+always published, shortening syntax as it goes, and `uglifyjs -m` minifies it as before.
+Publishing the compiler's modules instead would stop a minifier shortening any name one module
+exports to another, and a browser without a bundler would fetch about twenty files. Measured in
+the repo's container image, the bundle is 11366 bytes gzipped against 11480 for the single source
+file. Declarations are not bundled:
 `types/` mirrors the modules, and `types/index.d.ts` names the public ones. The suite tests the
 bundle through `index.js`. A test that imports a module directly runs tsc's output for that module,
 not the bundle, so it suits a pure rule and never what the bundler or minifier could change.

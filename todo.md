@@ -264,7 +264,7 @@ README → Footprint budgets `index.js` at ≤10 KB gzipped for Goals #5. On 202
 `gzip -9c index.js | wc -c`. The budget is broken, and nothing checks it. Whether to shrink the
 build or re-state the budget is for this item to work out. Item 26 will check the budget in CI, and
 that check will fail from its first run until this item lands. Found on 2026-10-28, at 10439 bytes.
-On 2026-11-13 the bundled build was 11514 bytes, and 10395 with `uglifyjs --toplevel`. That flag
+On 2026-11-13 the bundled build was 11366 bytes, and 10241 with `uglifyjs --toplevel`. That flag
 shortens every top-level name, keeping only the names consumers import. So `Log.name` and
 `Queue.name`, which a debugger prints, are shortened too unless the build reserves them.
 
