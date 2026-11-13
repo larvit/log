@@ -389,3 +389,19 @@ Read most (opens and searches):
 - `AGENTS.md` 1
 
 ## Reading cost reset, 2026-11-13T22:03:24Z
+
+## Reading cost, chunk bcf4e80998a8, finished 2026-11-13T22:12:10Z
+
+47481 new input tokens before the first commit.
+
+Read most (opens and searches):
+
+- `todo.md` 4
+- `README.md` 3
+- `docs/decisions.md` 3
+- `docs/reading-cost.md` 3
+- `AGENTS.md` 2
+- `tests/test.ts` 2
+- `package.json` 1
+- `tests/tap.ts` 1
+- `tsconfig.test.json` 1
