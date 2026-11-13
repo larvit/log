@@ -2034,6 +2034,11 @@ function entryFormatterDeprecation(settings: LogSettings): string | undefined {
 	return "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format";
 }
 
+// Only undefined is unset: a null is kept, so the check for a bad value still sees it.
+function orDefault<T>(value: T | undefined, fallback: T): T {
+	return value === undefined ? fallback : value;
+}
+
 function withDefaults(settings: LogSettings): ResolvedLogConf {
 	const { entryFormatter, format, formatFunction, ...rest } = settings;
 	// Never two that differ: a caller's entryFormatter stops inherited() from taking a function, and
@@ -2041,14 +2046,12 @@ function withDefaults(settings: LogSettings): ResolvedLogConf {
 	const formatter = formatFunction ?? entryFormatter;
 	const conf = {
 		...rest,
-		clock: rest.clock ?? systemClock,
-		colors: rest.colors ?? colorsFromEnv() ?? true,
-		// Only types the literal: the alias below replaces it with a live read of the formatter.
-		entryFormatter: msgTextFormatter,
-		logLevel: rest.logLevel ?? DEFAULT_LOG_LEVEL,
-		randomBytes: rest.randomBytes ?? platformRandomBytes,
-		stderr: rest.stderr ?? console.error,
-		stdout: rest.stdout ?? console.log,
+		clock: orDefault(rest.clock, systemClock),
+		colors: orDefault(rest.colors, colorsFromEnv() ?? true),
+		logLevel: orDefault(rest.logLevel, DEFAULT_LOG_LEVEL),
+		randomBytes: orDefault(rest.randomBytes, platformRandomBytes),
+		stderr: orDefault(rest.stderr, console.error),
+		stdout: orDefault(rest.stdout, console.log),
 		...format !== undefined ? { format } : formatter ? {} : { format: "text" as const },
 	};
 
@@ -2056,7 +2059,10 @@ function withDefaults(settings: LogSettings): ResolvedLogConf {
 		formatFunctions.set(conf, formatter);
 	}
 
-	return Object.defineProperty(conf, "entryFormatter", ENTRY_FORMATTER_ALIAS);
+	// The one cast left, and it claims only the alias: TypeScript can't type a property defineProperty
+	// adds. Writing entryFormatter into the literal instead, then redefining it, turns a data property
+	// into an accessor, which drops every conf into V8's slow dictionary mode and past README → Footprint.
+	return Object.defineProperty(conf, "entryFormatter", ENTRY_FORMATTER_ALIAS) as typeof conf & Pick<ResolvedLogConf, "entryFormatter">;
 }
 
 // Each step hands the next a new value: defaults come last, so none hides an inherited value, and
