@@ -12,9 +12,8 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 131 | 2.6.0 |  |  | **Let a reader check each query, path and text redaction routine in `tracing/span-credentials.ts` on one read: its state, its recursion and the order of its checks plain where they act.** | 2 | 2 | 4 | 6 | 5 | code health by 7 | 4.0 |
 | 134 | 2.6.0 |  |  | **Lower the reading cost of the files a chunk reads most before its first commit.** | 2 | 2 | 1 | 3 | 4 | code health by 3 | 2.7 |
-| 135 | 2.7.0 | 131 | decision | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
+| 135 | 2.7.0 |  | decision | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
 | 36 | 2.7.0 |  | principle | **Reach the retry decision and a `log.fetch` span's attributes without a network call.** | 2 | 1 | 1 | 2 | 5 | code health by 5 | 4.5 |
 | 43 | 2.7.0 |  | principle | **Give `ExportScheduler` and save coalescing named states.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
 | 48 | 2.7.0 |  | principle | **Test the untested failure paths.** | 2 | 1 | 1 | 2 | 4 | code health by 4 | 4.2 |
@@ -91,25 +90,6 @@
 | 75 | 3.0.0 | 22 | decision | **Keep credentials off `log.conf` and `queue.conf`.** | 2 | 1 | 2 | 3 | 3 | 3 by 3 | 0.7 |
 
 ## Details
-
-### 131. Let a reader check each query, path and text redaction routine in `tracing/span-credentials.ts` on one read: its state, its recursion and the order of its checks plain where they act.
-
-Every seat of the 2026-11-13 comprehension run ranked these places among the hardest, and a wrong
-edit to one leaks a credential, against README → Goals #7: `redactedSearch` unions three readings
-of one query; `redactQueryPair`, `redactQueryPart`, `readQueryPart` and `redactedSearch` recurse
-in a four-function cycle marked only by two eslint-disable lines, with a depth, a memo keyed by a string, and five
-ordered exits whose order is load-bearing and unmarked; in `redactedPath`, `cut` is both the loop
-bound and the result, the loop starts at 1 for an unstated reason, and a fallback discards both;
-`redactTextQueryKeys` steers by two global regexes' `lastIndex` and a `copied` cursor, behind a
-guard whose comment lists cases instead of stating the invariant; `failureMessage` stacks
-redactors in an order only README bullets justify; and in `splitUserinfoPairs` two `if`s on
-`start` can both fire on one pair, and the name says split where it returns ranges to redact.
-Make each of those places easier to read.
-
-Item 118 takes the module's grouping and `splitUserinfoPairs`'s closures.
-What each routine records stays as it is: README → Audience lets only a major drop a shape that
-records `REDACTED`, and the rules stay in one module, as `docs/decisions.md` → "Every rule on
-credentials in a span sits in one module" asks.
 
 ### 134. Lower the reading cost of the files a chunk reads most before its first commit.
 
