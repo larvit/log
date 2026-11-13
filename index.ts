@@ -215,7 +215,7 @@ export function msgTextFormatter(conf: EntryFormatterConf) {
 //   and write alias of the formatter in use (ENTRY_FORMATTER_ALIAS).
 // - `formatFunction`: a function formatter in LogSettings, while a conf is being resolved.
 // - `confFormatters`: the table below, which holds a function formatter once a conf exists.
-// - `cloneFormatters`: the table a clone hands its function formatter to the constructor in.
+// - `cloneFormatters`: the table through which a clone hands its function formatter to the constructor.
 // - `formatterOf`: the formatter a conf uses; `resolveFormatter` is its exported form.
 
 // A conf's function formatter, which `conf.format` cannot hold before 3.0.0.
@@ -1879,16 +1879,14 @@ export class Queue implements OtlpQueue {
 //   rejectQueueBesideShorthand and rejectTwoFormatters, then withDefaults, then attachDefaultQueue.
 // - `log.clone(options)`: confFromOptions, then inherited(…, "clone"), then optionsFromSettings, whose
 //   result goes through `new Log` as above.
-// Three things travel beside the plain keys:
-// - A function formatter: formatFunction while settings resolve. withDefaults moves it into
-//   confFormatters, keyed by the conf, which the entryFormatter alias reads and writes. A clone hands
-//   its own to the constructor through cloneFormatters, keyed by the options; a Log's conf passed as
-//   options hands on its own from confFormatters.
+// Three things need more than copying a LogConf key:
+// - A function formatter: formatFunction, or the deprecated entryFormatter option, while settings
+//   resolve. withDefaults moves it into confFormatters, keyed by the conf, which the entryFormatter
+//   alias reads and writes. A clone hands its own to the constructor through cloneFormatters, keyed by
+//   the options; a Log's conf passed as options hands on its own from confFormatters.
 // - The default queue: attachDefaultQueue builds it into conf.otlpQueue and marks it in defaultQueues.
-//   A child or clone inherits it with the endpoint keys it was built from, by reference, and only that
-//   pair passes rejectQueueBesideShorthand.
-// - Warnings: writeOnce, in "stderr lines, and warnings written once per sink", writes each one once
-//   per sink. A default queue warns through its Log's stderr, so a Log and its queue share one record.
+// - Warnings: writeOnce, in "stderr lines, and warnings written once per sink". A default queue warns
+//   through its Log's stderr, so a message the Log and its queue both raise is written there once.
 
 const OTLP_ENDPOINT_KEYS = ["otlpAdditionalHeaders", "otlpHttpBaseURI", "otlpProtocol"] as const;
 
@@ -2005,8 +2003,9 @@ type LogSettings = Omit<LogOptions, "context" | "format"> & { context?: Metadata
 // confFromOptions, called by that constructor, reads it.
 const cloneFormatters = new WeakMap<LogOptions, EntryFormatter>();
 
-// The function formatter that options carry outside `format`: a clone's, or that of a Log whose own
-// conf is passed as options, which the spread below drops with the non-enumerable alias.
+// The function formatter that options carry outside `format`: a clone's, or, when a Log's own conf is
+// passed as options, that Log's. confFromOptions spreads the options, which drops the non-enumerable
+// entryFormatter alias and that function with it.
 function handedFormatFunction(options: LogOptions): EntryFormatter | undefined {
 	return cloneFormatters.get(options) ?? confFormatters.get(options);
 }
@@ -2023,7 +2022,7 @@ function confFromOptions(options: LogOptions | LogLevel | "none" | undefined): L
 	};
 }
 
-// A clone's settings as constructor options, its function formatter put in cloneFormatters.
+// A clone's settings as constructor options.
 function optionsFromSettings({ formatFunction, ...options }: LogSettings): LogOptions {
 	if (formatFunction) {
 		cloneFormatters.set(options, formatFunction);
@@ -2034,8 +2033,8 @@ function optionsFromSettings({ formatFunction, ...options }: LogSettings): LogOp
 
 // The function formatter a child or clone takes from its source, if any.
 function sourceFormatFunction(sourceConf: LogConf): EntryFormatter | undefined {
-	// The alias's getter marks a conf this module built: confFormatters alone holds its function, since
-	// its entryFormatter reads back a built-in formatter where it has none.
+	// The alias's getter marks a conf this module built. Only confFormatters holds such a conf's
+	// function: its entryFormatter reads back a built-in formatter when it has no function.
 	const builtHere = Object.getOwnPropertyDescriptor(sourceConf, "entryFormatter")?.get === ENTRY_FORMATTER_ALIAS.get;
 
 	// A conf from another copy of this module, or an older LogInt's, shows its function only as
@@ -2049,8 +2048,8 @@ function isLogConfKey(key: string): key is keyof LogConf {
 
 const LOG_CONF_KEYS = Object.keys(INHERITED_BY).filter(isLogConfKey);
 
-// Generic over the key, so the compiler sees one value type on both sides. It copies the reference,
-// never the value: an inherited default queue passes isDefaultQueueFor only beside the very
+// Generic over the key, so the compiler sees one value type on both sides. Keep this a plain
+// assignment: an inherited default queue passes isDefaultQueueFor only beside the very
 // otlpAdditionalHeaders object it was built with.
 function copyKey<K extends keyof LogConf>(target: LogConf, source: LogConf, key: K): void {
 	target[key] = source[key];
