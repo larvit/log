@@ -859,10 +859,10 @@ test("conf.entryFormatter reads and writes the formatter until 3.0.0", t => {
 
 	liveChild.conf.format = "text";
 	liveChild.info("child");
-	t.ok(live.stdout[1].endsWith("child"), "a child of a Log with a built-in formatter follows its own format, as no function came with it");
+	t.ok(live.stdout[1].endsWith("child"), "a child of a Log with a built-in formatter follows its own format, since the parent has no function formatter to hand it");
 
 	new Log(swap.log.conf).info("from conf");
-	t.strictEqual(swap.stdout[2], "swapped from conf", "a Log built from another's conf object keeps its function formatter, as through 2.5.0");
+	t.strictEqual(swap.stdout[2], "swapped from conf", "a Log built from another Log's conf object takes that Log's function formatter, as through 2.5.0");
 
 	// Only a hand-written LogInt's conf carries the deprecated name as a key of its own.
 	const handBuilt = capture({ format: (entry: EntryFormatterConf) => `parent ${entry.msg}` });
@@ -1836,7 +1836,7 @@ test("otlpQueue and the otlp* options are two spellings of one endpoint; inherit
 	const headered = new Log({ otlpAdditionalHeaders: { authorization: "Bearer t0k3n" }, otlpHttpBaseURI: "http://127.0.0.1:4318" });
 
 	t.ok(thrown(() => new Log({ ...headered.conf, otlpAdditionalHeaders: { authorization: "Bearer t0k3n" } })).includes("otlpQueue"), "and beside an equal copy of its headers, which a rotation could make differ");
-	t.deepEqual([new Log({ parentLog: headered }), headered.clone()].map(log => log.conf.otlpQueue === headered.conf.otlpQueue), [true, true], "a child or clone of a headered Log shares its queue, so inheritance hands the headers on by reference");
+	t.deepEqual([new Log({ parentLog: headered }), headered.clone()].map(log => log.conf.otlpQueue === headered.conf.otlpQueue), [true, true], "a child or clone of a headered Log shares its queue, since inheritance hands the headers on by reference");
 
 	const elsewhere = [new Log({ otlpHttpBaseURI: "https://other.test", parentLog: headered }), headered.clone({ otlpHttpBaseURI: "http://127.0.0.1:4319" })];
 
