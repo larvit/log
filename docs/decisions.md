@@ -417,7 +417,7 @@ cannot carry beside the inherited `format` string, and the other route was a mod
 keyed on whichever object was in hand, which every seat of two comprehension runs named as the
 hardest place to follow. README documents neither parameter, and a caller who passes one gets no
 promise from Goal 8. Serves code health; bounded by README → Goals #8. Valid until 3.0.0, where
-both can move behind a factory the package doesn't export.
+`todo.md` item 142 takes both off the published constructors.
 
 ## The package publishes one bundled `index.js`, built from a module per part
 
