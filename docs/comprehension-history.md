@@ -191,3 +191,93 @@ Inherited architect, would restructure first:
 - `index.ts:2256` `Log.inFlight`: differs only in case from `Queue.inflight` at `index.ts:1595` and means un-awaited fetches
 - `index.ts:1723` `Queue.warnOnce`: shares a name with the module `warnOnce` at `index.ts:702` and keys on a different thing
 - `index.ts:1835` "Resolving a Log's settings": about 20 functions and three module-level identity registries
+
+## 2026-11-13T22:06:17Z, PR #360 at 238982e
+
+| Seat | Navigation | Locality | Shape | Self-sufficiency | Overall |
+|---|---|---|---|---|---|
+| Junior A | 7 | 5.5 | 6 | 6 | 6 |
+| Mid A | 7.5 | 6 | 6.5 | 6.5 | 6.5 |
+| Maintainability senior | 7.5 | 6 | 6.5 | 6.5 | 6.5 |
+| Inherited architect | 7.5 | 6 | 6.5 | 7 | 6.5 |
+| Mean | 7.38 | 5.88 | 6.38 | 6.50 | 6.38 |
+
+Junior A, hardest first:
+
+- Overall, Self-sufficiency: `tracing/span-credentials.ts:282` `redactQueryPair`: a four-function recursion cycle with a depth cap and a memo, five checks whose order is load-bearing, and form-decoded and raw readings side by side; moving a check could not be shown safe
+- Overall, Shape: `tracing/span-credentials.ts:151` `pairsInUserinfoRuns`: two closures change shared start and end, both `if`s can fire on one pair, and the caller runs it over three readings
+- Locality, Overall: `log/settings.ts:147` `confFromOptions`: one formatter travels under six names through two WeakMaps and a getter-identity check across `settings.ts` and `entry-format.ts`
+- Locality: `log/settings.ts:188` `copyKey`: must stay a plain assignment because `isDefaultQueueFor` compares headers by reference, a link only a comment states
+- Shape: `tracing/span-credentials.ts:359` `redactedPath`: two cut indices, a loop bound that depends on one, and a whole-path fallback
+- Overall: `otlp/export-scheduler.ts:44` `ExportScheduler.flush`: `running`, `pending` and `timer.retry` with a recursive `next`
+
+Mid A, hardest first:
+
+- Overall, Self-sufficiency: `tracing/span-credentials.ts:218` `redactedSearch`: three readings of one query feed a four-function recursive cycle; dropping one reading cannot be judged without the tests
+- Overall: `tracing/span-credentials.ts:282` `redactQueryPair`: five ordered checks, and the comment states that the order matters but not why it suffices
+- Locality, Overall: `log/settings.ts:169` `sourceFormatFunction`: a function formatter moves between `formatFunction`, `cloneFormatters`, `confFormatters` and an accessor, told apart by getter identity
+- Locality: `log/settings.ts:88` `isDefaultQueueFor`: default-queue recognition rests on `otlpAdditionalHeaders` being the same reference, which `copyKey` has to keep
+- Self-sufficiency: `tracing/fetch.ts:2` `warnOnceToStderr`: an import against the stated direction whose reason sits only in the decision log
+- Overall: `otlp/export-scheduler.ts:44` `ExportScheduler.flush`: three interacting fields and re-entry through `next`
+
+Maintainability senior, hardest first:
+
+- Overall, Self-sufficiency: `tracing/span-credentials.ts:217` `redactedSearch`: a four-function cycle, three readings and five ordered steps held at once; a change fails open into an exported credential
+- Locality, Overall: `log/settings.ts:135` `sourceFormatFunction`: formatter state in two identity-keyed WeakMaps across two files, with a getter comparison to tell a conf this copy built
+- Locality: `log/settings.ts:66` `otlpKeysNotToInherit`: default-queue recognition rests on a reference check that a comment two functions away constrains
+- Shape: `tracing/span-credentials.ts:359` `redactedPath`: three interacting cut indexes and a loop bound that changes with one
+- Navigation, Self-sufficiency: `otlp/sender.ts:3` `isCredentialHeaderName`: an import against the stated direction with no note at the import
+- Overall: `otlp/export-scheduler.ts:44` `ExportScheduler.flush`: `running`, `pending`, `timer.retry` and `ready`, re-entered from `next`
+
+Inherited architect, would restructure first:
+
+- Locality, Shape, Overall: `log/settings.ts:120` `ENTRY_FORMATTER_ALIAS`: nine concepts in one module, with the formatter alias split from `log/entry-format.ts:74` and kept apart by two WeakMaps
+- Locality: `log/settings.ts:188` `copyKey`: a reference-identity constraint stated 100 lines from the rule that needs it
+- Shape, Navigation: `otlp/sender.ts:3` `isCredentialHeaderName`: three imports run against the stated direction, none explained at its site
+- Shape, Overall: `tracing/span-credentials.ts:213` the redaction cycle: 432 lines with a four-function recursion and three readings of each query, near the size where AGENTS says a module becomes a folder
+- Navigation: `otlp/queue-items.ts:1` the queue's public types: found beside storage parsing and byte measurement, not in `queue.ts`
+
+## 2026-11-13T22:09:10Z, PR #360 rerun at 238982e
+
+| Seat | Navigation | Locality | Shape | Self-sufficiency | Overall |
+|---|---|---|---|---|---|
+| Junior A | 7 | 5 | 6 | 5.5 | 5.5 |
+| Mid A | 7.5 | 6 | 7 | 6.5 | 6.5 |
+| Maintainability senior | 7 | 6 | 6.5 | 6.5 | 6.5 |
+| Inherited architect | 7.5 | 6.5 | 6.5 | 7 | 7 |
+| Mean | 7.25 | 5.88 | 6.50 | 6.38 | 6.38 |
+
+Junior A, hardest first:
+
+- Overall, Self-sufficiency: `tracing/span-credentials.ts:282` `redactQueryPair`: five ordered checks inside a four-function cycle with a memo and a depth cap; reordering two could not be shown safe without the tests
+- Overall, Shape: `tracing/span-credentials.ts:151` `pairsInUserinfoRuns`: two closures change shared start and end, both `if`s can fire on one pair, and the caller runs it over three readings
+- Locality, Overall: `log/settings.ts:169` `sourceFormatFunction`: one formatter travels under six names through two WeakMaps and a getter-identity check across two files
+- Locality: `log/settings.ts:188` `copyKey`: must stay a plain assignment because `isDefaultQueueFor` compares headers by reference
+- Self-sufficiency: `tracing/fetch.ts:2` `warnOnceToStderr`: an import against the stated direction with no reason at the import
+- Overall: `otlp/export-scheduler.ts:44` `ExportScheduler.flush`: `running`, `pending` and `timer.retry` interact
+
+Mid A, hardest first:
+
+- Overall, Self-sufficiency: `tracing/span-credentials.ts:282` `redactQueryPair`: five numbered checks, three readings and a depth memo held at once; the comment says the order matters but not why it suffices
+- Locality, Overall: `log/settings.ts:143` `handedFormatFunction`: a function formatter travels through `cloneFormatters`, `confFormatters`, an accessor and `formatFunction`
+- Locality: `log/settings.ts:88` `isDefaultQueueFor`: queue acceptance rests on the headers object being the same reference, guarded by a comment
+- Self-sufficiency: `otlp/sender.ts:3` `isCredentialHeaderName`: an import against the stated direction explained only in the decision log
+- Overall: `otlp/queue.ts:80` `Queue`: the constructor assigns `ready` before `scheduler`, an ordering nothing marks
+
+Maintainability senior, hardest first:
+
+- Overall, Self-sufficiency: `tracing/span-credentials.ts:217` the redaction cycle: check order and three readings are load-bearing, and by its own comment a green suite does not prove a change safe
+- Overall, Shape: `tracing/span-credentials.ts:151` `pairsInUserinfoRuns`: closures change `start` and `end` out of sight, and the function runs three ways
+- Locality, Overall: `log/settings.ts:169` `sourceFormatFunction`: the most hidden state in the project, in two side tables across two files
+- Locality: `log/settings.ts:88` `isDefaultQueueFor`: the invariant lives in `copyKey` and breaks in another function
+- Navigation, Shape: `tracing/span-credentials.ts:334` `pageHref`: a platform read in a module named for credential rules
+- Self-sufficiency: `tracing/fetch.ts:1` the imports from `log/`: against the charter's direction, with no note at the import
+
+Inherited architect, would restructure first:
+
+- Shape, Overall: `tracing/span-credentials.ts:213` the redaction cycle: 432 lines and about 30 functions in a file that AGENTS says becomes a folder once it outgrows a module
+- Shape, Self-sufficiency: `otlp/sender.ts:3` `isCredentialHeaderName`: three imports run against the declared layer order and none says why at its site
+- Locality, Shape: `log/settings.ts:120` `ENTRY_FORMATTER_ALIAS`: formatter machinery in two files, under seven names
+- Navigation: `otlp/queue-items.ts:7` `QueueConf`: the queue's public types sit under a name that says items
+- Navigation: `primitives/failure-fields.ts:1` `failure-fields.ts`: wider than its name, field readers used on four paths
+- Self-sufficiency: `log/entry-format.ts:23` the comment "A platform read sits at its caller": cites the decision log, and `processEnv` sits away from its caller

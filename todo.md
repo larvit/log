@@ -92,12 +92,18 @@
 
 ### 135. Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.
 
-The 2026-11-13 run scored Navigation 7.5, Locality 5.88, Shape 6.13, Self-sufficiency 6.5, overall
-6.38; items 130, 131, 132 and 133 take the places its seats named. Its tagline names the floor, so
-its chunk runs the four-seat scoring run. Where a dimension or the overall stays under 7.0, file
-items for the places the seats name, lowest dimension first, and a copy of this item blocked by
-them. Where every score reaches 7.0, it doesn't file anything, and the run replaces the comprehension
-baseline.
+The 2026-11-13 run, at the end of release 2.6.0, scored Navigation 7.25, Locality 5.88, Shape 6.50,
+Self-sufficiency 6.38, overall 6.38 (two runs of one head, means of the second). Locality is the
+lowest. Its seats named three places again and again:
+`log/settings.ts:169` `sourceFormatFunction`, where one formatter travels under six names through
+two identity-keyed WeakMaps across `settings.ts` and `entry-format.ts`; `log/settings.ts:188`
+`copyKey`, whose plain assignment `isDefaultQueueFor` at `log/settings.ts:88` depends on by
+reference; and `tracing/span-credentials.ts:282` `redactQueryPair`, in a four-function cycle. Item
+118 takes the last and item 136 the imports against the layer order they also named. Its tagline
+names the floor, so its chunk runs the four-seat scoring run. Where a dimension or the overall stays
+under 7.0, file items for the places the seats name, lowest dimension first, and a copy of this item
+blocked by them. Where every score reaches 7.0, it doesn't file anything, and the run replaces the
+comprehension baseline.
 
 ### 36. Reach the retry decision and a `log.fetch` span's attributes without a network call.
 
