@@ -104,8 +104,7 @@ WeakMaps across `settings.ts` and `entry-format.ts`; `copyKey`, whose plain assi
 `isDefaultQueueFor` depends on by reference; and `redactQueryPair`, in a four-function cycle. The
 release review of 2.6.0 reshaped all three, into `log/formatter-setting.ts`, `log/default-queue.ts`
 and `credentials/query.ts`, after this run. Item 136 takes the imports against the layer order
-they also named. Its tagline
-names the floor, so its chunk runs the four-seat scoring run. Where a dimension or the overall stays
+they also named. This item's tagline names the floor, so its chunk runs the four-seat scoring run. Where a dimension or the overall stays
 under 7.0, file items for the places the seats name, lowest dimension first, and a copy of this item
 blocked by them. Where every score reaches 7.0, it doesn't file anything, and the run replaces the
 comprehension baseline.
@@ -124,12 +123,12 @@ things per level".
 nobody named; the batch timer left behind mid-round is one of them. Principle: Always use explicit
 state machines.
 
-A shape the architecture pass of 2.6.0's release review proposed, as evidence and not as the
-prescribed repair: one `SchedulerState` union of `idle`, `waiting`, `backingOff` and `running`, and
-one transition function taking the events `schedule`, `flush`, timer fired, round done and storage
-ready, so one function sets the state that four fields set from three or four places each today.
-The save coalescing now lives apart, in `otlp/queue-storage.ts` → `StoredQueue`, with `dirty`,
-`saving`, `loaded` and `unreadable`.
+The architecture pass of 2.6.0's release review proposed a shape: one `SchedulerState` union of
+`backingOff`, `idle`, `running` and `waiting`, and one transition function taking the events
+`flush`, round done, `schedule`, storage ready and timer fired. Today three or four places set
+each of the four fields; one function would then set the state. The save coalescing now lives
+apart, in `otlp/queue-storage.ts` → `StoredQueue`, with `dirty`, `loaded`, `saving` and
+`unreadable`.
 
 ### 48. Test the untested failure paths.
 
@@ -155,10 +154,9 @@ principle "Compose, do not entangle". AGENTS.md → "Working here" states the di
 `docs/decisions.md` → "The package publishes one bundled `index.js`" names these imports as the
 exception this item ends.
 
-A shape the architecture pass of 2.6.0's release review proposed, as evidence and not as the
-prescribed repair: `tracedFetch`, `childSpan` and `endSpan` take one value the `Log` builds, holding
-the capture settings, `clock`, `randomBytes`, the queue, `sampled`, `span`, `context` and a `warn`
-function. `tracing/` then doesn't import anything from `log/`, and a test can hand `tracedFetch` a
+The architecture pass of 2.6.0's release review proposed a shape: `childSpan`, `endSpan` and
+`tracedFetch` take one value the `Log` builds, holding the capture settings, `clock`, `context`,
+the queue, `randomBytes`, `sampled`, `span` and a `warn` function. `tracing/` then doesn't import anything from `log/`, and a test can hand `tracedFetch` a
 fake of that value, which item 36 needs.
 
 ### 137. Give each part's tests a file of their own under `tests/`, beside the helpers they share.
@@ -179,20 +177,21 @@ one behaviour per test, named for it; no loops or branches in a test body, param
 
 ### 140. Test each platform default with its value passed in, and swap a global in at most one test per default.
 
-The suite swaps `globalThis.process`, `console.error` and `Deno` by name to reach `colorsFromEnv`,
-`unref` and the stderr default, in three places in `tests/test.ts`. A test that fails between the
+The suite swaps three globals by name in `tests/test.ts`: `globalThis.process` to reach
+`colorsFromEnv`, `console.error` to reach the stderr default, and `Deno` to reach the scheduler's
+`unref`. A test that fails between the
 swap and the restore leaves the global changed for every later test, and the tests cannot run in
 parallel. The technical principle "Functional core, imperative shell" bans a test swapping a global
 by name. `colorsFromEnv`, `traceableUrl` and `unref` already take the value they read, so a test
-can import the module and pass it. Found by the principles pass of 2.6.0's release review.
+can import the module and pass it, once `otlp/export-scheduler.ts` exports `unref`. Found by the principles pass of 2.6.0's release review.
 
 ### 141. Let `mutate-changes` mutation-test a branch's changed lines, in the repo's container.
 
 `~/.claude/bin/mutate-changes` runs Stryker for TypeScript, from the project's own
-`@stryker-mutator/core`, and installs none. This project has no Stryker and no Stryker config, and
-its suite runs as one script against the built bundle, which Stryker's runners do not start as it
-stands. So the release review of 2.6.0, which rewrote three credential-redaction routines in shape,
-could not run mutation tests on them; a differential fuzz against the old module stood in. The
+`@stryker-mutator/core`, and doesn't install one. This project has no Stryker and no Stryker
+config, and its suite runs as one script against the built bundle, which Stryker's runners do not
+start as it stands. So the release review of 2.6.0, which restructured three credential-redaction
+routines, could not run mutation tests on them; a differential fuzz against the old module stood in. The
 technical principle "Every mutant of a changed line fails a test" asks for the run.
 
 ### 25. Publish the artifact the gate tested.
@@ -284,11 +283,10 @@ README → Footprint budgets `index.js` at ≤10 KB gzipped for Goals #5. On 202
 `gzip -9c index.js | wc -c`. The budget is broken, and nothing checks it. Whether to shrink the
 build or re-state the budget is for this item to work out. Item 26 will check the budget in CI, and
 that check will fail from its first run until this item lands. Found on 2026-10-28, at 10439 bytes.
-On 2026-11-13 the bundled build was 11366 bytes, and 10241 with `uglifyjs --toplevel`. That flag
+On 2026-11-13 the bundled build was 11366 bytes, and 11668 after the release review of 2.6.0
+split the credential, settings and queue modules. With `uglifyjs --toplevel` the 11366 became 10241. That flag
 shortens every top-level name, keeping only the names consumers import. So `Log.name` and
 `Queue.name`, which a debugger prints, are shortened too unless the build reserves them.
-After the release review of 2.6.0 split the credential, settings and queue modules, it was 11668
-bytes.
 
 ### 31. Set a log record's `flags` to the W3C trace flags.
 

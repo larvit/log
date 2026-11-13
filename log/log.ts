@@ -36,8 +36,9 @@ export class Log implements LogInt {
 	span: OtlpSpan;
 
 	/**
-	 * @param cloneSettings Not part of the API: `clone()` passes its clone's settings, which options
-	 * cannot carry whole, since `format` holds no function beside the inherited format string.
+	 * @param cloneSettings Not part of the API, so leave it out: a value here replaces `options`.
+	 * `clone()` passes its clone's settings, which options cannot carry whole, since `format` holds
+	 * no function beside the inherited format string.
 	 */
 	constructor(options?: LogOptions | LogLevel | "none", cloneSettings?: LogSettings) {
 		const { conf, deprecations } = resolveSettings(cloneSettings ?? confFromOptions(options));

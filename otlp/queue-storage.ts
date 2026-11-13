@@ -22,7 +22,7 @@ function parseStoredPayloads(raw: string): { error: string | undefined } | { pay
 }
 
 // A queue's copy in `conf.storage`: read once, when the queue starts, and rewritten after each change
-// by one writer at a time. A queue without storage is never read or written.
+// by one writer at a time.
 export class StoredQueue {
 	private dirty = false;
 	// The one read, restore included, which every write waits for. It never rejects.

@@ -13,12 +13,6 @@ import type { LogConf, LogOptions, ResolvedLogConf } from "./types.js";
 //   hands to resolveSettings.
 // - resolveSettings: inherited(…, "child") where parentLog is set, then rejectQueueBesideShorthand and
 //   rejectTwoFormatters, then withDefaults, then attachDefaultQueue.
-// Two things need more than copying a LogConf key, and each has a module:
-// - A function formatter, in formatter-setting.ts: formatFunction while settings resolve, then
-//   attachFormatter keeps it for the conf.
-// - The default queue, in default-queue.ts.
-// Warnings go through writeOnce, in primitives/once-per-sink.ts. A default queue warns through its
-// Log's stderr, so a message the Log and its queue both raise is written there once.
 
 type Derivation = "child" | "clone";
 

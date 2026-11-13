@@ -3,7 +3,7 @@ import { holdsAtSignInAnyDecoding, pairsInUserinfoRuns } from "./query-userinfo-
 import { holdsListedKeyInAnyDecoding, holdsUserinfoInAnyDecoding, isListedQueryKey, SCHEME_LED } from "./text.js";
 
 // Query parts parsed as a url, one inside the next; it also keeps the stack from running out. Past
-// it a part counts as holding a credential, as decodings.ts says of every reading limit.
+// this limit a part counts as holding a credential, as decodings.ts says of every reading limit.
 const MAX_NESTED_URLS = 8;
 
 function parsedUrl(text: string): URL | undefined {
@@ -32,8 +32,8 @@ interface QueryPair { key: string, rawKey: string, rawValue: string, value: stri
 
 // How deep in nested urls a read is, and what the exported value's reads have found so far. The
 // memo's key holds the depth, since a part read deeper meets MAX_NESTED_URLS sooner, so its reading
-// may differ. It is kept because a url key is read alone and with its value, so a chain of them
-// would re-read each level.
+// may differ. The memo is kept because a url key is read alone and with its value, so a chain of
+// such keys would re-read each level.
 interface QueryReading { depth: number, memo: Map<string, string> }
 
 const newReading = (): QueryReading => ({ depth: 0, memo: new Map() });
@@ -74,8 +74,8 @@ function readNestedUrl(part: string, reading: QueryReading): string {
 
 type PairRedaction = "key and value" | "value";
 
-// What one pair, read alone, loses. The first rule to answer decides, so the order is the rule set:
-// each rule that redacts the key stands before any that keeps it. Userinfo spanning pairs or the `=`,
+// What one pair, read alone, loses. The first rule to answer decides, so reordering the rules changes
+// what is redacted: each rule that redacts the key stands before any that keeps it. Userinfo spanning pairs or the `=`,
 // as in `?//u:p=w@host`, is not theirs to find: `redactedSearch` redacts it first, with `pairsInUserinfoRuns`.
 const PAIR_RULES: ReadonlyArray<(pair: QueryPair, reading: QueryReading) => PairRedaction | undefined> = [
 	// A key opening a url that holds a credential, alone or joined to its value: a server taking

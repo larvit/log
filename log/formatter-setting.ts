@@ -1,7 +1,7 @@
 import { msgJsonFormatter, msgTextFormatter } from "./entry-format.js";
 import type { EntryFormatter, LogConf, LogOptions, ResolvedLogConf } from "./types.js";
 
-// Every read and write of a Log's formatter. It goes by these names:
+// A Log's formatter goes by these names:
 // - `format`: the option, "json" or "text"; a function passed there becomes a function formatter.
 // - `entryFormatter`: the deprecated option holding a function formatter; on a resolved conf, a read
 //   and write alias of the formatter in use (ENTRY_FORMATTER_ALIAS).
@@ -38,8 +38,8 @@ const ENTRY_FORMATTER_ALIAS: PropertyDescriptor = {
 export interface FormatterSettings { entryFormatter?: EntryFormatter, format?: LogConf["format"], formatFunction?: EntryFormatter }
 
 // The function formatter that options carry: the one in `format`, or, when a Log's own conf is passed
-// as options, that Log's. A spread of such a conf drops the non-enumerable entryFormatter alias and
-// that function with it, so it is read from the conf itself.
+// as options, that Log's. A caller's spread of a Log's conf drops the non-enumerable entryFormatter
+// alias, and the function with it, so only the conf itself, unspread, hands the function on.
 export function formatterFromOptions(options: LogOptions): EntryFormatter | undefined {
 	return typeof options.format === "function" ? options.format : confFormatters.get(options);
 }
