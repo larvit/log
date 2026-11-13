@@ -1,10 +1,8 @@
-// log.fetch: a fetch traced as one client span per request.
-
-import { numberFieldAsString, stringField } from "../log/failure-fields.js";
 import type { Log } from "../log/log.js";
 import { warnOnceToStderr } from "../log/stderr-warnings.js";
-import type { Metadata } from "../log/types.js";
 import { getNsTimestamp, type OtlpSpan, SPAN_KIND_CLIENT, STATUS_CODE_ERROR, STATUS_CODE_UNSET } from "../otlp/payloads.js";
+import { numberFieldAsString, stringField } from "../primitives/failure-fields.js";
+import type { Metadata } from "../primitives/metadata.js";
 import { buildUrlFull, failureMessage, redactHeaderCredential } from "./span-credentials.js";
 import { childSpan, exportSpan } from "./spans.js";
 import { formatTraceparent } from "./traceparent.js";

@@ -1,8 +1,7 @@
-// OTLP/HTTP protobuf encoding: a hand-rolled wire encoder for the small, frozen OTLP subset this
-// library emits. It has no dependency, so the built file runs anywhere. Field numbers are from the
-// OTLP proto defs (v1).
-
 import { byKind, type OtlpAttribute, type OtlpLogPayload, type OtlpPayload, type OtlpScope, type OtlpSpanPayload } from "./payloads.js";
+
+// Hand-rolled wire encoder for the small, frozen OTLP subset this library emits. Field numbers are
+// from the OTLP proto defs (v1).
 
 const WIRE_VARINT = 0;
 const WIRE_FIXED64 = 1;

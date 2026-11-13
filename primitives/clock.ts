@@ -1,5 +1,3 @@
-// The clock a Log and a Queue read the time and set timers through.
-
 // The library's one source of time; now() returns epoch milliseconds.
 export type Clock = {
 	clearTimeout: (timer?: TimerHandle) => void;

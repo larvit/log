@@ -1,53 +1,5 @@
-// Levels, metadata and entry formatting.
-
-import type { EntryFormatter, EntryFormatterConf, LogConf, LogLevel, Metadata, MetadataInput } from "./types.js";
-
-export const LogLevels = {
-	/* eslint-disable sort-keys */
-	error: {
-		severityNumber: 17,
-		severityText: "ERROR",
-	},
-	warn: {
-		severityNumber: 13,
-		severityText: "WARN",
-	},
-	info: {
-		severityNumber: 9,
-		severityText: "INFO",
-	},
-	verbose: {
-		severityNumber: 6,
-		severityText: "DEBUG2",
-	},
-	debug: {
-		severityNumber: 5,
-		severityText: "DEBUG",
-	},
-	silly: {
-		severityNumber: 1,
-		severityText: "TRACE",
-	},
-	/* eslint-enable sort-keys */
-};
-
-// The level an unset logLevel resolves to, and the one an unknown logLevel logs at.
-export const DEFAULT_LOG_LEVEL: LogLevel = "info";
-
-// A Map, so a JavaScript caller's `"constructor"` finds no level and `["debug"]` is never coerced into one.
-export const SEVERITY_NUMBERS = new Map<unknown, number>(Object.entries(LogLevels).map(([logLevel, { severityNumber }]) => [logLevel, severityNumber]));
-
-export function withoutUndefined(metadata: MetadataInput = {}): Metadata {
-	const defined: Metadata = {};
-
-	for (const key in metadata) {
-		const value = metadata[key];
-
-		if (value !== undefined) defined[key] = value;
-	}
-
-	return defined;
-}
+import type { LogLevel } from "../primitives/levels.js";
+import type { EntryFormatter, EntryFormatterConf, LogConf } from "./types.js";
 
 export function msgJsonFormatter(conf: EntryFormatterConf) {
 	// New object: never mutate the caller's metadata. Framework keys win over metadata.
@@ -68,8 +20,9 @@ const TEXT_LEVEL_TAGS: Record<LogLevel, { ansi: number, tag: string }> = {
 	warn: { ansi: 33, tag: "war" },
 };
 
-// The platform reads (processEnv below, pageHref and denoUnrefTimer in their modules) sit at their callers,
-// which hand each function the value it needs instead of letting it reach for a global. See docs/decisions.md → "A platform read stays a default".
+// A platform read sits at its caller, which hands a function the value it needs, so no function
+// reaches for a global: processEnv here, pageHref in tracing/span-credentials.ts and denoUnrefTimer
+// in otlp/export-scheduler.ts. See docs/decisions.md → "A platform read stays a default".
 
 // The process global's env, or undefined where there is none (browsers) or a permission-gated one throws.
 export function processEnv(): unknown {

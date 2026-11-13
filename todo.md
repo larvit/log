@@ -6,7 +6,7 @@
 
 `Bar = 0.5`
 
-`Next ID = 136`
+`Next ID = 138`
 
 ## Items
 
@@ -19,6 +19,8 @@
 | 43 | 2.7.0 |  | principle | **Give `ExportScheduler` and save coalescing named states.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
 | 48 | 2.7.0 |  | principle | **Test the untested failure paths.** | 2 | 1 | 1 | 2 | 4 | code health by 4 | 4.2 |
 | 109 | 2.7.0 |  | principle | **Test without the wall clock: no sleep, no real timer and no time bound.** | 2 | 1 | 1 | 2 | 4 | code health by 4 | 4.2 |
+| 136 | 2.7.0 |  | decision | **Stop `tracing/` importing `log/`, so imports run one way from `log/` down to `primitives/`.** | 2 | 1 | 2 | 3 | 3 | code health by 4 | 4.2 |
+| 137 | 2.7.0 |  |  | **Give each part's tests a file of their own under `tests/`, beside the helpers they share.** | 2 | 1 | 1 | 2 | 4 | code health by 4 | 4.2 |
 | 110 | 2.7.0 |  | principle | **Register one test per case where a test loops over its cases or checks many behaviours.** | 1 | 1 | 1 | 1 | 4 | code health by 3 | 3.7 |
 | 25 | 2.7.0 |  |  | **Publish the artifact the gate tested.** | 2 | 2 | 3 | 5 | 4 | code health by 5 | 3.5 |
 | 118 | 2.7.0 |  | principle | **Bring `tracing/span-credentials.ts` within about seven things per level, or record why it holds more.** | 2 | 1 | 4 | 5 | 4 | code health by 5 | 3.5 |
@@ -51,7 +53,7 @@
 | 15 | 2.8.0 |  |  | **Warn once when `colors` is unset, `process.stdout.isTTY` is false and neither `NO_COLOR` nor `FORCE_COLOR` is set, where 3.0.0 turns colour off.** | 1 | 1 | 1 | 1 | 2 | 3 by 4 | 1.8 |
 | 17 | 2.8.0 |  |  | **Warn once when an instance with `otlpQueue` set or inherited leaves `spanName` unset.** | 1 | 1 | 1 | 1 | 2 | 3 by 4 | 1.8 |
 | 22 | 2.8.0 |  |  | **Announce in the README and CHANGELOG that 3.0.0 stops `log.conf` and `queue.conf` handing back a credential, so a consumer reading one out of them moves to their own copy first.** | 1 | 2 | 1 | 2 | 1 | 3 by 3 | 1.4 |
-| 24 | 2.8.0 |  |  | **Publish an `index.js.map` that maps the published `index.js`.** | 1 | 1 | 1 | 1 | 2 | 3 by 3 | 1.4 |
+| 24 | 2.8.0 |  |  | **End the published `index.js` with a `sourceMappingURL` comment, so a runtime loads `index.js.map` unasked.** | 1 | 1 | 1 | 1 | 2 | 3 by 3 | 1.4 |
 | 46 | 2.8.0 |  | principle | **Keep an injected `clock` or `stdout` that throws from escaping a level method.** | 1 | 1 | 2 | 2 | 2 | 3 by 4 | 1.4 |
 | 50 | 2.8.0 |  | principle | **Match the level set and where this library's own lines go to `~/.claude/principles/logging.md`, or record why not.** | 1 | 1 | 1 | 1 | 2 | 3 by 3 | 1.4 |
 | 14 | 2.8.0 |  |  | **Deprecate `parentLog` together with `traceparent`.** | 1 | 1 | 2 | 2 | 2 | 4 by 4 | 1.3 |
@@ -151,6 +153,26 @@ should have automated tests.
 real `setTimeout`, one test sleeps 10 ms and one runs a real 20 ms retry timer. Principle: a test
 neither sleeps nor asserts on the wall clock (`~/.claude/principles/technical-principles.md`).
 
+### 136. Stop `tracing/` importing `log/`, so imports run one way from `log/` down to `primitives/`.
+
+`tracing/spans.ts` and `tracing/fetch.ts` take the `Log` that calls them, as a type import of
+`log/log.ts`, and read its `conf`, `context`, `sampled` and `span`. `tracing/spans.ts` also imports
+`ResolvedLogConf` from `log/types.ts`, and `tracing/fetch.ts` `warnOnceToStderr` from
+`log/stderr-warnings.ts`. So the callee knows its caller, and neither can be read or tested without
+`log/`. Found by the stability review of the module split, 2026-11-13, against the technical
+principle "Compose, do not entangle". AGENTS.md → "Working here" states the direction, and
+`docs/decisions.md` → "The package publishes one bundled `index.js`" names these imports as the
+exception this item ends.
+
+### 137. Give each part's tests a file of their own under `tests/`, beside the helpers they share.
+
+`tests/test.ts` is one file of about 3150 lines, divided by six `// --- name ---` banners, and
+every test of a pure rule passes through `Log`, `fetch` and the queue. The source modules it tests
+are split, and AGENTS.md allows a banner in a source module only where a technical limit stops a
+split; no such limit is known for the suite. The browser run loads the suite from one entry, which
+a split keeps. Found by the prose review of the module split, 2026-11-13. `tests/test.ts` is also
+among the files a chunk reads most (`docs/reading-cost.md`).
+
 ### 110. Register one test per case where a test loops over its cases or checks many behaviours.
 
 `tests/tap.ts`'s `test()` can register one test per case, yet the redaction tables loop
@@ -242,8 +264,9 @@ README → Footprint budgets `index.js` at ≤10 KB gzipped for Goals #5. On 202
 `gzip -9c index.js | wc -c`. The budget is broken, and nothing checks it. Whether to shrink the
 build or re-state the budget is for this item to work out. Item 26 will check the budget in CI, and
 that check will fail from its first run until this item lands. Found on 2026-10-28, at 10439 bytes.
-On 2026-11-13 the bundled build was 11522 bytes, and 10395 with `uglifyjs --toplevel`, which
-shortens every name but the exports and so also `Log`'s and `Queue`'s class names, unless reserved.
+On 2026-11-13 the bundled build was 11514 bytes, and 10395 with `uglifyjs --toplevel`. That flag
+shortens every top-level name, keeping only the names consumers import. So `Log.name` and
+`Queue.name`, which a debugger prints, are shortened too unless the build reserves them.
 
 ### 31. Set a log record's `flags` to the W3C trace flags.
 
@@ -336,9 +359,11 @@ consumer their code stops working in 3.0.0 from inside `### Everything else`, un
 
 Item 77 makes the constructor reject it in 3.0.0, and this warning is that break's only notice.
 
-### 24. Publish an `index.js.map` that maps the published `index.js`.
+### 24. End the published `index.js` with a `sourceMappingURL` comment, so a runtime loads `index.js.map` unasked.
 
-It describes tsc's output, which uglify then minifies and, since 2.5.0, mangles.
+The map matches `index.js` since the module split of 2026-11-13, yet `index.js` doesn't name it, so
+Node's `--enable-source-maps` and a browser's devtools don't load it. The comment adds about 40
+bytes to a file over README → Footprint's budget (item 117).
 
 ### 46. Keep an injected `clock` or `stdout` that throws from escaping a level method.
 

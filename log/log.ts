@@ -1,15 +1,16 @@
-// The Log class.
-
 import { buildLogPayload, getNsTimestamp, type OtlpSpan, STATUS_CODE_ERROR } from "../otlp/payloads.js";
+import { stringField } from "../primitives/failure-fields.js";
+import { DEFAULT_LOG_LEVEL, type LogLevel, LogLevels, SEVERITY_NUMBERS } from "../primitives/levels.js";
+import { type Metadata, type MetadataInput, withoutUndefined } from "../primitives/metadata.js";
+import { writeOnce } from "../primitives/once-per-sink.js";
 import { tracedFetch } from "../tracing/fetch.js";
 import { failureMessage, pageHref, traceableUrl } from "../tracing/span-credentials.js";
 import { exportSpan, openSpan } from "../tracing/spans.js";
 import { formatTraceparent } from "../tracing/traceparent.js";
-import { DEFAULT_LOG_LEVEL, formatterOf, LogLevels, SEVERITY_NUMBERS, withoutUndefined } from "./entry-format.js";
-import { stringField } from "./failure-fields.js";
+import { formatterOf } from "./entry-format.js";
 import { confFromOptions, inherited, optionsFromSettings, resolveLogConf } from "./settings.js";
-import { describeLogLevel, warnOnceToStderr, writeOnce, writeStderr } from "./stderr-warnings.js";
-import type { LogInt, LogLevel, LogOptions, Metadata, MetadataInput, ResolvedLogConf } from "./types.js";
+import { describeLogLevel, warnOnceToStderr, writeStderr } from "./stderr-warnings.js";
+import type { LogInt, LogOptions, ResolvedLogConf } from "./types.js";
 
 export class Log implements LogInt {
 	context: Metadata;

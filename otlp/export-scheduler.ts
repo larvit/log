@@ -1,6 +1,4 @@
-// OTLP export: scheduling rounds.
-
-import { systemClock, type TimerHandle } from "../log/clock.js";
+import { systemClock, type TimerHandle } from "../primitives/clock.js";
 import type { ResolvedQueueConf } from "./queue-items.js";
 
 const RETRY_DELAY_MAX_MS = 30000;

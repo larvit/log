@@ -1,7 +1,5 @@
-// OTLP payloads: the wire types, and building a payload from an entry or a span.
-
-import { LogLevels } from "../log/entry-format.js";
-import type { LogLevel, Metadata } from "../log/types.js";
+import { type LogLevel, LogLevels } from "../primitives/levels.js";
+import type { Metadata } from "../primitives/metadata.js";
 
 export type OtlpAttribute = {
 	key: string,

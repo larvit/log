@@ -1,8 +1,5 @@
-// OTLP export: sending a batch.
-
-import { withoutUndefined } from "../log/entry-format.js";
-import { stringField } from "../log/failure-fields.js";
-import type { Metadata } from "../log/types.js";
+import { stringField } from "../primitives/failure-fields.js";
+import { type Metadata, withoutUndefined } from "../primitives/metadata.js";
 import { isCredentialHeaderName } from "../tracing/span-credentials.js";
 import { byKind, type OtlpLogPayload, type OtlpPayload, type OtlpScope, type OtlpSpanPayload } from "./payloads.js";
 import { encodeOtlpProtobuf } from "./protobuf.js";

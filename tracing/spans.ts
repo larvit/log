@@ -1,8 +1,7 @@
-// A Log's spans.
-
 import type { Log } from "../log/log.js";
-import type { Metadata, ResolvedLogConf } from "../log/types.js";
+import type { ResolvedLogConf } from "../log/types.js";
 import { attributesOf, buildSpanPayload, getNsTimestamp, type OtlpSpan, SPAN_KIND_INTERNAL, STATUS_CODE_UNSET } from "../otlp/payloads.js";
+import type { Metadata } from "../primitives/metadata.js";
 import { parseTraceparent, spanIdFrom, traceIdFrom } from "./traceparent.js";
 
 // A span just opened: it starts and ends now, and doesn't carry any attributes, events or links yet.

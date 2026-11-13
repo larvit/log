@@ -1,10 +1,7 @@
-// The Queue, the OTLP export queue.
-
-import { systemClock } from "../log/clock.js";
-import { withoutUndefined } from "../log/entry-format.js";
-import { stringField } from "../log/failure-fields.js";
-import { writeOnce } from "../log/stderr-warnings.js";
-import type { Metadata } from "../log/types.js";
+import { systemClock } from "../primitives/clock.js";
+import { stringField } from "../primitives/failure-fields.js";
+import { type Metadata, withoutUndefined } from "../primitives/metadata.js";
+import { writeOnce } from "../primitives/once-per-sink.js";
 import { ExportScheduler } from "./export-scheduler.js";
 import { type OtlpPayload, payloadKind } from "./payloads.js";
 import { DEFAULT_OTLP_PROTOCOL, isOtlpPayload, KEEPALIVE_MAX_BYTES, type OtlpQueue, parseStoredPayloads, type QueueConf, type QueuedItem, type QueueStorage, type ResolvedQueueConf, withBytes } from "./queue-items.js";

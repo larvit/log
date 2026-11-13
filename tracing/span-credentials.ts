@@ -1,6 +1,4 @@
-// Credentials on a span: every rule deciding whether one reaches a span.
-
-import { stringField } from "../log/failure-fields.js";
+import { stringField } from "../primitives/failure-fields.js";
 
 // Where README → Credentials in a captured value is enforced, bullet by bullet:
 // 1. A credential header name: isCredentialHeaderName, applied by redactHeaderCredential.

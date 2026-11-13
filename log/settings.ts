@@ -1,12 +1,12 @@
-// Resolving a Log's settings.
-
 import { Queue } from "../otlp/queue.js";
 import { DEFAULT_OTLP_PROTOCOL, type OtlpQueue } from "../otlp/queue-items.js";
+import { systemClock } from "../primitives/clock.js";
+import { DEFAULT_LOG_LEVEL, type LogLevel } from "../primitives/levels.js";
+import { type Metadata, withoutUndefined } from "../primitives/metadata.js";
 import { platformRandomBytes } from "../tracing/traceparent.js";
-import { systemClock } from "./clock.js";
-import { colorsFromEnv, confFormatters, DEFAULT_LOG_LEVEL, formatterOf, processEnv, withoutUndefined } from "./entry-format.js";
+import { colorsFromEnv, confFormatters, formatterOf, processEnv } from "./entry-format.js";
 import { warnOnceToStderr, writeStderr } from "./stderr-warnings.js";
-import type { EntryFormatter, LogConf, LogLevel, LogOptions, Metadata, ResolvedLogConf } from "./types.js";
+import type { EntryFormatter, LogConf, LogOptions, ResolvedLogConf } from "./types.js";
 
 // How options become a Log's conf:
 // - `new Log(options)`: confFromOptions, then inherited(…, "child") where parentLog is set, then
@@ -19,8 +19,8 @@ import type { EntryFormatter, LogConf, LogLevel, LogOptions, Metadata, ResolvedL
 //   alias reads and writes. A clone hands its own to the constructor through cloneFormatters, keyed by
 //   the options; a Log's conf passed as options hands on its own from confFormatters.
 // - The default queue: attachDefaultQueue builds it into conf.otlpQueue and marks it in defaultQueues.
-// - Warnings: writeOnce, in "stderr lines, and warnings written once per sink". A default queue warns
-//   through its Log's stderr, so a message the Log and its queue both raise is written there once.
+// - Warnings: writeOnce, in primitives/once-per-sink.ts. A default queue warns through its Log's
+//   stderr, so a message the Log and its queue both raise is written there once.
 
 const OTLP_ENDPOINT_KEYS = ["otlpAdditionalHeaders", "otlpHttpBaseURI", "otlpProtocol"] as const;
 
