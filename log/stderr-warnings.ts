@@ -1,6 +1,6 @@
 import { type MetadataInput, withoutUndefined } from "../primitives/metadata.js";
 import { writeOnce } from "../primitives/once-per-sink.js";
-import { formatterOf } from "./entry-format.js";
+import { writeConsoleEntry } from "./console-output.js";
 import type { ResolvedLogConf } from "./types.js";
 
 export function describeLogLevel(value: unknown): string {
@@ -21,8 +21,9 @@ export function describeLogLevel(value: unknown): string {
 	}
 }
 
+// A line this library writes of its own accord, stamped now.
 export function writeStderr(conf: ResolvedLogConf, logLevel: "error" | "warn", metadata: MetadataInput | undefined, msg: string): void {
-	conf.stderr(formatterOf(conf)({ colors: conf.colors, logLevel, metadata: withoutUndefined(metadata), msTimestamp: conf.clock.now(), msg }));
+	writeConsoleEntry(conf, logLevel, msg, withoutUndefined(metadata), conf.clock.now());
 }
 
 export function warnOnceToStderr(conf: ResolvedLogConf, metadata: MetadataInput | undefined, msg: string): void {

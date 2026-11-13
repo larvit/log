@@ -1,6 +1,7 @@
+import { failureMessage } from "../credentials/span-values.js";
 import type { Log } from "../log/log.js";
 import type { ResolvedLogConf } from "../log/types.js";
-import { attributesOf, buildSpanPayload, getNsTimestamp, type OtlpSpan, SPAN_KIND_INTERNAL, STATUS_CODE_UNSET } from "../otlp/payloads.js";
+import { attributesOf, buildSpanPayload, getNsTimestamp, type OtlpSpan, SPAN_KIND_INTERNAL, STATUS_CODE_ERROR, STATUS_CODE_UNSET } from "../otlp/payloads.js";
 import type { Metadata } from "../primitives/metadata.js";
 import { parseTraceparent, spanIdFrom, traceIdFrom } from "./traceparent.js";
 
@@ -47,7 +48,19 @@ export function childSpan(log: Pick<Log, "conf" | "span">, name: string, kind: O
 	}, log.conf.clock.now());
 }
 
-export function exportSpan(log: Pick<Log, "conf" | "sampled">, span: OtlpSpan, attributes: Metadata): void {
+// What a span failed with. Each caller picks `errorType`, the span's `error.type`, by its own documented
+// fallback; `url` is the one a fetch handed the runtime, which may quote it back in the error's message.
+export interface SpanFailure { error: unknown, errorType: string, url?: URL }
+
+// Closes the span now, failed where a failure is given, and exports it where the trace is sampled.
+export function endSpan(log: Pick<Log, "conf" | "sampled">, span: OtlpSpan, attributes: Metadata, failure?: SpanFailure): void {
+	span.endTimeUnixNano = getNsTimestamp(log.conf.clock.now());
+
+	if (failure) {
+		span.status = { code: STATUS_CODE_ERROR, message: failureMessage(failure.error, failure.url) };
+		attributes["error.type"] = failure.errorType;
+	}
+
 	if (log.sampled) {
 		const spanAttributes = attributesOf(attributes);
 

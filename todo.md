@@ -21,7 +21,6 @@
 | 137 | 2.7.0 |  |  | **Give each part's tests a file of their own under `tests/`, beside the helpers they share.** | 2 | 1 | 1 | 2 | 4 | code health by 4 | 4.2 |
 | 110 | 2.7.0 |  | principle | **Register one test per case where a test loops over its cases or checks many behaviours.** | 1 | 1 | 1 | 1 | 4 | code health by 3 | 3.7 |
 | 25 | 2.7.0 |  |  | **Publish the artifact the gate tested.** | 2 | 2 | 3 | 5 | 4 | code health by 5 | 3.5 |
-| 118 | 2.7.0 |  | principle | **Bring `tracing/span-credentials.ts` within about seven things per level, or record why it holds more.** | 2 | 1 | 4 | 5 | 4 | code health by 5 | 3.5 |
 | 82 | 2.7.0 |  |  | **Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.** | 1 | 2 | 1 | 2 | 1 | 3 by 5 | 2.3 |
 | 19 | 2.7.0 |  | defect | **Leave a `Request` untraced in `log.fetch`.** | 1 | 1 | 2 | 2 | 2 | 2.1 by 6 | 2.1 |
 | 114 | 2.7.0 |  |  | **Move `package.json`'s build and test one-liners into named scripts, and let the OTLP test read its collector's port, image and container name from the environment, today's values as defaults.** | 1 | 1 | 1 | 1 | 2 | code health by 1 | 2.1 |
@@ -95,11 +94,12 @@
 The 2026-11-13 run, at the end of release 2.6.0, scored Navigation 7.25, Locality 5.88, Shape 6.50,
 Self-sufficiency 6.38, overall 6.38 (two runs of one head, means of the second). Locality is the
 lowest. Its seats named three places again and again:
-`log/settings.ts:169` `sourceFormatFunction`, where one formatter travels under six names through
-two identity-keyed WeakMaps across `settings.ts` and `entry-format.ts`; `log/settings.ts:188`
-`copyKey`, whose plain assignment `isDefaultQueueFor` at `log/settings.ts:88` depends on by
-reference; and `tracing/span-credentials.ts:282` `redactQueryPair`, in a four-function cycle. Item
-118 takes the last and item 136 the imports against the layer order they also named. Its tagline
+`sourceFormatFunction`, where one formatter travelled under six names through two identity-keyed
+WeakMaps across `settings.ts` and `entry-format.ts`; `copyKey`, whose plain assignment
+`isDefaultQueueFor` depends on by reference; and `redactQueryPair`, in a four-function cycle. The
+release review of 2.6.0 reshaped all three, into `log/formatter-setting.ts`, `log/default-queue.ts`
+and `credentials/query.ts`, after this run. Item 136 takes the imports against the layer order
+they also named. Its tagline
 names the floor, so its chunk runs the four-seat scoring run. Where a dimension or the overall stays
 under 7.0, file items for the places the seats name, lowest dimension first, and a copy of this item
 blocked by them. Where every score reaches 7.0, it doesn't file anything, and the run replaces the
@@ -116,6 +116,13 @@ core, imperative shell.
 `timer.retry`, `running`, `pending` and `failures`, and `dirty` with `saving`, combine into states
 nobody named; the batch timer left behind mid-round is one of them. Principle: Always use explicit
 state machines.
+
+A shape the architecture pass of 2.6.0's release review proposed, as evidence and not as the
+prescribed repair: one `SchedulerState` union of `idle`, `waiting`, `backingOff` and `running`, and
+one transition function taking the events `schedule`, `flush`, timer fired, round done and storage
+ready, so one function sets the state that four fields set from three or four places each today.
+The save coalescing now lives apart, in `otlp/queue-storage.ts` → `StoredQueue`, with `dirty`,
+`saving`, `loaded` and `unreadable`.
 
 ### 48. Test the untested failure paths.
 
@@ -141,6 +148,12 @@ principle "Compose, do not entangle". AGENTS.md → "Working here" states the di
 `docs/decisions.md` → "The package publishes one bundled `index.js`" names these imports as the
 exception this item ends.
 
+A shape the architecture pass of 2.6.0's release review proposed, as evidence and not as the
+prescribed repair: `tracedFetch`, `childSpan` and `endSpan` take one value the `Log` builds, holding
+the capture settings, `clock`, `randomBytes`, the queue, `sampled`, `span`, `context` and a `warn`
+function. `tracing/` then doesn't import anything from `log/`, and a test can hand `tracedFetch` a
+fake of that value, which item 36 needs.
+
 ### 137. Give each part's tests a file of their own under `tests/`, beside the helpers they share.
 
 `tests/test.ts` is one file of about 3150 lines, divided by six `// --- name ---` banners, and
@@ -162,17 +175,6 @@ one behaviour per test, named for it; no loops or branches in a test body, param
 `push.yaml` builds and tests `index.js` inside the container; `publish.yaml` builds a second one on
 the runner and publishes that, so the thing consumers install is never the thing CI proved. Build
 once, upload, publish that.
-
-### 118. Bring `tracing/span-credentials.ts` within about seven things per level, or record why it holds more.
-
-The module holds over 30 flat top-level declarations, with no recorded reason and no name order
-a reader could find them by. That crosses the limit of about seven things per level. The principle
-asks for a grouping under names a reader can follow, or a recorded reason. The rules must stay in
-one module or folder, as `docs/decisions.md` → "Every rule on credentials in a span sits in one
-module" asks. Principle: `~/.claude/principles/technical-principles.md` → "About seven things per
-level". Found by the principles audit of 2026-10-28. `pairsInUserinfoRuns` is hard to read too: its
-closures `close` and `read` mutate `start`, `end` and `inRuns`, more interacting values than four or
-five. Found by the 2.5.0 principles audit.
 
 ### 82. Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.
 
@@ -244,6 +246,8 @@ that check will fail from its first run until this item lands. Found on 2026-10-
 On 2026-11-13 the bundled build was 11366 bytes, and 10241 with `uglifyjs --toplevel`. That flag
 shortens every top-level name, keeping only the names consumers import. So `Log.name` and
 `Queue.name`, which a debugger prints, are shortened too unless the build reserves them.
+After the release review of 2.6.0 split the credential, settings and queue modules, it was 11668
+bytes.
 
 ### 31. Set a log record's `flags` to the W3C trace flags.
 

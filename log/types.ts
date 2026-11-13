@@ -1,5 +1,5 @@
 import type { OtlpSpan } from "../otlp/payloads.js";
-import type { OtlpQueue } from "../otlp/queue-items.js";
+import type { OtlpQueue } from "../otlp/queue-types.js";
 import type { Clock } from "../primitives/clock.js";
 import type { LogLevel } from "../primitives/levels.js";
 import type { Metadata, MetadataInput } from "../primitives/metadata.js";

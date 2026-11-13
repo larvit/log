@@ -1,10 +1,10 @@
+import { buildUrlFull, redactHeaderCredential } from "../credentials/span-values.js";
 import type { Log } from "../log/log.js";
 import { warnOnceToStderr } from "../log/stderr-warnings.js";
-import { getNsTimestamp, type OtlpSpan, SPAN_KIND_CLIENT, STATUS_CODE_ERROR, STATUS_CODE_UNSET } from "../otlp/payloads.js";
+import { type OtlpSpan, SPAN_KIND_CLIENT, STATUS_CODE_ERROR, STATUS_CODE_UNSET } from "../otlp/payloads.js";
 import { numberFieldAsString, stringField } from "../primitives/failure-fields.js";
 import type { Metadata } from "../primitives/metadata.js";
-import { buildUrlFull, failureMessage, redactHeaderCredential } from "./span-credentials.js";
-import { childSpan, exportSpan } from "./spans.js";
+import { childSpan, endSpan, type SpanFailure } from "./spans.js";
 import { formatTraceparent } from "./traceparent.js";
 
 // An invalid name makes headers.get throw, which must never cost the platform's result.
@@ -46,6 +46,7 @@ export async function tracedFetch(log: Pick<Log, "conf" | "context" | "sampled" 
 	}
 
 	const attributes: Metadata = { ...log.context };
+	let failure: SpanFailure | undefined;
 
 	try {
 		const method = (init?.method ?? "GET").toUpperCase();
@@ -79,15 +80,13 @@ export async function tracedFetch(log: Pick<Log, "conf" | "context" | "sampled" 
 
 		return res;
 	} catch (err) {
-		span.status = { code: STATUS_CODE_ERROR, message: failureMessage(err, url) };
 		// README's value: the error's code, else its name, else fetch_error. end() applies semconv's `_OTHER` fallback instead; that waits for 3.0.0.
-		attributes["error.type"] = stringField(err, "code") ?? numberFieldAsString(err, "code") ?? stringField(err, "name") ?? "fetch_error";
+		failure = { error: err, errorType: stringField(err, "code") ?? numberFieldAsString(err, "code") ?? stringField(err, "name") ?? "fetch_error", url };
 
 		throw err;
 	} finally {
 		try {
-			span.endTimeUnixNano = getNsTimestamp(log.conf.clock.now());
-			exportSpan(log, span, attributes);
+			endSpan(log, span, attributes, failure);
 		} catch {
 			// The span is dropped.
 		}

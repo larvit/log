@@ -1,5 +1,5 @@
 import { systemClock, type TimerHandle } from "../primitives/clock.js";
-import type { ResolvedQueueConf } from "./queue-items.js";
+import type { ResolvedQueueConf } from "./queue-types.js";
 
 const RETRY_DELAY_MAX_MS = 30000;
 

@@ -3,9 +3,10 @@ export type { EntryFormatter, EntryFormatterConf, LogConf, Logger, LogInt, LogOp
 export { LogLevels } from "./primitives/levels.js";
 export type { LogLevel } from "./primitives/levels.js";
 export type { Metadata, MetadataInput, MetadataValue } from "./primitives/metadata.js";
-export { msgJsonFormatter, msgTextFormatter, resolveFormatter } from "./log/entry-format.js";
+export { msgJsonFormatter, msgTextFormatter } from "./log/entry-format.js";
+export { resolveFormatter } from "./log/formatter-setting.js";
 export { formatTraceparent, generateSpanId, generateTraceId, parseTraceparent } from "./tracing/traceparent.js";
 export type { OtlpAttribute, OtlpLogPayload, OtlpPayload, OtlpScope, OtlpSpan, OtlpSpanPayload } from "./otlp/payloads.js";
-export type { OtlpQueue, QueueConf, QueueStorage, ResolvedQueueConf } from "./otlp/queue-items.js";
+export type { OtlpQueue, QueueConf, QueueStorage, ResolvedQueueConf } from "./otlp/queue-types.js";
 export { Queue } from "./otlp/queue.js";
 export { Log } from "./log/log.js";

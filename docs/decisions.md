@@ -164,7 +164,7 @@ stance the query-key list already took. `REDACTED` over dropping the attribute k
 reader's "was the header there?", so a false hit costs a value, never the header's presence. Valid
 while Elastic's default list is the published one.
 
-## Every rule on credentials in a span sits in one module
+## Every rule on credentials in a span sits in one folder
 
 2026-09-20, the implementing agent: every rule deciding whether a credential reaches a span sits in
 one place, grouped by that question and not by the caller asking it, so `traceableUrl` and
@@ -173,11 +173,12 @@ the whole set, and the rules used to sit in two places ~800 lines apart with the
 upward and no comment at either end naming the other. Neither the place's opening comment nor this
 entry lists the routes in: prose has nothing keeping a count true, and the
 userinfo-free-by-construction choices at the `log.fetch` call site are not rules it holds. Scoped
-to spans because the remaining credential rules are the queue's. 2026-11-13, the module split: the place is the
-module `tracing/span-credentials.ts`. The header-name rule `isCredentialHeaderName`, which the
-queue's plain-`http:` warning reads too, stays in it, so `otlp/sender.ts` imports it against the
-direction AGENTS.md → "Working here" states. Serves README → Goals #7 and code health. Valid while
-one module stays readable as a whole; a split of it keeps every such rule in one folder.
+to spans because the remaining credential rules are the queue's. 2026-11-13, the module split: the place became
+one module. 2026-11-13, the release review of 2.6.0: the module outgrew one read, so the place is
+the folder `credentials/`, a module per kind of value, which `credentials/span-values.ts` maps in
+its opening comment. The folder sits below `otlp/`, since the queue's plain-`http:` warning reads
+the header-name rule `isCredentialHeaderName` too. Serves README → Goals #7 and code health. Valid
+while a rule on a span's credentials has no reason to sit beside its caller.
 
 ## `format` is the formatter's one name, `entryFormatter` its alias until 3.0.0
 
@@ -408,17 +409,16 @@ consumer needs the page address or the env injected apart from these.
 
 2026-11-13, the implementing agent, on the maintainer's request for source files in folders: the
 source is `index.ts`, holding only the public exports, and one module per part under `log/`,
-`otlp/`, `primitives/` and `tracing/`. esbuild bundles them into the one `index.js` the package has
+`otlp/`, `credentials/`, `primitives/` and `tracing/`. esbuild bundles them into the one `index.js` the package has
 always published, shortening syntax as it goes, and `uglifyjs -m` minifies it as before.
 Publishing the compiler's modules instead would stop a minifier shortening any name one module
-exports to another, and a browser without a bundler would fetch about twenty files. Measured in
+exports to another, and a browser without a bundler would fetch about thirty files. Measured in
 the repo's container image, the bundle is 11366 bytes gzipped against 11480 for the single source
 file. Declarations are not bundled:
 `types/` mirrors the modules, and `types/index.d.ts` names the public ones. The suite tests the
 bundle through `index.js`. A test that imports a module directly runs tsc's output for that module,
 not the bundle, so it suits a pure rule and never what the bundler or minifier could change.
-Imports point one way, `log/` → `tracing/` → `otlp/` → `primitives/`, with two exceptions:
-`otlp/sender.ts` imports the header-name rule (see "Every rule on credentials in a span sits in one
-module"), and `tracing/` imports `log/` until `todo.md` item 136 ends that. Serves code health and
+Imports point one way, `log/` → `tracing/` → `otlp/` → `credentials/` → `primitives/`, with one
+exception: `tracing/` imports `log/` until `todo.md` item 136 ends that. Serves code health and
 README → Goals #5; applies the technical principle "Compose, do not entangle". Valid while every
 supported runtime loads one ESM file.
