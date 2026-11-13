@@ -376,3 +376,16 @@ Read most (opens and searches):
 - `CHANGELOG.md` 3
 - `log/entry-format.ts` 3
 - `package.json` 3
+
+## Reading cost, chunk a8f8be6b5460, finished 2026-11-13T22:01:36Z
+
+61989 new input tokens before the first commit.
+
+Read most (opens and searches):
+
+- `tracing/span-credentials.ts` 9
+- `README.md` 4
+- `todo.md` 3
+- `AGENTS.md` 1
+
+## Reading cost reset, 2026-11-13T22:03:24Z

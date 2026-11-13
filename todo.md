@@ -12,7 +12,6 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 134 | 2.6.0 |  |  | **Lower the reading cost of the files a chunk reads most before its first commit.** | 2 | 2 | 1 | 3 | 4 | code health by 3 | 2.7 |
 | 135 | 2.7.0 |  | decision | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
 | 36 | 2.7.0 |  | principle | **Reach the retry decision and a `log.fetch` span's attributes without a network call.** | 2 | 1 | 1 | 2 | 5 | code health by 5 | 4.5 |
 | 43 | 2.7.0 |  | principle | **Give `ExportScheduler` and save coalescing named states.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
@@ -90,14 +89,6 @@
 | 75 | 3.0.0 | 22 | decision | **Keep credentials off `log.conf` and `queue.conf`.** | 2 | 1 | 2 | 3 | 3 | 3 by 3 | 0.7 |
 
 ## Details
-
-### 134. Lower the reading cost of the files a chunk reads most before its first commit.
-
-The last 5 chunks read a median of 91574 new input tokens before their first commit; the 5 before
-them read 52550. Over the last 5 chunks, the files read most, counting opens and searches, were
-`index.ts` 97 times, `test.ts` 35, `README.md` 33, `todo.md` 20, `docs/decisions.md` 17,
-`package.json` 11, `CHANGELOG.md` 5, `AGENTS.md` 4, `eslint.config.js` 3 and `tap.ts` 2. The
-figures live in `docs/reading-cost.md`.
 
 ### 135. Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.
 
