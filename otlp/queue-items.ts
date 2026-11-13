@@ -1,8 +1,6 @@
-// OTLP export: types and queued items.
-
-import type { Clock } from "../log/clock.js";
-import { stringField } from "../log/failure-fields.js";
-import type { Metadata } from "../log/types.js";
+import type { Clock } from "../primitives/clock.js";
+import { stringField } from "../primitives/failure-fields.js";
+import type { Metadata } from "../primitives/metadata.js";
 import { type OtlpPayload, PAYLOAD_KEYS } from "./payloads.js";
 
 // What Log exports through. Queue is the shipped implementation; any { enqueue, flush } will do.

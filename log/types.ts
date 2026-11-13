@@ -1,9 +1,8 @@
-// What a Log takes and hands back: its options, conf, level methods and metadata.
-
 import type { OtlpSpan } from "../otlp/payloads.js";
 import type { OtlpQueue } from "../otlp/queue-items.js";
-import type { Clock } from "./clock.js";
-import type { LogLevels } from "./entry-format.js";
+import type { Clock } from "../primitives/clock.js";
+import type { LogLevel } from "../primitives/levels.js";
+import type { Metadata, MetadataInput } from "../primitives/metadata.js";
 
 export type EntryFormatter = (entry: EntryFormatterConf) => string;
 
@@ -63,19 +62,4 @@ export type LogInt = { [level in LogLevel]: LogShorthand } & {
 	traceparent: () => string;
 };
 
-export type LogLevel = keyof typeof LogLevels;
-
 export type LogShorthand = (msg: string, metadata?: Metadata) => void;
-
-export type Metadata = {
-	[key: string]: MetadataValue;
-};
-
-// Primitive values only. String() coerces them for OTLP; the JSON formatter keeps them native.
-// bigint/objects are excluded: JSON.stringify throws on bigint and renders objects as "[object Object]".
-export type MetadataValue = boolean | number | string;
-
-// What a level method and `context` accept: an undefined key is dropped.
-export type MetadataInput = {
-	[key: string]: MetadataValue | undefined;
-};

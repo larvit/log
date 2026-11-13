@@ -1,5 +1,3 @@
-// Reading a failure's message and code.
-
 // Total: a throwing getter yields undefined, so the flush path never rejects on its input.
 function readField(value: unknown, key: string): unknown {
 	try {
