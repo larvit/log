@@ -11,7 +11,7 @@ import { chromium } from "playwright";
 
 const testDir = resolve(dirname(fileURLToPath(import.meta.url)), "..", ".tmp", "test");
 const mimeByExt = { ".js": "text/javascript", ".json": "application/json", ".map": "application/json" };
-const indexHtml = "<!doctype html><meta charset=\"utf-8\"><script type=\"module\" src=\"/test.js\"></script>";
+const indexHtml = "<!doctype html><meta charset=\"utf-8\"><script type=\"module\" src=\"/tests/test.js\"></script>";
 
 // Static server for the compiled ESM so the browser can resolve the relative imports (./index.js etc).
 const server = createServer(async (req, res) => {

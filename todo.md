@@ -12,9 +12,8 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 128 | 2.6.0 |  |  | **Give each part of the library a source module of its own, so a rule can be read and tested without the rest.** | 4 | 2 | 3 | 7 | 8 | code health by 8 | 3.3 |
-| 131 | 2.6.0 | 128 |  | **Let a reader check each query, path and text redaction routine in `// --- Credentials on a span ---` on one read: its state, its recursion and the order of its checks plain where they act.** | 2 | 2 | 4 | 6 | 5 | code health by 7 | 4.0 |
-| 134 | 2.6.0 | 128 |  | **Lower the reading cost of the files a chunk reads most before its first commit.** | 2 | 2 | 1 | 3 | 4 | code health by 3 | 2.7 |
+| 131 | 2.6.0 |  |  | **Let a reader check each query, path and text redaction routine in `tracing/span-credentials.ts` on one read: its state, its recursion and the order of its checks plain where they act.** | 2 | 2 | 4 | 6 | 5 | code health by 7 | 4.0 |
+| 134 | 2.6.0 |  |  | **Lower the reading cost of the files a chunk reads most before its first commit.** | 2 | 2 | 1 | 3 | 4 | code health by 3 | 2.7 |
 | 135 | 2.7.0 | 131 | decision | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
 | 36 | 2.7.0 |  | principle | **Reach the retry decision and a `log.fetch` span's attributes without a network call.** | 2 | 1 | 1 | 2 | 5 | code health by 5 | 4.5 |
 | 43 | 2.7.0 |  | principle | **Give `ExportScheduler` and save coalescing named states.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
@@ -22,13 +21,13 @@
 | 109 | 2.7.0 |  | principle | **Test without the wall clock: no sleep, no real timer and no time bound.** | 2 | 1 | 1 | 2 | 4 | code health by 4 | 4.2 |
 | 110 | 2.7.0 |  | principle | **Register one test per case where a test loops over its cases or checks many behaviours.** | 1 | 1 | 1 | 1 | 4 | code health by 3 | 3.7 |
 | 25 | 2.7.0 |  |  | **Publish the artifact the gate tested.** | 2 | 2 | 3 | 5 | 4 | code health by 5 | 3.5 |
-| 118 | 2.7.0 | 128 | principle | **Bring `index.ts`'s `// --- Credentials on a span ---` section within about seven things per level, or record why it holds more.** | 2 | 1 | 4 | 5 | 4 | code health by 5 | 3.5 |
+| 118 | 2.7.0 |  | principle | **Bring `tracing/span-credentials.ts` within about seven things per level, or record why it holds more.** | 2 | 1 | 4 | 5 | 4 | code health by 5 | 3.5 |
 | 82 | 2.7.0 |  |  | **Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.** | 1 | 2 | 1 | 2 | 1 | 3 by 5 | 2.3 |
 | 19 | 2.7.0 |  | defect | **Leave a `Request` untraced in `log.fetch`.** | 1 | 1 | 2 | 2 | 2 | 2.1 by 6 | 2.1 |
 | 114 | 2.7.0 |  |  | **Move `package.json`'s build and test one-liners into named scripts, and let the OTLP test read its collector's port, image and container name from the environment, today's values as defaults.** | 1 | 1 | 1 | 1 | 2 | code health by 1 | 2.1 |
 | 18 | 2.7.0 |  |  | **Export `LogEntry` as an alias of `EntryFormatterConf`, so the 3.0.0 rename has a spelling a consumer can move to first.** | 1 | 1 | 1 | 1 | 1 | 3 by 3 | 2.1 |
 | 80 | 2.7.0 |  | principle | **Run the browser suite in WebKit and Firefox as well as Chromium.** | 2 | 1 | 1 | 2 | 3 | 2 by 7 | 2.1 |
-| 96 | 2.7.0 | 18, 128 | owner | **Add a list of transports, each handed plain log entries it encodes itself, with console and OTLP as the two this library ships and uses by default.** | 4 | 2 | 3 | 7 | 8 | 1 by 7, 4 by 8 | 1.4 |
+| 96 | 2.7.0 | 18 | owner | **Add a list of transports, each handed plain log entries it encodes itself, with console and OTLP as the two this library ships and uses by default.** | 4 | 2 | 3 | 7 | 8 | 1 by 7, 4 by 8 | 1.4 |
 | 28 | 2.7.0 | 96 |  | **Export resource attributes beyond `service.name`.** | 2 | 1 | 2 | 3 | 3 | 1 by 7 | 1.8 |
 | 117 | 2.7.0 |  |  | **Bring the built `index.js` within README → Footprint's 10 KB gzipped budget.** | 2 | 1 | 2 | 3 | 3 | 5 by 7 | 1.5 |
 | 31 | 2.7.0 | 96 |  | **Set a log record's `flags` to the W3C trace flags.** | 1 | 1 | 2 | 2 | 2 | 1 by 4 | 1.5 |
@@ -91,23 +90,7 @@
 
 ## Details
 
-### 128. Give each part of the library a source module of its own, so a rule can be read and tested without the rest.
-
-`index.ts` is one module, and any of its sections can reach every module-level table. The pure
-credential rules therefore have no seam of their own: each redaction test passes through `Log`,
-`fetch`, the queue and the export, so item 96 would move all of them, and item 96's "no other code
-knows OTLP" can't be enforced within one file. No decision ever asked for one source file: the
-library began as one in 2022, and README's "One file, every runtime" only restated that. On
-2026-11-13 the maintainer asked for the parts to live in files in folders, with `// --- name ---`
-banners only where a technical limit stops a split, and for an entry point a newcomer finds at
-once: `index.ts` and few other files in the root, so `tap.ts` and `test.ts` move too. Whether the
-package publishes one bundled `index.js` or the compiler's modules, which import each other as
-native ESM in every runtime this library supports, is part of this item; the 2026-11-10 approval of
-a bundler allows one without asking for it. The footprint budgets in README → Footprint (see item
-117) must hold. Reword README's "One file" bullet, and AGENTS.md's rule on `index.ts` sections, to
-match. Items 118, 130, 131 and 134 wait for this, since each reworks code it moves.
-
-### 131. Let a reader check each query, path and text redaction routine in `// --- Credentials on a span ---` on one read: its state, its recursion and the order of its checks plain where they act.
+### 131. Let a reader check each query, path and text redaction routine in `tracing/span-credentials.ts` on one read: its state, its recursion and the order of its checks plain where they act.
 
 Every seat of the 2026-11-13 comprehension run ranked these places among the hardest, and a wrong
 edit to one leaks a credential, against README → Goals #7: `redactedSearch` unions three readings
@@ -121,10 +104,10 @@ redactors in an order only README bullets justify; and in `splitUserinfoPairs` t
 `start` can both fire on one pair, and the name says split where it returns ranges to redact.
 Make each of those places easier to read.
 
-Item 118 takes the section's grouping and `splitUserinfoPairs`'s closures; item 128 its module.
+Item 118 takes the module's grouping and `splitUserinfoPairs`'s closures.
 What each routine records stays as it is: README → Audience lets only a major drop a shape that
-records `REDACTED`, and the rules stay in one section, as `docs/decisions.md` → "Every rule on
-credentials in a span sits in one source section" asks.
+records `REDACTED`, and the rules stay in one module, as `docs/decisions.md` → "Every rule on
+credentials in a span sits in one module" asks.
 
 ### 134. Lower the reading cost of the files a chunk reads most before its first commit.
 
@@ -170,7 +153,7 @@ neither sleeps nor asserts on the wall clock (`~/.claude/principles/technical-pr
 
 ### 110. Register one test per case where a test loops over its cases or checks many behaviours.
 
-`tap.ts`'s `test()` can register one test per case, yet the redaction tables loop
+`tests/tap.ts`'s `test()` can register one test per case, yet the redaction tables loop
 inside one test, and one `deepEqual` covers a whole table, so a failure names no case. Principle:
 one behaviour per test, named for it; no loops or branches in a test body, parametrize the cases
 (`~/.claude/principles/technical-principles.md`).
@@ -181,13 +164,13 @@ one behaviour per test, named for it; no loops or branches in a test body, param
 the runner and publishes that, so the thing consumers install is never the thing CI proved. Build
 once, upload, publish that.
 
-### 118. Bring `index.ts`'s `// --- Credentials on a span ---` section within about seven things per level, or record why it holds more.
+### 118. Bring `tracing/span-credentials.ts` within about seven things per level, or record why it holds more.
 
-The section holds over 30 flat top-level declarations, with no recorded reason and no name order
+The module holds over 30 flat top-level declarations, with no recorded reason and no name order
 a reader could find them by. That crosses the limit of about seven things per level. The principle
 asks for a grouping under names a reader can follow, or a recorded reason. The rules must stay in
-one section, as `docs/decisions.md` → "Every rule on credentials in a span sits in one source
-section" asks. Principle: `~/.claude/principles/technical-principles.md` → "About seven things per
+one module or folder, as `docs/decisions.md` → "Every rule on credentials in a span sits in one
+module" asks. Principle: `~/.claude/principles/technical-principles.md` → "About seven things per
 level". Found by the principles audit of 2026-10-28. `splitUserinfoPairs` is hard to read too: its
 closures `close` and `read` mutate `start`, `end` and `split`, more interacting values than four or
 five. Found by the 2.5.0 principles audit.
@@ -259,6 +242,8 @@ README → Footprint budgets `index.js` at ≤10 KB gzipped for Goals #5. On 202
 `gzip -9c index.js | wc -c`. The budget is broken, and nothing checks it. Whether to shrink the
 build or re-state the budget is for this item to work out. Item 26 will check the budget in CI, and
 that check will fail from its first run until this item lands. Found on 2026-10-28, at 10439 bytes.
+On 2026-11-13 the bundled build was 11522 bytes, and 10395 with `uglifyjs --toplevel`, which
+shortens every name but the exports and so also `Log`'s and `Queue`'s class names, unless reserved.
 
 ### 31. Set a log record's `flags` to the W3C trace flags.
 
