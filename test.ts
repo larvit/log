@@ -406,6 +406,13 @@ test("respects the configured log-level threshold", t => {
 	unknown.log.info("x");
 	t.strictEqual(unknown.stderr.length, 2, "the warning is written once per sink and value");
 
+	// A JavaScript caller can pass null, which the types forbid.
+	const nulled = capture({ colors: null as unknown as boolean, logLevel: null as unknown as LogLevel });
+
+	nulled.log.info("x");
+	t.ok(nulled.stderr[0]?.includes("logLevel null is not a level"), "a null logLevel is not unset: it warns like any other bad value");
+	t.strictEqual(nulled.log.conf.colors, null, "and a null colors is kept, not replaced by the default");
+
 	const asked = capture({ colors: false, logLevel: unknownLevel });
 
 	t.strictEqual(asked.log.enabled("info"), true, "enabled() treats an unknown logLevel as info");
