@@ -219,7 +219,7 @@ export function msgTextFormatter(conf: EntryFormatterConf) {
 // - `formatterOf`: the formatter a conf uses; `resolveFormatter` is its exported form.
 
 // A conf's function formatter, which `conf.format` cannot hold before 3.0.0.
-const confFormatters = new WeakMap<LogConf, EntryFormatter>();
+const confFormatters = new WeakMap<object, EntryFormatter>();
 
 function formatterOf(conf: LogConf): EntryFormatter {
 	return confFormatters.get(conf) ?? (conf.format === "json" ? msgJsonFormatter : msgTextFormatter);
@@ -1882,7 +1882,8 @@ export class Queue implements OtlpQueue {
 // Three things travel beside the plain keys:
 // - A function formatter: formatFunction while settings resolve. withDefaults moves it into
 //   confFormatters, keyed by the conf, which the entryFormatter alias reads and writes. A clone hands
-//   its own to the constructor through cloneFormatters, keyed by the options.
+//   its own to the constructor through cloneFormatters, keyed by the options; a Log's conf passed as
+//   options hands on its own from confFormatters.
 // - The default queue: attachDefaultQueue builds it into conf.otlpQueue and marks it in defaultQueues.
 //   A child or clone inherits it with the endpoint keys it was built from, by reference, and only that
 //   pair passes rejectQueueBesideShorthand.
@@ -2004,9 +2005,15 @@ type LogSettings = Omit<LogOptions, "context" | "format"> & { context?: Metadata
 // confFromOptions, called by that constructor, reads it.
 const cloneFormatters = new WeakMap<LogOptions, EntryFormatter>();
 
+// The function formatter that options carry outside `format`: a clone's, or that of a Log whose own
+// conf is passed as options, which the spread below drops with the non-enumerable alias.
+function handedFormatFunction(options: LogOptions): EntryFormatter | undefined {
+	return cloneFormatters.get(options) ?? confFormatters.get(options);
+}
+
 function confFromOptions(options: LogOptions | LogLevel | "none" | undefined): LogSettings {
 	const { context, format, ...rest }: LogOptions = typeof options === "string" ? { logLevel: options } : { ...options };
-	const formatFunction = typeof format === "function" ? format : typeof options === "object" ? cloneFormatters.get(options) : undefined;
+	const formatFunction = typeof format === "function" ? format : typeof options === "object" ? handedFormatFunction(options) : undefined;
 
 	return {
 		...rest,
