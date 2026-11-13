@@ -18,8 +18,6 @@ const systemClock: Clock = {
 
 export type EntryFormatter = (entry: EntryFormatterConf) => string;
 
-// The two sort rules disagree on `msg` and `msTimestamp`: a type lists `msg` first, an object
-// literal `msTimestamp` first. Each follows its rule.
 export type EntryFormatterConf = {
 	// The instance's resolved `colors`. Unset means on.
 	colors?: boolean;
@@ -48,9 +46,7 @@ export type LogConf = {
 	parentLog?: LogInt;
 	printTraceInfo?: boolean;
 
-	// `randomBytes(size)` returns `size` random bytes for a trace or span id. Unset, a `Log` draws from
-	// Web Crypto, else `Math.random`. Named by the audience panel of `todo.md` item 34 over `random` and
-	// `idBytes`, which two of three readers took for a `Math.random` or a fixed id.
+	// Returns `size` random bytes for a trace or span id. Unset, Web Crypto, else `Math.random`.
 	randomBytes?: (size: number) => Uint8Array;
 	spanName?: string;
 	stderr?: (msg: string) => void;
@@ -58,7 +54,7 @@ export type LogConf = {
 	traceparent?: string;
 };
 
-export type ResolvedLogConf = LogConf & Required<Pick<LogConf, "clock" | "colors" | "entryFormatter" | "logLevel" | "stderr" | "stdout">>;
+export type ResolvedLogConf = LogConf & Required<Pick<LogConf, "clock" | "colors" | "entryFormatter" | "logLevel" | "randomBytes" | "stderr" | "stdout">>;
 
 export type LogOptions = Omit<LogConf, "context" | "format"> & { context?: MetadataInput, format?: LogConf["format"] | EntryFormatter };
 
@@ -219,7 +215,6 @@ function bytesToHex(bytes: Uint8Array): string {
 	return Array.from(bytes).map(byte => byte.toString(16).padStart(2, "0")).join("");
 }
 
-// The platform's randomness, which a `Log` uses unless its `randomBytes` option says otherwise.
 function platformRandomBytes(size: number): Uint8Array {
 	const bytes = new Uint8Array(size);
 	const webcrypto = globalThis.crypto;
@@ -236,20 +231,20 @@ function platformRandomBytes(size: number): Uint8Array {
 	return bytes;
 }
 
-function spanIdFrom(randomBytes: LogConf["randomBytes"] = platformRandomBytes): string {
+function spanIdFrom(randomBytes: (size: number) => Uint8Array): string {
 	return bytesToHex(randomBytes(8));
 }
 
-function traceIdFrom(randomBytes: LogConf["randomBytes"] = platformRandomBytes): string {
+function traceIdFrom(randomBytes: (size: number) => Uint8Array): string {
 	return bytesToHex(randomBytes(16));
 }
 
 export function generateSpanId(): string {
-	return spanIdFrom();
+	return spanIdFrom(platformRandomBytes);
 }
 
 export function generateTraceId(): string {
-	return traceIdFrom();
+	return traceIdFrom(platformRandomBytes);
 }
 
 export function formatTraceparent(traceId: string, spanId: string, sampled: boolean = true): string {
@@ -449,7 +444,7 @@ function buildLogPayload(opts: {
 	};
 }
 
-// service.name is carried on the resource scope, so it is excluded from the span attributes.
+// service.name is carried on the resource, so it is excluded from the span attributes.
 function toSpanAttributes(attributes: Metadata): OtlpAttribute[] {
 	return Object.entries(attributes)
 		.filter(([key]) => key !== "service.name")
@@ -457,7 +452,7 @@ function toSpanAttributes(attributes: Metadata): OtlpAttribute[] {
 }
 
 // Unredacted: callers redact what they capture into `attributes`, and per README → Credentials in a
-// captured value the context and span name go as written. `attributes` feeds the resource only; the
+// captured value, the context and span name go as written. `attributes` feeds the resource only; the
 // span goes out as it is, with the attributes it already holds.
 function buildSpanPayload(opts: {
 	attributes: Metadata,
@@ -1723,7 +1718,8 @@ export class Queue implements OtlpQueue {
 
 	// A failed or persisted batch is older than anything queued since, so it goes in front.
 	private prepend(items: QueuedItem[]): void {
-		this.items.unshift(...items);
+		// Not unshift(...items): a long stored list would overflow the call stack.
+		this.items = [...items, ...this.items];
 		this.countAndTrim(items);
 	}
 
@@ -2006,6 +2002,10 @@ function withDefaults(conf: LogSettings): ResolvedLogConf {
 		conf.clock = systemClock;
 	}
 
+	if (conf.randomBytes === undefined) {
+		conf.randomBytes = platformRandomBytes;
+	}
+
 	if (conf.colors === undefined) {
 		conf.colors = colorsFromEnv() ?? true;
 	}
@@ -2175,8 +2175,8 @@ async function tracedFetch(log: Pick<Log, "conf" | "context" | "sampled" | "span
 		Object.assign(attributes, {
 			"http.request.method": method,
 			"server.address": url.hostname,
-			"url.full": buildUrlFull(url, log.conf.captureQuery === true),
 			...url.port ? { "server.port": Number(url.port) } : {},
+			"url.full": buildUrlFull(url, log.conf.captureQuery === true),
 			"url.scheme": url.protocol.replace(/:$/, ""),
 		});
 

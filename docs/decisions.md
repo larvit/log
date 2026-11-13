@@ -55,15 +55,14 @@ process-exit behaviour intact.
 ## A `Log` and a `Queue` default their clock, and a `Log` its randomness
 
 2026-11-10, the maintainer: a `Log` and a `Queue` use the system clock unless their `clock` option
-says otherwise, and a `Log` draws trace and span ids from `globalThis.crypto`, else `Math.random`.
-Asking the caller for either would break Goal 1 ("Useful with no config") and Goal 3 ("A very easy
-API"). This departs from the technical principle "Sane defaults", which has a library ask for its
-clock and randomness. Item 291 of the plan that keeps the technical principles will give "Sane
-defaults" an exception for a library whose goals ask that it work with no config, where a
-documented option overrides each default. The documented `clock` option already changes the clock,
-so item 291 ends the clock's departure; the documented `randomBytes` option, from 2.6.0, ends the
-randomness's. Serves README → Goals #1 and #3. Valid while Goal 1 asks for a logger useful with no
-config.
+says otherwise, and a `Log` draws trace and span ids from `globalThis.crypto`, else `Math.random`,
+unless its `randomBytes` option says otherwise. Asking the caller for either would break Goal 1
+("Useful with no config") and Goal 3 ("A very easy API"). This departs from the technical principle
+"Sane defaults", which has a library ask for its clock and randomness. Item 291 of the plan that
+keeps the technical principles will give "Sane defaults" an exception for a library whose goals ask
+that it work with no config, where a documented option overrides each default. The `clock` and
+`randomBytes` options are documented, so item 291 ends the departure for both. Serves README →
+Goals #1 and #3. Valid while Goal 1 asks for a logger useful with no config.
 
 ## A required `Resolved*Conf` key is added in a minor and removed in a major
 
