@@ -1,16 +1,25 @@
-import { buildLogPayload, getNsTimestamp, type OtlpSpan, STATUS_CODE_ERROR } from "../otlp/payloads.js";
+import { traceableUrl } from "../credentials/span-values.js";
+import { buildLogPayload, type OtlpSpan } from "../otlp/payloads.js";
 import { stringField } from "../primitives/failure-fields.js";
 import { DEFAULT_LOG_LEVEL, type LogLevel, LogLevels, SEVERITY_NUMBERS } from "../primitives/levels.js";
 import { type Metadata, type MetadataInput, withoutUndefined } from "../primitives/metadata.js";
 import { writeOnce } from "../primitives/once-per-sink.js";
 import { tracedFetch } from "../tracing/fetch.js";
-import { failureMessage, pageHref, traceableUrl } from "../tracing/span-credentials.js";
-import { exportSpan, openSpan } from "../tracing/spans.js";
+import { endSpan, openSpan } from "../tracing/spans.js";
 import { formatTraceparent } from "../tracing/traceparent.js";
-import { formatterOf } from "./entry-format.js";
-import { confFromOptions, inherited, optionsFromSettings, resolveLogConf } from "./settings.js";
+import { writeConsoleEntry } from "./console-output.js";
+import { confFromOptions, inherited, type LogSettings, resolveSettings } from "./settings.js";
 import { describeLogLevel, warnOnceToStderr, writeStderr } from "./stderr-warnings.js";
 import type { LogInt, LogOptions, ResolvedLogConf } from "./types.js";
+
+// The page's address, which a relative url resolves against; undefined outside a browser, or where the getter throws.
+function pageHref(): string | undefined {
+	try {
+		return (globalThis as { location?: { href?: string } }).location?.href;
+	} catch {
+		return undefined;
+	}
+}
 
 export class Log implements LogInt {
 	context: Metadata;
@@ -26,8 +35,14 @@ export class Log implements LogInt {
 
 	span: OtlpSpan;
 
-	constructor(options?: LogOptions | LogLevel | "none") {
-		const { conf, deprecations } = resolveLogConf(options);
+	// `cloneSettings` is clone()'s own, not for a consumer: a clone's settings, which options cannot
+	// carry whole, since `format` holds no function beside the inherited format string.
+	constructor(options?: LogOptions | LogLevel | "none", cloneSettings?: LogSettings) {
+		const { conf, deprecations } = resolveSettings(cloneSettings ?? confFromOptions(options));
+
+		if (typeof options === "string") {
+			deprecations.unshift("@larvit/log: new Log(\"level\") is deprecated and removed in 3.0.0, use new Log({ logLevel })");
+		}
 
 		this.conf = conf;
 		// Own copy, so a clone/child never mutates a context object shared with another instance.
@@ -48,7 +63,7 @@ export class Log implements LogInt {
 			warnOnceToStderr(this.conf, this.context, "@larvit/log: log.clone(\"level\") is deprecated and removed in 3.0.0, use log.clone({ logLevel })");
 		}
 
-		return new Log(optionsFromSettings(inherited(confFromOptions(options), this, "clone")));
+		return new Log(undefined, inherited(confFromOptions(options), this, "clone"));
 	}
 
 	public async end(options?: { error?: unknown }): Promise<void> {
@@ -57,16 +72,12 @@ export class Log implements LogInt {
 
 		// What is already queued is delivered even when the span's own close throws.
 		try {
-			this.span.endTimeUnixNano = getNsTimestamp(this.conf.clock.now());
+			const error = options?.error;
 
-			const attributes: Metadata = { ...this.context };
-
-			if (options?.error !== undefined && options.error !== null) {
-				this.span.status = { code: STATUS_CODE_ERROR, message: failureMessage(options.error) };
-				attributes["error.type"] = stringField(options.error, "code") ?? stringField(options.error, "name") ?? "_OTHER";
-			}
-
-			exportSpan(this, this.span, attributes);
+			endSpan(this, this.span, { ...this.context }, error === undefined || error === null ? undefined : {
+				error,
+				errorType: stringField(error, "code") ?? stringField(error, "name") ?? "_OTHER",
+			});
 		} finally {
 			await this.flush();
 		}
@@ -153,7 +164,7 @@ export class Log implements LogInt {
 			consoleMetadata.traceId = this.span.traceId;
 			consoleMetadata.spanName = this.span.name;
 		}
-		this.outputToConsole(logLevel, msg, consoleMetadata, msTimestamp);
+		writeConsoleEntry(this.conf, logLevel, msg, consoleMetadata, msTimestamp);
 
 		if (!this.conf.otlpQueue) {
 			return;
@@ -168,21 +179,5 @@ export class Log implements LogInt {
 		this.pendingFetches.add(promise);
 		// The tracked promise only resolves, but stay defensive so a stray rejection can't become unhandled.
 		void promise.catch(() => {}).finally(() => this.pendingFetches.delete(promise));
-	}
-
-	private outputToConsole(logLevel: LogLevel, msg: string, metadata: Metadata, msTimestamp: number) {
-		const output = formatterOf(this.conf)({
-			colors: this.conf.colors,
-			logLevel,
-			metadata,
-			msTimestamp,
-			msg,
-		});
-
-		if (["error", "warn"].includes(logLevel)) {
-			this.conf.stderr(output);
-		} else {
-			this.conf.stdout(output);
-		}
 	}
 }

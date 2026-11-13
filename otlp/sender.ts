@@ -1,9 +1,15 @@
+import { isCredentialHeaderName } from "../credentials/header-names.js";
 import { stringField } from "../primitives/failure-fields.js";
 import { type Metadata, withoutUndefined } from "../primitives/metadata.js";
-import { isCredentialHeaderName } from "../tracing/span-credentials.js";
 import { byKind, type OtlpLogPayload, type OtlpPayload, type OtlpScope, type OtlpSpanPayload } from "./payloads.js";
 import { encodeOtlpProtobuf } from "./protobuf.js";
-import { KEEPALIVE_MAX_BYTES, type QueuedItem, type ResolvedQueueConf, type SendFailure, utf8Length } from "./queue-items.js";
+import { type QueuedItem, utf8Length } from "./queue-items.js";
+import type { ResolvedQueueConf } from "./queue-types.js";
+
+export type SendFailure = { message: string, reportAs?: string, retry: boolean, status?: number };
+
+// Browsers reject a keepalive request whose body is over 64 KiB.
+export const KEEPALIVE_MAX_BYTES = 65536;
 
 const OTLP_EXPORT_TIMEOUT_MS = 3000;
 

@@ -1,5 +1,5 @@
+import { isCredentialHeaderName } from "../credentials/header-names.js";
 import { type EntryFormatter, type EntryFormatterConf, formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, type Logger, type LogInt, type LogLevel, LogLevels, type LogOptions, type Metadata, msgJsonFormatter, msgTextFormatter, type OtlpPayload, type OtlpQueue, type OtlpSpan, parseTraceparent, Queue, type QueueStorage, type ResolvedLogConf, resolveFormatter, type TimerHandle } from "../index.js";
-import { isCredentialHeaderName } from "../tracing/span-credentials.js";
 import test from "./tap.js";
 
 // --- helpers ---------------------------------------------------------------

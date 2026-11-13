@@ -176,3 +176,8 @@ export function buildSpanPayload(opts: {
 		}],
 	};
 }
+
+export function isOtlpPayload(value: unknown): value is OtlpPayload {
+	return typeof value === "object" && value !== null
+		&& Object.values(PAYLOAD_KEYS).some(key => Array.isArray(Reflect.get(value, key)));
+}

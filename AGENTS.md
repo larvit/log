@@ -26,7 +26,7 @@ In [docs/decisions.md](docs/decisions.md):
 - `log.fetch` traces only `http:` and `https:` urls
 - `log.fetch` passes url userinfo through, and redacts it in its own span's status
 - A captured value holding a credential records `REDACTED`
-- Every rule on credentials in a span sits in one module
+- Every rule on credentials in a span sits in one folder
 - `format` is the formatter's one name, `entryFormatter` its alias until 3.0.0
 - `ResolvedLogConf` keeps `entryFormatter` required
 - A query key is redacted by Datadog's suffix rule
@@ -52,8 +52,8 @@ In [docs/decisions.md](docs/decisions.md):
 - `index.ts` holds only the public exports. New code joins the module whose file name stays true
   of it, or gets its own. A rule set answering one question — what a reader has to check as a
   whole — lives in one module, or in one folder once it outgrows a module.
-- Imports point one way: `log/` → `tracing/` → `otlp/` → `primitives/`. The decision log names
-  each import that runs against it.
+- Imports point one way: `log/` → `tracing/` → `otlp/` → `credentials/` → `primitives/`. The
+  decision log names each import that runs against it.
 - A `// --- name ---` banner divides a source module only where a technical limit stops a split.
 - A done `todo.md` item leaves the file: a change a consumer can observe is reworded for them
   under `CHANGELOG.md` → `## Unreleased`; anything else is deleted outright.
