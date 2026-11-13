@@ -13,10 +13,9 @@
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 128 | 2.6.0 |  |  | **Give each part of the library a source module of its own, so a rule can be read and tested without the rest.** | 4 | 2 | 3 | 7 | 8 | code health by 8 | 3.3 |
-| 130 | 2.6.0 | 128 |  | **Let a reader follow how a `Log`'s formatter, default queue and once-only warnings pass between functions, without tracing module-level tables across sections.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
 | 131 | 2.6.0 | 128 |  | **Let a reader check each query, path and text redaction routine in `// --- Credentials on a span ---` on one read: its state, its recursion and the order of its checks plain where they act.** | 2 | 2 | 4 | 6 | 5 | code health by 7 | 4.0 |
 | 134 | 2.6.0 | 128 |  | **Lower the reading cost of the files a chunk reads most before its first commit.** | 2 | 2 | 1 | 3 | 4 | code health by 3 | 2.7 |
-| 135 | 2.7.0 | 130, 131 | decision | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
+| 135 | 2.7.0 | 131 | decision | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
 | 36 | 2.7.0 |  | principle | **Reach the retry decision and a `log.fetch` span's attributes without a network call.** | 2 | 1 | 1 | 2 | 5 | code health by 5 | 4.5 |
 | 43 | 2.7.0 |  | principle | **Give `ExportScheduler` and save coalescing named states.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
 | 48 | 2.7.0 |  | principle | **Test the untested failure paths.** | 2 | 1 | 1 | 2 | 4 | code health by 4 | 4.2 |
@@ -107,26 +106,6 @@ native ESM in every runtime this library supports, is part of this item; the 202
 a bundler allows one without asking for it. The footprint budgets in README → Footprint (see item
 117) must hold. Reword README's "One file" bullet, and AGENTS.md's rule on `index.ts` sections, to
 match. Items 118, 130, 131 and 134 wait for this, since each reworks code it moves.
-
-### 130. Let a reader follow how a `Log`'s formatter, default queue and once-only warnings pass between functions, without tracing module-level tables across sections.
-
-The 2026-11-13 comprehension run ranked these places hard for Locality: `formatFunctions`, a
-module-level WeakMap keyed by confs and by options objects, written by `optionsFromSettings` and
-read by `confFromOptions`, so a clone's function formatter reaches the constructor through it;
-`ENTRY_FORMATTER_ALIAS`, whose getter's identity tells a conf this module built;
-`sourceFormatFunction`, `inherited` and `withDefaults` on top of them; `warned` beside
-`logWarningOfReport`; `defaultQueues`; and `otlpKeysNotToInherit`, where a child keeps a default
-queue only while its headers object is the same reference as the conf's, an invariant `inherited`
-must keep and nothing enforces. Understanding or changing one of these needs the others in mind,
-and nothing states their lifecycle in one place. Make each of those places easier to read.
-
-What must keep holding, from `docs/decisions.md`: `entryFormatter` stays a read and write alias
-of `format`, a function formatter reads back from `conf.entryFormatter` alone, and the alias is one
-module-level descriptor, not a closure pair per `Log`, for README → Footprint (decisions.md: "`format`
-is the formatter's one name…", "`ResolvedLogConf` keeps `entryFormatter` required" and "A v2.3.0
-copy's child loses a function formatter"); the default `Queue` lives in `conf.otlpQueue`; and each warning is
-written once per `stderr` sink. Item 96 may later move the formatter and the queue into the console
-and OTLP transports; this item doesn't wait for it.
 
 ### 131. Let a reader check each query, path and text redaction routine in `// --- Credentials on a span ---` on one read: its state, its recursion and the order of its checks plain where they act.
 
