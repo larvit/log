@@ -119,7 +119,6 @@ function redactTextQueryKeys(text: string): string {
 		const insideRedactedValue = opener.lastIndex <= copied;
 
 		if (!insideRedactedValue && isListedQueryKey(withoutDropped(pair[1]))) {
-			// Both regexes are global, so the search for the value's end starts at this `lastIndex`.
 			valueEnd.lastIndex = opener.lastIndex;
 
 			const end = valueEnd.exec(text)?.index ?? text.length;
@@ -145,11 +144,10 @@ const opensUserinfo = (key: string) => inAnyDecoding(decodings(key), decoding =>
 
 // A parser reads the `&` in `?//u:p&w@host` as part of the userinfo, which the query splits into
 // two pairs. A key opening userinfo starts a run: its value and each later pair join it, up to the
-// first URL_DELIMITER. The indexes of the pairs up to the run's last `@` are returned, for the caller
-// to redact whole. Keep `\` out of
-// URL_DELIMITER, since userinfo after `//` may hold one; a run that a backslash opens may then redact
-// a pair holding no credential. A value opening userinfo is a url of its own, so
-// `?next=https://h&q=a@b` is kept.
+// first URL_DELIMITER. The indexes of the pairs from the run's start to its last `@` are returned,
+// for the caller to redact whole. Keep `\` out of URL_DELIMITER, since userinfo after `//` may hold
+// one; a run that a backslash opens may then redact a pair holding no credential. A value opening
+// userinfo is a url of its own, so `?next=https://h&q=a@b` is kept.
 function pairsInUserinfoRuns(pairs: Array<[string, string]>, holdsAtSign: (text: string) => boolean): Set<number> {
 	const inRuns = new Set<number>();
 	let start = -1;
@@ -212,15 +210,16 @@ function rawQueryPairs(url: URL): Array<[string, string]> {
 const formDecoded = (text: string) => new URLSearchParams(`=${text}`).get("") ?? "";
 const holdsAtSignInAnyDecoding = (text: string) => inAnyDecoding(decodings(text), decoding => decoding.includes("@"));
 
-// redactedSearch, redactQueryPair, redactQueryPart and readQueryPart call each other in a cycle, once
-// per url nested in a query; the eslint-disable lines below are that cycle. `depth` counts its turns and
-// is what ends it: past MAX_NESTED_URLS a url counts as holding a credential. `partsRead` is its memo.
+// redactedSearch, redactQueryPair, redactQueryPart and readQueryPart call each other in a cycle, one
+// turn per url nested in a query. It ends at a part that parses as no url; `depth` counts its turns
+// and caps it. The two eslint-disable lines are this cycle's calls to a function declared further down.
 
 // `undefined` where no pair changes.
 function redactedSearch(url: URL, depth: number, partsRead: PartsRead): string | undefined {
 	const raw = rawQueryPairs(url);
 	const pairs = raw.map(([key, value]): [string, string] => [formDecoded(key), formDecoded(value)]);
-	// Where a run of userinfo ends is read three ways, and a pair is redacted if any finds it. Raw, only
+	// Where a run of userinfo ends is read three ways, each as one consumer reads the query, and a pair
+	// is redacted if any finds it; dropping a reading no test tells apart can only let a credential through. Raw, only
 	// a literal delimiter ends a run and only a literal `@` counts: a `%2F` or `%40` there is no `/` or
 	// `@`. Percent-decoded, an escaped delimiter ends a run and an escaped `@` counts, for a consumer
 	// that decodes first; its `+` stays, since a parser takes it as part of the userinfo. Form-decoded,
@@ -277,11 +276,11 @@ const SCHEME_LED = /^[\0- ]*[a-z][a-z\d+.-]*:/i;
 // password ends the key. This function reads one pair alone, so userinfo spanning pairs or the `=`,
 // as in `?//u:p=w@host`, is for the caller to redact first, as `redactedSearch` does with
 // `pairsInUserinfoRuns`.
-// The exits run from the widest redaction to the narrowest, and that order is load-bearing: the first
-// two redact the key too, and each later exit keeps the key, so a key holding a credential must be
-// caught before any of them.
+// The order of the checks is load-bearing, in two places: the two that redact the key come before any
+// that keeps it, and a listed key's value goes whole (3) before a value is read as a url (4), which
+// would return it as written.
 function redactQueryPair(key: string, value: string, [rawKey, rawValue]: [string, string], depth: number, partsRead: PartsRead): [string, string] {
-	// Exit 1, key and value: a key opening a url that holds a credential, alone or joined to its value.
+	// 1. Key and value: a key opening a url that holds a credential, alone or joined to its value.
 	if (SCHEME_LED.test(withoutDropped(key))) {
 		const joined = `${key}=${value}`;
 
@@ -290,19 +289,19 @@ function redactQueryPair(key: string, value: string, [rawKey, rawValue]: [string
 		}
 	}
 
-	// Exit 2, key and value: a credential in the key. Form-decoded and raw both: a `+` or an escaped
+	// 2. Key and value: a credential in the key. Form-decoded and raw both: a `+` or an escaped
 	// delimiter ends the match in one reading.
 	if (holdsUserinfoInAnyDecoding(key) || holdsUserinfoInAnyDecoding(rawKey) || holdsListedKeyInAnyDecoding(key)) {
 		return ["REDACTED", "REDACTED"];
 	}
 
-	// Exit 3, the value: the key is listed, or the value holds userinfo.
+	// 3. The value: the key is listed, or the value holds userinfo.
 	if (isListedQueryKey(key) || holdsUserinfoInAnyDecoding(value) || holdsUserinfoInAnyDecoding(rawValue)) {
 		return [key, "REDACTED"];
 	}
 
-	// Exits 4 and 5, the value: a url the runtime parses has its listed keys redacted in place (4); a
-	// listed key still left in the result sits where its query rules don't reach, such as a fragment (5).
+	// 4. A url the runtime parses has its listed keys redacted in place. 5. A listed key still left in the
+	// result sits where its query rules don't reach, such as a fragment: the value goes whole.
 	const part = redactQueryPart(value, depth, partsRead);
 
 	return [key, holdsListedKeyInAnyDecoding(part) ? "REDACTED" : part];
@@ -365,9 +364,9 @@ function redactedPath(pathname: string): string {
 		return "/REDACTED";
 	}
 
-	// A listed key cuts the path at its segment. A url opened in an earlier segment may cut it sooner.
 	const listedKeyAt = read.findIndex(segmentRead => inAnyDecoding(segmentRead, holdsListedKey));
-	// Segments before `cutAt` are kept, and `REDACTED` replaces the rest; -1 keeps all.
+	// Segments before `cutAt` are kept, and `REDACTED` replaces the rest; -1 keeps all. The scan stops
+	// at `listedKeyAt`, so a url opened after it cannot move the cut later.
 	let cutAt = listedKeyAt;
 	let opened = 0;
 
@@ -390,8 +389,7 @@ function redactedPath(pathname: string): string {
 	const kept = cutAt === -1 ? pathname : [...segments.slice(0, cutAt), "REDACTED"].join("/");
 
 	// Userinfo after `//`, `\\`, `/\` or `\/` needs no scheme and no query key, so both cuts can miss it.
-	// That userinfo may sit in a decoding that maps to no raw segment, so the whole path goes, whatever
-	// the cuts kept.
+	// That userinfo may sit in a decoding that maps to no raw segment, so the whole path goes.
 	return holdsUserinfoInAnyDecoding(kept) ? "/REDACTED" : kept;
 }
 
@@ -414,8 +412,8 @@ export function failureMessage(error: unknown, url?: URL): string {
 		}
 	}
 
-	// Precise rules first, coarse after, so each coarse rule sees only what the finer ones left.
-	// 1. The known url, which the runtime quotes back: Firefox's `Window.fetch: <url> …` parses whole, its
+	// Precise rules first, coarse after, so each coarse rule sees only what the finer ones left. First,
+	// the known url, which the runtime quotes back: Firefox's `Window.fetch: <url> …` parses whole, its
 	// quoted userinfo in the path.
 	let quoted = message;
 
@@ -426,9 +424,9 @@ export function failureMessage(error: unknown, url?: URL): string {
 		quoted = message.split(url.href).join(known.href);
 	}
 
-	// 2. The message as one url, then userinfo and listed keys in free text.
+	// Then the message as one url, then free text.
 	const keyed = redactTextQueryKeys(redactTextUserinfo(redactedWholeUrl(quoted) ?? quoted));
 
-	// 3. A listed key that only a decoding spells is beyond the text rules, so the message goes.
+	// Last, a listed key that only a decoding spells is beyond the text rules, so the message goes.
 	return holdsListedKeyInAnyDecoding(keyed) ? "REDACTED" : keyed;
 }
