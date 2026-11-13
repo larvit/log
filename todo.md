@@ -6,7 +6,7 @@
 
 `Bar = 0.5`
 
-`Next ID = 142`
+`Next ID = 143`
 
 ## Items
 
@@ -64,6 +64,7 @@
 | 51 | 2.8.0 |  | principle | **Keep a retried export from duplicating log records, or record in `docs/decisions.md` why duplicates stand.** | 2 | 2 | 2 | 4 | 4 | 1 by 4 | 0.8 |
 | 32 | 2.8.0 |  |  | **Propagate `tracestate`.** | 3 | 2 | 2 | 5 | 5 | 1 by 4 | 0.6 |
 | 55 | 3.0.0 |  | principle | **Make `log.span` and `ended` read-only, and an open span carry no end time.** | 2 | 1 | 1 | 2 | 3 | code health by 4 | 5.0 |
+| 142 | 3.0.0 |  | principle | **Take `cloneSettings` off `Log`'s published constructor and `warn` off `Queue`'s.** | 2 | 1 | 2 | 3 | 3 | code health by 3 | 3.1 |
 | 57 | 3.0.0 |  |  | **Retry only what OTLP/HTTP calls retryable: 429, 502, 503 and 504.** | 1 | 1 | 2 | 2 | 2 | 1 by 5 | 1.9 |
 | 61 | 3.0.0 |  | decision | **Remove the level-string shorthand from `Log` and `clone`.** | 1 | 1 | 2 | 2 | 1 | 3 by 4 | 1.8 |
 | 64 | 3.0.0 | 16 |  | **Reject a `format` string other than `"text"` or `"json"` in the constructor.** | 1 | 1 | 2 | 2 | 1 | 3 by 4 | 1.8 |
@@ -433,6 +434,15 @@ ordering, the `ot` vendor key — are where the cost sits.
 
 Anyone handed a `LogInt` can rewrite what is exported, `log.ended = false` exports a span twice, and
 an open span reads as a finished zero-length one. Principle: One owner per value.
+
+### 142. Take `cloneSettings` off `Log`'s published constructor and `warn` off `Queue`'s.
+
+Each is a second constructor parameter only this library passes, marked "Not part of the API" in
+its JSDoc: `clone()` hands `Log` its clone's settings, and a `Log` hands the queue it builds the
+function that writes its warnings. A consumer can still pass either, and `cloneSettings` silently
+replaces `options`. Removing a parameter from a published signature needs a major. Against the
+technical principles "Make invalid states unrepresentable" and "Explicit over implicit". Found by
+the principles pass of 2.6.0's release review.
 
 ### 57. Retry only what OTLP/HTTP calls retryable: 429, 502, 503 and 504.
 
