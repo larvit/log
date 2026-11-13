@@ -137,3 +137,57 @@ Inherited architect, would restructure first:
 - `index.ts:698` `warnOnce`: keyed per stderr sink, while `Queue.warnOnce` is keyed per report function; one name, two rules
 - `index.ts:2062` `childSpan`: makes only `log.fetch`'s client span, while `openSpan` makes child spans too
 - `index.ts:1541` `Queue.unreadable`: a throwing `getItem` silently stops every storage write until the next start
+
+## 2026-11-13T20:18:02Z, item-98 at 83091b4
+
+| Seat | Navigation | Locality | Shape | Self-sufficiency | Overall |
+|---|---|---|---|---|---|
+| Junior A | 7 | 5.5 | 6 | 6 | 6 |
+| Mid A | 7.5 | 6 | 6.5 | 6.5 | 6.5 |
+| Maintainability senior | 8 | 6 | 6 | 7 | 6.5 |
+| Inherited architect | 7.5 | 6 | 6 | 6.5 | 6.5 |
+| Mean | 7.50 | 5.88 | 6.13 | 6.50 | 6.38 |
+
+Junior A, hardest first:
+
+- `index.ts:903` `redactedSearch`: three readings each run through `splitUserinfoPairs`, whose run state two closures mutate, then a four-function recursion with a depth and a shared cache; which pair an input ends up redacting stayed opaque
+- `index.ts:961` `redactQueryPair`: five ordered checks over decoded and raw key and value side by side, and a rule whose order matters
+- `index.ts:1025` `redactedPath`: two cut rules and a whole-path fallback, a loop bound that the loop lowers, and a start at 1 with no comment
+- `index.ts:1947` `confFromOptions`: a clone's function formatter reaches it through a WeakMap written in `optionsFromSettings` and keyed by whichever object is in hand; four places held in mind at once
+- `index.ts:1993` `inherited`: a skip set, a formatter rule, a per-key merge and a queue identity check by reference sit on top of the `INHERITED_BY` table
+- `index.ts:803` `redactTextQueryKeys`: two regexes' `lastIndex` and a `copied` cursor, and a dense guard `opener.lastIndex > copied`
+- `index.ts:1067` `failureMessage`: four stacked redactors whose order is explained only by README bullets
+- `index.ts:1225` `ExportScheduler.flush`: `running`, `pending` and `timer.retry` plus a recursive `next`
+
+Mid A, hardest first:
+
+- `index.ts:842` `splitUserinfoPairs`: a state machine in `start` and `end` changed by two closures, and a stop rule resting on `URL_DELIMITER`; the three readings' union stayed half-opaque
+- `index.ts:961` `redactQueryPair`: the four-function cycle through `redactQueryPart` and `readQueryPart`, marked only by two eslint-disable lines, with an order of checks only a comment states
+- `index.ts:1025` `redactedPath`: `cut` set by one rule and then bounding the loop that lowers it, with a fallback that discards both
+- `index.ts:1932` `ENTRY_FORMATTER_ALIAS`: the formatter is carried in seven names across a WeakMap and a getter-identity check, so a clone's function reaches the constructor invisibly
+- `index.ts:1879` `otlpKeysNotToInherit`: a child keeps a default queue only while its headers object is the same reference as the conf's
+- `index.ts:1225` `ExportScheduler.flush`: a comment about a bug already gone and three interacting fields
+- `index.ts:1067` `failureMessage`: layered redaction whose order only the README bullets justify
+- `index.ts:726` `Levels`: means percent-decoding depth beside `LogLevels`
+
+Maintainability senior, hardest first:
+
+- `index.ts:842` `splitUserinfoPairs`: two `if`s on `start` can both fire on one pair, and the name says split where it returns indices to redact
+- `index.ts:961` `redactQueryPair`: a recursion cycle marked only by two eslint-disable lines and an order of checks nothing marks as load-bearing
+- `index.ts:1025` `redactedPath`: `cut` bounds the loop it is lowered in, and the loop starts at 1 for an unstated reason
+- `index.ts:1932` `ENTRY_FORMATTER_ALIAS`: a clone's formatter travels by a WeakMap entry keyed by the options object, and a getter's identity tells a conf this module built
+- `index.ts:803` `redactTextQueryKeys`: the guard `opener.lastIndex > copied` carries a rule explained by a comment that lists cases, not the invariant
+- `index.ts:1067` `failureMessage`: five stages in a fixed order, and which stage serves which runtime's message is unclear
+- `index.ts:1879` `otlpKeysNotToInherit`: an invariant on reference equality that `inherited` must keep and nothing enforces
+- `index.ts:1225` `ExportScheduler.flush`: three pieces of state and re-entry through `next`
+
+Inherited architect, would restructure first:
+
+- `index.ts:706` "Credentials on a span": about 30 units in 385 lines with no sub-banners or map from a README bullet to its function, five of them recursing into each other, and it also hosts the sender's header-name rule
+- `index.ts:903` `redactedSearch`: three readings of one query and a recursive cycle held at once to say why a shape slipped into `url.full`
+- `index.ts:202` `formatFunctions`: a module-level WeakMap keyed on confs and on options objects, written by `optionsFromSettings` and read by `confFromOptions`, so `clone()` passes a function through global state
+- `index.ts:1837` `OTLP_TRANSPORT_KEYS`: "transport" names endpoint options here, encodings at `index.ts:1156`, and a destination in the glossary
+- `index.ts:728` `Levels`: "level" names log level and percent-decoding depth in one file
+- `index.ts:2256` `Log.inFlight`: differs only in case from `Queue.inflight` at `index.ts:1595` and means un-awaited fetches
+- `index.ts:1723` `Queue.warnOnce`: shares a name with the module `warnOnce` at `index.ts:702` and keys on a different thing
+- `index.ts:1835` "Resolving a Log's settings": about 20 functions and three module-level identity registries
