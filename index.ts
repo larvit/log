@@ -1848,7 +1848,7 @@ const INHERITED_BY: { [K in keyof LogConf]-?: readonly Derivation[] } = {
 	colors: CHILD_AND_CLONE,
 	// A clone merges its source's live `context` per key instead.
 	context: ["child"],
-	// Its function is inherited beside format, by inheritSettings.
+	// Its function is inherited beside format, by inherited().
 	entryFormatter: [],
 	format: CHILD_AND_CLONE,
 	logLevel: CHILD_AND_CLONE,
@@ -1904,7 +1904,9 @@ function isDefaultQueueFor(queue: OtlpQueue, conf: LogSettings): boolean {
 		&& queue.conf.otlpAdditionalHeaders === conf.otlpAdditionalHeaders;
 }
 
-function buildDefaultQueue(conf: ResolvedLogConf): void {
+// The one write to a conf after withDefaults builds it: the queue warns through that conf, and may
+// while it is built, so the conf exists first.
+function attachDefaultQueue(conf: ResolvedLogConf): void {
 	if (!conf.otlpQueue && conf.otlpHttpBaseURI) {
 		const report = (msg: string, metadata: Metadata) => writeStderr(conf, "error", metadata, msg);
 
@@ -1938,20 +1940,30 @@ const ENTRY_FORMATTER_ALIAS: PropertyDescriptor = {
 	},
 };
 
-// A conf while it is resolved.
-type LogSettings = Omit<LogOptions, "context"> & { context?: Metadata };
+// A conf while it is resolved. A function formatter rides apart, in formatFunction, since
+// `conf.format` holds none before 3.0.0.
+type LogSettings = Omit<LogOptions, "context" | "format"> & { context?: Metadata, format?: LogConf["format"], formatFunction?: EntryFormatter };
 
 function confFromOptions(options: LogOptions | LogLevel | "none" | undefined): LogSettings {
-	const { context, ...rest }: LogOptions = typeof options === "string" ? { logLevel: options } : { ...options };
-	const settings: LogSettings = context === undefined ? rest : { ...rest, context: withoutUndefined(context) };
-	const formatFunction = typeof options === "object" ? formatFunctions.get(options) : undefined;
+	const { context, format, ...rest }: LogOptions = typeof options === "string" ? { logLevel: options } : { ...options };
+	// A clone hands the constructor the function it inherited this way, as optionsFromSettings says.
+	const formatFunction = typeof format === "function" ? format : typeof options === "object" ? formatFunctions.get(options) : undefined;
 
-	// So a clone's settings, handed to the constructor, keep the function they inherited.
+	return {
+		...rest,
+		...context === undefined ? {} : { context: withoutUndefined(context) },
+		...typeof format === "function" ? {} : { format },
+		...formatFunction ? { formatFunction } : {},
+	};
+}
+
+// The other way round, for a clone's settings: an option can't hold a function beside a format string.
+function optionsFromSettings({ formatFunction, ...options }: LogSettings): LogOptions {
 	if (formatFunction) {
-		formatFunctions.set(settings, formatFunction);
+		formatFunctions.set(options, formatFunction);
 	}
 
-	return settings;
+	return options;
 }
 
 // One this module did not store — another copy of it, or a v2.3.0 LogInt — shows only as
@@ -1966,119 +1978,111 @@ function sourceFormatFunction(sourceConf: LogConf): EntryFormatter | undefined {
 	return sourceConf.entryFormatter;
 }
 
-function inheritSettings(conf: LogSettings, source: { conf: LogConf, context?: Metadata }, derivation: Derivation): void {
-	if (derivation === "clone") {
-		conf.context = { ...source.context, ...conf.context };
-	}
+// Object.keys types its result string[]; this checks each against the table that lists every key.
+function isLogConfKey(key: string): key is keyof LogConf {
+	return Object.prototype.hasOwnProperty.call(INHERITED_BY, key);
+}
 
-	const skip = new Set(otlpKeysNotToInherit(conf, source.conf));
+const LOG_CONF_KEYS = Object.keys(INHERITED_BY).filter(isLogConfKey);
 
-	if (conf.format === undefined && conf.entryFormatter === undefined && !formatFunctions.has(conf)) {
-		const formatFunction = sourceFormatFunction(source.conf);
+// Generic over the key, so the compiler sees one value type on both sides.
+function copyKey<K extends keyof LogConf>(target: LogConf, source: LogConf, key: K): void {
+	target[key] = source[key];
+}
 
-		if (formatFunction) {
-			formatFunctions.set(conf, formatFunction);
-		}
-	} else {
+function inherited(settings: LogSettings, source: { conf: LogConf, context?: Metadata }, derivation: Derivation): LogSettings {
+	const skip = new Set(otlpKeysNotToInherit(settings, source.conf));
+	const ownsFormatter = settings.format !== undefined || settings.entryFormatter !== undefined || settings.formatFunction !== undefined;
+
+	if (ownsFormatter) {
 		skip.add("format");
 	}
 
-	for (const key of Object.keys(INHERITED_BY) as (keyof LogConf)[]) {
-		if (INHERITED_BY[key].includes(derivation) && !skip.has(key) && conf[key] === undefined && source.conf[key] !== undefined) {
-			// Same key on both sides, so the value type matches; `as never` satisfies the writer.
-			conf[key] = source.conf[key] as never;
+	const taken: LogConf = {};
+
+	for (const key of LOG_CONF_KEYS) {
+		if (INHERITED_BY[key].includes(derivation) && !skip.has(key) && settings[key] === undefined && source.conf[key] !== undefined) {
+			copyKey(taken, source.conf, key);
 		}
 	}
+
+	const formatFunction = ownsFormatter ? undefined : sourceFormatFunction(source.conf);
+
+	return {
+		...settings,
+		...taken,
+		...derivation === "clone" ? { context: { ...source.context, ...settings.context } } : {},
+		...formatFunction ? { formatFunction } : {},
+	};
 }
 
-function rejectTwoFormatters(conf: LogSettings): void {
-	if (conf.entryFormatter !== undefined && typeof conf.format === "function" && conf.format !== conf.entryFormatter) {
+function rejectTwoFormatters(settings: LogSettings): void {
+	if (settings.entryFormatter !== undefined && settings.formatFunction !== undefined && settings.formatFunction !== settings.entryFormatter) {
 		throw new Error("entryFormatter and format are two spellings of one formatter: pass only format");
 	}
 }
 
-function entryFormatterDeprecation(conf: LogSettings): string | undefined {
-	if (conf.entryFormatter === undefined) {
+function entryFormatterDeprecation(settings: LogSettings): string | undefined {
+	if (settings.entryFormatter === undefined) {
 		return undefined;
 	}
 
-	if (typeof conf.format === "string") {
+	if (typeof settings.format === "string") {
 		return "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format — entryFormatter wins and the format beside it is ignored";
 	}
 
 	return "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format";
 }
 
-function withDefaults(conf: LogSettings): ResolvedLogConf {
-	if (conf.logLevel === undefined) {
-		conf.logLevel = DEFAULT_LOG_LEVEL;
+function withDefaults(settings: LogSettings): ResolvedLogConf {
+	const { entryFormatter, format, formatFunction, ...rest } = settings;
+	// entryFormatter wins over an inherited function; beside its own, rejectTwoFormatters has made them one.
+	const formatter = entryFormatter ?? formatFunction;
+	const conf = {
+		...rest,
+		clock: rest.clock ?? systemClock,
+		colors: rest.colors ?? colorsFromEnv() ?? true,
+		// Types the literal; the alias below replaces it with a live read of the same formatter.
+		entryFormatter: formatter ?? (format === "json" ? msgJsonFormatter : msgTextFormatter),
+		logLevel: rest.logLevel ?? DEFAULT_LOG_LEVEL,
+		randomBytes: rest.randomBytes ?? platformRandomBytes,
+		stderr: rest.stderr ?? console.error,
+		stdout: rest.stdout ?? console.log,
+		...format !== undefined ? { format } : formatter ? {} : { format: "text" as const },
+	};
+
+	if (formatter) {
+		formatFunctions.set(conf, formatter);
 	}
 
-	if (conf.clock === undefined) {
-		conf.clock = systemClock;
-	}
-
-	if (conf.randomBytes === undefined) {
-		conf.randomBytes = platformRandomBytes;
-	}
-
-	if (conf.colors === undefined) {
-		conf.colors = colorsFromEnv() ?? true;
-	}
-
-	const formatFunction = typeof conf.format === "function" ? conf.format : conf.entryFormatter;
-
-	if (typeof conf.format === "function") {
-		delete conf.format;
-	}
-
-	if (formatFunction) {
-		formatFunctions.set(conf, formatFunction);
-	} else if (conf.format === undefined && !formatFunctions.has(conf)) {
-		conf.format = "text";
-	}
-
-	if (conf.stderr === undefined) {
-		conf.stderr = console.error;
-	}
-
-	if (conf.stdout === undefined) {
-		conf.stdout = console.log;
-	}
-
-	Object.defineProperty(conf, "entryFormatter", ENTRY_FORMATTER_ALIAS);
-
-	return conf as ResolvedLogConf;
+	return Object.defineProperty(conf, "entryFormatter", ENTRY_FORMATTER_ALIAS);
 }
 
-// Defaults come last, so none hides an inherited value; the entryFormatter check precedes them,
-// which move a function format out of conf.
+// Each step hands the next a new value: defaults come last, so none hides an inherited value, and
+// the formatter checks read the settings before withDefaults folds both spellings into the alias.
 function resolveLogConf(options: LogOptions | LogLevel | "none" | undefined): { conf: ResolvedLogConf, deprecations: string[] } {
-	const conf = confFromOptions(options);
+	const given = confFromOptions(options);
+	const settings = typeof given.parentLog === "object" ? inherited(given, given.parentLog, "child") : given;
 	const deprecations: string[] = [];
 
 	if (typeof options === "string") {
 		deprecations.push("@larvit/log: new Log(\"level\") is deprecated and removed in 3.0.0, use new Log({ logLevel })");
 	}
 
-	if (typeof conf.parentLog === "object") {
-		inheritSettings(conf, conf.parentLog, "child");
-	}
+	rejectQueueBesideShorthand(settings);
+	rejectTwoFormatters(settings);
 
-	rejectQueueBesideShorthand(conf);
-	rejectTwoFormatters(conf);
-
-	const formatterDeprecation = entryFormatterDeprecation(conf);
+	const formatterDeprecation = entryFormatterDeprecation(settings);
 
 	if (formatterDeprecation) {
 		deprecations.push(formatterDeprecation);
 	}
 
-	const resolved = withDefaults(conf);
+	const conf = withDefaults(settings);
 
-	buildDefaultQueue(resolved);
+	attachDefaultQueue(conf);
 
-	return { conf: resolved, deprecations };
+	return { conf, deprecations };
 }
 
 // --- A Log's spans ---------------------------------------------------------
@@ -2266,11 +2270,7 @@ export class Log implements LogInt {
 			warnOnce(this.conf, this.context, "@larvit/log: log.clone(\"level\") is deprecated and removed in 3.0.0, use log.clone({ logLevel })");
 		}
 
-		const conf = confFromOptions(options);
-
-		inheritSettings(conf, this, "clone");
-
-		return new Log(conf);
+		return new Log(optionsFromSettings(inherited(confFromOptions(options), this, "clone")));
 	}
 
 	public async end(options?: { error?: unknown }): Promise<void> {
