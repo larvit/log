@@ -306,3 +306,19 @@ Read most (opens and searches):
 - `eslint.config.js` 1
 - `package.json` 1
 - `todo.md` 1
+
+## Reading cost, chunk 5ca546d37e41, finished 2026-11-13T20:14:18Z
+
+91574 new input tokens before the first commit.
+
+Read most (opens and searches):
+
+- `index.ts` 18
+- `test.ts` 5
+- `README.md` 4
+- `docs/decisions.md` 3
+- `package.json` 2
+- `todo.md` 2
+- `AGENTS.md` 1
+- `tsconfig.build.json` 1
+- `tsconfig.json` 1
