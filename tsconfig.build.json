@@ -3,7 +3,7 @@
 		"declaration": true,
 		"declarationDir": "types",
 		"emitDeclarationOnly": true,
-		// esbuild compiles each module alone, so tsc holds the source to what that allows.
+		// esbuild compiles each file alone, so tsc rejects code that needs another file to compile.
 		"isolatedModules": true,
 		"module": "NodeNext",
 		"strict": true,

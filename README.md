@@ -7,8 +7,8 @@
 Structured logging with a tiny API, plus OTLP export of logs and traces from Node, Bun, Deno,
 browsers and React Native. No OpenTelemetry SDK, no dependencies.
 
-- **One built file, every runtime.** A single `index.js` on the global `fetch`, so a browser and a
-  React Native app export the same way a server does. No SDK, no bundler config, no native module.
+- **One built file, every runtime.** It uses the global `fetch`, so a browser and a React Native
+  app export the same way a server does. No SDK, no bundler config, no native module.
 - **Exports survive a restart.** Entries and spans are batched and retried with backoff; give the
   queue a storage and an offline phone holds them until the network is back.
 - **Just log.** `log.info("msg", { key: "value" })` to stdout/stderr, text or JSON.
