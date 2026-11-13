@@ -37,18 +37,18 @@ export function otlpKeysNotToInherit(conf: OtlpSettings, sourceConf: LogConf): (
 	return ["otlpAdditionalHeaders", "otlpQueue"];
 }
 
-// Each default queue, with the shorthand it was built from. Only such a queue passes the rejection
-// below, and only beside that shorthand: the strings equal, and the headers the same object, since an
-// equal copy is one a rotation could make differ.
-const defaultQueueShorthand = new WeakMap<OtlpQueue, OtlpShorthand>();
+// The queues attachDefaultQueue built. Only such a queue passes the rejection below, and only beside
+// the endpoint its own conf holds now: the strings equal, and the headers the same object, since an
+// equal copy is one a rotation could make differ. The queue's conf is read as it stands, so a
+// consumer who writes new headers to both the Log's conf and the queue's keeps the pair.
+const defaultQueues = new WeakSet<OtlpQueue>();
 
 function isDefaultQueueFor(queue: OtlpQueue, conf: OtlpShorthand): boolean {
-	const builtFrom = defaultQueueShorthand.get(queue);
-
-	return builtFrom !== undefined
-		&& builtFrom.otlpHttpBaseURI === conf.otlpHttpBaseURI
-		&& (builtFrom.otlpProtocol ?? DEFAULT_OTLP_PROTOCOL) === (conf.otlpProtocol ?? DEFAULT_OTLP_PROTOCOL)
-		&& builtFrom.otlpAdditionalHeaders === conf.otlpAdditionalHeaders;
+	return defaultQueues.has(queue)
+		&& queue instanceof Queue
+		&& queue.conf.otlpHttpBaseURI === conf.otlpHttpBaseURI
+		&& queue.conf.otlpProtocol === (conf.otlpProtocol ?? DEFAULT_OTLP_PROTOCOL)
+		&& queue.conf.otlpAdditionalHeaders === conf.otlpAdditionalHeaders;
 }
 
 // The one write to a conf after its defaults are set. The queue warns through the conf, and can warn
@@ -59,7 +59,7 @@ export function attachDefaultQueue(conf: ResolvedLogConf): void {
 		const report = (msg: string, metadata: Metadata) => writeStderr(conf, "error", metadata, msg);
 
 		conf.otlpQueue = new Queue({ clock: conf.clock, otlpAdditionalHeaders, otlpHttpBaseURI, otlpProtocol, report }, msg => warnOnceToStderr(conf, undefined, msg));
-		defaultQueueShorthand.set(conf.otlpQueue, { otlpAdditionalHeaders, otlpHttpBaseURI, otlpProtocol });
+		defaultQueues.add(conf.otlpQueue);
 	}
 }
 
