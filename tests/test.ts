@@ -824,6 +824,7 @@ test("resolveFormatter hands back the formatter a conf writes with", t => {
 	t.strictEqual(resolveFormatter(new Log({ format: own }).conf), own, "a function format, which conf.format cannot hold before 3.0.0");
 	t.strictEqual(resolveFormatter(new Log({ format: "json" }).conf), msgJsonFormatter, "json");
 	t.strictEqual(resolveFormatter(new Log().conf), msgTextFormatter, "text by default");
+	t.strictEqual(resolveFormatter(new Log(null as never).conf), msgTextFormatter, "and with null for options, as untyped code may pass");
 	t.strictEqual(resolveFormatter({ entryFormatter: own, format: "json" }), own, "a hand-built conf's entryFormatter, which wins over its format as on a Log");
 	t.end();
 });

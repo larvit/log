@@ -58,17 +58,17 @@ export function endSpan(log: Pick<Log, "conf" | "sampled">, span: OtlpSpan, attr
 
 	if (failure) {
 		span.status = { code: STATUS_CODE_ERROR, message: failureMessage(failure.error, failure.url) };
-		attributes["error.type"] = failure.errorType;
 	}
 
 	if (log.sampled) {
-		const spanAttributes = attributesOf(attributes);
+		const ended = failure ? { ...attributes, "error.type": failure.errorType } : attributes;
+		const spanAttributes = attributesOf(ended);
 
 		// README → Audience: each documented span attribute is on `log.span` as on the wire.
 		if (spanAttributes.length) {
 			span.attributes = spanAttributes;
 		}
 
-		log.conf.otlpQueue?.enqueue(buildSpanPayload({ attributes, span }));
+		log.conf.otlpQueue?.enqueue(buildSpanPayload({ attributes: ended, span }));
 	}
 }
