@@ -25,28 +25,22 @@ function parseStoredPayloads(raw: string): { error: string | undefined } | { pay
 // by one writer at a time. A queue without storage is never read or written.
 export class StoredQueue {
 	private dirty = false;
-	// The one read, restore included, which every write waits for.
-	private loaded: Promise<void> = Promise.resolve();
+	// The one read, restore included, which every write waits for. It never rejects.
+	readonly loaded: Promise<void>;
 	private saving?: Promise<void>;
 	// A getItem that threw: what storage holds stays untouched, since a later read may return it.
 	private unreadable = false;
 
 	// `items` is what a write persists. It is read as the write starts, so one write covers every
-	// change made before it.
+	// change made before it. `restore` is handed the payloads storage holds, if it holds any that can
+	// be read. Storage is read asynchronously, so `restore` runs only after this constructor returns.
 	constructor(
 		private readonly conf: ResolvedQueueConf,
 		private readonly report: (msg: string, metadata: Metadata) => void,
 		private readonly items: () => readonly QueuedItem[],
-	) {}
-
-	// Hands `restore` the payloads storage holds, if it holds any that can be read. The promise settles
-	// once storage is read and restored, and never rejects.
-	load(restore: (payloads: OtlpPayload[]) => void): Promise<void> {
-		const { storage } = this.conf;
-
-		this.loaded = storage ? this.read(storage, restore) : Promise.resolve();
-
-		return this.loaded;
+		restore: (payloads: OtlpPayload[]) => void,
+	) {
+		this.loaded = conf.storage ? this.read(conf.storage, restore) : Promise.resolve();
 	}
 
 	// Saves coalesce: a change made while a write runs is covered by one more write after it.

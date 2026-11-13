@@ -100,10 +100,9 @@ export class Queue implements OtlpQueue {
 
 		this.sender = new OtlpSender(this.conf, report, msg => this.warnOnceToSink(msg));
 		// A batch being sent is out of the buffer, but stays in storage until its send settles.
-		this.stored = new StoredQueue(this.conf, report, () => [...this.batchBeingSent, ...this.buffer.items]);
-		// Leftovers load before the first round. Storage is read asynchronously, so `restore` runs only
-		// after this constructor returns.
-		this.scheduler = new ExportScheduler(this.conf, this.stored.load(payloads => this.restore(payloads)), () => this.round());
+		this.stored = new StoredQueue(this.conf, report, () => [...this.batchBeingSent, ...this.buffer.items], payloads => this.restore(payloads));
+		// Leftovers load before the first round.
+		this.scheduler = new ExportScheduler(this.conf, this.stored.loaded, () => this.round());
 	}
 
 	enqueue(payload: OtlpPayload): void {

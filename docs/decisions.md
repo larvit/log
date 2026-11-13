@@ -61,7 +61,8 @@ unless its `randomBytes` option says otherwise. Asking the caller for either wou
 "Sane defaults", which has a library ask for its clock and randomness. Item 291 of the plan that
 keeps the technical principles will give "Sane defaults" an exception for a library whose goals ask
 that it work with no config, where a documented option overrides each default. The `clock` and
-`randomBytes` options are documented, so item 291 ends the departure for both. Serves README →
+`randomBytes` options are documented, so item 291 ends the departure for both, and `todo.md` item
+139 then rewords this entry to cite the principle as applied. Serves README →
 Goals #1 and #3. Valid while Goal 1 asks for a logger useful with no config.
 
 ## A required `Resolved*Conf` key is added in a minor and removed in a major
@@ -401,9 +402,22 @@ read, and `processEnv`, `pageHref` and `denoUnrefTimer` read it at their callers
 for these reads: a consumer already injects through `colors`, which beats the env, through `clock`,
 whose timers `unref` handles, and through an absolute url, which needs no page address. A further
 option would grow the documented surface for what only a default reads. The suite still swaps
-`globalThis.process` and `Deno` to reach those defaults; that cost stays. Applies the technical
+`globalThis.process` and `Deno` to reach those defaults, against the same principle, until
+`todo.md` item 140 tests each default with its value passed in. Applies the technical
 principle "Functional core, imperative shell"; serves README → Goals #1 and #5. Valid while no
 consumer needs the page address or the env injected apart from these.
+
+## A constructor parameter marked "Not part of the API" carries what only this library passes
+
+2026-11-13, the implementing agent, in the release review of 2.6.0: `Queue`'s second parameter
+`warn` and `Log`'s second parameter `cloneSettings` are each passed only by this library, and each
+says so in the JSDoc its published type carries. `warn` shipped in 2.x, so only a major removes it.
+`cloneSettings` follows it: `clone()` has to hand its clone a function formatter, which options
+cannot carry beside the inherited `format` string, and the other route was a module-level WeakMap
+keyed on whichever object was in hand, which every seat of two comprehension runs named as the
+hardest place to follow. README documents neither parameter, and a caller who passes one gets no
+promise from Goal 8. Serves code health; bounded by README → Goals #8. Valid until 3.0.0, where
+both can move behind a factory the package doesn't export.
 
 ## The package publishes one bundled `index.js`, built from a module per part
 

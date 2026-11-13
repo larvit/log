@@ -6,7 +6,7 @@
 
 `Bar = 0.5`
 
-`Next ID = 138`
+`Next ID = 141`
 
 ## Items
 
@@ -20,10 +20,13 @@
 | 136 | 2.7.0 |  | decision | **Stop `tracing/` importing `log/`, so imports run one way from `log/` down to `primitives/`.** | 2 | 1 | 2 | 3 | 3 | code health by 4 | 4.2 |
 | 137 | 2.7.0 |  |  | **Give each part's tests a file of their own under `tests/`, beside the helpers they share.** | 2 | 1 | 1 | 2 | 4 | code health by 4 | 4.2 |
 | 110 | 2.7.0 |  | principle | **Register one test per case where a test loops over its cases or checks many behaviours.** | 1 | 1 | 1 | 1 | 4 | code health by 3 | 3.7 |
+| 140 | 2.7.0 |  | principle | **Test each platform default with its value passed in, and swap a global in at most one test per default.** | 2 | 1 | 1 | 2 | 3 | code health by 3 | 3.7 |
 | 25 | 2.7.0 |  |  | **Publish the artifact the gate tested.** | 2 | 2 | 3 | 5 | 4 | code health by 5 | 3.5 |
+| 138 | 2.7.0 |  | principle | **Sort each module's imports on their first binding, with a lint rule that keeps them so.** | 2 | 1 | 1 | 2 | 3 | code health by 2 | 2.5 |
 | 82 | 2.7.0 |  |  | **Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.** | 1 | 2 | 1 | 2 | 1 | 3 by 5 | 2.3 |
 | 19 | 2.7.0 |  | defect | **Leave a `Request` untraced in `log.fetch`.** | 1 | 1 | 2 | 2 | 2 | 2.1 by 6 | 2.1 |
 | 114 | 2.7.0 |  |  | **Move `package.json`'s build and test one-liners into named scripts, and let the OTLP test read its collector's port, image and container name from the environment, today's values as defaults.** | 1 | 1 | 1 | 1 | 2 | code health by 1 | 2.1 |
+| 139 | 2.7.0 |  | principle | **Cite "Sane defaults" as applied in the clock and randomness decision, once the principle carries its exception for a library.** | 1 | 2 | 1 | 2 | 1 | code health by 1 | 2.1 |
 | 18 | 2.7.0 |  |  | **Export `LogEntry` as an alias of `EntryFormatterConf`, so the 3.0.0 rename has a spelling a consumer can move to first.** | 1 | 1 | 1 | 1 | 1 | 3 by 3 | 2.1 |
 | 80 | 2.7.0 |  | principle | **Run the browser suite in WebKit and Firefox as well as Chromium.** | 2 | 1 | 1 | 2 | 3 | 2 by 7 | 2.1 |
 | 96 | 2.7.0 | 18 | owner | **Add a list of transports, each handed plain log entries it encodes itself, with console and OTLP as the two this library ships and uses by default.** | 4 | 2 | 3 | 7 | 8 | 1 by 7, 4 by 8 | 1.4 |
@@ -109,7 +112,9 @@ comprehension baseline.
 
 `OtlpSender.send` holds the plain-http warning, encoding, the send and the status decision in one
 method, and `tracedFetch` builds and redacts attributes around the live call. Principle: Functional
-core, imperative shell.
+core, imperative shell. `tracedFetch` is also 56 lines tracking seven values across a try, a catch
+and a finally, which the principles pass of 2.6.0's release review raised against "About seven
+things per level".
 
 ### 43. Give `ExportScheduler` and save coalescing named states.
 
@@ -170,11 +175,27 @@ inside one test, and one `deepEqual` covers a whole table, so a failure names no
 one behaviour per test, named for it; no loops or branches in a test body, parametrize the cases
 (`~/.claude/principles/technical-principles.md`).
 
+### 140. Test each platform default with its value passed in, and swap a global in at most one test per default.
+
+The suite swaps `globalThis.process`, `console.error` and `Deno` by name to reach `colorsFromEnv`,
+`unref` and the stderr default, in three places in `tests/test.ts`. A test that fails between the
+swap and the restore leaves the global changed for every later test, and the tests cannot run in
+parallel. The technical principle "Functional core, imperative shell" bans a test swapping a global
+by name. `colorsFromEnv`, `traceableUrl` and `unref` already take the value they read, so a test
+can import the module and pass it. Found by the principles pass of 2.6.0's release review.
+
 ### 25. Publish the artifact the gate tested.
 
 `push.yaml` builds and tests `index.js` inside the container; `publish.yaml` builds a second one on
 the runner and publishes that, so the thing consumers install is never the thing CI proved. Build
 once, upload, publish that.
+
+### 138. Sort each module's imports on their first binding, with a lint rule that keeps them so.
+
+Every module's imports sort on the module path, as the shared eslint config's `simple-import-sort`
+orders them. So moving or renaming a module reorders the imports of each module that reads it, as
+the `credentials/` split did. The technical principle "Deterministic order" sorts an import on its
+first binding. Found by the principles pass of 2.6.0's release review.
 
 ### 82. Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.
 
@@ -194,6 +215,15 @@ URL`, so a TypeScript consumer cannot reach it.
 shell inside one JSON string. `scripts/run-otlp-tests.mjs` fixes port 4318, the image and the
 container name, so two runs on one machine clash, and its `docker rm -f` removes the other run's
 collector. Found by the technical principles audit on 2026-10-26.
+
+### 139. Cite "Sane defaults" as applied in the clock and randomness decision, once the principle carries its exception for a library.
+
+`docs/decisions.md` → "A `Log` and a `Queue` default their clock, and a `Log` its randomness"
+departs from the technical principle "Sane defaults", which still has a library ask for its clock
+and randomness. The exception is planned where the technical principles are kept, outside this
+repo. When it lands, reword the decision to cite the principle as applied, and finish this item.
+Until then the code stays: README → Goals #1 and #3 need the defaults. Found by the principles pass
+of 2.6.0's release review.
 
 ### 80. Run the browser suite in WebKit and Firefox as well as Chromium.
 

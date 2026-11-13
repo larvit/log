@@ -56,7 +56,8 @@ export type LogSettings = Omit<LogOptions, "context" | "entryFormatter" | "forma
 
 export function confFromOptions(options: LogOptions | LogLevel | "none" | undefined): LogSettings {
 	const { context, format, ...rest }: LogOptions = typeof options === "string" ? { logLevel: options } : { ...options };
-	const formatFunction = typeof options === "object" ? formatterFromOptions(options) : undefined;
+	// Options from untyped code may be null, which counts as no options.
+	const formatFunction = typeof options === "object" && options !== null ? formatterFromOptions(options) : undefined;
 
 	return {
 		...rest,

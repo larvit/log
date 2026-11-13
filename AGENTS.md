@@ -45,6 +45,7 @@ In [docs/decisions.md](docs/decisions.md):
 - The protobuf encoder stays
 - In text, a plain space ends a credential and no other whitespace does
 - A platform read stays a default, and a consumer injects through `colors` and `clock`
+- A constructor parameter marked "Not part of the API" carries what only this library passes
 - The package publishes one bundled `index.js`, built from a module per part
 
 ## Working here

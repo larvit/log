@@ -8,8 +8,9 @@ import { childSpan, endSpan, type SpanFailure } from "./spans.js";
 import { formatTraceparent } from "./traceparent.js";
 
 // An invalid name makes headers.get throw, which must never cost the platform's result.
-function captureHeaders(log: Pick<Log, "conf" | "context">, option: "captureRequestHeaders" | "captureResponseHeaders", headers: Headers, attributes: Metadata): void {
+function capturedHeaders(log: Pick<Log, "conf" | "context">, option: "captureRequestHeaders" | "captureResponseHeaders", headers: Headers): Metadata {
 	const prefix = option === "captureRequestHeaders" ? "http.request.header." : "http.response.header.";
+	const captured: Metadata = {};
 
 	for (const [index, name] of (log.conf[option] ?? []).entries()) {
 		let key: string;
@@ -30,9 +31,11 @@ function captureHeaders(log: Pick<Log, "conf" | "context">, option: "captureRequ
 		}
 
 		if (value !== null) {
-			attributes[prefix + key] = redactHeaderCredential(key, value);
+			captured[prefix + key] = redactHeaderCredential(key, value);
 		}
 	}
+
+	return captured;
 }
 
 // A throwing clock or queue costs the span, never the platform's result.
@@ -69,14 +72,14 @@ export async function tracedFetch(log: Pick<Log, "conf" | "context" | "sampled" 
 			headers.set("traceparent", formatTraceparent(span.traceId, span.spanId, log.sampled));
 		}
 
-		captureHeaders(log, "captureRequestHeaders", headers, attributes);
+		Object.assign(attributes, capturedHeaders(log, "captureRequestHeaders", headers));
 
 		const res = await (request ? globalThis.fetch(request) : globalThis.fetch(url, { ...init, headers }));
 
 		attributes["http.response.status_code"] = res.status;
 		span.status.code = res.status >= 400 ? STATUS_CODE_ERROR : STATUS_CODE_UNSET;
 
-		captureHeaders(log, "captureResponseHeaders", res.headers, attributes);
+		Object.assign(attributes, capturedHeaders(log, "captureResponseHeaders", res.headers));
 
 		return res;
 	} catch (err) {
