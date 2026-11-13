@@ -73,7 +73,7 @@ One word per concept, in code, docs and the plan alike:
 - **payload**: an OTLP `resourceLogs` or `resourceSpans` body, holding log records or spans.
 - **queue**: the `Queue`, or any `OtlpQueue`, that a `Log` hands payloads to for export.
 - **transport**: a destination a `Log` hands entries to; this library ships two, console and OTLP,
-  and item 96 makes them a list.
+  and will become a list of destinations.
 
 ## Scoring run
 
