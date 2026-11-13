@@ -8,7 +8,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "build": "rm -rf index.js index.js.map types && tsc -p tsconfig.build.json && esbuild index.ts --bundle --format=esm --target=es2020 --sourcemap=external --sources-content=false --log-level=warning --outfile=index.js && npm run replace-version-string && uglifyjs index.js -m --source-map \"content='index.js.map'\" -o index.js",
+    "build": "rm -rf index.js index.js.map types && tsc -p tsconfig.build.json && esbuild index.ts --bundle --minify-syntax --format=esm --target=es2020 --sourcemap=external --sources-content=false --log-level=warning --outfile=index.js && npm run replace-version-string && uglifyjs index.js -m --source-map \"content='index.js.map'\" -o index.js",
     "build-tests": "npm run build && rm -rf .tmp/test && tsc -p tsconfig.test.json && cp index.js .tmp/test/index.js",
     "ci": "npm run build-tests && npm run test-node",
     "ci-browser": "npm run build-tests && node e2e-tests/run-browser-tests.mjs",
