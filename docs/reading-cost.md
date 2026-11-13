@@ -274,3 +274,20 @@ Read most (opens and searches):
 ## Reading cost, chunk 78919fa36112, finished 2026-11-10T21:51:40Z
 
 40763 new input tokens before the first commit.
+
+## Reading cost, chunk 047ed555324c, finished 2026-11-13T19:20:18Z
+
+182363 new input tokens before the first commit.
+
+Read most (opens and searches):
+
+- `index.ts` 44
+- `README.md` 15
+- `test.ts` 14
+- `todo.md` 7
+- `package.json` 5
+- `docs/decisions.md` 4
+- `CHANGELOG.md` 3
+- `AGENTS.md` 2
+- `eslint.config.js` 2
+- `tap.ts` 2
