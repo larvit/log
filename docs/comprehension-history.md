@@ -281,3 +281,32 @@ Inherited architect, would restructure first:
 - Navigation: `otlp/queue-items.ts:7` `QueueConf`: the queue's public types sit under a name that says items
 - Navigation: `primitives/failure-fields.ts:1` `failure-fields.ts`: wider than its name, field readers used on four paths
 - Self-sufficiency: `log/entry-format.ts:23` the comment "A platform read sits at its caller": cites the decision log, and `processEnv` sits away from its caller
+
+## 2026-11-13T22:59:24Z, PR #361 at 5d92ecc, against 5a8c1a9
+
+Ruling: better
+
+| Seat | Navigation | Locality | Shape | Self-sufficiency | Overall |
+|---|---|---|---|---|---|
+| Mid A | better | better | better | same | better |
+| Inherited architect | better | better | better | same | better |
+
+Mid A, decided by:
+
+- Navigation, Shape: `credentials/span-values.ts:7` the credential-rule map: it names the file each rule lives in, and each file stays at or under 154 lines, where one 433-line module held every rule
+- Locality, Shape: `otlp/queue-storage.ts:26` `StoredQueue`: storage state sits behind one class and an `items()` callback, where `Queue` mixed it with batching state
+- Locality: `log/log.ts:43` `Log.constructor`: a clone's settings are passed directly, where a WeakMap keyed by the options object carried the formatter; the price is a hidden second parameter
+- Navigation, Shape: `log/formatter-setting.ts:4` the formatter glossary: the glossary and every unit it names share one file, and `log/settings.ts` holds only inheritance and defaults
+- Locality: `tracing/spans.ts:55` `endSpan`: one function ends a span from a typed `SpanFailure`, where `Log.end` and `tracedFetch` each did
+- Locality: `credentials/query.ts:80` `PAIR_RULES`: the rule list encodes that the first rule to answer decides, and one reading object carries depth and memo through a three-function cycle
+
+Inherited architect, decided by:
+
+- Navigation, Shape, Overall: `credentials/span-values.ts:7` the credential-rule map: each rule names its file, the files import one way with no cycle, and a password in `url.full` leads to one file of 50 to 150 lines; reading one rule still jumps between `decodings.ts` and `text.ts`
+- Locality, Overall: `log/log.ts:43` `Log.constructor`: `clone()` hands the settings straight to the constructor, where a module-level WeakMap moved a clone's formatter through hidden state; the cost is a public-looking second parameter
+- Navigation, Locality: `log/formatter-setting.ts:4` the formatter glossary: formatter rules and the default queue each have a module named for them, where `settings.ts` mixed both with inheritance
+- Shape, Locality: `credentials/query.ts:80` `PAIR_RULES`: an ordered table of rules whose comments say why the order matters, where five numbered checks carried two values through a four-function cycle
+- Navigation, Shape: `otlp/queue-storage.ts:26` `StoredQueue`: dropped batches lead to `queue.ts` for the batch loop and `queue-storage.ts` for persistence; `restore` reaching a scheduler assigned later works only because the storage read is asynchronous, which a comment states
+- Locality: `tracing/spans.ts:55` `endSpan`: one function sets the end time, the error status and `error.type`
+- Locality: `log/console-output.ts:7` `writeConsoleEntry`: one function chooses the sink, where two console writers did
+- Shape: `credentials/path.ts:13` `firstCredentialUrlSegment`: the scan is its own function and the cut one `const`
