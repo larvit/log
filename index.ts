@@ -197,7 +197,8 @@ export function msgTextFormatter(conf: EntryFormatterConf) {
 	return str;
 }
 
-// A conf's function formatter, which `conf.format` cannot hold before 3.0.0.
+// A conf's function formatter, which `conf.format` cannot hold before 3.0.0, or the one a clone hands
+// the constructor, keyed by its options.
 const formatFunctions = new WeakMap<object, EntryFormatter>();
 
 function formatterOf(conf: LogConf): EntryFormatter {
@@ -1848,7 +1849,7 @@ const INHERITED_BY: { [K in keyof LogConf]-?: readonly Derivation[] } = {
 	colors: CHILD_AND_CLONE,
 	// A clone merges its source's live `context` per key instead.
 	context: ["child"],
-	// Its function is inherited beside format, by inherited().
+	// A source's function formatter reaches a child or clone by inherited() alone, as formatFunction.
 	entryFormatter: [],
 	format: CHILD_AND_CLONE,
 	logLevel: CHILD_AND_CLONE,
@@ -1904,8 +1905,8 @@ function isDefaultQueueFor(queue: OtlpQueue, conf: LogSettings): boolean {
 		&& queue.conf.otlpAdditionalHeaders === conf.otlpAdditionalHeaders;
 }
 
-// The one write to a conf after withDefaults builds it: the queue warns through that conf, and may
-// while it is built, so the conf exists first.
+// The one write to a conf after withDefaults builds it. The queue warns through the conf, and can warn
+// while the queue is being built, so the conf has to exist first.
 function attachDefaultQueue(conf: ResolvedLogConf): void {
 	if (!conf.otlpQueue && conf.otlpHttpBaseURI) {
 		const report = (msg: string, metadata: Metadata) => writeStderr(conf, "error", metadata, msg);
@@ -1940,13 +1941,12 @@ const ENTRY_FORMATTER_ALIAS: PropertyDescriptor = {
 	},
 };
 
-// A conf while it is resolved. A function formatter rides apart, in formatFunction, since
-// `conf.format` holds none before 3.0.0.
+// A conf while it is resolved. A function formatter is kept in formatFunction, not in format.
 type LogSettings = Omit<LogOptions, "context" | "format"> & { context?: Metadata, format?: LogConf["format"], formatFunction?: EntryFormatter };
 
 function confFromOptions(options: LogOptions | LogLevel | "none" | undefined): LogSettings {
 	const { context, format, ...rest }: LogOptions = typeof options === "string" ? { logLevel: options } : { ...options };
-	// A clone hands the constructor the function it inherited this way, as optionsFromSettings says.
+	// A clone's inherited function waits in formatFunctions, keyed by the options it hands the constructor.
 	const formatFunction = typeof format === "function" ? format : typeof options === "object" ? formatFunctions.get(options) : undefined;
 
 	return {
@@ -1957,7 +1957,8 @@ function confFromOptions(options: LogOptions | LogLevel | "none" | undefined): L
 	};
 }
 
-// The other way round, for a clone's settings: an option can't hold a function beside a format string.
+// A clone's settings as constructor options. A function formatter goes into formatFunctions, keyed by
+// those options, since an option can't hold a function beside a format string.
 function optionsFromSettings({ formatFunction, ...options }: LogSettings): LogOptions {
 	if (formatFunction) {
 		formatFunctions.set(options, formatFunction);
@@ -1978,7 +1979,6 @@ function sourceFormatFunction(sourceConf: LogConf): EntryFormatter | undefined {
 	return sourceConf.entryFormatter;
 }
 
-// Object.keys types its result string[]; this checks each against the table that lists every key.
 function isLogConfKey(key: string): key is keyof LogConf {
 	return Object.prototype.hasOwnProperty.call(INHERITED_BY, key);
 }
@@ -2041,8 +2041,8 @@ function orDefault<T>(value: T | undefined, fallback: T): T {
 
 function withDefaults(settings: LogSettings): ResolvedLogConf {
 	const { entryFormatter, format, formatFunction, ...rest } = settings;
-	// Never two that differ: a caller's entryFormatter stops inherited() from taking a function, and
-	// rejectTwoFormatters throws on a different one beside it.
+	// A function and an entryFormatter that differ never meet here: a caller's entryFormatter stops
+	// inherited() from taking a function, and rejectTwoFormatters throws on a different one beside it.
 	const formatter = formatFunction ?? entryFormatter;
 	const conf = {
 		...rest,
@@ -2065,8 +2065,7 @@ function withDefaults(settings: LogSettings): ResolvedLogConf {
 	return Object.defineProperty(conf, "entryFormatter", ENTRY_FORMATTER_ALIAS) as typeof conf & Pick<ResolvedLogConf, "entryFormatter">;
 }
 
-// Each step hands the next a new value: defaults come last, so none hides an inherited value, and
-// the formatter checks read the settings before withDefaults folds both spellings into the alias.
+// Defaults come last, since inherited() takes only the keys still unset.
 function resolveLogConf(options: LogOptions | LogLevel | "none" | undefined): { conf: ResolvedLogConf, deprecations: string[] } {
 	const given = confFromOptions(options);
 	const settings = typeof given.parentLog === "object" ? inherited(given, given.parentLog, "child") : given;
