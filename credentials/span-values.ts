@@ -4,8 +4,7 @@ import { redactedPath } from "./path.js";
 import { redactedQuery, redactedWholeUrl } from "./query.js";
 import { holdsListedKeyInAnyDecoding, holdsUserinfoInAnyDecoding, redactTextQueryKeys, redactTextUserinfo } from "./text.js";
 
-// What a span records of a url, a header and a failure. Where README → Credentials in a captured
-// value is enforced, bullet by bullet:
+// Where README → Credentials in a captured value is enforced, bullet by bullet:
 // 1. A credential header name: isCredentialHeaderName in header-names.ts, applied by redactHeaderCredential.
 // 2. A listed query key: isListedQueryKey and redactTextQueryKeys in text.ts, applied by PAIR_RULES in query.ts.
 // 3. A url in a kept query value or key: redactedSearch in query.ts, with PAIR_RULES and readNestedUrl.

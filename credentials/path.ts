@@ -3,7 +3,7 @@ import { decodings, inAnyDecoding, UNREADABLE } from "./decodings.js";
 import { redactedWholeUrl } from "./query.js";
 import { holdsListedKey, holdsUserinfoInAnyDecoding, redactTextUserinfo, SCHEME_LED } from "./text.js";
 
-// Path segments opening a url, each read with the rest of the path. Past it a segment counts as
+// Path segments opening a url, each read with the rest of the path. Past this limit a segment counts as
 // holding a credential, as decodings.ts says of every reading limit.
 const MAX_SCHEME_SEGMENTS = 8;
 

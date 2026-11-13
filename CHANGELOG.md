@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+Trace and span ids can be made predictable in a test, through the new `randomBytes` option. The
+source map now matches the published file, and the type declarations moved to `types/`. Nothing
+here needs a change in your code.
+
 - **Ship an `index.js.map` that matches the minified `index.js`.** The map used to describe the
   build before minifying, so a stack trace mapped to the wrong place. It now names the source
   modules the file is built from.
@@ -11,6 +15,8 @@
   test can hand back fixed bytes and check the ids exactly. Unset, ids come from Web Crypto, else
   `Math.random`, as before; a child and a clone inherit the option, and `log.conf.randomBytes` reads
   back the function in use. `generateTraceId()` and `generateSpanId()` don't use it.
+- **Leave out the second parameter that `new Log()` now shows in its types.** `clone()` passes it,
+  it is not part of the API, and 3.0.0 removes it.
 
 ## v2.5.0
 

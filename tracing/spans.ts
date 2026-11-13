@@ -52,7 +52,6 @@ export function childSpan(log: Pick<Log, "conf" | "span">, name: string, kind: O
 // fallback; `url` is the one a fetch handed the runtime, which may quote it back in the error's message.
 export interface SpanFailure { error: unknown, errorType: string, url?: URL }
 
-// Closes the span now, failed where a failure is given, and exports it where the trace is sampled.
 export function endSpan(log: Pick<Log, "conf" | "sampled">, span: OtlpSpan, attributes: Metadata, failure?: SpanFailure): void {
 	span.endTimeUnixNano = getNsTimestamp(log.conf.clock.now());
 

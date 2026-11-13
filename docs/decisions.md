@@ -171,11 +171,10 @@ while Elastic's default list is the published one.
 one place, grouped by that question and not by the caller asking it, so `traceableUrl` and
 `buildUrlFull` are there and not beside `log.fetch`. README → Goals #7 is checkable only against
 the whole set, and the rules used to sit in two places ~800 lines apart with the call running
-upward and no comment at either end naming the other. Neither the place's opening comment nor this
+upward and no comment at either end naming the other. Neither a comment there nor this
 entry lists the routes in: prose has nothing keeping a count true, and the
 userinfo-free-by-construction choices at the `log.fetch` call site are not rules it holds. Scoped
-to spans because the remaining credential rules are the queue's. 2026-11-13, the module split: the place became
-one module. 2026-11-13, the release review of 2.6.0: the module outgrew one read, so the place is
+to spans because the remaining credential rules are the queue's. 2026-11-13, the release review of 2.6.0: one module outgrew one read, so the place is
 the folder `credentials/`, a module per kind of value, which `credentials/span-values.ts` maps in
 its opening comment. The folder sits below `otlp/`, since the queue's plain-`http:` warning reads
 the header-name rule `isCredentialHeaderName` too. Serves README → Goals #7 and code health. Valid
@@ -264,7 +263,7 @@ lives in `conf.otlpQueue`, beside the shorthand it was built from. A `parentLog`
 whose `conf` holds every setting a child reads from it, so only there does the queue share through a
 wrapper; and 3.0.0's plan (`todo.md` item 97) moves every OTLP setting into the OTLP transport, so
 moving the queue off `conf` before then would move it twice. Only a queue this library built may sit beside the
-shorthand, and only beside exactly the shorthand it was built from; a queue the consumer built is
+shorthand, and only beside exactly the endpoint its own conf holds; a queue the consumer built is
 rejected beside any shorthand, even an identical one. It leaves `JSON.stringify(log.conf)` circular.
 "A stringified `Queue` carries its `conf`" fixes that on the `Queue`, so the queue can stay on
 `conf`. Serves README → Goals #4. Valid until 3.0.0 clears the shorthand from `conf`.
@@ -401,10 +400,10 @@ Valid while a url parser keeps such whitespace in userinfo and a query value.
 read, and `processEnv`, `pageHref` and `denoUnrefTimer` read it at their callers. No option is added
 for these reads: a consumer already injects through `colors`, which beats the env, through `clock`,
 whose timers `unref` handles, and through an absolute url, which needs no page address. A further
-option would grow the documented surface for what only a default reads. The suite still swaps
-`globalThis.process` and `Deno` to reach those defaults, against the same principle, until
-`todo.md` item 140 tests each default with its value passed in. Applies the technical
-principle "Functional core, imperative shell"; serves README → Goals #1 and #5. Valid while no
+option would grow the documented surface for what only a default reads. Applies the technical
+principle "Functional core, imperative shell". The suite still swaps `globalThis.process` and
+`Deno` to reach those defaults, which that principle bans, until `todo.md` item 140 tests each
+default with its value passed in. Serves README → Goals #1 and #5. Valid while no
 consumer needs the page address or the env injected apart from these.
 
 ## A constructor parameter marked "Not part of the API" carries what only this library passes
@@ -412,8 +411,8 @@ consumer needs the page address or the env injected apart from these.
 2026-11-13, the implementing agent, in the release review of 2.6.0: `Queue`'s second parameter
 `warn` and `Log`'s second parameter `cloneSettings` are each passed only by this library, and each
 says so in the JSDoc its published type carries. `warn` shipped in 2.x, so only a major removes it.
-`cloneSettings` follows it: `clone()` has to hand its clone a function formatter, which options
-cannot carry beside the inherited `format` string, and the other route was a module-level WeakMap
+`cloneSettings` is new in 2.6.0, and marked the same way. `clone()` has to hand its clone a function
+formatter, which options cannot carry beside the inherited `format` string. The other route was a module-level WeakMap
 keyed on whichever object was in hand, which every seat of two comprehension runs named as the
 hardest place to follow. README documents neither parameter, and a caller who passes one gets no
 promise from Goal 8. Serves code health; bounded by README → Goals #8. Valid until 3.0.0, where
@@ -423,12 +422,12 @@ promise from Goal 8. Serves code health; bounded by README → Goals #8. Valid u
 
 2026-11-13, the implementing agent, on the maintainer's request for source files in folders: the
 source is `index.ts`, holding only the public exports, and one module per part under `log/`,
-`otlp/`, `credentials/`, `primitives/` and `tracing/`. esbuild bundles them into the one `index.js` the package has
+`credentials/`, `log/`, `otlp/`, `primitives/` and `tracing/`. esbuild bundles them into the one `index.js` the package has
 always published, shortening syntax as it goes, and `uglifyjs -m` minifies it as before.
 Publishing the compiler's modules instead would stop a minifier shortening any name one module
 exports to another, and a browser without a bundler would fetch about thirty files. Measured in
-the repo's container image, the bundle is 11366 bytes gzipped against 11480 for the single source
-file. Declarations are not bundled:
+the repo's container image at the split, the bundle was 11366 bytes gzipped against 11480 for the
+single source file. Declarations are not bundled:
 `types/` mirrors the modules, and `types/index.d.ts` names the public ones. The suite tests the
 bundle through `index.js`. A test that imports a module directly runs tsc's output for that module,
 not the bundle, so it suits a pure rule and never what the bundler or minifier could change.

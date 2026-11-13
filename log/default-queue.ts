@@ -38,8 +38,8 @@ export function otlpKeysNotToInherit(conf: OtlpSettings, sourceConf: LogConf): (
 }
 
 // The queues attachDefaultQueue built. Only such a queue passes the rejection below, and only beside
-// the endpoint its own conf holds now: the strings equal, and the headers the same object, since an
-// equal copy is one a rotation could make differ. The queue's conf is read as it stands, so a
+// the endpoint its own conf holds now: the strings equal, and the headers the same object. An
+// equal copy of the headers doesn't pass: it stops being equal once either side rotates a token. The queue's conf is read as it stands, so a
 // consumer who writes new headers to both the Log's conf and the queue's keeps the pair.
 const defaultQueues = new WeakSet<OtlpQueue>();
 
