@@ -2036,14 +2036,15 @@ function entryFormatterDeprecation(settings: LogSettings): string | undefined {
 
 function withDefaults(settings: LogSettings): ResolvedLogConf {
 	const { entryFormatter, format, formatFunction, ...rest } = settings;
-	// entryFormatter wins over an inherited function; beside its own, rejectTwoFormatters has made them one.
-	const formatter = entryFormatter ?? formatFunction;
+	// Never two that differ: a caller's entryFormatter stops inherited() from taking a function, and
+	// rejectTwoFormatters throws on a different one beside it.
+	const formatter = formatFunction ?? entryFormatter;
 	const conf = {
 		...rest,
 		clock: rest.clock ?? systemClock,
 		colors: rest.colors ?? colorsFromEnv() ?? true,
-		// Types the literal; the alias below replaces it with a live read of the same formatter.
-		entryFormatter: formatter ?? (format === "json" ? msgJsonFormatter : msgTextFormatter),
+		// Only types the literal: the alias below replaces it with a live read of the formatter.
+		entryFormatter: msgTextFormatter,
 		logLevel: rest.logLevel ?? DEFAULT_LOG_LEVEL,
 		randomBytes: rest.randomBytes ?? platformRandomBytes,
 		stderr: rest.stderr ?? console.error,
