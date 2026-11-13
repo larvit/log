@@ -861,6 +861,9 @@ test("conf.entryFormatter reads and writes the formatter until 3.0.0", t => {
 	liveChild.info("child");
 	t.ok(live.stdout[1].endsWith("child"), "a child of a Log with a built-in formatter follows its own format, as no function came with it");
 
+	new Log(swap.log.conf).info("from conf");
+	t.strictEqual(swap.stdout[2], "swapped from conf", "a Log built from another's conf object keeps its function formatter, as through 2.5.0");
+
 	// Only a hand-written LogInt's conf carries the deprecated name as a key of its own.
 	const handBuilt = capture({ format: (entry: EntryFormatterConf) => `parent ${entry.msg}` });
 
