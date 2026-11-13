@@ -2,7 +2,11 @@
 
 ## Unreleased
 
-- **Ship an `index.js.map` that matches the minified `index.js`.** The map used to describe the build before minifying, so a stack trace mapped to the wrong place. It now names the source modules the file is built from. Type declarations moved from `index.d.ts` to `types/`, which the package's `types` entry points to, so imports resolve as before.
+- **Ship an `index.js.map` that matches the minified `index.js`.** The map used to describe the
+  build before minifying, so a stack trace mapped to the wrong place. It now names the source
+  modules the file is built from.
+- **Find the type declarations under `types/`, no longer in `index.d.ts`.** The package's `types`
+  entry points there, so an import of `@larvit/log` resolves its types as before.
 - **Pass `randomBytes` to control the random bytes behind each trace and span id a `Log` makes.** A
   test can hand back fixed bytes and check the ids exactly. Unset, ids come from Web Crypto, else
   `Math.random`, as before; a child and a clone inherit the option, and `log.conf.randomBytes` reads
