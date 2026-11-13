@@ -13,11 +13,11 @@
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 35 | 2.6.0 |  | principle | **Let a consumer inject what `colorsFromEnv`, `traceableUrl` and `unref` read from the platform.** | 2 | 1 | 1 | 2 | 4 | code health by 5 | 5.2 |
+| 132 | 2.6.0 |  |  | **Give each concept in `index.ts` one name, so no name, and no two names differing only in case, stand for two things.** | 2 | 1 | 1 | 2 | 3 | code health by 4 | 5.0 |
+| 133 | 2.6.0 |  |  | **Let a cold reader understand `index.ts`'s comments and `AGENTS.md` without opening the CHANGELOG or `todo.md`.** | 1 | 2 | 1 | 2 | 2 | code health by 3 | 4.7 |
+| 130 | 2.6.0 |  |  | **Let a reader follow how a `Log`'s formatter, default queue and once-only warnings pass between functions, without tracing module-level tables across sections.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
+| 131 | 2.6.0 |  |  | **Let a reader check each query, path and text redaction routine in `// --- Credentials on a span ---` on one read: its state, its recursion and the order of its checks plain where they act.** | 2 | 2 | 4 | 6 | 5 | code health by 7 | 4.0 |
 | 134 | 2.6.0 |  |  | **Lower the reading cost of the files a chunk reads most before its first commit.** | 2 | 2 | 1 | 3 | 4 | code health by 3 | 2.7 |
-| 132 | 2.7.0 |  |  | **Give each concept in `index.ts` one name, so no name, and no two names differing only in case, stand for two things.** | 2 | 1 | 1 | 2 | 3 | code health by 4 | 5.0 |
-| 133 | 2.7.0 |  |  | **Let a cold reader understand `index.ts`'s comments and `AGENTS.md` without opening the CHANGELOG or `todo.md`.** | 1 | 2 | 1 | 2 | 2 | code health by 3 | 4.7 |
-| 130 | 2.7.0 |  |  | **Let a reader follow how a `Log`'s formatter, default queue and once-only warnings pass between functions, without tracing module-level tables across sections.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
-| 131 | 2.7.0 |  |  | **Let a reader check each query, path and text redaction routine in `// --- Credentials on a span ---` on one read: its state, its recursion and the order of its checks plain where they act.** | 2 | 2 | 4 | 6 | 5 | code health by 7 | 4.0 |
 | 135 | 2.7.0 | 130, 131, 132, 133 | decision | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
 | 36 | 2.7.0 |  | principle | **Reach the retry decision and a `log.fetch` span's attributes without a network call.** | 2 | 1 | 1 | 2 | 5 | code health by 5 | 4.5 |
 | 43 | 2.7.0 |  | principle | **Give `ExportScheduler` and save coalescing named states.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
@@ -101,15 +101,6 @@ They read `process.env`, `globalThis.location` and `globalThis.Deno`, and the su
 `globalThis.process` and `console.error` to reach them. Principle: Functional core, imperative
 shell.
 
-### 134. Lower the reading cost of the files a chunk reads most before its first commit.
-
-The last 5 chunks read a median of 91574 new input tokens before their first commit; the 5 before
-them read 52550. Over the last 5 chunks, the files read most, counting opens and searches, were
-`index.ts` 97 times, `test.ts` 35, `README.md` 33, `todo.md` 20, `docs/decisions.md` 17,
-`package.json` 11, `CHANGELOG.md` 5, `AGENTS.md` 4, `eslint.config.js` 3 and `tap.ts` 2. The
-figures live in `docs/reading-cost.md`. Item 128 splits `index.ts` into modules; this item doesn't
-wait for it.
-
 ### 132. Give each concept in `index.ts` one name, so no name, and no two names differing only in case, stand for two things.
 
 The 2026-11-13 comprehension run ranked these places hard for Shape: `Log.inFlight` (un-awaited
@@ -130,13 +121,14 @@ of them in 3.0.0. Item 96 brings transports as a list, so "transport" keeps the 
 The 2026-11-13 comprehension run ranked these places hard for Self-sufficiency: comments that lean
 on release history, naming "v2.3.0" or "v2.4.0" where the constraint itself is what the reader
 needs, at `index.ts:65`, `index.ts:747`, `index.ts:1352`, `index.ts:1970` and `index.ts:2233`; and
-`AGENTS.md` → Words citing "item 96", a plan item a cold reader doesn't open. Make each of those
-places easier to read.
+`AGENTS.md` → Words citing "item 96", a plan item a cold reader doesn't open; and the "Credentials
+on a span" section, which has no map from a README bullet to the function that enforces it. Make
+each of those places easier to read.
 
-The seats named three more places, which this item leaves: the "Credentials on a span" section's
-size and its missing map from a README bullet to its function are item 118's; that section holds
-the header-name rule by `docs/decisions.md` → "Every rule on credentials in a span sits in one
-source section"; and README → Footprint's untracked budgets are items 26 and 117.
+The seats named three more places, which this item leaves: the section's size, which item 118
+restructures into about seven things per level; where the header-name rule sits, which stays in
+that section, as `docs/decisions.md` → "Every rule on credentials in a span sits in one source
+section" asks; and README → Footprint's untracked budgets, which items 26 and 117 take.
 
 ### 130. Let a reader follow how a `Log`'s formatter, default queue and once-only warnings pass between functions, without tracing module-level tables across sections.
 
@@ -152,9 +144,9 @@ and nothing states their lifecycle in one place. Make each of those places easie
 
 What must keep holding, from `docs/decisions.md`: `entryFormatter` stays a read and write alias
 of `format`, a function formatter reads back from `conf.entryFormatter` alone, and the alias is one
-module-level descriptor, not a closure pair per `Log`, for README → Footprint ("`format` is the
-formatter's one name…", "`ResolvedLogConf` keeps `entryFormatter` required", "A v2.3.0 copy's child
-loses a function formatter"); the default `Queue` lives in `conf.otlpQueue`; and each warning is
+module-level descriptor, not a closure pair per `Log`, for README → Footprint (decisions.md: "`format`
+is the formatter's one name…", "`ResolvedLogConf` keeps `entryFormatter` required" and "A v2.3.0
+copy's child loses a function formatter"); the default `Queue` lives in `conf.otlpQueue`; and each warning is
 written once per `stderr` sink. Item 96 may later move the formatter and the queue into the console
 and OTLP transports; this item doesn't wait for it.
 
@@ -162,8 +154,8 @@ and OTLP transports; this item doesn't wait for it.
 
 Every seat of the 2026-11-13 comprehension run ranked these places among the hardest, and a wrong
 edit to one leaks a credential, against README → Goals #7: `redactedSearch` unions three readings
-of one query; `redactQueryPair`, `redactQueryPart` and `readQueryPart` recurse in a four-function
-cycle marked only by two eslint-disable lines, with a depth, a memo keyed by a string, and five
+of one query; `redactQueryPair`, `redactQueryPart`, `readQueryPart` and `redactedSearch` recurse
+in a four-function cycle marked only by two eslint-disable lines, with a depth, a memo keyed by a string, and five
 ordered exits whose order is load-bearing and unmarked; in `redactedPath`, `cut` is both the loop
 bound and the result, the loop starts at 1 for an unstated reason, and a fallback discards both;
 `redactTextQueryKeys` steers by two global regexes' `lastIndex` and a `copied` cursor, behind a
@@ -177,13 +169,22 @@ What each routine records stays as it is: README → Audience lets only a major 
 records `REDACTED`, and the rules stay in one section, as `docs/decisions.md` → "Every rule on
 credentials in a span sits in one source section" asks.
 
+### 134. Lower the reading cost of the files a chunk reads most before its first commit.
+
+The last 5 chunks read a median of 91574 new input tokens before their first commit; the 5 before
+them read 52550. Over the last 5 chunks, the files read most, counting opens and searches, were
+`index.ts` 97 times, `test.ts` 35, `README.md` 33, `todo.md` 20, `docs/decisions.md` 17,
+`package.json` 11, `CHANGELOG.md` 5, `AGENTS.md` 4, `eslint.config.js` 3 and `tap.ts` 2. The
+figures live in `docs/reading-cost.md`. Item 128 splits `index.ts` into modules; this item doesn't
+wait for it.
+
 ### 135. Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.
 
 The 2026-11-13 run scored Navigation 7.5, Locality 5.88, Shape 6.13, Self-sufficiency 6.5, overall
 6.38; items 130, 131, 132 and 133 take the places its seats named. Its tagline names the floor, so
 its chunk runs the four-seat scoring run. Where a dimension or the overall stays under 7.0, file
 items for the places the seats name, lowest dimension first, and a copy of this item blocked by
-them. Where every score reaches 7.0, it files nothing, and the run replaces the comprehension
+them. Where every score reaches 7.0, it doesn't file anything, and the run replaces the comprehension
 baseline.
 
 ### 36. Reach the retry decision and a `log.fetch` span's attributes without a network call.
