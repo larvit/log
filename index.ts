@@ -159,7 +159,7 @@ const TEXT_LEVEL_TAGS: Record<LogLevel, { ansi: number, tag: string }> = {
 	warn: { ansi: 33, tag: "war" },
 };
 
-// Platform reads (processEnv, denoUnrefTimer, and the `location` read in Log.fetch) happen at the caller,
+// Platform reads (processEnv, pageHref and denoUnrefTimer) happen at the caller,
 // which hands the value to a function that touches no global. A consumer injects through the `colors`
 // and `clock` options; a further option would grow the documented surface for a default.
 // The process global's env, or undefined where there is none (browsers) or a permission-gated one throws.
@@ -1032,6 +1032,15 @@ function redactedWholeUrl(value: string): string | undefined {
 
 function redactHeaderCredential(name: string, value: string): string {
 	return isCredentialHeaderName(name) || redactedWholeUrl(value) !== undefined || holdsUserinfoAtAnyLevel(value) || holdsListedKeyAtAnyLevel(value) ? "REDACTED" : value;
+}
+
+// The page's address, which a relative url resolves against; undefined outside a browser, or where the getter throws.
+function pageHref(): string | undefined {
+	try {
+		return (globalThis as { location?: { href?: string } }).location?.href;
+	} catch {
+		return undefined;
+	}
 }
 
 // The URL log.fetch traces: a scheme written without "//" parses to an opaque path, where
@@ -2347,7 +2356,7 @@ export class Log implements LogInt {
 	public fetch(input: string | URL, init?: RequestInit): Promise<Response> {
 		this.throwIfEnded();
 
-		const url = traceableUrl(input, (globalThis as { location?: { href?: string } }).location?.href);
+		const url = traceableUrl(input, pageHref());
 
 		if (!url) {
 			return globalThis.fetch(input, init);
