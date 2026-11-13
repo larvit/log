@@ -603,7 +603,7 @@ test("a clone merges context and takes no spanName; a child replaces context and
 	const holed = new Log({ context: { foo: "bar" }, stdout: () => {} });
 
 	(holed.context as Record<string, unknown>).gone = undefined;
-	t.deepEqual(Object.keys(holed.clone().context), ["foo"], "a key the source's context holds as undefined is dropped too");
+	t.deepEqual(Object.keys(holed.clone().conf.context ?? {}), ["foo"], "a key the source's context holds as undefined is dropped too");
 	t.end();
 });
 
@@ -1861,7 +1861,9 @@ test("otlpQueue and the otlp* options are two spellings of one endpoint; inherit
 	const rotatedHeaders = { authorization: "Bearer new" };
 
 	rotated.conf.otlpAdditionalHeaders = rotatedHeaders;
-	(rotated.conf.otlpQueue as Queue).conf.otlpAdditionalHeaders = rotatedHeaders;
+	if (rotated.conf.otlpQueue instanceof Queue) {
+		rotated.conf.otlpQueue.conf.otlpAdditionalHeaders = rotatedHeaders;
+	}
 	t.doesNotThrow(() => [new Log({ parentLog: rotated }), rotated.clone(), new Log({ ...rotated.conf })], "headers rotated on both the conf and its queue keep the pair for a child, a clone and a spread");
 	rotated.conf.otlpAdditionalHeaders = { authorization: "Bearer newer" };
 	t.ok(thrown(() => new Log({ ...rotated.conf })).includes("otlpQueue"), "headers rotated on the conf alone do not");
