@@ -12,11 +12,8 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 44 | 2.6.0 |  | principle | **Route a `Queue`'s warnings through one explicit seam.** | 2 | 1 | 1 | 2 | 4 | code health by 9 | 9.4 |
 | 38 | 2.6.0 |  | principle | **Resolve a `Log`'s conf in steps that each return a new value, with no cast at the end.** | 3 | 1 | 2 | 4 | 5 | code health by 9 | 6.2 |
-| 39 | 2.6.0 |  | principle | **Keep a `Queue`'s items and their byte count in one structure.** | 2 | 1 | 1 | 2 | 3 | code health by 5 | 6.2 |
-| 45 | 2.6.0 |  | principle | **Build the shared parts of a span and of a payload's attributes once.** | 2 | 1 | 1 | 2 | 3 | code health by 5 | 6.2 |
-| 98 | 2.6.0 | 38, 44 | decision | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
+| 98 | 2.6.0 | 38 | decision | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
 | 35 | 2.6.0 |  | principle | **Let a consumer inject what `colorsFromEnv`, `traceableUrl` and `unref` read from the platform.** | 2 | 1 | 1 | 2 | 4 | code health by 5 | 5.2 |
 | 36 | 2.7.0 |  | principle | **Reach the retry decision and a `log.fetch` span's attributes without a network call.** | 2 | 1 | 1 | 2 | 5 | code health by 5 | 4.5 |
 | 43 | 2.7.0 |  | principle | **Give `ExportScheduler` and save coalescing named states.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
@@ -94,16 +91,6 @@
 
 ## Details
 
-### 44. Route a `Queue`'s warnings through one explicit seam.
-
-`logWarningOfReport` finds a Log's warner by the identity of its `report` function, and
-`warnOnce(conf)` and `Queue.warnOnce` are two once-only rules. Principle: Explicit over implicit.
-`firstWarning(sink, key)` reads as a query but also records that the warning was written, against
-Command–query separation. Found by the 2.5.0 principles audit.
-
-Every seat of the 2026-10-03 run named the module-level tables `warned` and `logWarningOfReport`, so
-it lifts Locality, the lowest dimension at 5.5.
-
 ### 38. Resolve a `Log`'s conf in steps that each return a new value, with no cast at the end.
 
 `confFromOptions`, `inheritSettings`, `rejectQueueBesideShorthand` and `withDefaults` mutate one
@@ -114,16 +101,6 @@ LogConf)[]` and `as never`.
 
 Every seat of the 2026-10-03 run named this order-dependent mutation in `resolveLogConf`, so it
 lifts Locality, the lowest dimension at 5.5.
-
-### 39. Keep a `Queue`'s items and their byte count in one structure.
-
-Four writers keep `items` and `bytes` in step by hand, and the size-triggered flush trusts them.
-Principle: One owner per value.
-
-### 45. Build the shared parts of a span and of a payload's attributes once.
-
-`openSpan` and `childSpan` repeat the span object; both payload builders drop `service.name` and
-stringify values. Principle: Don't Repeat Yourself.
 
 ### 98. Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.
 

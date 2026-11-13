@@ -409,6 +409,13 @@ function buildResourceAttributes(attributes: Metadata): OtlpAttribute[] {
 	];
 }
 
+// service.name is carried on the resource, so it is excluded from the per-record and span attributes.
+function attributesOf(attributes: Metadata): OtlpAttribute[] {
+	return Object.entries(attributes)
+		.filter(([key]) => key !== "service.name")
+		.map(([key, value]) => ({ key, value: { stringValue: String(value) } }));
+}
+
 // Unredacted, per README → Credentials in a captured value: the message, metadata and context are
 // the caller's own text.
 function buildLogPayload(opts: {
@@ -420,10 +427,7 @@ function buildLogPayload(opts: {
 }): OtlpLogPayload {
 	const { attributes, logLevel, msTimestamp, msg, span } = opts;
 
-	// service.name is carried on the resource (below), so it is excluded from the per-record attributes.
-	const recordAttributes: OtlpAttribute[] = Object.entries(attributes)
-		.filter(([key]) => key !== "service.name")
-		.map(([key, value]) => ({ key, value: { stringValue: String(value) } }));
+	const recordAttributes = attributesOf(attributes);
 
 	return {
 		resourceLogs: [{
@@ -442,13 +446,6 @@ function buildLogPayload(opts: {
 			}],
 		}],
 	};
-}
-
-// service.name is carried on the resource, so it is excluded from the span attributes.
-function toSpanAttributes(attributes: Metadata): OtlpAttribute[] {
-	return Object.entries(attributes)
-		.filter(([key]) => key !== "service.name")
-		.map(([key, value]) => ({ key, value: { stringValue: String(value) } }));
 }
 
 // Unredacted: callers redact what they capture into `attributes`, and per README → Credentials in a
@@ -661,11 +658,9 @@ function encodeOtlpProtobuf(payload: OtlpPayload): Uint8Array<ArrayBuffer> {
 
 const warned = new WeakMap<object, Set<unknown>>();
 
-// A Log-built queue warns as its Log does: at warn, once per stderr.
-const logWarningOfReport = new WeakMap<object, (msg: string) => void>();
-
-// Marked before the sink runs, so a sink that itself uses the deprecated spelling cannot recurse.
-function firstWarning(sink: object, key: unknown): boolean {
+// The one once-only rule: runs `write` the first time `key` is seen for `sink`. The key is marked
+// before `write` runs, so a sink that itself uses the deprecated spelling cannot recurse.
+function writeOnce(sink: object, key: unknown, write: () => void): void {
 	let keys = warned.get(sink);
 
 	if (!keys) {
@@ -674,12 +669,11 @@ function firstWarning(sink: object, key: unknown): boolean {
 	}
 
 	if (keys.has(key)) {
-		return false;
+		return;
 	}
 
 	keys.add(key);
-
-	return true;
+	write();
 }
 
 function describeLogLevel(value: unknown): string {
@@ -705,9 +699,7 @@ function writeStderr(conf: ResolvedLogConf, logLevel: "error" | "warn", metadata
 }
 
 function warnOnce(conf: ResolvedLogConf, metadata: MetadataInput | undefined, msg: string): void {
-	if (firstWarning(conf.stderr, msg)) {
-		writeStderr(conf, "warn", metadata, msg);
-	}
+	writeOnce(conf.stderr, msg, () => writeStderr(conf, "warn", metadata, msg));
 }
 
 // --- Credentials on a span -------------------------------------------------
@@ -1544,16 +1536,60 @@ class OtlpSender {
 
 // --- OTLP export queue -----------------------------------------------------
 
+function sumBytes(items: readonly QueuedItem[]): number {
+	let sum = 0;
+
+	for (const item of items) {
+		sum += item.bytes;
+	}
+
+	return sum;
+}
+
+// The queued items and their byte total. Only these methods change either, so the total, which the
+// size-triggered flush trusts, cannot drift from the items.
+class ItemBuffer {
+	private list: QueuedItem[] = [];
+	private total = 0;
+
+	get bytes(): number {
+		return this.total;
+	}
+
+	get items(): readonly QueuedItem[] {
+		return this.list;
+	}
+
+	append(items: QueuedItem[]): void {
+		this.list.push(...items);
+		this.total += sumBytes(items);
+	}
+
+	// Not unshift(...items): a long stored list would overflow the call stack.
+	prepend(items: QueuedItem[]): void {
+		this.list = [...items, ...this.list];
+		this.total += sumBytes(items);
+	}
+
+	remove(gone: ReadonlySet<QueuedItem>): void {
+		this.list = this.list.filter(item => {
+			if (gone.has(item)) {
+				this.total -= item.bytes;
+			}
+
+			return !gone.has(item);
+		});
+	}
+}
+
 export class Queue implements OtlpQueue {
 	readonly conf: ResolvedQueueConf;
 
 	private readonly scheduler: ExportScheduler;
 	private readonly sender: OtlpSender;
 
-	// Buffer: bytes is the running sum of items[].bytes, so countAndTrim() and takeBatch() move both together.
-	private bytes = 0;
+	private readonly buffer = new ItemBuffer();
 	private dropped = 0;
-	private items: QueuedItem[] = [];
 	// The batch being sent: out of items, but kept in storage until its send settles.
 	private inflight: QueuedItem[] = [];
 	// A failed batch whose retry its report promised, so the trim spares it. Only `round` sets it.
@@ -1566,7 +1602,10 @@ export class Queue implements OtlpQueue {
 	// A getItem that threw: what storage holds stays untouched, since a later read may return it.
 	private unreadable = false;
 
-	constructor(conf: QueueConf) {
+	// `warn` takes this queue's warnings, once per message, where a caller owns a better sink than
+	// `report`: a Log passes the queue it builds its own, so they land once per stderr, at warn. Else
+	// they go through `report`, once per function and message.
+	constructor(conf: QueueConf, private readonly warn?: (msg: string) => void) {
 		this.conf = {
 			...conf,
 			acceptPlainHttpCredentials: conf.acceptPlainHttpCredentials === true,
@@ -1606,7 +1645,7 @@ export class Queue implements OtlpQueue {
 		this.append([withBytes(payload)]);
 		this.scheduleSave();
 
-		if (this.bytes >= this.conf.maxBatchBytes) {
+		if (this.buffer.bytes >= this.conf.maxBatchBytes) {
 			void this.flush();
 		} else {
 			this.scheduler.schedule();
@@ -1623,7 +1662,7 @@ export class Queue implements OtlpQueue {
 	}
 
 	private async round(): Promise<void> {
-		while (this.items.length) {
+		while (this.buffer.items.length) {
 			const batch = this.takeBatch();
 
 			this.inflight = batch;
@@ -1656,11 +1695,11 @@ export class Queue implements OtlpQueue {
 
 	// The oldest item's kind, plus every later item of the same, up to maxBatchBytes.
 	private takeBatch(): QueuedItem[] {
-		const kind = payloadKind(this.items[0].payload);
+		const kind = payloadKind(this.buffer.items[0].payload);
 		const batch: QueuedItem[] = [];
 		let bytes = 0;
 
-		for (const item of this.items) {
+		for (const item of this.buffer.items) {
 			if (payloadKind(item.payload) !== kind) {
 				continue;
 			}
@@ -1673,23 +1712,19 @@ export class Queue implements OtlpQueue {
 			bytes += item.bytes;
 		}
 
-		const taken = new Set(batch);
-
-		this.items = this.items.filter(item => !taken.has(item));
-		this.bytes -= bytes;
+		this.buffer.remove(new Set(batch));
 
 		return batch;
 	}
 
 	private warnOnce(msg: string): void {
 		const { report } = this.conf;
-		const logWarning = logWarningOfReport.get(report);
 
 		try {
-			if (logWarning) {
-				logWarning(msg);
-			} else if (typeof report !== "function" || firstWarning(report, msg)) {
-				report(msg, {});
+			if (this.warn) {
+				this.warn(msg);
+			} else {
+				writeOnce(report, msg, () => report(msg, {}));
 			}
 		} catch {
 			// A sink that throws must not break the export loop.
@@ -1712,35 +1747,23 @@ export class Queue implements OtlpQueue {
 	}
 
 	private append(items: QueuedItem[]): void {
-		this.items.push(...items);
-		this.countAndTrim(items);
+		this.buffer.append(items);
+		this.trim();
 	}
 
 	// A failed or persisted batch is older than anything queued since, so it goes in front.
 	private prepend(items: QueuedItem[]): void {
-		// Not unshift(...items): a long stored list would overflow the call stack.
-		this.items = [...items, ...this.items];
-		this.countAndTrim(items);
+		this.buffer.prepend(items);
+		this.trim();
 	}
 
 	// Drops the oldest over maxItems, sparing the batch being retried; it holds at most maxItems, so
 	// enough other items remain to drop.
-	private countAndTrim(items: QueuedItem[]): void {
-		for (const item of items) {
-			this.bytes += item.bytes;
-		}
-
-		const excess = this.items.length - this.conf.maxItems;
+	private trim(): void {
+		const excess = this.buffer.items.length - this.conf.maxItems;
 
 		if (excess > 0) {
-			const dropping = new Set(this.items.filter(item => !this.retrying.has(item)).slice(0, excess));
-
-			this.items = this.items.filter(item => !dropping.has(item));
-
-			for (const item of dropping) {
-				this.bytes -= item.bytes;
-			}
-
+			this.buffer.remove(new Set(this.buffer.items.filter(item => !this.retrying.has(item)).slice(0, excess)));
 			this.dropped += excess;
 		}
 	}
@@ -1766,7 +1789,7 @@ export class Queue implements OtlpQueue {
 		if ("payloads" in stored) {
 			this.prepend(stored.payloads.map(withBytes));
 
-			if (this.items.length) {
+			if (this.buffer.items.length) {
 				this.scheduler.schedule();
 			}
 
@@ -1798,7 +1821,7 @@ export class Queue implements OtlpQueue {
 			this.dirty = false;
 
 			try {
-				const persisted = [...this.inflight, ...this.items];
+				const persisted = [...this.inflight, ...this.buffer.items];
 
 				if (persisted.length) {
 					await storage.setItem(this.conf.key, JSON.stringify(persisted.map(item => item.payload)));
@@ -1891,14 +1914,13 @@ function buildDefaultQueue(conf: ResolvedLogConf): void {
 	if (!conf.otlpQueue && conf.otlpHttpBaseURI) {
 		const report = (msg: string, metadata: Metadata) => writeStderr(conf, "error", metadata, msg);
 
-		logWarningOfReport.set(report, msg => warnOnce(conf, undefined, msg));
 		conf.otlpQueue = new Queue({
 			clock: conf.clock,
 			otlpAdditionalHeaders: conf.otlpAdditionalHeaders,
 			otlpHttpBaseURI: conf.otlpHttpBaseURI,
 			otlpProtocol: conf.otlpProtocol,
 			report,
-		});
+		}, msg => warnOnce(conf, undefined, msg));
 		defaultQueues.add(conf.otlpQueue);
 	}
 }
@@ -2067,55 +2089,52 @@ function resolveLogConf(options: LogOptions | LogLevel | "none" | undefined): { 
 
 // --- A Log's spans ---------------------------------------------------------
 
-function openSpan(conf: ResolvedLogConf): { sampled: boolean, span: OtlpSpan } {
-	const incoming = !conf.parentLog && conf.traceparent ? parseTraceparent(conf.traceparent) : null;
-	const startedAt = getNsTimestamp(conf.clock.now());
-
-	return {
-		sampled: conf.parentLog?.sampled ?? incoming?.sampled ?? true,
-		span: {
-			attributes: [],
-			droppedAttributesCount: 0,
-			droppedEventsCount: 0,
-			droppedLinksCount: 0,
-			endTimeUnixNano: startedAt,
-			events: [],
-			kind: SPAN_KIND_INTERNAL,
-			links: [],
-			name: conf.spanName || "unnamed-span",
-			parentSpanId: conf.parentLog?.span.spanId ?? incoming?.spanId,
-			spanId: spanIdFrom(conf.randomBytes),
-			startTimeUnixNano: startedAt,
-			status: { code: STATUS_CODE_UNSET },
-			traceId: conf.parentLog?.span.traceId || incoming?.traceId || traceIdFrom(conf.randomBytes),
-		},
-	};
-}
-
-function childSpan(log: Pick<Log, "conf" | "span">, name: string, kind: OtlpSpan["kind"]): OtlpSpan {
-	const now = getNsTimestamp(log.conf.clock.now());
+// A span just opened: it starts and ends now, and carries nothing yet.
+function newSpan(fields: Pick<OtlpSpan, "kind" | "name" | "parentSpanId" | "spanId" | "traceId">, nowMs: number): OtlpSpan {
+	const startedAt = getNsTimestamp(nowMs);
 
 	return {
 		attributes: [],
 		droppedAttributesCount: 0,
 		droppedEventsCount: 0,
 		droppedLinksCount: 0,
-		endTimeUnixNano: now,
+		endTimeUnixNano: startedAt,
 		events: [],
-		kind,
 		links: [],
+		startTimeUnixNano: startedAt,
+		status: { code: STATUS_CODE_UNSET },
+		...fields,
+	};
+}
+
+function openSpan(conf: ResolvedLogConf): { sampled: boolean, span: OtlpSpan } {
+	const incoming = !conf.parentLog && conf.traceparent ? parseTraceparent(conf.traceparent) : null;
+
+	return {
+		sampled: conf.parentLog?.sampled ?? incoming?.sampled ?? true,
+		span: newSpan({
+			kind: SPAN_KIND_INTERNAL,
+			name: conf.spanName || "unnamed-span",
+			parentSpanId: conf.parentLog?.span.spanId ?? incoming?.spanId,
+			spanId: spanIdFrom(conf.randomBytes),
+			traceId: conf.parentLog?.span.traceId || incoming?.traceId || traceIdFrom(conf.randomBytes),
+		}, conf.clock.now()),
+	};
+}
+
+function childSpan(log: Pick<Log, "conf" | "span">, name: string, kind: OtlpSpan["kind"]): OtlpSpan {
+	return newSpan({
+		kind,
 		name,
 		parentSpanId: log.span.spanId,
 		spanId: spanIdFrom(log.conf.randomBytes),
-		startTimeUnixNano: now,
-		status: { code: STATUS_CODE_UNSET },
 		traceId: log.span.traceId,
-	};
+	}, log.conf.clock.now());
 }
 
 function exportSpan(log: Pick<Log, "conf" | "sampled">, span: OtlpSpan, attributes: Metadata): void {
 	if (log.sampled) {
-		const spanAttributes = toSpanAttributes(attributes);
+		const spanAttributes = attributesOf(attributes);
 
 		// README → Audience: each documented span attribute is on `log.span` as on the wire.
 		if (spanAttributes.length) {
@@ -2335,9 +2354,9 @@ export class Log implements LogInt {
 		}
 
 		// Keyed on the raw value, so only the first call per sink and value builds the message.
-		if (firstWarning(this.conf.stderr, configured)) {
+		writeOnce(this.conf.stderr, configured, () => {
 			writeStderr(this.conf, "warn", undefined, `@larvit/log: logLevel ${describeLogLevel(configured)} is not a level, logging at "${DEFAULT_LOG_LEVEL}"; use error, warn, info, verbose, debug, silly or none`);
-		}
+		});
 	}
 
 	private throwIfEnded(): void {
