@@ -44,6 +44,7 @@ In [docs/decisions.md](docs/decisions.md):
 - `ProtoWriter.string` uses `TextEncoder` with no fallback
 - The protobuf encoder stays
 - In text, a plain space ends a credential and no other whitespace does
+- A platform read stays a default, and a consumer injects through `colors` and `clock`
 
 ## Working here
 
@@ -72,8 +73,7 @@ One word per concept, in code, docs and the plan alike:
 - **span**: one timed operation in a trace, such as a `log.fetch` request.
 - **payload**: an OTLP `resourceLogs` or `resourceSpans` body, holding log records or spans.
 - **queue**: the `Queue`, or any `OtlpQueue`, that a `Log` hands payloads to for export.
-- **transport**: a destination a `Log` hands entries to; this library ships two, console and OTLP,
-  and will become a list of destinations.
+- **transport**: a destination a `Log` hands entries to; this library ships two, console and OTLP.
 
 ## Scoring run
 

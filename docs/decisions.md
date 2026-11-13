@@ -393,3 +393,13 @@ status message, userinfo (`SLASHED_USERINFO`, `URL_DELIMITER`) and a listed quer
 no-break space, `\v`, `\f`, U+2028 and the like in both, so ending there would export the rest of the
 credential, and prose such as `see //host and mail a@b` stays readable. Serves README → Goals #7.
 Valid while a url parser keeps such whitespace in userinfo and a query value.
+
+## A platform read stays a default, and a consumer injects through `colors` and `clock`
+
+2026-11-13, the implementing agent: `colorsFromEnv`, `traceableUrl` and `unref` take the value they
+read, and `processEnv`, `pageHref` and `denoUnrefTimer` read it at their callers. No option is added
+for these reads: a consumer already injects through `colors`, which beats the env, through `clock`,
+whose timers `unref` handles, and through an absolute url, which needs no page address. A further
+option would grow the documented surface for what only a default reads. Applies the technical
+principle "Functional core, imperative shell"; serves README → Goals #1 and #5. Valid while no
+consumer needs the page address or the env injected apart from these.
