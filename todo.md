@@ -6,7 +6,7 @@
 
 `Bar = 0.5`
 
-`Next ID = 141`
+`Next ID = 142`
 
 ## Items
 
@@ -21,6 +21,7 @@
 | 137 | 2.7.0 |  |  | **Give each part's tests a file of their own under `tests/`, beside the helpers they share.** | 2 | 1 | 1 | 2 | 4 | code health by 4 | 4.2 |
 | 110 | 2.7.0 |  | principle | **Register one test per case where a test loops over its cases or checks many behaviours.** | 1 | 1 | 1 | 1 | 4 | code health by 3 | 3.7 |
 | 140 | 2.7.0 |  | principle | **Test each platform default with its value passed in, and swap a global in at most one test per default.** | 2 | 1 | 1 | 2 | 3 | code health by 3 | 3.7 |
+| 141 | 2.7.0 |  | principle | **Let `mutate-changes` mutation-test a branch's changed lines, in the repo's container.** | 3 | 1 | 1 | 3 | 4 | code health by 4 | 3.6 |
 | 25 | 2.7.0 |  |  | **Publish the artifact the gate tested.** | 2 | 2 | 3 | 5 | 4 | code health by 5 | 3.5 |
 | 138 | 2.7.0 |  | principle | **Sort each module's imports on their first binding, with a lint rule that keeps them so.** | 2 | 1 | 1 | 2 | 3 | code health by 2 | 2.5 |
 | 82 | 2.7.0 |  |  | **Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.** | 1 | 2 | 1 | 2 | 1 | 3 by 5 | 2.3 |
@@ -183,6 +184,15 @@ swap and the restore leaves the global changed for every later test, and the tes
 parallel. The technical principle "Functional core, imperative shell" bans a test swapping a global
 by name. `colorsFromEnv`, `traceableUrl` and `unref` already take the value they read, so a test
 can import the module and pass it. Found by the principles pass of 2.6.0's release review.
+
+### 141. Let `mutate-changes` mutation-test a branch's changed lines, in the repo's container.
+
+`~/.claude/bin/mutate-changes` runs Stryker for TypeScript, from the project's own
+`@stryker-mutator/core`, and installs none. This project has no Stryker and no Stryker config, and
+its suite runs as one script against the built bundle, which Stryker's runners do not start as it
+stands. So the release review of 2.6.0, which rewrote three credential-redaction routines in shape,
+could not run mutation tests on them; a differential fuzz against the old module stood in. The
+technical principle "Every mutant of a changed line fails a test" asks for the run.
 
 ### 25. Publish the artifact the gate tested.
 
