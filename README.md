@@ -385,7 +385,7 @@ instead. `entryFormatter` is deprecated the same way: pass the function as `form
 | `otlpQueue` | `OtlpQueue` | none | The [export queue](#queue-exports). Cannot be combined with the three shorthands above; on an instance given them, `log.conf.otlpQueue` reads back the queue they built. Inherited by children and clones; one that sets a shorthand instead gets a queue of its own. |
 | `parentLog` | `LogInt` | none | Nest under this instance's span and inherit its options except `traceparent`. Log entries attach to the parent's span. |
 | `printTraceInfo` | `boolean` | `false` | Append `spanId`, `traceId` and `spanName` to console output. |
-| `randomBytes` | `(size: number) => Uint8Array` | Web Crypto, else `Math.random` | Returns `size` random bytes for each trace and span id. Supply one for deterministic ids in a test. Children and clones inherit it. |
+| `randomBytes` | `(size: number) => Uint8Array` | Web Crypto, else `Math.random` | Returns `size` random bytes for each trace and span id. Supply one for deterministic ids in a test; return exactly `size` bytes and not all zeros, which trace context rejects. Children and clones inherit it. |
 | `spanName` | `string` | `"unnamed-span"` | The instance's span name. Inherited from `parentLog` when set there. |
 | `stderr` | `(msg: string) => void` | `console.error` | Sink for `error` and `warn`. |
 | `stdout` | `(msg: string) => void` | `console.log` | Sink for the other levels. |
