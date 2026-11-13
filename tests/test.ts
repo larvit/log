@@ -1,4 +1,5 @@
-import { type EntryFormatter, type EntryFormatterConf, formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, type Logger, type LogInt, type LogLevel, LogLevels, type LogOptions, type Metadata, msgJsonFormatter, msgTextFormatter, type OtlpPayload, type OtlpQueue, type OtlpSpan, parseTraceparent, Queue, type QueueStorage, type ResolvedLogConf, resolveFormatter, type TimerHandle } from "./index.js";
+import { type EntryFormatter, type EntryFormatterConf, formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, type Logger, type LogInt, type LogLevel, LogLevels, type LogOptions, type Metadata, msgJsonFormatter, msgTextFormatter, type OtlpPayload, type OtlpQueue, type OtlpSpan, parseTraceparent, Queue, type QueueStorage, type ResolvedLogConf, resolveFormatter, type TimerHandle } from "../index.js";
+import { isCredentialHeaderName } from "../tracing/span-credentials.js";
 import test from "./tap.js";
 
 // --- helpers ---------------------------------------------------------------
@@ -3143,5 +3144,11 @@ test("an injected clock's numeric timer id is never handed to Deno's unrefTimer"
 	}
 
 	t.deepEqual(unrefed, [], "a stranger's timer id is left alone");
+	t.end();
+});
+
+test("a credential rule is testable on its own module, with no Log, fetch or queue", t => {
+	t.strictEqual(isCredentialHeaderName("Authorization"), true, "Authorization is a credential header");
+	t.strictEqual(isCredentialHeaderName("Content-Type"), false, "Content-Type is not");
 	t.end();
 });

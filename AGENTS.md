@@ -26,7 +26,7 @@ In [docs/decisions.md](docs/decisions.md):
 - `log.fetch` traces only `http:` and `https:` urls
 - `log.fetch` passes url userinfo through, and redacts it in its own span's status
 - A captured value holding a credential records `REDACTED`
-- Every rule on credentials in a span sits in one source section
+- Every rule on credentials in a span sits in one module
 - `format` is the formatter's one name, `entryFormatter` its alias until 3.0.0
 - `ResolvedLogConf` keeps `entryFormatter` required
 - A query key is redacted by Datadog's suffix rule
@@ -45,12 +45,14 @@ In [docs/decisions.md](docs/decisions.md):
 - The protobuf encoder stays
 - In text, a plain space ends a credential and no other whitespace does
 - A platform read stays a default, and a consumer injects through `colors` and `clock`
+- The package publishes one bundled `index.js`, built from a module per part
 
 ## Working here
 
-- New code in `index.ts` joins a `// --- name ---` section whose banner stays true of it, or gets
-  its own. A rule set answering one question — what a reader has to check as a whole — lives in one
-  section, never split across two.
+- `index.ts` holds only the public exports. New code joins the module under `log/`, `tracing/` or
+  `otlp/` whose opening comment stays true of it, or gets its own. A rule set answering one
+  question — what a reader has to check as a whole — lives in one module, never split across two.
+  A `// --- name ---` banner divides a file only where a technical limit stops a split.
 - A done `todo.md` item leaves the file: a change a consumer can observe is reworded for them
   under `CHANGELOG.md` → `## Unreleased`; anything else is deleted outright.
 - A `todo.md` item states the problem, and working out *how* is part of it: a mechanism it names
@@ -60,7 +62,7 @@ In [docs/decisions.md](docs/decisions.md):
 - A release section with anything a consumer must act on — a rotation advisory, an exposure still
   open — puts `### Security` holding it right after that intro, ahead of `### Everything else`;
   one with none omits both headings. Thirty flat bullets is where a rotation notice goes unread.
-- Tests-first. The suite (`test.ts`) injects `stdout`/`stderr` and stubs the global `fetch`, so the same tests cover console + OTLP in both Node and the browser.
+- Tests-first. The suite (`tests/test.ts`) injects `stdout`/`stderr` and stubs the global `fetch`, so the same tests cover console + OTLP in both Node and the browser.
 - See [README](README.md) for build/test/release commands.
 - Don't wait on CodeRabbit: under 10 stars it reviews only when triggered by hand.
 

@@ -350,3 +350,12 @@ Read most (opens and searches):
 - `docs/decisions.md` 3
 - `AGENTS.md` 2
 - `package.json` 2
+
+## Reading cost, chunk d421598bb0dd, finished 2026-11-13T21:20:35Z
+
+58030 new input tokens before the first commit.
+
+Read most (opens and searches):
+
+- `index.ts` 10
+- `test.ts` 1

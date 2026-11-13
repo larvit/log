@@ -164,21 +164,19 @@ stance the query-key list already took. `REDACTED` over dropping the attribute k
 reader's "was the header there?", so a false hit costs a value, never the header's presence. Valid
 while Elastic's default list is the published one.
 
-## Every rule on credentials in a span sits in one source section
+## Every rule on credentials in a span sits in one module
 
 2026-09-20, the implementing agent: every rule deciding whether a credential reaches a span sits in
-one region, `// --- Credentials on a span ---`, grouped by that question and not by the caller
-asking it, so `traceableUrl` and `buildUrlFull` are there and not beside `log.fetch`. README → Goals
-#7 is checkable only against the whole set, and the rules used to sit in two places ~800 lines apart
-with the call running upward and no comment at either end naming the other. Neither the banner nor
-this entry lists the routes in: prose has nothing keeping a count true, and the
-userinfo-free-by-construction choices at the `log.fetch` call site are not rules this region holds.
-Scoped to spans because the remaining credential rules are the queue's, and the conf-redaction and
-Basic-over-`http:` items rewrite that code. 2026-11-10, the 2.5.0 release review: the region sits
-above the OTLP export sections, so the header-name rule `isCredentialHeaderName`, which the queue's
-plain-`http:` warning reads too, is defined in it before that use. This ends the 2026-11-08
-exception that kept the rule beside the queue's sender. Serves README → Goals #7 and code health.
-Valid while the source is a single `index.ts`; item 128 splits it into modules.
+one module, `tracing/span-credentials.ts`, grouped by that question and not by the caller asking
+it, so `traceableUrl` and `buildUrlFull` are there and not beside `log.fetch`. README → Goals #7 is
+checkable only against the whole set, and the rules used to sit in two places ~800 lines apart with
+the call running upward and no comment at either end naming the other. Neither the module's opening
+comment nor this entry lists the routes in: prose has nothing keeping a count true, and the
+userinfo-free-by-construction choices at the `log.fetch` call site are not rules this module holds.
+Scoped to spans because the remaining credential rules are the queue's. The header-name rule
+`isCredentialHeaderName`, which the queue's plain-`http:` warning reads too, is defined here and
+imported by the queue's sender. Serves README → Goals #7 and code health. Valid while one module
+stays readable as a whole; a split of it keeps every such rule in one folder.
 
 ## `format` is the formatter's one name, `entryFormatter` its alias until 3.0.0
 
@@ -404,3 +402,16 @@ option would grow the documented surface for what only a default reads. The suit
 `globalThis.process` and `Deno` to reach those defaults; that cost stays. Applies the technical
 principle "Functional core, imperative shell"; serves README → Goals #1 and #5. Valid while no
 consumer needs the page address or the env injected apart from these.
+
+## The package publishes one bundled `index.js`, built from a module per part
+
+2026-11-13, the implementing agent, on the maintainer's request for source files in folders: the
+source is `index.ts`, holding only the public exports, and one module per part under `log/`,
+`tracing/` and `otlp/`. esbuild bundles them into the one `index.js` the package has always
+published, and `uglifyjs -m` minifies it as before. Publishing the compiler's modules instead would
+stop a minifier shortening any name one module exports to another, and a browser without a bundler
+would fetch eighteen files. Measured in the repo's container image, the bundle is 11522 bytes
+gzipped against 11480 for the single source file. Declarations are not bundled: `types/` mirrors
+the modules, and `types/index.d.ts` names the public ones. A test may import a module directly, as
+the suite's compiled copy sits beside the bundle it tests. Serves code health and README → Goals
+#5. Valid while every supported runtime loads one ESM file.

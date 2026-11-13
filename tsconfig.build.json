@@ -1,8 +1,11 @@
 {
 	"compilerOptions": {
 		"declaration": true,
+		"declarationDir": "types",
+		"emitDeclarationOnly": true,
+		// esbuild compiles each module alone, so tsc holds the source to what that allows.
+		"isolatedModules": true,
 		"module": "NodeNext",
-		"sourceMap": true,
 		"strict": true,
 		// The target is the browser floor README → Runtimes states: tsc lowers newer syntax and
 		// rejects newer built-ins, so the floor can't rise unnoticed.

@@ -3,5 +3,5 @@
 	"compilerOptions": {
 		"noEmit": true
 	},
-	"files": ["index.ts", "tap.ts", "test.ts"]
+	"files": ["index.ts", "tests/tap.ts", "tests/test.ts"]
 }

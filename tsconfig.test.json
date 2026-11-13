@@ -2,9 +2,10 @@
 	"extends": "./tsconfig.build.json",
 	"compilerOptions": {
 		"declaration": false,
+		"declarationDir": null,
+		"emitDeclarationOnly": false,
 		"outDir": ".tmp/test",
-		"rootDir": ".",
-		"sourceMap": false
+		"rootDir": "."
 	},
-	"files": ["tap.ts", "test.ts"]
+	"files": ["tests/tap.ts", "tests/test.ts"]
 }
