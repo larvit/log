@@ -599,6 +599,11 @@ test("a clone merges context and takes no spanName; a child replaces context and
 	t.strictEqual(JSON.stringify(log.clone({ context: { baz: "fu" } }).context), "{\"foo\":\"bar\",\"baz\":\"fu\"}", "new keys merge in");
 	t.strictEqual(JSON.stringify(log.clone({ context: { foo: "burp" } }).context), "{\"foo\":\"burp\"}", "existing keys are overridden");
 	t.strictEqual(JSON.stringify(log.clone({ context: { foo: undefined } }).context), "{\"foo\":\"bar\"}", "an undefined override is dropped, not applied");
+
+	const holed = new Log({ context: { foo: "bar" }, stdout: () => {} });
+
+	(holed.context as Record<string, unknown>).gone = undefined;
+	t.deepEqual(Object.keys(holed.clone().context), ["foo"], "a key the source's context holds as undefined is dropped too");
 	t.end();
 });
 
@@ -1692,6 +1697,21 @@ test("Queue with storage writes through one writer, so changes made during a wri
 	t.end();
 });
 
+test("Queue schedules the leftovers it loads, with nothing new enqueued", async t => {
+	const clock = fakeClock();
+	const storage = fakeStorage(true);
+
+	storage.data.set("@larvit/log:otlp-queue", JSON.stringify([{ resourceLogs: [{ resource: { attributes: [] }, scopeLogs: [{ logRecords: [{ body: { stringValue: "leftover" }, severityNumber: 9, severityText: "INFO", timeUnixNano: nanos(clock.now()) }] }] }] }]));
+
+	const { calls } = stubFetch();
+
+	new Queue({ clock, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, storage });
+	await waitFor(() => clock.pending.size === 1);
+	await clock.advance(60000);
+	t.deepEqual(exportedRecords(calls), ["leftover"], "the batch timer the load set sends them");
+	t.end();
+});
+
 test("Queue flushed while storage loads sends the leftovers and leaves no batch timer behind", async t => {
 	const clock = fakeClock();
 	const storage = fakeStorage(true);
@@ -1834,6 +1854,17 @@ test("otlpQueue and the otlp* options are two spellings of one endpoint; inherit
 	t.strictEqual(custom.conf.otlpHttpBaseURI, undefined, "and does not inherit the parent's endpoint beside it");
 	t.doesNotThrow(() => new Log({ ...parent.conf, spanName: "sibling" }), "spreading a conf keeps its queue and endpoint together");
 	t.ok(thrown(() => new Log({ ...parent.conf, otlpHttpBaseURI: "http://127.0.0.1:4319" })).includes("otlpQueue"), "a default queue beside an endpoint it was not built from is rejected");
+	t.ok(thrown(() => new Log({ ...parent.conf, otlpProtocol: "http/json" })).includes("otlpQueue"), "and beside a protocol it was not built with");
+	t.doesNotThrow(() => new Log({ ...parent.conf, otlpProtocol: "http/protobuf" }), "but beside the default protocol spelled out, which is what it sends");
+
+	const rotated = new Log({ otlpAdditionalHeaders: { authorization: "Bearer old" }, otlpHttpBaseURI: "http://127.0.0.1:4318" });
+	const rotatedHeaders = { authorization: "Bearer new" };
+
+	rotated.conf.otlpAdditionalHeaders = rotatedHeaders;
+	(rotated.conf.otlpQueue as Queue).conf.otlpAdditionalHeaders = rotatedHeaders;
+	t.doesNotThrow(() => [new Log({ parentLog: rotated }), rotated.clone(), new Log({ ...rotated.conf })], "headers rotated on both the conf and its queue keep the pair for a child, a clone and a spread");
+	rotated.conf.otlpAdditionalHeaders = { authorization: "Bearer newer" };
+	t.ok(thrown(() => new Log({ ...rotated.conf })).includes("otlpQueue"), "headers rotated on the conf alone do not");
 
 	const headered = new Log({ otlpAdditionalHeaders: { authorization: "Bearer t0k3n" }, otlpHttpBaseURI: "http://127.0.0.1:4318" });
 
@@ -2863,6 +2894,7 @@ test("log.fetch marks error spans for 4xx and for network failures, propagating 
 		if (path === "/boom") throw Object.assign(new Error("down"), { code: "ECONNREFUSED" });
 		if (path === "/abort") throw new DOMException("aborted", "AbortError");
 		if (path === "/bare") throw "bare";
+		if (path.startsWith("/a/")) throw new Error("fetch failed: https://api.test/a/https:%2F%2Fu:hunter3%40z/b");
 
 		return undefined;
 	});
@@ -2885,6 +2917,7 @@ test("log.fetch marks error spans for 4xx and for network failures, propagating 
 
 	await log.fetch("https://api.test/abort").catch(() => {});
 	await log.fetch("https://api.test/bare").catch(() => {});
+	await log.fetch("https://api.test/a/https:%2F%2Fu:hunter3%40z/b").catch(() => {});
 	await log.end();
 
 	const spans = exportedSpans(calls);
@@ -2897,6 +2930,7 @@ test("log.fetch marks error spans for 4xx and for network failures, propagating 
 	t.strictEqual(attr(spanBoom, "error.type"), "ECONNREFUSED", "error.type captured from the error code");
 	t.ok(spans.some(span => attr(span, "error.type") === "20"), "a numeric code (DOMException) is kept, as v2.3.0 documented");
 	t.ok(spans.some(span => attr(span, "error.type") === "fetch_error"), "error.type is \"fetch_error\" when there is neither code nor name");
+	t.ok(spans.some(span => span.status.message === "fetch failed: https://api.test/a/REDACTED"), "the url the runtime quotes back is redacted as the known url, its path's nested userinfo included");
 	t.end();
 });
 
