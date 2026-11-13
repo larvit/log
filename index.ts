@@ -159,8 +159,9 @@ const TEXT_LEVEL_TAGS: Record<LogLevel, { ansi: number, tag: string }> = {
 	warn: { ansi: 33, tag: "war" },
 };
 
-// The platform reads below (processEnv, pageHref, denoUnrefTimer) sit at their callers: a function takes
-// the value it needs, never the global. See docs/decisions.md → "A platform read stays a default".
+// The platform reads below (processEnv, pageHref, denoUnrefTimer) sit at their callers, which hand each
+// function the value it needs instead of letting it reach for a global. See docs/decisions.md → "A platform read stays a default".
+
 // The process global's env, or undefined where there is none (browsers) or a permission-gated one throws.
 function processEnv(): unknown {
 	try {
@@ -1223,18 +1224,19 @@ function parseStoredPayloads(raw: string): { error: string | undefined } | { pay
 const RETRY_DELAY_MAX_MS = 30000;
 
 // Deno's unref for a numeric timer id, or undefined elsewhere.
-function denoUnrefTimer(): unknown {
+function denoUnrefTimer(): ((id: number) => void) | undefined {
 	const deno: unknown = Reflect.get(globalThis, "Deno");
+	const unrefTimer: unknown = typeof deno === "object" && deno !== null ? Reflect.get(deno, "unrefTimer") : undefined;
 
-	return typeof deno === "object" && deno !== null ? Reflect.get(deno, "unrefTimer") : undefined;
+	return typeof unrefTimer === "function" ? unrefTimer as (id: number) => void : undefined;
 }
 
 // A pending batch or retry must not keep a finished Node or Deno process alive.
-function unref(timer: TimerHandle, unrefNumericTimer: unknown): void {
+function unref(timer: TimerHandle, unrefNumericTimer: ((id: number) => void) | undefined): void {
 	if (typeof timer === "object" && typeof timer.unref === "function") {
 		timer.unref();
-	} else if (typeof timer === "number" && typeof unrefNumericTimer === "function") {
-		unrefNumericTimer(timer);
+	} else if (typeof timer === "number") {
+		unrefNumericTimer?.(timer);
 	}
 }
 
