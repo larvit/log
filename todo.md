@@ -12,13 +12,10 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 35 | 2.6.0 |  | principle | **Let a consumer inject what `colorsFromEnv`, `traceableUrl` and `unref` read from the platform.** | 2 | 1 | 1 | 2 | 4 | code health by 5 | 5.2 |
-| 132 | 2.6.0 |  |  | **Give each concept in `index.ts` one name, so no name, and no two names differing only in case, stand for two things.** | 2 | 1 | 1 | 2 | 3 | code health by 4 | 5.0 |
-| 133 | 2.6.0 |  |  | **Let a cold reader understand `index.ts`'s comments and `AGENTS.md` without opening the CHANGELOG or `todo.md`.** | 1 | 2 | 1 | 2 | 2 | code health by 3 | 4.7 |
 | 130 | 2.6.0 |  |  | **Let a reader follow how a `Log`'s formatter, default queue and once-only warnings pass between functions, without tracing module-level tables across sections.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
 | 131 | 2.6.0 |  |  | **Let a reader check each query, path and text redaction routine in `// --- Credentials on a span ---` on one read: its state, its recursion and the order of its checks plain where they act.** | 2 | 2 | 4 | 6 | 5 | code health by 7 | 4.0 |
 | 134 | 2.6.0 |  |  | **Lower the reading cost of the files a chunk reads most before its first commit.** | 2 | 2 | 1 | 3 | 4 | code health by 3 | 2.7 |
-| 135 | 2.7.0 | 130, 131, 132, 133 | decision | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
+| 135 | 2.7.0 | 130, 131 | decision | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
 | 36 | 2.7.0 |  | principle | **Reach the retry decision and a `log.fetch` span's attributes without a network call.** | 2 | 1 | 1 | 2 | 5 | code health by 5 | 4.5 |
 | 43 | 2.7.0 |  | principle | **Give `ExportScheduler` and save coalescing named states.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
 | 48 | 2.7.0 |  | principle | **Test the untested failure paths.** | 2 | 1 | 1 | 2 | 4 | code health by 4 | 4.2 |
@@ -94,41 +91,6 @@
 | 75 | 3.0.0 | 22 | decision | **Keep credentials off `log.conf` and `queue.conf`.** | 2 | 1 | 2 | 3 | 3 | 3 by 3 | 0.7 |
 
 ## Details
-
-### 35. Let a consumer inject what `colorsFromEnv`, `traceableUrl` and `unref` read from the platform.
-
-They read `process.env`, `globalThis.location` and `globalThis.Deno`, and the suite swaps
-`globalThis.process` and `console.error` to reach them. Principle: Functional core, imperative
-shell.
-
-### 132. Give each concept in `index.ts` one name, so no name, and no two names differing only in case, stand for two things.
-
-The 2026-11-13 comprehension run ranked these places hard for Shape: `Log.inFlight` (un-awaited
-fetches) and `Queue.inflight` (the batch being sent) differ only in case; `Levels` means
-percent-decoding depth beside `LogLevels`; "transport" names endpoint options in
-`OTLP_TRANSPORT_KEYS` and encodings in the comment on `withBytes`, where `AGENTS.md` → Words makes
-it a destination a `Log` hands entries to; `Queue.warnOnce` shares the module `warnOnce`'s name and
-keys on a different thing; and the formatter goes by seven names. Make each of those places easier
-to read.
-
-Exported and documented names, such as `format`, `entryFormatter`, `resolveFormatter` and
-`EntryFormatterConf`, change only in a major, per README → Audience; item 62 and item 63 take two
-of them in 3.0.0. Item 96 brings transports as a list, so "transport" keeps the meaning `AGENTS.md`
-→ Words gives it.
-
-### 133. Let a cold reader understand `index.ts`'s comments and `AGENTS.md` without opening the CHANGELOG or `todo.md`.
-
-The 2026-11-13 comprehension run ranked these places hard for Self-sufficiency: comments that lean
-on release history, naming "v2.3.0" or "v2.4.0" where the constraint itself is what the reader
-needs, at `index.ts:65`, `index.ts:747`, `index.ts:1352`, `index.ts:1970` and `index.ts:2233`; and
-`AGENTS.md` → Words citing "item 96", a plan item a cold reader doesn't open; and the "Credentials
-on a span" section, which has no map from a README bullet to the function that enforces it. Make
-each of those places easier to read.
-
-The seats named three more places, which this item leaves: the section's size, which item 118
-restructures into about seven things per level; where the header-name rule sits, which stays in
-that section, as `docs/decisions.md` → "Every rule on credentials in a span sits in one source
-section" asks; and README → Footprint's untracked budgets, which items 26 and 117 take.
 
 ### 130. Let a reader follow how a `Log`'s formatter, default queue and once-only warnings pass between functions, without tracing module-level tables across sections.
 

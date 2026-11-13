@@ -62,7 +62,7 @@ export type Logger = { [level in LogLevel]: (msg: string, metadata?: MetadataInp
 	enabled: (logLevel: LogLevel) => boolean;
 };
 
-// Stays assignable from a v2.3.0 LogInt until 3.0.0.
+// An older LogInt, whose fetch, enabled and conf may be missing or narrower, stays assignable until 3.0.0.
 export type LogInt = { [level in LogLevel]: LogShorthand } & {
 	conf: LogConf;
 	enabled?: Logger["enabled"];
@@ -159,13 +159,25 @@ const TEXT_LEVEL_TAGS: Record<LogLevel, { ansi: number, tag: string }> = {
 	warn: { ansi: 33, tag: "war" },
 };
 
-// NO_COLOR wins over FORCE_COLOR; FORCE_COLOR=0 and =false disable, as in Node's tty.hasColors.
-function colorsFromEnv(): boolean | undefined {
+// Platform reads (processEnv, denoUnrefTimer, and the `location` read in Log.fetch) happen at the caller,
+// which hands the value to a function that touches no global. A consumer injects through the `colors`
+// and `clock` options; a further option would grow the documented surface for a default.
+// The process global's env, or undefined where there is none (browsers) or a permission-gated one throws.
+function processEnv(): unknown {
 	try {
 		const processGlobal: unknown = Reflect.get(globalThis, "process");
-		const env: unknown = typeof processGlobal === "object" && processGlobal !== null ? Reflect.get(processGlobal, "env") : undefined;
 
-		if (typeof env !== "object" || env === null) return undefined;
+		return typeof processGlobal === "object" && processGlobal !== null ? Reflect.get(processGlobal, "env") : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+// NO_COLOR wins over FORCE_COLOR; FORCE_COLOR=0 and =false disable, as in Node's tty.hasColors.
+function colorsFromEnv(env: unknown): boolean | undefined {
+	if (typeof env !== "object" || env === null) return undefined;
+
+	try {
 		if (Reflect.get(env, "NO_COLOR")) return false;
 
 		const forceColor: unknown = Reflect.get(env, "FORCE_COLOR");
@@ -197,6 +209,13 @@ export function msgTextFormatter(conf: EntryFormatterConf) {
 	return str;
 }
 
+// The formatter goes by these names:
+// - `format`: the option, "json" or "text"; a function passed there becomes a function formatter.
+// - `entryFormatter`: the deprecated option holding a function formatter, and on a resolved conf an
+//   alias of `format` (ENTRY_FORMATTER_ALIAS).
+// - `formatFunction`: a function formatter in LogSettings, while a conf is being resolved.
+// - `formatFunctions`: the table below, which holds a function formatter once a conf exists.
+// - `formatterOf`: the formatter a conf uses; `resolveFormatter` is its exported form.
 // A conf's function formatter, which `conf.format` cannot hold before 3.0.0, or the one a clone hands
 // the constructor, keyed by its options.
 const formatFunctions = new WeakMap<object, EntryFormatter>();
@@ -699,11 +718,21 @@ function writeStderr(conf: ResolvedLogConf, logLevel: "error" | "warn", metadata
 	conf.stderr(formatterOf(conf)({ colors: conf.colors, logLevel, metadata: withoutUndefined(metadata), msTimestamp: conf.clock.now(), msg }));
 }
 
-function warnOnce(conf: ResolvedLogConf, metadata: MetadataInput | undefined, msg: string): void {
+function warnOnceToStderr(conf: ResolvedLogConf, metadata: MetadataInput | undefined, msg: string): void {
 	writeOnce(conf.stderr, msg, () => writeStderr(conf, "warn", metadata, msg));
 }
 
 // --- Credentials on a span -------------------------------------------------
+
+// Where README → Credentials in a captured value is enforced, bullet by bullet:
+// 1. A credential header name: isCredentialHeaderName, applied by redactHeaderCredential.
+// 2. A listed query key: isListedQueryKey and redactTextQueryKeys, applied by redactQueryPair.
+// 3. A url in a kept query value or key: redactedSearch, with redactQueryPart, readQueryPart and redactQueryPair.
+// 4. A url that parses whole, in a header value or status message: redactedWholeUrl.
+// 5. Userinfo after `//` or its backslash forms: redactTextUserinfo in text, splitUserinfoPairs in a query.
+// 6. A listed key after `?`, `&`, `#` or `;` in text: redactTextQueryKeys.
+// 7. A url nested in the path: redactedPath.
+// buildUrlFull assembles url.full from 3 and 7, and failureMessage a span's status from 4 to 6.
 
 // One rule for the credential headers a span redacts and a send warns of. Elastic APM's default `sanitize_field_names`, plus the spec's optional `cookie`.
 const SENSITIVE_HEADER_NAME = /^(cookie|passwd|password|pwd|secret|set-cookie)$|key$|auth|card|credit|principal|session|token/;
@@ -716,22 +745,22 @@ function isCredentialHeaderName(name: string): boolean {
 // a credential, so a limit can only redact more, never let a credential through.
 
 // Percent-decodings of one text.
-const MAX_PERCENT_LEVELS = 8;
+const MAX_PERCENT_DECODINGS = 8;
 // Query parts parsed as a url, one inside the next; it also keeps the stack from running out.
 const MAX_NESTED_URLS = 8;
 // Path segments opening a url, each read with the rest of the path.
 const MAX_SCHEME_SEGMENTS = 8;
 
-// The levels of a text encoded past MAX_PERCENT_LEVELS: no reading is left to test.
+// The decodings of a text encoded past MAX_PERCENT_DECODINGS: no reading is left to test.
 const UNREADABLE = Symbol("unreadable");
 
-type Levels = string[] | typeof UNREADABLE;
+type Decodings = string[] | typeof UNREADABLE;
 
-// Text encoded past MAX_PERCENT_LEVELS holds whatever a reader tests for.
-const atAnyLevel = (levels: Levels, test: (level: string) => boolean) => levels === UNREADABLE || levels.some(test);
+// Text encoded past MAX_PERCENT_DECODINGS holds whatever a reader tests for.
+const inAnyDecoding = (readings: Decodings, test: (decoding: string) => boolean) => readings === UNREADABLE || readings.some(test);
 
 // A part's reading by depth, kept for one exported value: a url key is read alone and with its
-// value, so a chain of them would re-read each level.
+// value, so a chain of them would re-read each decoding.
 type PartsRead = Map<string, string>;
 
 function parsedUrl(text: string): URL | undefined {
@@ -744,7 +773,7 @@ function parsedUrl(text: string): URL | undefined {
 
 const holdsUserinfo = (url: URL) => url.username !== "" || url.password !== "";
 
-// v2.4.0's `//` rule, and the same after `\\`, `/\` or `\/`: they match a url among other text, or one
+// The `//` rule, and the same after `\\`, `/\` or `\/`: they match a url among other text, or one
 // the runtime cannot parse. After an opener holding a `\`, userinfo may not hold a `\`, so matching a
 // long run of `\` stays linear. Only a `/`, `?` or `#` ends userinfo in WHATWG URL's authority state,
 // as does a `\` in a special url, so a parser keeps a no-break space, a `\v` or a U+2028 in a
@@ -768,20 +797,20 @@ function percentDecoded(value: string): string {
 	});
 }
 
-// Every level: decoding a `%2F` inside userinfo puts a `/` before the `@`, so a match at one level
-// can vanish at the next.
-function decodings(text: string): Levels {
-	const levels = [text];
+// Every decoding: decoding a `%2F` inside userinfo puts a `/` before the `@`, so a match in one
+// decoding can vanish in the next.
+function decodings(text: string): Decodings {
+	const readings = [text];
 
-	for (let decoded = percentDecoded(text); decoded !== levels[levels.length - 1]; decoded = percentDecoded(decoded)) {
-		if (levels.length > MAX_PERCENT_LEVELS) {
+	for (let decoded = percentDecoded(text); decoded !== readings[readings.length - 1]; decoded = percentDecoded(decoded)) {
+		if (readings.length > MAX_PERCENT_DECODINGS) {
 			return UNREADABLE;
 		}
 
-		levels.push(decoded);
+		readings.push(decoded);
 	}
 
-	return levels;
+	return readings;
 }
 
 // A parser drops a tab, newline or carriage return: `si%09g` reads as `sig`.
@@ -822,16 +851,16 @@ function redactTextQueryKeys(text: string): string {
 	return redacted + text.slice(copied);
 }
 
-const changesAtAnyLevel = (text: string, redact: (level: string) => string) => atAnyLevel(decodings(text), level => redact(level) !== level);
+const changesInAnyDecoding = (text: string, redact: (decoding: string) => string) => inAnyDecoding(decodings(text), decoding => redact(decoding) !== decoding);
 
-const holdsUserinfoAtAnyLevel = (text: string) => changesAtAnyLevel(text, redactTextUserinfo);
+const holdsUserinfoAtAnyLevel = (text: string) => changesInAnyDecoding(text, redactTextUserinfo);
 const holdsListedKey = (text: string) => redactTextQueryKeys(text) !== text;
-const holdsListedKeyAtAnyLevel = (text: string) => changesAtAnyLevel(text, redactTextQueryKeys);
+const holdsListedKeyAtAnyLevel = (text: string) => changesInAnyDecoding(text, redactTextQueryKeys);
 
 const URL_DELIMITER = /[/?# ]/;
 
 // Whether a `//`, `\\`, `/\` or `\/` at the key's end, at any level, opens userinfo.
-const opensUserinfo = (key: string) => atAnyLevel(decodings(key), level => OPENS_USERINFO.test(level));
+const opensUserinfo = (key: string) => inAnyDecoding(decodings(key), decoding => OPENS_USERINFO.test(decoding));
 
 // A parser reads the `&` in `?//u:p&w@host` as part of the userinfo, which the query splits into
 // two pairs. A key opening userinfo starts a run: its value and each later pair join it, up to the
@@ -897,7 +926,7 @@ function rawQueryPairs(url: URL): Array<[string, string]> {
 }
 
 const formDecoded = (text: string) => new URLSearchParams(`=${text}`).get("") ?? "";
-const holdsAtSignAtAnyLevel = (text: string) => atAnyLevel(decodings(text), level => level.includes("@"));
+const holdsAtSignAtAnyLevel = (text: string) => inAnyDecoding(decodings(text), decoding => decoding.includes("@"));
 
 // `undefined` where no pair changes.
 function redactedSearch(url: URL, depth: number, partsRead: PartsRead): string | undefined {
@@ -1007,11 +1036,11 @@ function redactHeaderCredential(name: string, value: string): string {
 
 // The URL log.fetch traces: a scheme written without "//" parses to an opaque path, where
 // userinfo, or a data: payload, sits in pathname and would ride into url.full.
-function traceableUrl(input: string | URL): URL | undefined {
+function traceableUrl(input: string | URL, baseHref: string | undefined): URL | undefined {
 	let url: URL;
 
 	try {
-		url = new URL(String(input), (globalThis as { location?: { href?: string } }).location?.href);
+		url = new URL(String(input), baseHref);
 	} catch {
 		return undefined;
 	}
@@ -1031,11 +1060,11 @@ function redactedPath(pathname: string): string {
 	}
 
 	// Segments before `cut` are kept, and `REDACTED` replaces the rest; -1 keeps all.
-	let cut = read.findIndex(segmentRead => atAnyLevel(segmentRead, holdsListedKey));
+	let cut = read.findIndex(segmentRead => inAnyDecoding(segmentRead, holdsListedKey));
 	let opened = 0;
 
 	for (let index = 1; index < (cut === -1 ? segments.length : cut); index++) {
-		if (!atAnyLevel(read[index], level => SCHEME_LED.test(level))) {
+		if (!inAnyDecoding(read[index], decoding => SCHEME_LED.test(decoding))) {
 			continue;
 		}
 
@@ -1043,7 +1072,7 @@ function redactedPath(pathname: string): string {
 
 		const nested = decodings(segments.slice(index).join("/"));
 
-		if (opened > MAX_SCHEME_SEGMENTS || atAnyLevel(nested, level => SCHEME_LED.test(level) && (redactedWholeUrl(level) !== undefined || redactTextUserinfo(level) !== level))) {
+		if (opened > MAX_SCHEME_SEGMENTS || inAnyDecoding(nested, decoding => SCHEME_LED.test(decoding) && (redactedWholeUrl(decoding) !== undefined || redactTextUserinfo(decoding) !== decoding))) {
 			cut = index;
 			break;
 		}
@@ -1153,7 +1182,7 @@ function utf8Length(str: string): number {
 	return bytes;
 }
 
-// The JSON size bounds the protobuf size too, so one measure serves both transports.
+// The JSON size bounds the protobuf size too, so one measure serves both encodings.
 function withBytes(payload: OtlpPayload): QueuedItem {
 	return { bytes: utf8Length(JSON.stringify(payload)), payload };
 }
@@ -1184,20 +1213,19 @@ function parseStoredPayloads(raw: string): { error: string | undefined } | { pay
 
 const RETRY_DELAY_MAX_MS = 30000;
 
+// Deno's unref for a numeric timer id, or undefined elsewhere.
+function denoUnrefTimer(): unknown {
+	const deno: unknown = Reflect.get(globalThis, "Deno");
+
+	return typeof deno === "object" && deno !== null ? Reflect.get(deno, "unrefTimer") : undefined;
+}
+
 // A pending batch or retry must not keep a finished Node or Deno process alive.
-function unref(timer: TimerHandle, fromSystemClock: boolean): void {
+function unref(timer: TimerHandle, unrefNumericTimer: unknown): void {
 	if (typeof timer === "object" && typeof timer.unref === "function") {
 		timer.unref();
-
-		return;
-	}
-
-	const deno: unknown = Reflect.get(globalThis, "Deno");
-	const unrefTimer: unknown = typeof deno === "object" && deno !== null ? Reflect.get(deno, "unrefTimer") : undefined;
-
-	// An injected clock's number may not be a Deno timer id, and unrefing a stranger's is worse.
-	if (fromSystemClock && typeof timer === "number" && typeof unrefTimer === "function") {
-		unrefTimer(timer);
+	} else if (typeof timer === "number" && typeof unrefNumericTimer === "function") {
+		unrefNumericTimer(timer);
 	}
 }
 
@@ -1283,7 +1311,8 @@ class ExportScheduler {
 			void this.flush();
 		}, delayMs);
 
-		unref(handle, this.conf.clock === systemClock);
+		// An injected clock's number may not be a Deno timer id, and unrefing a stranger's is worse.
+		unref(handle, this.conf.clock === systemClock ? denoUnrefTimer() : undefined);
 		this.timer = { handle, retry };
 	}
 }
@@ -1349,7 +1378,7 @@ function groupBy<T>(items: T[], keyOf: (item: T) => string, join: (group: T[]) =
 
 const resourceKey = (entry: { resource: unknown }) => JSON.stringify(entry.resource);
 
-// A payload stored by v2.4.0 or earlier carries no scope on its logs, and its span name as its spans' scope.
+// A payload an older version stored carries no scope on its logs, and its span name as its spans' scope; both merge by this key.
 const scopeKey = (entry: { scope?: OtlpScope }) => JSON.stringify([entry.scope?.name, entry.scope?.version]);
 
 function mergeLogPayloads(payloads: OtlpLogPayload[]): OtlpLogPayload {
@@ -1511,7 +1540,7 @@ class OtlpSender {
 				};
 			}
 
-			// Protobuf responses are binary; only the JSON transport reads the body, for a partialSuccess.
+			// Protobuf responses are binary; only the JSON encoding reads the body, for a partialSuccess.
 			if (!this.protobuf) {
 				const rejection = partialRejection(await res.json().catch(() => undefined));
 
@@ -1592,7 +1621,7 @@ export class Queue implements OtlpQueue {
 	private readonly buffer = new ItemBuffer();
 	private dropped = 0;
 	// The batch being sent: out of the buffer, but kept in storage until its send settles.
-	private inflight: QueuedItem[] = [];
+	private batchBeingSent: QueuedItem[] = [];
 	// A failed batch whose retry its report promised, so the trim spares it. Only `round` sets it.
 	private retrying: ReadonlySet<QueuedItem> = new Set();
 
@@ -1631,7 +1660,7 @@ export class Queue implements OtlpQueue {
 			throw new Error("clock must be { now, setTimeout, clearTimeout }");
 		}
 
-		this.sender = new OtlpSender(this.conf, (msg, metadata) => this.report(msg, metadata), msg => this.warnOnce(msg));
+		this.sender = new OtlpSender(this.conf, (msg, metadata) => this.report(msg, metadata), msg => this.warnOnceToSink(msg));
 
 		this.ready = conf.storage ? this.load(conf.storage) : Promise.resolve();
 		this.scheduler = new ExportScheduler(this.conf, this.ready, () => this.round());
@@ -1668,11 +1697,11 @@ export class Queue implements OtlpQueue {
 		while (this.buffer.items.length) {
 			const batch = this.takeBatch();
 
-			this.inflight = batch;
+			this.batchBeingSent = batch;
 
 			const failure = await this.sender.send(batch);
 
-			this.inflight = [];
+			this.batchBeingSent = [];
 			this.retrying = new Set(failure?.retry ? batch : []);
 
 			if (failure?.retry) {
@@ -1720,7 +1749,7 @@ export class Queue implements OtlpQueue {
 		return batch;
 	}
 
-	private warnOnce(msg: string): void {
+	private warnOnceToSink(msg: string): void {
 		const { report } = this.conf;
 
 		try {
@@ -1816,7 +1845,7 @@ export class Queue implements OtlpQueue {
 			this.dirty = false;
 
 			try {
-				const persisted = [...this.inflight, ...this.buffer.items];
+				const persisted = [...this.batchBeingSent, ...this.buffer.items];
 
 				if (persisted.length) {
 					await storage.setItem(this.conf.key, JSON.stringify(persisted.map(item => item.payload)));
@@ -1834,7 +1863,7 @@ export class Queue implements OtlpQueue {
 
 // --- Resolving a Log's settings --------------------------------------------
 
-const OTLP_TRANSPORT_KEYS = ["otlpAdditionalHeaders", "otlpHttpBaseURI", "otlpProtocol"] as const;
+const OTLP_ENDPOINT_KEYS = ["otlpAdditionalHeaders", "otlpHttpBaseURI", "otlpProtocol"] as const;
 
 type Derivation = "child" | "clone";
 
@@ -1878,10 +1907,10 @@ function sameOrigin(uri: string, other: string): boolean {
 // A queue stays only beside the endpoint it was built from; headers only beside their endpoint's origin.
 function otlpKeysNotToInherit(conf: LogSettings, sourceConf: LogConf): (keyof LogConf)[] {
 	if (conf.otlpQueue) {
-		return [...OTLP_TRANSPORT_KEYS];
+		return [...OTLP_ENDPOINT_KEYS];
 	}
 
-	if (!OTLP_TRANSPORT_KEYS.some(key => conf[key] !== undefined)) {
+	if (!OTLP_ENDPOINT_KEYS.some(key => conf[key] !== undefined)) {
 		return [];
 	}
 
@@ -1917,13 +1946,13 @@ function attachDefaultQueue(conf: ResolvedLogConf): void {
 			otlpHttpBaseURI: conf.otlpHttpBaseURI,
 			otlpProtocol: conf.otlpProtocol,
 			report,
-		}, msg => warnOnce(conf, undefined, msg));
+		}, msg => warnOnceToStderr(conf, undefined, msg));
 		defaultQueues.add(conf.otlpQueue);
 	}
 }
 
 function rejectQueueBesideShorthand(conf: LogSettings): void {
-	if (conf.otlpQueue && OTLP_TRANSPORT_KEYS.some(key => conf[key] !== undefined) && !isDefaultQueueFor(conf.otlpQueue, conf)) {
+	if (conf.otlpQueue && OTLP_ENDPOINT_KEYS.some(key => conf[key] !== undefined) && !isDefaultQueueFor(conf.otlpQueue, conf)) {
 		throw new Error("otlpQueue carries the endpoint: set otlpHttpBaseURI, otlpProtocol and otlpAdditionalHeaders on the queue, not beside it");
 	}
 }
@@ -1967,8 +1996,8 @@ function optionsFromSettings({ formatFunction, ...options }: LogSettings): LogOp
 	return options;
 }
 
-// One this module did not store — another copy of it, or a v2.3.0 LogInt — shows only as
-// entryFormatter, which wins over its format as in v2.3.0.
+// One this module did not store — another copy of it, or an older LogInt — shows only as
+// entryFormatter, which wins over its format.
 function sourceFormatFunction(sourceConf: LogConf): EntryFormatter | undefined {
 	const stored = formatFunctions.get(sourceConf);
 
@@ -2054,7 +2083,7 @@ function withDefaults(settings: LogSettings): ResolvedLogConf {
 	const conf = {
 		...rest,
 		clock: orDefault(rest.clock, systemClock),
-		colors: orDefault(rest.colors, colorsFromEnv() ?? true),
+		colors: orDefault(rest.colors, colorsFromEnv(processEnv()) ?? true),
 		logLevel: orDefault(rest.logLevel, DEFAULT_LOG_LEVEL),
 		randomBytes: orDefault(rest.randomBytes, platformRandomBytes),
 		stderr: orDefault(rest.stderr, console.error),
@@ -2171,7 +2200,7 @@ function captureHeaders(log: Pick<Log, "conf" | "context">, option: "captureRequ
 		} catch {
 			// The index, never the name: an invalid one may be a whole header line, value and all.
 			try {
-				warnOnce(log.conf, log.context, `@larvit/log: ${option}[${index}] is not a valid header name, so log.fetch skips it`);
+				warnOnceToStderr(log.conf, log.context, `@larvit/log: ${option}[${index}] is not a valid header name, so log.fetch skips it`);
 			} catch {
 				// A stderr that throws costs the warning.
 			}
@@ -2230,7 +2259,7 @@ async function tracedFetch(log: Pick<Log, "conf" | "context" | "sampled" | "span
 		return res;
 	} catch (err) {
 		span.status = { code: STATUS_CODE_ERROR, message: failureMessage(err, url) };
-		// v2.3.0's documented value; semconv's rule, as end() applies it, waits for 3.0.0.
+		// The value this library has always documented; semconv's rule, as end() applies it, waits for 3.0.0.
 		attributes["error.type"] = stringField(err, "code") ?? numberFieldAsString(err, "code") ?? stringField(err, "name") ?? "fetch_error";
 
 		throw err;
@@ -2253,7 +2282,7 @@ export class Log implements LogInt {
 	readonly conf: ResolvedLogConf;
 
 	// Un-awaited log.fetch calls, awaited by flush() so their spans are queued before the queue flushes.
-	private inFlight = new Set<Promise<unknown>>();
+	private pendingFetches = new Set<Promise<unknown>>();
 
 	// W3C sampled flag; false exports no spans and propagates 00.
 	readonly sampled: boolean;
@@ -2268,7 +2297,7 @@ export class Log implements LogInt {
 		this.context = withoutUndefined(conf.context);
 
 		for (const msg of deprecations) {
-			warnOnce(conf, this.context, msg);
+			warnOnceToStderr(conf, this.context, msg);
 		}
 
 		const { sampled, span } = openSpan(conf);
@@ -2279,7 +2308,7 @@ export class Log implements LogInt {
 
 	public clone(options?: LogOptions | LogLevel | "none") {
 		if (typeof options === "string") {
-			warnOnce(this.conf, this.context, "@larvit/log: log.clone(\"level\") is deprecated and removed in 3.0.0, use log.clone({ logLevel })");
+			warnOnceToStderr(this.conf, this.context, "@larvit/log: log.clone(\"level\") is deprecated and removed in 3.0.0, use log.clone({ logLevel })");
 		}
 
 		return new Log(optionsFromSettings(inherited(confFromOptions(options), this, "clone")));
@@ -2307,7 +2336,7 @@ export class Log implements LogInt {
 	}
 
 	public async flush(): Promise<void> {
-		await Promise.all([...this.inFlight]);
+		await Promise.all([...this.pendingFetches]);
 		await this.conf.otlpQueue?.flush();
 	}
 
@@ -2318,7 +2347,7 @@ export class Log implements LogInt {
 	public fetch(input: string | URL, init?: RequestInit): Promise<Response> {
 		this.throwIfEnded();
 
-		const url = traceableUrl(input);
+		const url = traceableUrl(input, (globalThis as { location?: { href?: string } }).location?.href);
 
 		if (!url) {
 			return globalThis.fetch(input, init);
@@ -2399,9 +2428,9 @@ export class Log implements LogInt {
 	}
 
 	private track(promise: Promise<unknown>): void {
-		this.inFlight.add(promise);
+		this.pendingFetches.add(promise);
 		// The tracked promise only resolves, but stay defensive so a stray rejection can't become unhandled.
-		void promise.catch(() => {}).finally(() => this.inFlight.delete(promise));
+		void promise.catch(() => {}).finally(() => this.pendingFetches.delete(promise));
 	}
 
 	private outputToConsole(logLevel: LogLevel, msg: string, metadata: Metadata, msTimestamp: number) {
