@@ -3147,7 +3147,7 @@ test("an injected clock's numeric timer id is never handed to Deno's unrefTimer"
 	t.end();
 });
 
-test("a credential rule is testable on its own module, with no Log, fetch or queue", t => {
+test("isCredentialHeaderName tells a credential header from any other, read from its own module", t => {
 	t.strictEqual(isCredentialHeaderName("Authorization"), true, "Authorization is a credential header");
 	t.strictEqual(isCredentialHeaderName("Content-Type"), false, "Content-Type is not");
 	t.end();
