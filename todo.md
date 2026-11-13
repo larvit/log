@@ -193,8 +193,8 @@ a reader could find them by. That crosses the limit of about seven things per le
 asks for a grouping under names a reader can follow, or a recorded reason. The rules must stay in
 one module or folder, as `docs/decisions.md` → "Every rule on credentials in a span sits in one
 module" asks. Principle: `~/.claude/principles/technical-principles.md` → "About seven things per
-level". Found by the principles audit of 2026-10-28. `splitUserinfoPairs` is hard to read too: its
-closures `close` and `read` mutate `start`, `end` and `split`, more interacting values than four or
+level". Found by the principles audit of 2026-10-28. `pairsInUserinfoRuns` is hard to read too: its
+closures `close` and `read` mutate `start`, `end` and `inRuns`, more interacting values than four or
 five. Found by the 2.5.0 principles audit.
 
 ### 82. Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.

@@ -359,3 +359,20 @@ Read most (opens and searches):
 
 - `index.ts` 10
 - `test.ts` 1
+
+## Reading cost, chunk 166820360b94, finished 2026-11-13T21:47:20Z
+
+93765 new input tokens before the first commit.
+
+Read most (opens and searches):
+
+- `README.md` 8
+- `todo.md` 8
+- `docs/decisions.md` 6
+- `AGENTS.md` 5
+- `index.ts` 5
+- `tests/test.ts` 4
+- `.dockerignore` 3
+- `CHANGELOG.md` 3
+- `log/entry-format.ts` 3
+- `package.json` 3
