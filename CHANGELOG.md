@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v2.6.0
 
 Trace and span ids can be made predictable in a test, through the new `randomBytes` option. The
 source map now matches the published file, and the type declarations moved to `types/`. Nothing
