@@ -386,18 +386,21 @@ cannot follow. `~/.claude/principles/frontend.md` → Prefer state in the URL fi
 
 ### 148. Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.
 
-The 2026-11-14 run, at 78682e7 during release 2.7.0, scored Navigation 7.38, Locality 6.00, Shape
-6.63, Self-sufficiency 6.63, overall 6.50. Locality is the lowest. Its seats named the formatter
-in `log/formatter-setting.ts` → `inheritedFormatter`, held under five names and told apart by
-getter identity, which item 143 takes with the conf pipeline split over four modules; the default
-queue's recognition in `log/default-queue.ts` → `isDefaultQueueFor`, which item 144 takes; and the
-query rules in `credentials/query.ts` → `redactedSearch` and `PAIR_RULES`, which item 145 takes
-with `credentials/query-userinfo-runs.ts` → `step`. Shape's seats also named
-`credentials/path.ts` → `redactedPath`, item 146, and Navigation's three misleading names, item
-147. Item 43 takes `otlp/export-scheduler.ts` → `ExportScheduler.flush`, named again. This item's tagline names the floor, so its chunk runs
-the four-seat scoring run. Where a dimension or the overall stays under 7.0, file items for the
-places the seats name, lowest dimension first, and a copy of this item blocked by them. Where every
-score reaches 7.0, it doesn't file anything, and the run replaces the comprehension baseline.
+The latest run, at 39d7c0a on 2026-11-14 during release 2.7.0, scored Navigation 7.75, Locality
+6.38, Shape 7.00, Self-sufficiency 7.00, overall 6.88. Locality is the lowest. Its seats named the
+query rules in `credentials/query.ts` → `redactedSearch` and `PAIR_RULES`, with
+`credentials/query-userinfo-runs.ts` → `step`, which item 145 takes; the formatter in
+`log/formatter-setting.ts` → `inheritedFormatter`, held under five names and told apart by getter
+identity, with what a child inherits in `log/settings.ts` → `inherited`, which item 143 takes; and
+the default queue's recognition in `log/default-queue.ts` → `isDefaultQueueFor`, which item 144
+takes. Shape's seats also named `credentials/path.ts` → `redactedPath`, item 146. No item yet
+takes `credentials/span-values.ts` → `failureMessage` and `traceableUrl`,
+`credentials/text.ts` → `redactTextQueryKeys`, `otlp/export-scheduler.ts` → `transitionRound`, or
+`tracing/fetch.ts` → `fetchFailure`, whose reason points into the plan. This item's tagline names
+the floor, so its chunk runs the four-seat scoring run. Where a dimension or the overall stays under
+7.0, file items for the places the seats name, lowest dimension first, and a copy of this item
+blocked by them. Where every score reaches 7.0, it doesn't file anything, and the run replaces the
+comprehension baseline.
 
 ### 16. Warn once when `format` is a string other than `"text"` or `"json"`.
 
