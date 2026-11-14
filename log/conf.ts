@@ -166,10 +166,12 @@ function inherited(conf: LogConf, source: Source, derivation: Derivation): LogCo
 		skip.add("entryFormatter");
 	}
 
-	const from: LogConf = { ...source.conf, entryFormatter: functionFormatterOf(source.conf) };
 	const taken: LogConf = {};
 
 	for (const key of LOG_CONF_KEYS) {
+		// Read off the source itself, since a hand-written LogInt's conf may hold a key behind a getter.
+		const from = key === "entryFormatter" ? { entryFormatter: functionFormatterOf(source.conf) } : source.conf;
+
 		if (INHERITED_BY[key].includes(derivation) && !skip.has(key) && conf[key] === undefined && from[key] !== undefined) {
 			copyKey(taken, from, key);
 		}
