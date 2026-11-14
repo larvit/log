@@ -6,11 +6,11 @@ import { holdsListedKeyInAnyDecoding, holdsUserinfoInAnyDecoding, redactTextQuer
 
 // Where README → Credentials in a captured value is enforced, bullet by bullet:
 // 1. A credential header name: isCredentialHeaderName in header-names.ts, applied by redactHeaderCredential.
-// 2. A listed query key: isListedQueryKey and redactTextQueryKeys in text.ts, applied by PAIR_RULES in query.ts.
-// 3. A url in a kept query value or key: redactedSearch in query.ts, with PAIR_RULES and readNestedUrl.
+// 2. A listed query key: isListedQueryKey and redactTextQueryKeys in text.ts, applied by redactsKeyAndValue and redactsValueOnly in query.ts.
+// 3. A url in a kept query value or key: redactedSearch in query.ts, with redactQueryPair and readNestedUrl.
 // 4. A url that parses whole, in a header value or status message: redactedWholeUrl in query.ts.
 // 5. Userinfo after `//` or its backslash forms: redactTextUserinfo in text.ts, and in a query
-//    pairsInUserinfoRuns in query-userinfo-runs.ts.
+//    pairsInUserinfoRunsOfAnyReading in query-userinfo-runs.ts.
 // 6. A listed key after `?`, `&`, `#` or `;` in text: redactTextQueryKeys in text.ts.
 // 7. A url nested in the path: redactedPath in path.ts.
 // buildUrlFull assembles url.full from 3 and 7, and failureMessage a span's status from 4 to 7.
