@@ -1,8 +1,7 @@
-import { buildUrlFull, redactHeaderCredential } from "../credentials/span-values.js";
+import { buildUrlFull, redactHeaderCredential, traceableUrl } from "../credentials/span-values.js";
 import { type OtlpSpan, SPAN_KIND_CLIENT, STATUS_CODE_ERROR, STATUS_CODE_UNSET } from "../otlp/payloads.js";
-import { numberFieldAsString, stringField } from "../primitives/failure-fields.js";
 import type { Metadata } from "../primitives/metadata.js";
-import { childSpan, endSpan, type SpanFailure, type SpanHost } from "./spans.js";
+import { childSpan, endSpan, fetchErrorType, type SpanFailure, type SpanHost } from "./spans.js";
 import { formatTraceparent } from "./traceparent.js";
 
 // What log.fetch reads of its Log, as plain values a test can hand it.
@@ -63,9 +62,8 @@ export function responseAttributes(trace: FetchTrace, res: Pick<Response, "heade
 
 export const spanStatusCode = (status: number) => status >= 400 ? STATUS_CODE_ERROR : STATUS_CODE_UNSET;
 
-// README's value: the error's code (a string, else a number), else its name, else fetch_error. Log.end() applies semconv's `_OTHER` fallback instead; todo.md item 59 ends the difference in 3.0.0.
 export function fetchFailure(err: unknown, url: URL): SpanFailure {
-	return { error: err, errorType: stringField(err, "code") ?? numberFieldAsString(err, "code") ?? stringField(err, "name") ?? "fetch_error", url };
+	return { error: err, errorType: fetchErrorType(err), url };
 }
 
 // What goes to the platform's fetch, carrying `traceparent` unless the caller set one.
@@ -83,7 +81,7 @@ function outgoing(url: URL, init: RequestInit | undefined, traceparent: string):
 }
 
 // A throwing clock or queue costs the span, never the platform's result.
-export async function tracedFetch(trace: FetchTrace, url: URL, init: RequestInit | undefined): Promise<Response> {
+async function tracedFetch(trace: FetchTrace, url: URL, init: RequestInit | undefined): Promise<Response> {
 	let span: OtlpSpan;
 
 	try {
@@ -122,4 +120,32 @@ export async function tracedFetch(trace: FetchTrace, url: URL, init: RequestInit
 			// The span is dropped.
 		}
 	}
+}
+
+// The page's address, which a relative url resolves against; undefined outside a browser, or where the getter throws.
+function pageHref(): string | undefined {
+	try {
+		return (globalThis as { location?: { href?: string } }).location?.href;
+	} catch {
+		return undefined;
+	}
+}
+
+// log.fetch as a whole: a url the credentials/ rule declines goes to the platform untraced, and any other is traced.
+// `track` gets a promise that settles once a traced request's span is queued, and isn't called for an untraced one.
+export function traceFetch(trace: FetchTrace, input: string | URL, init: RequestInit | undefined, track: (spanQueued: Promise<void>) => void): Promise<Response> {
+	const url = traceableUrl(input, pageHref());
+
+	if (!url) {
+		return globalThis.fetch(input, init);
+	}
+
+	// Registered synchronously, so a later await log.flush() delivers a fire-and-forget log.fetch().
+	// Settled on the caller's promise, never tracked from it: a handler there would mark its rejection handled.
+	// The executor runs at once, so `settle` is always set by the time the fetch settles.
+	let settle: (() => void) | undefined;
+
+	track(new Promise<void>(resolve => { settle = resolve; }));
+
+	return tracedFetch(trace, url, init).finally(() => settle?.());
 }

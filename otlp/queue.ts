@@ -1,12 +1,13 @@
 import { systemClock } from "../primitives/clock.js";
 import type { Metadata } from "../primitives/metadata.js";
 import { writeOnce } from "../primitives/once-per-sink.js";
+import { KEEPALIVE_MAX_BYTES } from "./batch.js";
 import { ExportScheduler } from "./export-scheduler.js";
 import { isOtlpPayload, type OtlpPayload, payloadKind } from "./payloads.js";
 import { type QueuedItem, withBytes } from "./queue-items.js";
 import { StoredQueue } from "./queue-storage.js";
 import { DEFAULT_OTLP_PROTOCOL, type OtlpQueue, type QueueConf, type ResolvedQueueConf } from "./queue-types.js";
-import { KEEPALIVE_MAX_BYTES, OtlpSender } from "./sender.js";
+import { OtlpSender } from "./sender.js";
 
 function sumBytes(items: readonly QueuedItem[]): number {
 	let sum = 0;

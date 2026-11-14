@@ -1,25 +1,14 @@
-import { traceableUrl } from "../credentials/span-values.js";
 import { buildLogPayload, type OtlpSpan } from "../otlp/payloads.js";
-import { stringField } from "../primitives/failure-fields.js";
 import { DEFAULT_LOG_LEVEL, type LogLevel, LogLevels, SEVERITY_NUMBERS } from "../primitives/levels.js";
 import { type Metadata, type MetadataInput, withoutUndefined } from "../primitives/metadata.js";
 import { writeOnce } from "../primitives/once-per-sink.js";
-import { type FetchTrace, tracedFetch } from "../tracing/fetch.js";
-import { endSpan, openSpan, type SpanHost } from "../tracing/spans.js";
+import { type FetchTrace, traceFetch } from "../tracing/fetch.js";
+import { endErrorType, endSpan, openSpan, type SpanHost } from "../tracing/spans.js";
 import { formatTraceparent } from "../tracing/traceparent.js";
 import { writeConsoleEntry } from "./console-output.js";
 import { confFromOptions, inherited, type LogSettings, resolveSettings } from "./settings.js";
 import { describeLogLevel, warnOnceToStderr, writeStderr } from "./stderr-warnings.js";
 import type { LogInt, LogOptions, ResolvedLogConf } from "./types.js";
-
-// The page's address, which a relative url resolves against; undefined outside a browser, or where the getter throws.
-function pageHref(): string | undefined {
-	try {
-		return (globalThis as { location?: { href?: string } }).location?.href;
-	} catch {
-		return undefined;
-	}
-}
 
 export class Log implements LogInt {
 	context: Metadata;
@@ -79,7 +68,7 @@ export class Log implements LogInt {
 
 			endSpan(this.spanHost(), this.span, { ...this.context }, error === undefined || error === null ? undefined : {
 				error,
-				errorType: stringField(error, "code") ?? stringField(error, "name") ?? "_OTHER",
+				errorType: endErrorType(error),
 			});
 		} finally {
 			await this.flush();
@@ -98,20 +87,7 @@ export class Log implements LogInt {
 	public fetch(input: string | URL, init?: RequestInit): Promise<Response> {
 		this.throwIfEnded();
 
-		const url = traceableUrl(input, pageHref());
-
-		if (!url) {
-			return globalThis.fetch(input, init);
-		}
-
-		// Registered synchronously, so a later await log.flush() delivers a fire-and-forget log.fetch().
-		// Settled on the caller's promise, never tracked from it: a handler there would mark its rejection handled.
-		// The executor runs at once, so `settle` is always set by the time the fetch settles.
-		let settle: (() => void) | undefined;
-
-		this.track(new Promise<void>(resolve => { settle = resolve; }));
-
-		return tracedFetch(this.fetchTrace(), url, init).finally(() => settle?.());
+		return traceFetch(this.fetchTrace(), input, init, spanQueued => { this.track(spanQueued); });
 	}
 
 	// Never writes, so a library author's `if (log.enabled(...))` emits no line; log() warns of an unknown logLevel.

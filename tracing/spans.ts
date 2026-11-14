@@ -2,6 +2,7 @@ import { failureMessage } from "../credentials/span-values.js";
 import { attributesOf, buildSpanPayload, getNsTimestamp, type OtlpSpan, SPAN_KIND_INTERNAL, STATUS_CODE_ERROR, STATUS_CODE_UNSET } from "../otlp/payloads.js";
 import type { OtlpQueue } from "../otlp/queue-types.js";
 import type { Clock } from "../primitives/clock.js";
+import { numberFieldAsString, stringField } from "../primitives/failure-fields.js";
 import type { Metadata } from "../primitives/metadata.js";
 import { parseTraceparent, spanIdFrom, traceIdFrom } from "./traceparent.js";
 
@@ -60,9 +61,22 @@ export function childSpan(host: Pick<SpanHost, "clock" | "randomBytes" | "span">
 	}, host.clock.now());
 }
 
-// What a span failed with. Each caller picks `errorType`, the span's `error.type`, by its own documented
-// fallback; `url` is the one a fetch handed the runtime, which may quote it back in the error's message.
+// What a span failed with. `errorType`, the span's `error.type`, comes from one of the two functions
+// below; `url` is the one a fetch handed the runtime, which may quote it back in the error's message.
 export interface SpanFailure { error: unknown, errorType: string, url?: URL }
+
+// A failed span's `error.type` follows one of two rules, and the README documents both. A `log.fetch`
+// span (README → "`log.fetch` in depth") takes the error's `code`, a numeric one as digits, else
+// its `name`, else `"fetch_error"`. A span closed by `log.end({ error })` (README → "Group logs into a trace") takes
+// the error's string `code`, else its `name`, else `"_OTHER"`, the fallback of OpenTelemetry's semantic
+// conventions. Both values are published, so semver keeps the two rules apart until a major version.
+export function fetchErrorType(err: unknown): string {
+	return stringField(err, "code") ?? numberFieldAsString(err, "code") ?? stringField(err, "name") ?? "fetch_error";
+}
+
+export function endErrorType(err: unknown): string {
+	return stringField(err, "code") ?? stringField(err, "name") ?? "_OTHER";
+}
 
 export function endSpan(host: Pick<SpanHost, "clock" | "otlpQueue" | "sampled">, span: OtlpSpan, attributes: Metadata, failure?: SpanFailure): void {
 	span.endTimeUnixNano = getNsTimestamp(host.clock.now());
