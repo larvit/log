@@ -6,13 +6,12 @@
 
 `Bar = 0.5`
 
-`Next ID = 143`
+`Next ID = 149`
 
 ## Items
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 135 | 2.7.0 |  | decision | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
 | 36 | 2.7.0 |  | principle | **Reach the retry decision and a `log.fetch` span's attributes without a network call.** | 2 | 1 | 1 | 2 | 5 | code health by 5 | 4.5 |
 | 43 | 2.7.0 |  | principle | **Give `ExportScheduler` and save coalescing named states.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
 | 48 | 2.7.0 |  | principle | **Test the untested failure paths.** | 2 | 1 | 1 | 2 | 4 | code health by 4 | 4.2 |
@@ -22,8 +21,13 @@
 | 110 | 2.7.0 |  | principle | **Register one test per case where a test loops over its cases or checks many behaviours.** | 1 | 1 | 1 | 1 | 4 | code health by 3 | 3.7 |
 | 140 | 2.7.0 |  | principle | **Test each platform default with its value passed in, and swap a global in at most one test per default.** | 2 | 1 | 1 | 2 | 3 | code health by 3 | 3.7 |
 | 141 | 2.7.0 |  | principle | **Let `mutate-changes` mutation-test a branch's changed lines, in the repo's container.** | 3 | 1 | 1 | 3 | 4 | code health by 4 | 3.6 |
+| 143 | 2.8.0 |  |  | **Let a reader answer what a `Log`'s conf holds, and how its formatter reaches a child or clone, from one module of `log/`.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
+| 144 | 2.8.0 |  |  | **Let a reader tell from the queue and the conf in front of them whether a `Log` accepts that queue beside the `otlp*` options.** | 2 | 1 | 2 | 3 | 3 | code health by 4 | 4.2 |
+| 147 | 2.8.0 |  |  | **Name `log/stderr-warnings.ts`, `traceableUrl` and `primitives/failure-fields.ts` for what each holds, so a name neither hides nor promises a job.** | 1 | 1 | 1 | 1 | 2 | code health by 2 | 4.2 |
 | 25 | 2.8.0 |  |  | **Publish the artifact the gate tested.** | 2 | 2 | 3 | 5 | 4 | code health by 5 | 3.5 |
+| 145 | 2.8.0 |  |  | **Let a reader check each rule that redacts a credential in a query from the code alone, without working out the rules' order or a run's state by hand.** | 2 | 2 | 4 | 6 | 5 | code health by 6 | 3.4 |
 | 138 | 2.8.0 |  | principle | **Sort each module's imports on their first binding, with a lint rule that keeps them so.** | 2 | 1 | 1 | 2 | 3 | code health by 2 | 2.5 |
+| 146 | 2.8.0 |  |  | **Let a reader see from `redactedPath` alone which segments of a request path it keeps.** | 2 | 2 | 4 | 6 | 2 | code health by 3 | 2.3 |
 | 82 | 2.8.0 |  |  | **Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.** | 1 | 2 | 1 | 2 | 1 | 3 by 5 | 2.3 |
 | 19 | 2.8.0 |  | defect | **Leave a `Request` untraced in `log.fetch`.** | 1 | 1 | 2 | 2 | 2 | 2.1 by 6 | 2.1 |
 | 114 | 2.8.0 |  |  | **Move `package.json`'s build and test one-liners into named scripts, and let the OTLP test read its collector's port, image and container name from the environment, today's values as defaults.** | 1 | 1 | 1 | 1 | 2 | code health by 1 | 2.1 |
@@ -46,6 +50,7 @@
 | 29 | 2.8.0 | 96 |  | **Export span events.** | 3 | 1 | 2 | 4 | 5 | 1 by 6 | 1.0 |
 | 87 | 2.8.0 | 96 |  | **Report a protobuf export's `partialSuccess` as the JSON transport does.** | 2 | 1 | 2 | 3 | 4 | 1 by 4 | 0.9 |
 | 108 | 2.8.0 |  | principle | **Keep two tabs of one web app sharing a `storage` key from sending a record twice or deleting each other's backlog.** | 3 | 2 | 2 | 5 | 5 | 2 by 5 | 0.7 |
+| 148 | 2.9.0 | 143, 144, 145, 146, 147 | owner | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
 | 16 | 2.9.0 |  |  | **Warn once when `format` is a string other than `"text"` or `"json"`.** | 1 | 1 | 1 | 1 | 1 | 3 by 5 | 3.5 |
 | 41 | 2.9.0 |  | principle | **Warn once about a negative, zero or `NaN` numeric `QueueConf` option, and use the default.** | 1 | 1 | 1 | 1 | 2 | 3 by 5 | 2.3 |
 | 20 | 2.9.0 |  |  | **Announce in the README and CHANGELOG that 3.0.0 gives a `log.fetch` span `end({ error })`'s `error.type`, so a query on `"20"` for an abort or `"fetch_error"` moves first.** | 1 | 1 | 1 | 1 | 1 | 3 by 3 | 2.1 |
@@ -93,21 +98,6 @@
 | 75 | 3.0.0 | 22 | decision | **Keep credentials off `log.conf` and `queue.conf`.** | 2 | 1 | 2 | 3 | 3 | 3 by 3 | 0.7 |
 
 ## Details
-
-### 135. Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.
-
-The 2026-11-13 run, at the end of release 2.6.0, scored Navigation 7.25, Locality 5.88, Shape 6.50,
-Self-sufficiency 6.38, overall 6.38 (two runs of one head, means of the second). Locality is the
-lowest. Its seats named three places again and again:
-`sourceFormatFunction`, where one formatter travelled under six names through two identity-keyed
-WeakMaps across `settings.ts` and `entry-format.ts`; `copyKey`, whose plain assignment
-`isDefaultQueueFor` depends on by reference; and `redactQueryPair`, in a four-function cycle. The
-release review of 2.6.0 reshaped all three, into `log/formatter-setting.ts`, `log/default-queue.ts`
-and `credentials/query.ts`, after this run. Item 136 takes the imports against the layer order
-they also named. This item's tagline names the floor, so its chunk runs the four-seat scoring run. Where a dimension or the overall stays
-under 7.0, file items for the places the seats name, lowest dimension first, and a copy of this item
-blocked by them. Where every score reaches 7.0, it doesn't file anything, and the run replaces the
-comprehension baseline.
 
 ### 36. Reach the retry decision and a `log.fetch` span's attributes without a network call.
 
@@ -194,11 +184,94 @@ start as it stands. So the release review of 2.6.0, which restructured three cre
 routines, could not run mutation tests on them; a differential fuzz against the old module stood in. The
 technical principle "Every mutant of a changed line fails a test" asks for the run.
 
+### 143. Let a reader answer what a `Log`'s conf holds, and how its formatter reaches a child or clone, from one module of `log/`.
+
+The comprehension run of 2026-11-14, at 78682e7, scored Locality 6.00, the lowest dimension, and
+every seat named the formatter among its hardest places. `log/formatter-setting.ts` →
+`inheritedFormatter` holds one formatter under five names, keeps a function formatter out of the
+conf in the module-level WeakMap `confFormatters`, and tells a conf this copy of the library built
+from any other by the identity of the `entryFormatter` alias's getter. `log/settings.ts` →
+`inherited` lists `entryFormatter` as inherited by nothing in `INHERITED_BY`, yet a function
+formatter still reaches the child by a side path. The inherited architect added that the conf
+pipeline sits in four modules, `settings.ts`, `formatter-setting.ts`, `default-queue.ts` and
+`types.ts`, and that the conf goes by `LogOptions`, `LogConf`, `LogSettings` and `ResolvedLogConf`
+across them, so a reader holds all four to say what `log.conf` contains.
+
+Every 2.x behaviour stays: `docs/decisions.md` → "`format` is the formatter's one name,
+`entryFormatter` its alias until 3.0.0", "`ResolvedLogConf` keeps `entryFormatter` required" and
+"A v2.3.0 copy's child loses a function formatter" set what a conf reads back and inherits, and the
+alias's single descriptor answers README → Footprint. The exported type names stay too. Item 62
+removes the alias in 3.0.0; this item makes the 2.x formatter readable until then. Item 130, which
+split the formatter table by key and stated how settings resolve in one place, is the nearest finished chunk.
+Against the technical principles "Compose, do not entangle" and "One owner per value; a reader can
+name every writer", and code health.
+
+### 144. Let a reader tell from the queue and the conf in front of them whether a `Log` accepts that queue beside the `otlp*` options.
+
+The comprehension run of 2026-11-14, at 78682e7, scored Locality 6.00, the lowest dimension, and
+three of four seats named `log/default-queue.ts` → `isDefaultQueueFor`. Whether a constructor
+accepts `otlpQueue` beside `otlpHttpBaseURI`, `otlpProtocol` or `otlpAdditionalHeaders` rests on
+the module-level WeakSet `defaultQueues` and on the headers object being the same reference, both
+explained in one long comment. So the answer depends on state no caller can see: the maintainability
+senior found that a consumer writing to `queue.conf.otlpAdditionalHeaders` changes whether a later
+child throws.
+
+What a conf may hold stays as `docs/decisions.md` → "The default `Queue` lives in
+`conf.otlpQueue`" and "Inherited `otlpAdditionalHeaders` follow the endpoint's origin" set it:
+only a queue this library built may sit beside the `otlp*` options, and only beside the endpoint
+it was built from. Item 97 removes the `otlp*` options from `conf` in 3.0.0. Against the technical
+principles "Explicit over implicit" and "One owner per value; a reader can name every writer", and
+code health.
+
+### 147. Name `log/stderr-warnings.ts`, `traceableUrl` and `primitives/failure-fields.ts` for what each holds, so a name neither hides nor promises a job.
+
+The comprehension run of 2026-11-14, at 78682e7, scored Navigation 7.38 and Overall 6.50, and the
+inherited architect named three places whose names say less or more than they do:
+
+- `log/stderr-warnings.ts`: says warnings, yet `writeStderr` also writes the queue's error-level
+  reports, and the module holds `describeLogLevel`, a value printer.
+- `credentials/span-values.ts` → `traceableUrl`: gates the scheme and redacts nothing, in a module
+  of credential rules. `docs/decisions.md` → "Every rule on credentials in a span sits in one
+  folder" keeps it in `credentials/` on purpose, so the name, not the place, is what misleads.
+- `primitives/failure-fields.ts`: total field reads that the sender, the storage and a span's
+  failure all use, under a name that says failure.
+
+None is exported, so a rename doesn't change the API. Item 136 also touches the imports of
+`log/stderr-warnings.ts`. Code health.
+
 ### 25. Publish the artifact the gate tested.
 
 `push.yaml` builds and tests `index.js` inside the container; `publish.yaml` builds a second one on
 the runner and publishes that, so the thing consumers install is never the thing CI proved. Build
 once, upload, publish that.
+
+### 145. Let a reader check each rule that redacts a credential in a query from the code alone, without working out the rules' order or a run's state by hand.
+
+The comprehension run of 2026-11-14, at 78682e7, scored Locality 6.00, Shape 6.63 and
+Self-sufficiency 6.63, and every seat put the query code first or second among its hardest places:
+
+- `credentials/query.ts` → `redactedSearch`, `redactQueryPair` and `readNestedUrl` call each other in
+  a cycle, with a memo keyed by depth, and read one query three ways, raw, percent-decoded and
+  form-decoded. Those readings appear inline and again as `key`, `rawKey`, `rawValue` and `value`,
+  with no name.
+- `credentials/query.ts` → `PAIR_RULES`: four rules where the first to answer decides, so a reader
+  has to work out why rule 3 stands before rule 4. The maintainability senior noted that a wrong
+  edit leaks a credential silently, with the suite as the only oracle.
+- `credentials/query-userinfo-runs.ts` → `step`: a state machine over `Run { lastAt, start }` with
+  a `-1` sentinel, where one pair can close a run and open another, run three times with different
+  decodings. Its name doesn't say what it does, and its comment's example had to be worked on
+  paper.
+- Two seats could judge this code only with README → "Credentials in a captured value" open beside
+  it.
+
+Item 131 made the order and the recursion plain where they act; the seats still name both, so
+saying it in comments was not enough. What is redacted stays as README → "Credentials in a captured
+value" and `docs/decisions.md` → "A query key is redacted by Datadog's suffix rule" set it, and the
+rules stay in `credentials/`, per "Every rule on credentials in a span sits in one folder". A
+defect here exposes a credential in an exported span, README → Goals #7, so the change needs a test
+for each case it touches before it moves. Against the technical principles "Always use explicit
+state machines", "Make invalid states unrepresentable" and "Keep It Simple, Stupid", and code
+health.
 
 ### 138. Sort each module's imports on their first binding, with a lint rule that keeps them so.
 
@@ -206,6 +279,18 @@ Every module's imports sort on the module path, as the shared eslint config's `s
 orders them. So moving or renaming a module reorders the imports of each module that reads it, as
 the `credentials/` split did. The technical principle "Deterministic order" sorts an import on its
 first binding. Found by the principles pass of 2.6.0's release review.
+
+### 146. Let a reader see from `redactedPath` alone which segments of a request path it keeps.
+
+The comprehension run of 2026-11-14, at 78682e7, scored Shape 6.63, and three of four seats named
+`credentials/path.ts` → `redactedPath`: it picks between two candidate cuts, one at a listed key and
+one at a url nested in the path whose search is bounded by the key's position, skips segment 0, and
+ends in a whole-path fallback that can override either cut. A reader has to hold all three
+together to say what a given path keeps.
+
+What is redacted stays as README → "Credentials in a captured value" sets it, and a defect here
+exposes a credential in an exported span's `url.full`, README → Goals #7. Against the technical
+principle "Keep It Simple, Stupid", and code health.
 
 ### 82. Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.
 
@@ -354,6 +439,22 @@ Every tab builds a `Queue` on the same `localStorage` key: each loads another ta
 then overwrites or removes the key on every change, so offline records go twice and a tab that drains
 first deletes another's backlog. README's "one `Queue` per `key` per process" is advice a web app
 cannot follow. `~/.claude/principles/frontend.md` → Prefer state in the URL first, backend second.
+
+### 148. Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.
+
+The 2026-11-14 run, at 78682e7 during release 2.7.0, scored Navigation 7.38, Locality 6.00, Shape
+6.63, Self-sufficiency 6.63, overall 6.50. Locality is the lowest. Its seats named the formatter
+in `log/formatter-setting.ts` → `inheritedFormatter`, held under five names and told apart by
+getter identity, which item 143 takes with the conf pipeline split over four modules; the default
+queue's recognition in `log/default-queue.ts` → `isDefaultQueueFor`, which item 144 takes; and the
+query rules in `credentials/query.ts` → `redactedSearch` and `PAIR_RULES`, which item 145 takes
+with `credentials/query-userinfo-runs.ts` → `step`. Shape's seats also named
+`credentials/path.ts` → `redactedPath`, item 146, and Navigation's three misleading names, item
+147. Item 43 takes `otlp/export-scheduler.ts` → `ExportScheduler.flush`, and item 136 the imports
+of `log/` from `tracing/`, both named again. This item's tagline names the floor, so its chunk runs
+the four-seat scoring run. Where a dimension or the overall stays under 7.0, file items for the
+places the seats name, lowest dimension first, and a copy of this item blocked by them. Where every
+score reaches 7.0, it doesn't file anything, and the run replaces the comprehension baseline.
 
 ### 16. Warn once when `format` is a string other than `"text"` or `"json"`.
 

@@ -310,3 +310,55 @@ Inherited architect, decided by:
 - Locality: `tracing/spans.ts:55` `endSpan`: one function sets the end time, the error status and `error.type`
 - Locality: `log/console-output.ts:7` `writeConsoleEntry`: one function chooses the sink, where two console writers did
 - Shape: `credentials/path.ts:13` `firstCredentialUrlSegment`: the scan is its own function and the cut one `const`
+
+## 2026-11-14T14:19:33Z, item-135 at 78682e7
+
+| Seat | Navigation | Locality | Shape | Self-sufficiency | Overall |
+|---|---|---|---|---|---|
+| Junior A | 7 | 5.5 | 6 | 6 | 6 |
+| Mid A | 8 | 6.5 | 7 | 7 | 7 |
+| Maintainability senior | 7 | 6 | 7 | 6.5 | 6.5 |
+| Inherited architect | 7.5 | 6 | 6.5 | 7 | 6.5 |
+| Mean | 7.38 | 6.00 | 6.63 | 6.63 | 6.50 |
+
+Junior A, hardest first:
+
+- Overall, Locality, Self-sufficiency: `credentials/query.ts:114` `redactedSearch`: a three-function cycle with a depth-keyed memo, three readings of one query and four order-sensitive rules; why rule 3 must precede rule 4 stays opaque
+- Overall, Shape: `credentials/query-userinfo-runs.ts:26` `step`: a small state machine over `Run { lastAt, start }` with a `-1` sentinel, open and closed runs, and a special case tested first
+- Locality, Shape: `log/formatter-setting.ts:48` `inheritedFormatter`: one formatter under five names in a WeakMap, told apart by getter identity
+- Locality: `log/default-queue.ts:46` `isDefaultQueueFor`: recognition rests on a module-level WeakSet and the identity of the headers object, explained in one long paragraph
+- Shape: `credentials/path.ts:36` `redactedPath`: two cut points, a skipped segment 0, and a whole-path fallback that can override the cut
+- Overall: `otlp/export-scheduler.ts:43` `ExportScheduler.flush`: `running`, `pending` and `timer.retry` interact, and three calls had to be simulated by hand
+- Navigation, Self-sufficiency: `tracing/fetch.ts:3` `warnOnceToStderr`: an import against the stated direction whose reason sits only in the decision log
+
+Mid A, hardest first:
+
+- Overall, Locality, Self-sufficiency: `credentials/query.ts:114` `redactedSearch`: a three-function cycle, a depth-keyed memo, three readings and order-sensitive pair rules, read only with README's credential bullets open beside it
+- Overall, Shape: `credentials/query-userinfo-runs.ts:26` `step`: one pair can close a run and open another, and the comment's example had to be worked on paper
+- Locality, Overall: `log/formatter-setting.ts:48` `inheritedFormatter`: "built by this copy of the library" is a getter-identity comparison, and the reason rests on pre-3.0.0 compatibility
+- Locality: `log/default-queue.ts:46` `isDefaultQueueFor`: queue acceptance depends on a WeakSet and `===` of the headers object
+- Shape: `credentials/path.ts:36` `redactedPath`: two candidate cuts, a url search bounded by the key's position and a whole-path fallback
+- Overall: `otlp/export-scheduler.ts:44` `ExportScheduler.flush`: callers arriving mid-round join exactly one next round through `this.pending ??= this.running.then(next, next)`
+- Self-sufficiency, Navigation: `tracing/fetch.ts:3` `warnOnceToStderr`: a runtime import from `log/` against AGENTS.md's direction, with no note at the import
+
+Maintainability senior, hardest first:
+
+- Overall, Locality, Self-sufficiency: `credentials/query.ts:80` `PAIR_RULES`: four ordered rules over three readings with a recursion through `readNestedUrl`; a wrong edit leaks a credential silently and the suite is the only oracle
+- Overall, Shape: `credentials/query-userinfo-runs.ts:26` `step`: run state with a sentinel, run three times by `redactedSearch` with different decodings
+- Locality, Shape: `log/formatter-setting.ts:48` `inheritedFormatter`: five names for one formatter, kept out of the conf in a WeakMap behind an accessor
+- Locality: `log/default-queue.ts:46` `isDefaultQueueFor`: a consumer mutating `queue.conf.otlpAdditionalHeaders` changes whether a later child throws
+- Locality: `log/settings.ts:75` `inherited`: `INHERITED_BY.entryFormatter` is empty yet a function formatter still reaches the child by a side path
+- Shape: `credentials/path.ts:36` `redactedPath`: two interacting cut points and a whole-path fallback
+- Overall: `otlp/export-scheduler.ts:44` `ExportScheduler.flush`: `running`, `pending`, `timer.retry` and `ready` interact
+- Navigation, Self-sufficiency: `tracing/fetch.ts:3` `warnOnceToStderr`: imports from `log/` against the charter's direction, with no note at the import
+
+Inherited architect, would restructure first:
+
+- Locality, Shape, Overall: `log/formatter-setting.ts:48` `inheritedFormatter`: the `log/` conf pipeline is split four ways over `settings.ts`, `formatter-setting.ts`, `default-queue.ts` and `types.ts`, and a reader holds all four to answer what `log.conf` contains
+- Overall, Shape, Self-sufficiency: `credentials/query-userinfo-runs.ts:26` `step`: its name does not say what it is, and it is understood only after `query.ts:114-132` and the README bullet
+- Navigation, Shape: `tracing/fetch.ts:3` `warnOnceToStderr`: `tracing/` imports `log/` at three points, a value and two types, and nothing marks them as sanctioned
+- Shape, Overall: `credentials/query.ts:114` `redactedSearch`: the raw, percent-decoded and form-decoded readings appear inline and again as `key`, `rawKey`, `rawValue` and `value`, with no name
+- Navigation: `log/stderr-warnings.ts:25` `writeStderr`: the module name says warnings but it also writes error-level reports and holds a value printer
+- Navigation: `credentials/span-values.ts:24` `traceableUrl`: it gates the scheme and redacts nothing, in a module of credential rules
+- Navigation: `primitives/failure-fields.ts:2` `failure-fields.ts`: total field reads used by the sender, the storage and the span failure, under a name that says failure
+- Overall: `otlp/export-scheduler.ts:44` `ExportScheduler.flush`: `running`/`pending` join with a retry timer that blocks new attempts
