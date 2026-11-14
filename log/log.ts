@@ -72,7 +72,7 @@ export class Log implements LogInt {
 
 			// The one writer of `this.span` after the constructor. It writes onto the object, never
 			// replacing it: README documents `log.span` as an instance field, so a reference taken before
-			// end() must see the end time and status too.
+			// end() must see what end() sets: the end time, status and attributes.
 			Object.assign(this.span, end.fields);
 			exportSpan(this.spanHost(), this.span, end.attributes);
 		} finally {

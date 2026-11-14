@@ -128,15 +128,16 @@ async function tracedFetch(trace: FetchTrace, url: URL, init: RequestInit | unde
 	}
 }
 
-// The page's address, which a relative url resolves against; undefined outside a browser, or where the getter throws.
-// `scope` is the global object, which a test replaces.
+// The page's address, which a relative url resolves against; undefined outside a browser, where the getter throws,
+// or where href is not a string. `scope` is the global object, which a test passes a stand-in for.
 export function pageHref(scope: object = globalThis): string | undefined {
 	let href: unknown;
 
 	try {
 		const location: unknown = Reflect.get(scope, "location");
 
-		// The guard is for the type: Reflect.get throws on a non-object, which the catch makes undefined too, so no test can drop it.
+		// The guard only satisfies the type: `Reflect.get` throws on a non-object, and the catch turns that into undefined
+		// too, so removing the guard doesn't fail any test.
 		href = typeof location === "object" && location !== null ? Reflect.get(location, "href") : undefined;
 	} catch {
 		// The address stays undefined.
@@ -145,8 +146,9 @@ export function pageHref(scope: object = globalThis): string | undefined {
 	return typeof href === "string" ? href : undefined;
 }
 
-// log.fetch as a whole: a url the credentials/ rule declines goes to the platform untraced, and any other is traced.
-// `track` gets a promise that settles once a traced request's span is queued, and isn't called for an untraced one.
+// log.fetch as a whole: a url `traceableUrl` rejects (unparsable, or not `http:` or `https:`) goes to the platform
+// untraced, and any other is traced. `track` gets a promise that settles once the traced request settles, with its
+// span queued or dropped. `track` isn't called for an untraced url.
 export function traceFetch(trace: FetchTrace, input: string | URL, init: RequestInit | undefined, track: (spanQueued: Promise<void>) => void): Promise<Response> {
 	const url = traceableUrl(input, pageHref());
 

@@ -26,7 +26,7 @@ function parseStoredPayloads(raw: string): { error: string | undefined } | { pay
 type SaveState = "idle" | "rewriteDue" | "unreadable" | "writing";
 
 // `save`: the queue changed. `unreadable`: a write found that the read failed. `writeStarted`: a write
-// reads the items, so it covers every save made before. `writeDone`: a write ended, stored or failed.
+// began. `writeDone`: a write ended, stored or failed.
 type SaveEvent = "save" | "unreadable" | "writeDone" | "writeStarted";
 
 // The whole save machine. `startWrite`: a write starts next, from save() or as one more pass of the running write.
