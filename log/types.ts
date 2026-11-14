@@ -6,6 +6,7 @@ import type { Metadata, MetadataInput } from "../primitives/metadata.js";
 
 export type EntryFormatter = (entry: EntryFormatterConf) => string;
 
+/** @deprecated Renamed in 3.0.0: use {@link LogEntry}. */
 export type EntryFormatterConf = {
 	// The instance's resolved `colors`. Unset means on.
 	colors?: boolean;
@@ -15,7 +16,7 @@ export type EntryFormatterConf = {
 	msTimestamp?: number;
 };
 
-// 3.0.0 renames EntryFormatterConf to this; use it now and the rename needs no change.
+// 3.0.0 renames EntryFormatterConf to this.
 export type LogEntry = EntryFormatterConf;
 
 export type LogConf = {
