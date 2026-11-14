@@ -401,9 +401,9 @@ read, and `processEnv`, `pageHref` and `denoUnrefTimer` read it at their callers
 for these reads: a consumer already injects through `colors`, which beats the env, through `clock`,
 whose timers `unref` handles, and through an absolute url, which needs no page address. A further
 option would grow the documented surface for what only a default reads. Applies the technical
-principle "Functional core, imperative shell". The suite still swaps `globalThis.process` and
-`Deno` to reach those defaults, which that principle bans, until `todo.md` item 140 tests each
-default with its value passed in. Serves README → Goals #1 and #5. Valid while no
+principle "Functional core, imperative shell". The suite tests `colorsFromEnv` and `unref` with
+the value passed in, and swaps `globalThis.process` and `Deno` in one test each, to prove the
+default reads them. Serves README → Goals #1 and #5. Valid while no
 consumer needs the page address or the env injected apart from these.
 
 ## A constructor parameter marked "Not part of the API" carries what only this library passes

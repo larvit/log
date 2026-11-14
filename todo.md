@@ -12,12 +12,6 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 43 | 2.7.0 |  | principle | **Give `ExportScheduler` and save coalescing named states.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
-| 48 | 2.7.0 |  | principle | **Test the untested failure paths.** | 2 | 1 | 1 | 2 | 4 | code health by 4 | 4.2 |
-| 109 | 2.7.0 |  | principle | **Test without the wall clock: no sleep, no real timer and no time bound.** | 2 | 1 | 1 | 2 | 4 | code health by 4 | 4.2 |
-| 137 | 2.7.0 |  |  | **Give each part's tests a file of their own under `tests/`, beside the helpers they share.** | 2 | 1 | 1 | 2 | 4 | code health by 4 | 4.2 |
-| 110 | 2.7.0 |  | principle | **Register one test per case where a test loops over its cases or checks many behaviours.** | 1 | 1 | 1 | 1 | 4 | code health by 3 | 3.7 |
-| 140 | 2.7.0 |  | principle | **Test each platform default with its value passed in, and swap a global in at most one test per default.** | 2 | 1 | 1 | 2 | 3 | code health by 3 | 3.7 |
 | 141 | 2.7.0 |  | principle | **Let `mutate-changes` mutation-test a branch's changed lines, in the repo's container.** | 3 | 1 | 1 | 3 | 4 | code health by 4 | 3.6 |
 | 143 | 2.8.0 |  |  | **Let a reader answer what a `Log`'s conf holds, and how its formatter reaches a child or clone, from one module of `log/`.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
 | 144 | 2.8.0 |  |  | **Let a reader tell from the queue and the conf in front of them whether a `Log` accepts that queue beside the `otlp*` options.** | 2 | 1 | 2 | 3 | 3 | code health by 4 | 4.2 |
@@ -96,58 +90,6 @@
 | 75 | 3.0.0 | 22 | decision | **Keep credentials off `log.conf` and `queue.conf`.** | 2 | 1 | 2 | 3 | 3 | 3 by 3 | 0.7 |
 
 ## Details
-
-### 43. Give `ExportScheduler` and save coalescing named states.
-
-`timer.retry`, `running`, `pending` and `failures`, and `dirty` with `saving`, combine into states
-nobody named; the batch timer left behind mid-round is one of them. Principle: Always use explicit
-state machines.
-
-The architecture pass of 2.6.0's release review proposed a shape: one `SchedulerState` union of
-`backingOff`, `idle`, `running` and `waiting`, and one transition function taking the events
-`flush`, round done, `schedule`, storage ready and timer fired. Today three or four places set
-each of the four fields; one function would then set the state. The save coalescing now lives
-apart, in `otlp/queue-storage.ts` → `StoredQueue`, with `dirty`, `loaded`, `saving` and
-`unreadable`.
-
-### 48. Test the untested failure paths.
-
-An unencodable payload, the 3 s send abort, `unref`'s effect, the clock-shape rejection, a malformed
-`%` in the endpoint password, stored JSON that is not a list, a throwing `removeItem`, retries on
-408/429/500, `end()` twice, and a level method after `end()`. Principle: Most, if not all, code
-should have automated tests.
-
-### 109. Test without the wall clock: no sleep, no real timer and no time bound.
-
-`log.fetch redacts a long query within 250 ms` asserts on `performance.now()`, `waitFor` polls with a
-real `setTimeout`, one test sleeps 10 ms and one runs a real 20 ms retry timer. Principle: a test
-neither sleeps nor asserts on the wall clock (`~/.claude/principles/technical-principles.md`).
-
-### 137. Give each part's tests a file of their own under `tests/`, beside the helpers they share.
-
-`tests/test.ts` is one file of about 3150 lines, divided by six `// --- name ---` banners, and
-every test of a pure rule passes through `Log`, `fetch` and the queue. The source modules it tests
-are split, and AGENTS.md allows a banner in a source module only where a technical limit stops a
-split; no such limit is known for the suite. The browser run loads the suite from one entry, which
-a split keeps. Found by the prose review of the module split, 2026-11-13. `tests/test.ts` is also
-among the files a chunk reads most (`docs/reading-cost.md`).
-
-### 110. Register one test per case where a test loops over its cases or checks many behaviours.
-
-`tests/tap.ts`'s `test()` can register one test per case, yet the redaction tables loop
-inside one test, and one `deepEqual` covers a whole table, so a failure names no case. Principle:
-one behaviour per test, named for it; no loops or branches in a test body, parametrize the cases
-(`~/.claude/principles/technical-principles.md`).
-
-### 140. Test each platform default with its value passed in, and swap a global in at most one test per default.
-
-The suite swaps three globals by name in `tests/test.ts`: `globalThis.process` to reach
-`colorsFromEnv`, `console.error` to reach the stderr default, and `Deno` to reach the scheduler's
-`unref`. A test that fails between the
-swap and the restore leaves the global changed for every later test, and the tests cannot run in
-parallel. The technical principle "Functional core, imperative shell" bans a test swapping a global
-by name. `colorsFromEnv`, `traceableUrl` and `unref` already take the value they read, so a test
-can import the module and pass it, once `otlp/export-scheduler.ts` exports `unref`. Found by the principles pass of 2.6.0's release review.
 
 ### 141. Let `mutate-changes` mutation-test a branch's changed lines, in the repo's container.
 
