@@ -65,7 +65,7 @@ In [docs/decisions.md](docs/decisions.md):
 - A release section with anything a consumer must act on — a rotation advisory, an exposure still
   open — puts `### Security` holding it right after that intro, ahead of `### Everything else`;
   one with none omits both headings. Thirty flat bullets is where a rotation notice goes unread.
-- Tests-first. The suite (`tests/test.ts`) injects `stdout`/`stderr` and stubs the global `fetch`, so the same tests cover console + OTLP in both Node and the browser.
+- Tests-first. Each part's tests sit in `tests/<part>.test.ts`, beside the doubles they share in `tests/test-doubles.ts`, and `tests/test.ts` loads them all, for Node and the browser alike. The suite injects `stdout`/`stderr` and stubs the global `fetch`, so the same tests cover console + OTLP in both Node and the browser.
 - See [README](README.md) for build/test/release commands.
 - Don't wait on CodeRabbit: under 10 stars it reviews only when triggered by hand.
 
