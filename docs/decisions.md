@@ -422,7 +422,7 @@ promise from Goal 8. Serves code health; bounded by README → Goals #8. Valid u
 
 2026-11-13, the implementing agent, on the maintainer's request for source files in folders: the
 source is `index.ts`, holding only the public exports, and one module per part under `log/`,
-`credentials/`, `log/`, `otlp/`, `primitives/` and `tracing/`. esbuild bundles them into the one `index.js` the package has
+`credentials/`, `otlp/`, `primitives/` and `tracing/`. esbuild bundles them into the one `index.js` the package has
 always published, shortening syntax as it goes, and `uglifyjs -m` minifies it as before.
 Publishing the compiler's modules instead would stop a minifier shortening any name one module
 exports to another, and a browser without a bundler would fetch about thirty files. Measured in
@@ -431,8 +431,9 @@ single source file. Declarations are not bundled:
 `types/` mirrors the modules, and `types/index.d.ts` names the public ones. The suite tests the
 bundle through `index.js`. A test that imports a module directly runs tsc's output for that module,
 not the bundle, so it suits a pure rule and never what the bundler or minifier could change.
-Imports point one way, `log/` → `tracing/` → `otlp/` → `credentials/` → `primitives/`, with no
-exception: `Log` hands `tracing/` a `SpanHost` or a `FetchTrace` of plain values, and a warning
-function, so `tracing/` never names `Log`. That cost 224 bytes gzipped, 11608 to 11832. Serves code health and
+Imports point one way, `log/` → `tracing/` → `otlp/` → `credentials/` → `primitives/`, and no
+import runs against it: `Log` hands `tracing/` plain values (`SpanOrigin`, `SpanHost`, and
+`FetchTrace` with its `warn` function), so `tracing/` never names `Log`. Building those values added
+224 bytes gzipped, 11608 to 11832. Serves code health and
 README → Goals #5; applies the technical principle "Compose, do not entangle". Valid while every
 supported runtime loads one ESM file.

@@ -23,7 +23,7 @@ function newSpan(fields: Pick<OtlpSpan, "kind" | "name" | "parentSpanId" | "span
 	};
 }
 
-// What a root span reads of a Log's settings. `tracing/` never names `Log`, so a test hands it plain values.
+// What openSpan reads of a Log's settings.
 export type SpanOrigin = {
 	clock: Clock,
 	parentLog?: { sampled?: boolean, span: OtlpSpan },
@@ -32,7 +32,7 @@ export type SpanOrigin = {
 	traceparent?: string,
 };
 
-// What a span is opened and ended against: the Log's clock, randomness, queue, sampled flag and own span.
+// What childSpan and endSpan read of a Log: the Log's clock, randomness, queue, sampled flag and own span.
 export type SpanHost = Pick<SpanOrigin, "clock" | "randomBytes"> & { otlpQueue?: OtlpQueue, sampled: boolean, span: OtlpSpan };
 
 export function openSpan(conf: SpanOrigin): { sampled: boolean, span: OtlpSpan } {

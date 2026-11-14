@@ -2,7 +2,7 @@ import { isCredentialHeaderName } from "../credentials/header-names.js";
 import { type EntryFormatter, type EntryFormatterConf, formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, type Logger, type LogInt, type LogLevel, LogLevels, type LogOptions, type Metadata, msgJsonFormatter, msgTextFormatter, type OtlpPayload, type OtlpQueue, type OtlpSpan, parseTraceparent, Queue, type QueueStorage, type ResolvedLogConf, resolveFormatter, type TimerHandle } from "../index.js";
 import { STATUS_CODE_ERROR, STATUS_CODE_UNSET } from "../otlp/payloads.js";
 import { encodeBatch, plainHttpWarnings, statusFailure } from "../otlp/sender.js";
-import { capturedHeaders, fetchFailure, type FetchTrace, requestAttributes, responseAttributes, spanStatusCode, tracedFetch } from "../tracing/fetch.js";
+import { capturedHeaders, fetchFailure, type FetchTrace, requestAttributes, responseAttributes, spanStatusCode } from "../tracing/fetch.js";
 import { openSpan } from "../tracing/spans.js";
 import test from "./tap.js";
 
@@ -2372,7 +2372,7 @@ test("an unsampled traceparent exports records but no spans, passes 00 on and st
 
 test("log.fetch traces a successful call and drops the query by default", async t => {
 	const { calls } = stubFetch();
-	const log = new Log({ context: { "service.name": "svc" }, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+	const log = new Log({ context: { "service.name": "svc", tenant: "acme" }, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 
 	const res = await log.fetch("https://api.test:8443/users?token=secret&q=hi", { method: "POST" });
 
@@ -2398,6 +2398,7 @@ test("log.fetch traces a successful call and drops the query by default", async 
 	t.strictEqual(attr("url.scheme"), "https", "scheme attribute");
 	t.strictEqual(attr("server.address"), "api.test", "server.address attribute");
 	t.strictEqual(attr("server.port"), "8443", "server.port attribute");
+	t.strictEqual(attr("tenant"), "acme", "the log's context rides on the span");
 	t.strictEqual(attr("http.response.status_code"), "200", "status_code attribute");
 	t.end();
 });
@@ -3208,7 +3209,7 @@ for (const status of [408, 429, 500, 503]) {
 	});
 }
 
-for (const status of [400, 404, 413]) {
+for (const status of [300, 400, 404, 413]) {
 	test(`statusFailure drops the batch on a ${status} status`, t => {
 		t.strictEqual(statusFailure(status)?.retry, false, "the batch is not retried");
 		t.end();
@@ -3238,14 +3239,13 @@ test("plainHttpWarnings blames the endpoint's userinfo for an Authorization head
 	t.end();
 });
 
-test("encodeBatch hands back a failure that is not retried for a payload it cannot encode", t => {
+test("encodeBatch hands back a failure that is not retried when a payload cannot be encoded", t => {
 	const unencodable = { payload: { resourceLogs: [{ resource: {}, scopeLogs: [{ logRecords: [{ get body(): never { throw new Error("corrupt"); } }] }] }] } } as unknown as Parameters<typeof encodeBatch>[0][number];
 
 	t.deepEqual(encodeBatch([unencodable], false), { failure: { message: "corrupt", retry: false } }, "corrupt and dropped");
 	t.end();
 });
 
-// A FetchTrace built from plain values: no Log, no queue, no network.
 function fetchTrace(over: Partial<FetchTrace> = {}): FetchTrace & { warnings: string[] } {
 	const warnings: string[] = [];
 	const clock = { clearTimeout: () => {}, now: () => 1700000000000, setTimeout: () => 1 };
@@ -3310,15 +3310,5 @@ test("fetchFailure names the error by its code, else its name, else fetch_error"
 	t.strictEqual(fetchFailure(named, url).errorType, "ECONNREFUSED", "code first");
 	t.strictEqual(fetchFailure(new TypeError("x"), url).errorType, "TypeError", "then name");
 	t.strictEqual(fetchFailure("boom", url).errorType, "fetch_error", "then the fallback");
-	t.end();
-});
-
-test("tracedFetch ends a span on a queue it was handed, with no Log in sight", async t => {
-	const payloads: OtlpPayload[] = [];
-
-	stubFetch();
-	await tracedFetch(fetchTrace({ otlpQueue: { enqueue: payload => { payloads.push(payload); }, flush: async () => {} } }), new URL("https://api.test/users"), undefined);
-
-	t.strictEqual(payloads.length, 1, "one span queued");
 	t.end();
 });
