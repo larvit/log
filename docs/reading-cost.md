@@ -501,3 +501,20 @@ Read most (opens and searches):
 - `AGENTS.md` 2
 - `index.ts` 2
 - `log/console-output.ts` 2
+
+## Reading cost, chunk 29d69a3ef9e8, finished 2026-11-14T23:26:39Z
+
+72883 new input tokens before the first commit.
+
+Read most (opens and searches):
+
+- `tests/console.test.ts` 6
+- `log/conf.ts` 5
+- `log/log.ts` 4
+- `CHANGELOG.md` 2
+- `README.md` 2
+- `log/stderr-lines.ts` 2
+- `log/types.ts` 2
+- `index.ts` 1
+- `package.json` 1
+- `tests/test-doubles.ts` 1
