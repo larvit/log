@@ -3,6 +3,7 @@ on:
   release:
     types: [published]
 permissions:
+  actions: read # to download the Push run's build
   contents: read
   id-token: write # for npm provenance
 jobs:
@@ -24,13 +25,20 @@ jobs:
             echo "Release tag ${{ github.ref_name }} does not match package.json version $PKG_VERSION"
             exit 1
           fi
-      - run: npm ci
-      # Lint runs on the host (it's no longer bundled into the dockerized `ci` script).
-      - run: npm run lint
-      # Dockerized node + browser tests (same as CI / local).
-      - run: npm test
-      # Build the publishable artifacts on the runner (the dockerized tests don't write to the host).
-      - run: npm run build
+      # The Push run for this commit built the package in its Node 26 container and ran the suite
+      # against it. Publish that build: only a run whose every job passed counts.
+      - name: Download the build the Push run tested
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          run_id="$(gh run list --workflow push.yaml --commit "$SHA" --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+          if [ -z "$run_id" ]; then
+            echo "No passing Push run for commit $SHA, so there is no tested build to publish"
+            exit 1
+          fi
+          gh run download "$run_id" --name tested-build
       - run: npm publish --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -12,7 +12,6 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 25 | 2.7.0 |  |  | **Publish the artifact the gate tested.** | 2 | 2 | 3 | 5 | 4 | code health by 5 | 3.5 |
 | 145 | 2.7.0 |  |  | **Let a reader check each rule that redacts a credential in a query from the code alone, without working out the rules' order or a run's state by hand.** | 2 | 2 | 4 | 6 | 5 | code health by 6 | 3.4 |
 | 82 | 2.7.0 |  |  | **Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.** | 1 | 2 | 1 | 2 | 1 | 1 by 5 | 2.5 |
 | 138 | 2.7.0 |  | principle | **Sort each module's imports on their first binding, with a lint rule that keeps them so.** | 2 | 1 | 1 | 2 | 3 | code health by 2 | 2.5 |
@@ -86,12 +85,6 @@
 | 108 | 3.0.0 |  | principle | **Keep two tabs of one web app sharing a `storage` key from sending a record twice or deleting each other's backlog.** | 3 | 2 | 2 | 5 | 5 | 3 by 5 | 0.7 |
 
 ## Details
-
-### 25. Publish the artifact the gate tested.
-
-`push.yaml` builds and tests `index.js` inside the container; `publish.yaml` builds a second one on
-the runner and publishes that, so the thing consumers install is never the thing CI proved. Build
-once, upload, publish that.
 
 ### 145. Let a reader check each rule that redacts a credential in a query from the code alone, without working out the rules' order or a run's state by hand.
 
