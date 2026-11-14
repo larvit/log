@@ -131,7 +131,10 @@ async function tracedFetch(trace: FetchTrace, url: URL, init: RequestInit | unde
 // The page's address, which a relative url resolves against; undefined outside a browser, or where the getter throws.
 function pageHref(): string | undefined {
 	try {
-		return (globalThis as { location?: { href?: string } }).location?.href;
+		const location: unknown = Reflect.get(globalThis, "location");
+		const href: unknown = typeof location === "object" && location !== null ? Reflect.get(location, "href") : undefined;
+
+		return typeof href === "string" ? href : undefined;
 	} catch {
 		return undefined;
 	}
