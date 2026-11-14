@@ -10,4 +10,4 @@ export { msgJsonFormatter, msgTextFormatter } from "./log/entry-format.js";
 export type { OtlpAttribute, OtlpLogPayload, OtlpPayload, OtlpScope, OtlpSpan, OtlpSpanPayload } from "./otlp/payloads.js";
 export type { OtlpQueue, QueueConf, QueueStorage, ResolvedQueueConf } from "./otlp/queue/queue-types.js";
 export { Queue } from "./otlp/queue/queue.js";
-export { resolveFormatter } from "./log/formatter-setting.js";
+export { resolveFormatter } from "./log/conf.js";

@@ -1,54 +1,31 @@
 import { Queue } from "../otlp/queue/queue.js";
 import { DEFAULT_OTLP_PROTOCOL, type OtlpQueue } from "../otlp/queue/queue-types.js";
 import type { Metadata } from "../primitives/metadata.js";
-import { warnOnceToStderr, writeStderr } from "./stderr-warnings.js";
+import { warnOnceToStderr, writeStderr } from "./stderr-lines.js";
 import type { LogConf, ResolvedLogConf } from "./types.js";
 
 // The default queue: the Queue a Log builds from its otlp* shorthand. attachDefaultQueue builds it into
 // conf.otlpQueue, beside that shorthand, so a child, a clone or a spread of the conf carries the pair.
 
-const OTLP_ENDPOINT_KEYS = ["otlpAdditionalHeaders", "otlpHttpBaseURI", "otlpProtocol"] as const;
+export const OTLP_ENDPOINT_KEYS = ["otlpAdditionalHeaders", "otlpHttpBaseURI", "otlpProtocol"] as const;
 
-type OtlpShorthand = Pick<LogConf, typeof OTLP_ENDPOINT_KEYS[number]>;
-type OtlpSettings = OtlpShorthand & Pick<LogConf, "otlpQueue">;
+// Its class is the mark that a Log built it.
+class DefaultQueue extends Queue {}
 
-function sameOrigin(uri: string, other: string): boolean {
-	try {
-		return new URL(uri).origin === new URL(other).origin;
-	} catch {
-		return false;
-	}
-}
-
-// A queue stays only beside the endpoint it was built from; headers only beside their endpoint's origin.
-export function otlpKeysNotToInherit(conf: OtlpSettings, sourceConf: LogConf): (keyof LogConf)[] {
-	if (conf.otlpQueue) {
-		return [...OTLP_ENDPOINT_KEYS];
-	}
-
-	if (!OTLP_ENDPOINT_KEYS.some(key => conf[key] !== undefined)) {
-		return [];
-	}
-
-	if (conf.otlpHttpBaseURI === undefined || sourceConf.otlpHttpBaseURI === undefined || sameOrigin(conf.otlpHttpBaseURI, sourceConf.otlpHttpBaseURI)) {
-		return ["otlpQueue"];
-	}
-
-	return ["otlpAdditionalHeaders", "otlpQueue"];
-}
-
-// The queues attachDefaultQueue built. Only such a queue passes the rejection below, and only beside
-// the endpoint its own conf holds now: the strings equal, and the headers the same object. An
-// equal copy of the headers doesn't pass: it stops being equal once either side rotates a token. The queue's conf is read as it stands, so a
-// consumer who writes new headers to both the Log's conf and the queue's keeps the pair.
-const defaultQueues = new WeakSet<OtlpQueue>();
-
-function isDefaultQueueFor(queue: OtlpQueue, conf: OtlpShorthand): boolean {
-	return defaultQueues.has(queue)
-		&& queue instanceof Queue
+// A queue may sit beside the shorthand only where a Log built it from that same endpoint, as its own
+// conf holds it now. The headers must be the same object: a token rotated in place then reaches the
+// queue, which an equal copy would miss.
+function isDefaultQueueFor(queue: OtlpQueue, conf: LogConf): boolean {
+	return queue instanceof DefaultQueue
 		&& queue.conf.otlpHttpBaseURI === conf.otlpHttpBaseURI
 		&& queue.conf.otlpProtocol === (conf.otlpProtocol ?? DEFAULT_OTLP_PROTOCOL)
 		&& queue.conf.otlpAdditionalHeaders === conf.otlpAdditionalHeaders;
+}
+
+export function rejectQueueBesideShorthand(conf: LogConf): void {
+	if (conf.otlpQueue && OTLP_ENDPOINT_KEYS.some(key => conf[key] !== undefined) && !isDefaultQueueFor(conf.otlpQueue, conf)) {
+		throw new Error("otlpQueue carries the endpoint: set otlpHttpBaseURI, otlpProtocol and otlpAdditionalHeaders on the queue, not beside it");
+	}
 }
 
 // The one write to a conf after its defaults are set. The queue warns through the conf, and can warn
@@ -58,13 +35,6 @@ export function attachDefaultQueue(conf: ResolvedLogConf): void {
 		const { otlpAdditionalHeaders, otlpHttpBaseURI, otlpProtocol } = conf;
 		const report = (msg: string, metadata: Metadata) => writeStderr(conf, "error", metadata, msg);
 
-		conf.otlpQueue = new Queue({ clock: conf.clock, otlpAdditionalHeaders, otlpHttpBaseURI, otlpProtocol, report }, msg => warnOnceToStderr(conf, undefined, msg));
-		defaultQueues.add(conf.otlpQueue);
-	}
-}
-
-export function rejectQueueBesideShorthand(conf: OtlpSettings): void {
-	if (conf.otlpQueue && OTLP_ENDPOINT_KEYS.some(key => conf[key] !== undefined) && !isDefaultQueueFor(conf.otlpQueue, conf)) {
-		throw new Error("otlpQueue carries the endpoint: set otlpHttpBaseURI, otlpProtocol and otlpAdditionalHeaders on the queue, not beside it");
+		conf.otlpQueue = new DefaultQueue({ clock: conf.clock, otlpAdditionalHeaders, otlpHttpBaseURI, otlpProtocol, report }, msg => warnOnceToStderr(conf, undefined, msg));
 	}
 }

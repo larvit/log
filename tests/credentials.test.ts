@@ -1,7 +1,7 @@
 import { percentDecoded } from "../credentials/decodings.js";
 import { isCredentialHeaderName } from "../credentials/header-names.js";
 import { redactedQuery, redactedWholeUrl } from "../credentials/query.js";
-import { traceableUrl } from "../credentials/span-values.js";
+import { parseHttpUrl } from "../credentials/span-values.js";
 import { isListedQueryKey } from "../credentials/text.js";
 import test from "./tap.js";
 import { withGlobals } from "./test-doubles.js";
@@ -30,10 +30,10 @@ test("isListedQueryKey matches code, googleaccessid and idtokenhint whole, never
 	t.end();
 });
 
-test("traceableUrl returns an http or https url, and undefined for anything else", t => {
-	t.strictEqual(traceableUrl("not a url", undefined), undefined, "text that is not a url");
-	t.strictEqual(traceableUrl("ftp://h.test/", undefined), undefined, "a scheme other than http and https");
-	t.strictEqual(traceableUrl("https://h.test/x", undefined)?.href, "https://h.test/x", "an https url");
+test("parseHttpUrl returns an http or https url, and undefined for anything else", t => {
+	t.strictEqual(parseHttpUrl("not a url", undefined), undefined, "text that is not a url");
+	t.strictEqual(parseHttpUrl("ftp://h.test/", undefined), undefined, "a scheme other than http and https");
+	t.strictEqual(parseHttpUrl("https://h.test/x", undefined)?.href, "https://h.test/x", "an https url");
 	t.end();
 });
 

@@ -1,4 +1,4 @@
-import { buildUrlFull, redactHeaderCredential, traceableUrl } from "../credentials/span-values.js";
+import { buildUrlFull, parseHttpUrl, redactHeaderCredential } from "../credentials/span-values.js";
 import { type OtlpSpan, SPAN_KIND_CLIENT, STATUS_CODE_ERROR, STATUS_CODE_UNSET } from "../otlp/payloads.js";
 import type { Metadata } from "../primitives/metadata.js";
 import { childSpan, exportSpan, fetchErrorType, spanEnd, type SpanFailure, type SpanHost } from "./spans.js";
@@ -147,11 +147,11 @@ export function pageHref(scope: object = globalThis): string | undefined {
 	return typeof href === "string" ? href : undefined;
 }
 
-// log.fetch as a whole: a url `traceableUrl` rejects (unparsable, or not `http:` or `https:`) goes to the platform
+// log.fetch as a whole: a url `parseHttpUrl` rejects (unparsable, or not `http:` or `https:`) goes to the platform
 // untraced, and any other is traced. `track` gets a promise that settles once the traced request settles, with its
 // span queued or dropped. `track` isn't called for an untraced url.
 export function traceFetch(trace: FetchTrace, input: string | URL, init: RequestInit | undefined, track: (spanQueued: Promise<void>) => void): Promise<Response> {
-	const url = traceableUrl(input, pageHref());
+	const url = parseHttpUrl(input, pageHref());
 
 	if (!url) {
 		return trace.fetch(input, init);

@@ -2,10 +2,9 @@ import { systemClock } from "../../primitives/clock.js";
 import type { Metadata } from "../../primitives/metadata.js";
 import { writeOnce } from "../../primitives/once-per-sink.js";
 import { isOtlpPayload, type OtlpPayload, payloadKind } from "../payloads.js";
-import { KEEPALIVE_MAX_BYTES } from "../send/batch.js";
+import { KEEPALIVE_MAX_BYTES, type QueuedItem, withBytes } from "../send/batch.js";
 import { OtlpSender } from "../send/sender.js";
 import { ExportScheduler } from "./export-scheduler.js";
-import { type QueuedItem, withBytes } from "./queue-items.js";
 import { StoredQueue } from "./queue-storage.js";
 import { DEFAULT_OTLP_PROTOCOL, type OtlpQueue, type QueueConf, type ResolvedQueueConf } from "./queue-types.js";
 
