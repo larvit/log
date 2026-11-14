@@ -1,9 +1,0 @@
-{
-	"$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
-	"mutate": ["index.ts", "{credentials,log,otlp,primitives,tracing}/**/*.ts"],
-	"disableTypeChecks": "{index,{credentials,log,otlp,primitives,tracing}/**/*}.ts",
-	"buildCommand": "npm run build-tests",
-	"testRunner": "command",
-	"commandRunner": { "command": "npm run test-node" },
-	"coverageAnalysis": "off"
-}
