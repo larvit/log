@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.6.1
+
+The code behind the OTLP export and `log.fetch` is reorganised so it is easier to read and test.
+Behaviour and the API are unchanged, so nothing here needs a change in your code.
+
 ## v2.6.0
 
 Trace and span ids can be made predictable in a test, through the new `randomBytes` option. The
