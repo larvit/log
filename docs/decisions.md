@@ -417,7 +417,7 @@ JSDoc its published type carries. README documents neither, and a caller who pas
 promise from Goal 8. Only a major removes either parameter, but a minor may change what one
 carries.
 
-2026-11-14, the implementing agent, in item 143: `Log`'s second parameter changes from 2.6.0's
+2026-11-14, the implementing agent: `Log`'s second parameter changes from 2.6.0's
 `cloneSettings`, a clone's settings already inherited, to 2.7.0's `cloneOf`, the `Log` it clones.
 `log/conf.ts` → `resolveConf` can then read the caller's options before it inherits anything, so
 one function makes the whole conf. Serves code health; bounded by README → Goals #8. Valid until

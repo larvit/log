@@ -12,11 +12,7 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 143 | 2.7.0 |  |  | **Let a reader answer what a `Log`'s conf holds, and how its formatter reaches a child or clone, from one module of `log/`.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
-| 144 | 2.7.0 |  |  | **Let a reader tell from the queue and the conf in front of them whether a `Log` accepts that queue beside the `otlp*` options.** | 2 | 1 | 2 | 3 | 3 | code health by 4 | 4.2 |
-| 147 | 2.7.0 |  |  | **Name `log/stderr-warnings.ts`, `traceableUrl` and `primitives/failure-fields.ts` for what each holds, so a name neither hides nor promises a job.** | 1 | 1 | 1 | 1 | 2 | code health by 2 | 4.2 |
 | 16 | 2.7.0 |  |  | **Warn once when `format` is a string other than `"text"` or `"json"`.** | 1 | 1 | 1 | 1 | 1 | 1 by 5 | 3.8 |
-| 152 | 2.7.0 |  | principle | **Make the imports between `otlp/queue/` and `otlp/send/` point one way.** | 2 | 1 | 1 | 2 | 3 | code health by 3 | 3.7 |
 | 25 | 2.7.0 |  |  | **Publish the artifact the gate tested.** | 2 | 2 | 3 | 5 | 4 | code health by 5 | 3.5 |
 | 145 | 2.7.0 |  |  | **Let a reader check each rule that redacts a credential in a query from the code alone, without working out the rules' order or a run's state by hand.** | 2 | 2 | 4 | 6 | 5 | code health by 6 | 3.4 |
 | 82 | 2.7.0 |  |  | **Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.** | 1 | 2 | 1 | 2 | 1 | 1 by 5 | 2.5 |
@@ -44,7 +40,7 @@
 | 86 | 2.8.0 | 96 |  | **Set `telemetry.sdk.language` to a semconv value, `nodejs` or `webjs`.** | 1 | 1 | 2 | 2 | 2 | 2 by 3 | 1.1 |
 | 29 | 2.8.0 | 96 |  | **Export span events.** | 3 | 1 | 2 | 4 | 5 | 2 by 6 | 1.0 |
 | 87 | 2.8.0 | 96 |  | **Report a protobuf export's `partialSuccess` as the JSON transport does.** | 2 | 1 | 2 | 3 | 4 | 2 by 4 | 0.8 |
-| 148 | 2.9.0 | 143, 144, 145, 146, 147 | owner | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
+| 148 | 2.9.0 | 145, 146 | owner | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
 | 41 | 2.9.0 |  | principle | **Warn once about a negative, zero or `NaN` numeric `QueueConf` option, and use the default.** | 1 | 1 | 1 | 1 | 2 | 1 by 5 | 2.5 |
 | 20 | 2.9.0 |  |  | **Announce in the README and CHANGELOG that 3.0.0 gives a `log.fetch` span `end({ error })`'s `error.type`, so a query on `"20"` for an abort or `"fetch_error"` moves first.** | 1 | 1 | 1 | 1 | 1 | 1 by 3 | 2.3 |
 | 23 | 2.9.0 |  |  | **Settle one marker for a CHANGELOG entry a consumer must act on, and record it in the `AGENTS.md` line beside `### Security`.** | 1 | 1 | 1 | 1 | 1 | 1 by 3 | 2.3 |
@@ -93,68 +89,10 @@
 
 ## Details
 
-### 143. Let a reader answer what a `Log`'s conf holds, and how its formatter reaches a child or clone, from one module of `log/`.
-
-The comprehension run of 2026-11-14, at 78682e7, scored Locality 6.00, the lowest dimension, and
-every seat named the formatter among its hardest places. `log/formatter-setting.ts` →
-`inheritedFormatter` holds one formatter under five names, keeps a function formatter out of the
-conf in the module-level WeakMap `confFormatters`, and tells a conf this copy of the library built
-from any other by the identity of the `entryFormatter` alias's getter. `log/settings.ts` →
-`inherited` lists `entryFormatter` as inherited by nothing in `INHERITED_BY`, yet a function
-formatter still reaches the child by a side path. The inherited architect added that the conf
-pipeline sits in four modules, `settings.ts`, `formatter-setting.ts`, `default-queue.ts` and
-`types.ts`, and that the conf goes by `LogOptions`, `LogConf`, `LogSettings` and `ResolvedLogConf`
-across them, so a reader holds all four to say what `log.conf` contains.
-
-Every 2.x behaviour stays: `docs/decisions.md` → "`format` is the formatter's one name,
-`entryFormatter` its alias until 3.0.0", "`ResolvedLogConf` keeps `entryFormatter` required" and
-"A v2.3.0 copy's child loses a function formatter" set what a conf reads back and inherits, and the
-alias's single descriptor answers README → Footprint. The exported type names stay too. Item 62
-removes the alias in 3.0.0; this item makes the 2.x formatter readable until then. Item 130, which
-split the formatter table by key and stated how settings resolve in one place, is the nearest finished chunk.
-Against the technical principles "Compose, do not entangle" and "One owner per value; a reader can
-name every writer", and code health.
-
-### 144. Let a reader tell from the queue and the conf in front of them whether a `Log` accepts that queue beside the `otlp*` options.
-
-The comprehension run of 2026-11-14, at 78682e7, scored Locality 6.00, the lowest dimension, and
-three of four seats named `log/default-queue.ts` → `isDefaultQueueFor`. Whether a constructor
-accepts `otlpQueue` beside `otlpHttpBaseURI`, `otlpProtocol` or `otlpAdditionalHeaders` rests on
-the module-level WeakSet `defaultQueues` and on the headers object being the same reference, both
-explained in one long comment. So the answer depends on state no caller can see: the maintainability
-senior found that a consumer writing to `queue.conf.otlpAdditionalHeaders` changes whether a later
-child throws.
-
-What a conf may hold stays as `docs/decisions.md` → "The default `Queue` lives in
-`conf.otlpQueue`" and "Inherited `otlpAdditionalHeaders` follow the endpoint's origin" set it:
-only a queue this library built may sit beside the `otlp*` options, and only beside the endpoint
-it was built from. Item 97 removes the `otlp*` options from `conf` in 3.0.0. Against the technical
-principles "Explicit over implicit" and "One owner per value; a reader can name every writer", and
-code health.
-
-### 147. Name `log/stderr-warnings.ts`, `traceableUrl` and `primitives/failure-fields.ts` for what each holds, so a name neither hides nor promises a job.
-
-The comprehension run of 2026-11-14, at 78682e7, scored Navigation 7.38 and Overall 6.50, and the
-inherited architect named three places whose names say less or more than they do:
-
-- `log/stderr-warnings.ts`: says warnings, yet `writeStderr` also writes the queue's error-level
-  reports, and the module holds `describeLogLevel`, a value printer.
-- `credentials/span-values.ts` → `traceableUrl`: gates the scheme and redacts nothing, in a module
-  of credential rules. `docs/decisions.md` → "Every rule on credentials in a span sits in one
-  folder" keeps it in `credentials/` on purpose, so the name, not the place, is what misleads.
-- `primitives/failure-fields.ts`: total field reads that the sender, the storage and a span's
-  failure all use, under a name that says failure.
-
-None is exported, so a rename doesn't change the API. Code health.
-
 ### 16. Warn once when `format` is a string other than `"text"` or `"json"`.
 
 Today it falls back to text unsignalled: `new Log({ format: process.env.LOG_FORMAT })` logs text for
 `"pretty"`.
-
-### 152. Make the imports between `otlp/queue/` and `otlp/send/` point one way.
-
-The 2.6.1 release review split `otlp/` into `queue/` and `send/`, and the two folders import each other: `otlp/queue/queue.ts` imports `OtlpSender` and `KEEPALIVE_MAX_BYTES` from `send/`, while `otlp/send/sender.ts`, `send/batch.ts` and `send/endpoint.ts` import `queue/queue-items.ts` and `queue/queue-types.ts`. Both seats of that release's paired ruling named it: the folder split says nothing about which way dependencies flow. AGENTS.md → "Working here" asks imports to point one way between the top folders; this is the same rule one level down. Technical principle: "Compose, do not entangle".
 
 ### 25. Publish the artifact the gate tested.
 
@@ -382,10 +320,10 @@ The latest run, at 39d7c0a on 2026-11-14 during release 2.6.1, scored Navigation
 query rules in `credentials/query.ts` → `redactedSearch` and `PAIR_RULES`, with
 `credentials/query-userinfo-runs.ts` → `step`, which item 145 takes; the formatter in
 `log/formatter-setting.ts` → `inheritedFormatter`, held under five names and told apart by getter
-identity, with what a child inherits in `log/settings.ts` → `inherited`, which item 143 takes; and
-the default queue's recognition in `log/default-queue.ts` → `isDefaultQueueFor`, which item 144
-takes. Shape's seats also named `credentials/path.ts` → `redactedPath`, item 146. No item yet
-takes `credentials/span-values.ts` → `failureMessage` and `traceableUrl`,
+identity, with what a child inherits in `log/settings.ts` → `inherited`; and the default queue's
+recognition in `log/default-queue.ts` → `isDefaultQueueFor`. Release 2.7.0 reworked both into
+`log/conf.ts` and `log/default-queue.ts`. Shape's seats also named `credentials/path.ts` → `redactedPath`, item 146. No item yet
+takes `credentials/span-values.ts` → `failureMessage` and `traceableUrl`, now `parseHttpUrl`,
 or `credentials/text.ts` → `redactTextQueryKeys`; the 2.6.1 release review reworked
 `otlp/queue/export-scheduler.ts` → `transitionRound` and `tracing/fetch.ts` → `fetchFailure`. This item's tagline names
 the floor, so its chunk runs the four-seat scoring run. Where a dimension or the overall stays under
