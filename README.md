@@ -33,13 +33,21 @@ Achieve goals come first, in priority order: each is a direction, weighed agains
 earlier one wins a tie. Maintain goals follow: each is a state every change holds, whatever it does
 for an achieve goal, and where two conflict the earlier one wins.
 
-1. **Achieve:** **The logger you reach for first.** Useful with no config, and enough for most apps
+1. **Achieve:** **Simple to use, easy to follow.** Sane defaults, and you can see what a call does by
+   reading it.
+   - Signal: you can tell what a call uses from the call itself and the logger it's made on, and the
+     README's examples for common tasks get shorter.
+   - Counter-signal: an option does something you wouldn't guess from its name, or a default
+     surprises someone.
+   - Why: an API that only looks simple because it hides where things come from is easy to call but
+     hard to debug.
+2. **Achieve:** **The logger you reach for first.** Useful with no config, and enough for most apps
    without a second logging or tracing library.
    - Signal: fewer common needs send a user to a second library, such as pino, winston or the
      OpenTelemetry SDK.
    - Counter-signal: the bundle size or the number of documented options grows.
    - Why: breadth bought with a larger surface stops it being the easy default.
-2. **Achieve:** **Runs everywhere.** Node, Bun, Deno, browsers and React Native.
+3. **Achieve:** **Runs everywhere.** Node, Bun, Deno, browsers and React Native.
    - Signal: CI proves more of these runtimes, and none needs setup of its own.
    - Counter-signal: code that branches on the runtime grows.
    - Why: support bought with per-runtime branches drifts apart, runtime by runtime.
@@ -48,10 +56,6 @@ for an achieve goal, and where two conflict the earlier one wins.
       - Signal: fewer tests skip or branch on the runtime they run in.
       - Counter-signal: code emulates on one runtime what its platform does differently.
       - Why: sameness forced against the platform surprises that platform's users.
-3. **Achieve:** **A very easy API.** Nobody learns OTLP to log.
-   - Signal: the README's example for a common task gets shorter and uses no OTLP term.
-   - Counter-signal: an option does more than its name says, or a default surprises a user.
-   - Why: an API shortened by hiding behaviour trades ease for surprise.
 4. **Achieve:** **Composable.** Instances nest, inherit, attach to an upstream trace, and send to
    any set of destinations.
    - Signal: an app or a library combines instances and traces with no glue code of its own.
@@ -67,6 +71,9 @@ for an achieve goal, and where two conflict the earlier one wins.
    are exported as written.
 8. **Maintain:** **[Semver, read strictly](#audience).**
 9. **Maintain:** **Never holds a process open** past the work the app asked for.
+10. **Maintain:** **No hidden global context.** A logger uses only what you give it, through its
+    options or its parent. The one exception is the opt-in OpenTelemetry adapter, which has to talk
+    to OpenTelemetry's global API.
 
 ## Audience
 
@@ -419,7 +426,7 @@ keeps it native. Levels map to OTLP severity through the exported `LogLevels` ta
 
 ## `log.fetch` in depth
 
-**`log.fetch` mirrors the runtime's `fetch`** ([Goals #2.1 and #3](#goals)). It takes a `string` or
+**`log.fetch` mirrors the runtime's `fetch`** ([Goals #1 and #3.1](#goals)). It takes a `string` or
 `URL` and an `init`. On an instance not yet ended, given an `init`, the response, the
 rejection and the promise you see are exactly what the runtime produced. What it adds is outbound trace context and a span,
 and never a success the platform would have refused. The request differs from yours only by
