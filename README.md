@@ -561,7 +561,7 @@ a call below `logLevel`, ≤2 µs for a console call, ≤10 µs with OTLP config
 | `LogLevel`, `LogShorthand` | Level name union; the signature of one `LogInt` level method. |
 | `Metadata`, `MetadataValue` | `Record<string, string \| number \| boolean>` and its value type: what a formatter and `log.context` see. |
 | `MetadataInput` | `Metadata` whose values may be `undefined`: what `Logger`'s level methods and `LogOptions.context` accept. |
-| `EntryFormatter`, `EntryFormatterConf` | A formatter, `(entry) => string`, and the entry it takes: `{ colors? (unset = on), logLevel, metadata?, msg, msTimestamp? }`. |
+| `EntryFormatter`, `EntryFormatterConf`, `LogEntry` | A formatter, `(entry) => string`, and the entry it takes: `{ colors? (unset = on), logLevel, metadata?, msg, msTimestamp? }`. `LogEntry` is the same type under the name 3.0.0 gives it. |
 | `OtlpSpan`, `OtlpAttribute`, `OtlpLogPayload`, `OtlpSpanPayload`, `OtlpScope` | The OTLP wire shapes; `log.span` is an `OtlpSpan`. |
 | `OtlpQueue`, `OtlpPayload` | What `otlpQueue` takes, `{ enqueue, flush }`, and what `enqueue` receives, a log or span payload. |
 | `Clock`, `TimerHandle` | The `clock` option, `{ now, setTimeout, clearTimeout }` with `now()` in epoch milliseconds, and what its `setTimeout` hands back. |

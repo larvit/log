@@ -47,18 +47,18 @@ export class Log implements LogInt {
 	 * @param cloneOf Not part of the API, so leave it out: `clone()` passes the Log it clones.
 	 */
 	constructor(options?: LogOptions | LogLevel | "none", cloneOf?: Log) {
-		const { conf, deprecations } = resolveConf(options, cloneOf);
+		const { conf, warnings } = resolveConf(options, cloneOf);
 
 		// clone() warns about its own string form.
 		if (typeof options === "string" && !cloneOf) {
-			deprecations.unshift("@larvit/log: new Log(\"level\") is deprecated and removed in 3.0.0, use new Log({ logLevel })");
+			warnings.unshift("@larvit/log: new Log(\"level\") is deprecated and removed in 3.0.0, use new Log({ logLevel })");
 		}
 
 		this.conf = conf;
 		// Own copy, so a clone/child never mutates a context object shared with another instance.
 		this.context = withoutUndefined(conf.context);
 
-		for (const msg of deprecations) {
+		for (const msg of warnings) {
 			warnOnceToStderr(conf, this.context, msg);
 		}
 

@@ -88,21 +88,27 @@ function functionFormatterOf(conf: LogConf): EntryFormatter | undefined {
 	return functionFormatters.get(conf) ?? (builtHere(conf) ? undefined : conf.entryFormatter);
 }
 
-function entryFormatterDeprecation(options: LogOptions): string | undefined {
-	if (options.entryFormatter === undefined) {
-		return undefined;
+// The warning the caller's formatter options earn: entryFormatter's deprecation, which names a format
+// beside it as ignored, or a format string that no formatter answers to.
+function formatterWarning(options: LogOptions): string | undefined {
+	if (options.entryFormatter !== undefined) {
+		if (typeof options.format === "string") {
+			return "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format — entryFormatter wins and the format beside it is ignored";
+		}
+
+		return "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format";
 	}
 
-	if (typeof options.format === "string") {
-		return "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format — entryFormatter wins and the format beside it is ignored";
+	if (typeof options.format === "string" && options.format !== "text" && options.format !== "json") {
+		return `@larvit/log: format ${JSON.stringify(options.format)} is not a format, writing text; use "text", "json" or a function`;
 	}
 
-	return "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format";
+	return undefined;
 }
 
 // The caller's options as a conf. A Log's own conf passed as options hands on its function formatter
 // only unspread: a spread drops the non-enumerable entryFormatter accessor.
-function ownConf(options: LogOptions | LogLevel | "none" | undefined): { conf: LogConf, deprecation?: string } {
+function ownConf(options: LogOptions | LogLevel | "none" | undefined): { conf: LogConf, warning?: string } {
 	const copy: LogOptions = typeof options === "string" ? { logLevel: options } : { ...options };
 	const { context, entryFormatter, format, ...rest } = copy;
 	// Options from untyped code may be null, which counts as no options.
@@ -125,7 +131,7 @@ function ownConf(options: LogOptions | LogLevel | "none" | undefined): { conf: L
 		...formatter === undefined ? {} : { entryFormatter: formatter },
 	};
 
-	return { conf, deprecation: entryFormatterDeprecation(copy) };
+	return { conf, warning: formatterWarning(copy) };
 }
 
 function sameOrigin(uri: string, other: string): boolean {
@@ -236,8 +242,8 @@ function withDefaults(given: LogConf): ResolvedLogConf {
 }
 
 // A clone passes the Log it clones as cloneOf.
-export function resolveConf(options: LogOptions | LogLevel | "none" | undefined, cloneOf?: Source): { conf: ResolvedLogConf, deprecations: string[] } {
-	const { conf: own, deprecation } = ownConf(options);
+export function resolveConf(options: LogOptions | LogLevel | "none" | undefined, cloneOf?: Source): { conf: ResolvedLogConf, warnings: string[] } {
+	const { conf: own, warning } = ownConf(options);
 	const cloned = cloneOf ? inherited(own, cloneOf, "clone") : own;
 	const derived = typeof cloned.parentLog === "object" ? inherited(cloned, cloned.parentLog, "child") : cloned;
 
@@ -247,5 +253,5 @@ export function resolveConf(options: LogOptions | LogLevel | "none" | undefined,
 
 	attachDefaultQueue(conf);
 
-	return { conf, deprecations: deprecation ? [deprecation] : [] };
+	return { conf, warnings: warning ? [warning] : [] };
 }
