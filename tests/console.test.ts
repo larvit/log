@@ -237,6 +237,7 @@ test("format takes a formatter function, inherited by clones and children", t =>
 
 	t.strictEqual(confRead, undefined, "conf.format keeps v2.3.0's read type, so a function formatter never lands in it");
 	t.strictEqual(logIntRead, undefined, "and so does LogInt's conf");
+	t.notOk(Object.keys(log.conf).includes("format"), "nor does a format key sit in the conf");
 	t.strictEqual(log.conf.entryFormatter, formatter, "conf.entryFormatter reads the function back");
 	log.info("hi");
 	log.clone().info("cloned");
