@@ -10,7 +10,7 @@ README → Goals #8 and #4.
 ## No level-string shorthand from 3.0.0
 
 2026-09-16, the maintainer: no level-string shorthand; `{ logLevel }` is the one spelling from
-3.0.0 (`todo.md` item 61). Serves README → Goals #3.
+3.0.0 (`todo.md` item 61). Serves README → Goals #1.
 
 ## The OTLP endpoint belongs to the queue
 
@@ -26,7 +26,7 @@ Valid while a queue owns the transport.
 the default. The default stays on through 2.x: a terminal is a new user's first sight of the
 library, and a minor never changes output for a consumer whose env says nothing. Following the TTY
 is a 3.0.0 change (`todo.md` item 65); Rails' always-on `colorize_logging` is the precedent for what
-unconditional colour costs log pipelines. Serves README → Goals #8 and #3. Valid while text is the
+unconditional colour costs log pipelines. Serves README → Goals #1 and #8. Valid while text is the
 default format.
 
 ## `Log` and `Queue` each own a `clock`
@@ -57,13 +57,13 @@ process-exit behaviour intact.
 2026-11-10, the maintainer: a `Log` and a `Queue` use the system clock unless their `clock` option
 says otherwise, and a `Log` draws trace and span ids from `globalThis.crypto`, else `Math.random`,
 unless its `randomBytes` option says otherwise. Asking the caller for either would break Goal 1
-("Useful with no config") and Goal 3 ("A very easy API"). This departs from the technical principle
+("Simple to use") and Goal 2 ("Useful with no config"). This departs from the technical principle
 "Sane defaults", which has a library ask for its clock and randomness. Item 291 of the plan that
 keeps the technical principles will give "Sane defaults" an exception for a library whose goals ask
 that it work with no config, where a documented option overrides each default. The `clock` and
 `randomBytes` options are documented, so item 291 ends the departure for both, and `todo.md` item
 139 then rewords this entry to cite the principle as applied. Serves README →
-Goals #1 and #3. Valid while Goal 1 asks for a logger useful with no config.
+Goals #1 and #2. Valid while Goal 2 asks for a logger useful with no config.
 
 ## A required `Resolved*Conf` key is added in a minor and removed in a major
 
@@ -82,7 +82,7 @@ which keeps a test independent of run order. A `warnOnce` message is literal: an
 breaks the once-only rule. Every such line opens with `@larvit/log: `, part of that literal, so an
 app developer can tell which dependency emitted one about code they may not own. A `Queue`'s failure
 lines through `report` carry no prefix, since they report that developer's own setup; its
-plain-`http:` `Authorization` warning is a warning, and keeps it. Serves README → Goals #3. Writing
+plain-`http:` `Authorization` warning is a warning, and keeps it. Serves README → Goals #1. Writing
 to `stderr` works against `~/.claude/principles/logging.md` → Infrastructure until `todo.md` item 50 settles
 where this library's own lines go. Valid while this library writes its own warnings to a `stderr`
 sink.
@@ -103,7 +103,7 @@ without `//` parses to an opaque path, where the userinfo stays in `pathname` an
 credential-free url cannot be built from its parts. `btoa` is assumed present beside `TextEncoder`,
 on the same floor as "`ProtoWriter.string` uses `TextEncoder` with no fallback": Hermes added both
 (facebook/hermes#1178) and React Native has shipped them since 0.74. Both spellings stand per "Both
-credential spellings stay, and their combination warns". Serves README → Goals #2 and #7. Valid
+credential spellings stay, and their combination warns". Serves README → Goals #3 and #7. Valid
 while a queue owns the transport.
 
 ## `log.fetch` traces only `http:` and `https:` urls
@@ -137,7 +137,7 @@ NSURL:]` and runs `NSURLSession` with no challenge delegate, so the system answe
 `Request.Builder().url()` and OkHttp derives no `Authorization` from it — leaving the caller a 401,
 and writing the userinfo out only in a plain-`http:` proxy's request line. Same at `v0.74.0` and at
 `main` on 2026-09-20. Mirroring keeps that the platform's behaviour. It ships in a minor on the
-precedent of the entry above, being the security fix itself. Serves README → Goals #2 and #7. Valid
+precedent of the entry above, being the security fix itself. Serves README → Goals #3 and #7. Valid
 while `log.fetch` is a drop-in for the runtime's `fetch`.
 
 ## A captured value holding a credential records `REDACTED`
@@ -190,7 +190,7 @@ while rejecting the documented one would break a minor. The alias stays because 
 `conf.entryFormatter` on every instance, whichever spelling set the formatter; it is one
 module-level descriptor, because a closure pair per `Log` measured 1347 bytes against README →
 Footprint's 1 KB, on `node:22-bookworm-slim` over 50 000 retained instances. Serves README → Goals
-#3 for the one name, README → Goals #8 for the alias. Valid until `todo.md` item 62 removes
+#1 for the one name, README → Goals #8 for the alias. Valid until `todo.md` item 62 removes
 `entryFormatter` in 3.0.0.
 
 2026-09-28, the maintainer, superseding the alias above on `log.conf`: `conf.format` keeps v2.3.0's
@@ -253,7 +253,7 @@ Valid until OTel's trace-based log filtering is stable and on by default.
 2026-09-25, the maintainer: an empty `logLevel` (`""`, as compose's `${LOG_LEVEL}` substitutes
 for an unset variable) is a value the caller wrote: it logs at `"info"` and
 warns once, like any other unknown level, so the operator sees the empty substitution. Only
-`undefined` means unset. Serves README → Goals #3. Valid while an unknown `logLevel` logs at the
+`undefined` means unset. Serves README → Goals #1. Valid while an unknown `logLevel` logs at the
 default and warns.
 
 ## The default `Queue` lives in `conf.otlpQueue`
@@ -315,7 +315,7 @@ README → Goals #7. Valid until 3.0.0 keeps credentials off `log.conf` and `que
 list of vendor names, such as `x-honeycomb-team`, needs a published source, and none has been
 chosen. The opt-out gets a new name covering every credential header, since the warning it silences
 no longer covers `Authorization` alone and an option does no more than its name says (README →
-Goals #3). The new name is `acceptPlainHttpCredentials`. 2026-11-09, the maintainer: the first
+Goals #1). The new name is `acceptPlainHttpCredentials`. 2026-11-09, the maintainer: the first
 name, `acceptPlainHttpAuthorization`, was never in a release, since it first appeared under 2.5.0's
 unreleased changes, so Goals #8 gives it no claim. It is dropped and never ships: no alias, no
 deprecation line. Valid while no published list of credential header names is chosen.
@@ -342,7 +342,7 @@ serves are not all known.
 
 2026-09-28, the maintainer: the resolver from a conf to the `EntryFormatter` it writes with is
 exported, so a library author handed a conf renders a line the way the instance does once 3.0.0
-takes `conf.entryFormatter` away. Serves README → Goals #3 and Audience #2; an export is a minor
+takes `conf.entryFormatter` away. Serves README → Goals #1 and Audience #2; an export is a minor
 under #8.
 
 ## Both credential spellings stay, and their combination warns
@@ -353,7 +353,7 @@ the only shape one env var carries, and a bearer token has no userinfo spelling.
 disagree, so setting both warns once per `report` sink, or per `stderr` for a queue a `Log` built,
 in 2.x, and throws when the queue is built from 3.0.0 (`todo.md` item 76): v2.4.0 documents the
 header winning, so rejecting the combination sooner would spend README → Goals #8. A header added
-later is not rechecked. Serves README → Goals #3.
+later is not rechecked. Serves README → Goals #1.
 
 ## Inherited `otlpAdditionalHeaders` follow the endpoint's origin
 
@@ -368,7 +368,7 @@ Serves README → Goals #7, "Credentials never leave", on the wire.
 aggregates them. It keeps the running totals, a stable `startTimeUnixNano` and bucket boundaries
 that match across a series. A caller left to aggregate needs a second library, which README → Goals
 #1 counts against. An earlier choice, that the caller hands over points it aggregated itself to keep
-the API and the bundle small (Goals #3 and #5), is dropped. Which instruments ship, and how they are
+the API and the bundle small (Goals #1 and #5), is dropped. Which instruments ship, and how they are
 collected without holding a process open (Goals #9), is `todo.md` item 56's. Valid until item 56
 ships; then the README documents it.
 
@@ -406,7 +406,7 @@ principle "Functional core, imperative shell". The suite tests `colorsFromEnv` a
 the value passed in, and `pageHref` with a stand-in for the global object. It swaps a global by
 name only in the tests of the default that reads it: `process` to prove the colour default reads
 the env, and, through `withGlobals`, `Deno` and `setTimeout` to prove that only the system clock's
-timer ids reach `Deno.unrefTimer`. Serves README → Goals #1 and #5. Valid while no
+timer ids reach `Deno.unrefTimer`. Serves README → Goals #2 and #5. Valid while no
 consumer needs the page address or the env injected apart from these.
 
 ## A constructor parameter marked "Not part of the API" carries what only this library passes
