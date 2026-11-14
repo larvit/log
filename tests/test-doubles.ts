@@ -190,9 +190,9 @@ export function stubFetch(responder?: Responder) {
 	return { calls };
 }
 
-// What log.fetch's tracing reads of a Log, for testing it without one. `fetch` records each call in
-// `calls` as stubFetch does, and the queue records each span payload there as the /v1/traces call a
-// Log's queue would send, so `clientSpan(calls)` reads it. `warnings` holds what `warn` was handed.
+// What log.fetch's tracing reads of a Log, for testing it without one. Its `fetch` and its queue both record into
+// `calls`: each request as stubFetch does, and each span payload as the /v1/traces call a Log's queue would send, so
+// `clientSpan(calls)` finds it. `warnings` holds what `warn` was handed. `logFetch` runs traceFetch on this trace.
 export function testFetchTrace(over: Partial<FetchTrace> = {}, responder?: Responder) {
 	const calls: RecordedCall[] = [];
 	const warnings: string[] = [];
@@ -221,7 +221,7 @@ export function testFetchTrace(over: Partial<FetchTrace> = {}, responder?: Respo
 		...over,
 	};
 
-	// log.fetch as a Log runs it on this trace.
+	// Calls traceFetch as Log.fetch does, with a `track` that ignores the promise, since this trace's queue needs no flush.
 	const logFetch = (input: string | URL, init?: RequestInit) => traceFetch(trace, input, init, () => {});
 
 	return { calls, logFetch, trace, warnings };

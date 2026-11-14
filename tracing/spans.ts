@@ -65,11 +65,8 @@ export function childSpan(host: Pick<SpanHost, "clock" | "randomBytes" | "span">
 // below; `url` is the one a fetch handed the runtime, which may quote it back in the error's message.
 export interface SpanFailure { error: unknown, errorType: string, url?: URL }
 
-// A failed span's `error.type` follows one of two rules, and the README documents both. A `log.fetch`
-// span (README → "`log.fetch` in depth") takes the error's `code`, a numeric one as digits, else
-// its `name`, else `"fetch_error"`. A span closed by `log.end({ error })` (README → "Group logs into a trace") takes
-// the error's string `code`, else its `name`, else `"_OTHER"`, the fallback of OpenTelemetry's semantic
-// conventions. Both values are published, so semver keeps the two rules apart until a major version.
+// A failed span's `error.type`: two published rules (README → "`log.fetch` in depth", → "Group logs into a
+// trace"), so they stay apart until a major version. `_OTHER` is the fallback of OpenTelemetry's semantic conventions.
 export function fetchErrorType(err: unknown): string {
 	return stringField(err, "code") ?? numberFieldAsString(err, "code") ?? stringField(err, "name") ?? "fetch_error";
 }
@@ -78,9 +75,9 @@ export function endErrorType(err: unknown): string {
 	return stringField(err, "code") ?? stringField(err, "name") ?? "_OTHER";
 }
 
-// How a span ends: `fields`, what its end sets on it, and `attributes`, what it exports with. `fields`
-// holds `attributes` only where the span is sampled and has any: README → Audience puts each documented
-// span attribute on `log.span` as on the wire.
+// How a span ends. `attributes`: the metadata it is exported with. `fields`: what end() sets on the span. Its
+// `attributes` key, the wire-form list, is set only where the span is sampled and has any, since README → Audience
+// promises each documented span attribute on `log.span` as on the wire.
 export interface SpanEnd {
 	attributes: Metadata,
 	fields: Pick<OtlpSpan, "endTimeUnixNano"> & Partial<Pick<OtlpSpan, "attributes" | "status">>,

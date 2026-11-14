@@ -73,7 +73,7 @@ export function resolveEndpoint(conf: EndpointConf, warn: (msg: string) => void)
 }
 
 // `base` with otlpAdditionalHeaders set over it, or the failure that stops the send.
-// The value never joins the message; it is the likeliest place for a credential. A name that is
+// A header's value never joins the failure message, since it is the likeliest place for a credential. A name that is
 // no RFC 9110 token may be a whole header line, value and all, so its position stands in for it.
 export function requestHeaders(base: Headers, additionalHeaders: Record<string, string> | undefined): { failure?: string, headers: Headers } {
 	const headers = new Headers(base);

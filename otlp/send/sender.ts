@@ -8,7 +8,7 @@ import { partialRejection, type SendFailure, statusFailure } from "./response.js
 
 const OTLP_EXPORT_TIMEOUT_MS = 3000;
 
-// Read live, so a rotated otlpAdditionalHeaders reaches the next send; report is the caller's guarded one.
+// Read live, so a rotated otlpAdditionalHeaders reaches the next send.
 type SenderConf = Pick<ResolvedQueueConf, "acceptPlainHttpCredentials" | "clock" | "otlpAdditionalHeaders" | "otlpHttpBaseURI" | "otlpProtocol">;
 
 // The HTTP send of one batch: the endpoint's headers, the encoded body, a timeout, and what the response means.
@@ -21,6 +21,7 @@ export class OtlpSender {
 	private readonly url: string;
 	private readonly warn: (msg: string) => void;
 
+	// `report` is the caller's guarded one.
 	constructor(conf: SenderConf, report: ResolvedQueueConf["report"], warn: (msg: string) => void) {
 		const { authorization, plainHttpHost, url } = resolveEndpoint(conf, warn);
 

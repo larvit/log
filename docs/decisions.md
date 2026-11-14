@@ -397,14 +397,16 @@ Valid while a url parser keeps such whitespace in userinfo and a query value.
 ## A platform read stays a default, and a consumer injects through `colors` and `clock`
 
 2026-11-13, the implementing agent: `colorsFromEnv`, `traceableUrl` and `unref` take the value they
-read, and `processEnv`, `pageHref` and `denoUnrefTimer` read it at their callers. No option is added
+read, and `processEnv` and `denoUnrefTimer` read it at their callers. `pageHref` reads the global
+object it is handed, `globalThis` by default. No option is added
 for these reads: a consumer already injects through `colors`, which beats the env, through `clock`,
 whose timers `unref` handles, and through an absolute url, which needs no page address. A further
 option would grow the documented surface for what only a default reads. Applies the technical
 principle "Functional core, imperative shell". The suite tests `colorsFromEnv` and `unref` with
-the value passed in. It swaps a global by name in one test per default, and no more: `process` to
-prove the colour default reads the env, and `Deno` to prove an injected clock's timer ids never
-reach `Deno.unrefTimer`. Serves README → Goals #1 and #5. Valid while no
+the value passed in, and `pageHref` with a stand-in for the global object. It swaps a global by
+name only in the tests of the default that reads it: `process` to prove the colour default reads
+the env, and, through `withGlobals`, `Deno` and `setTimeout` to prove that only the system clock's
+timer ids reach `Deno.unrefTimer`. Serves README → Goals #1 and #5. Valid while no
 consumer needs the page address or the env injected apart from these.
 
 ## A constructor parameter marked "Not part of the API" carries what only this library passes
@@ -434,7 +436,7 @@ bundle through `index.js`. A test that imports a module directly runs tsc's outp
 not the bundle, so it suits a pure rule and never what the bundler or minifier could change.
 Imports point one way, `log/` → `tracing/` → `otlp/` → `credentials/` → `primitives/`, and no
 import runs against it: `Log` hands `tracing/` plain values (`SpanOrigin`, `SpanHost`, and
-`FetchTrace` with its `warn` function), so `tracing/` never names `Log`. Building those values added
+`FetchTrace` with its `fetch` and `warn` functions), so `tracing/` never names `Log`. Building those values added
 263 bytes gzipped, 11608 to 11871. Serves code health and
 README → Goals #5; applies the technical principle "Compose, do not entangle". Valid while every
 supported runtime loads one ESM file.
