@@ -19,16 +19,12 @@ export function statusFailure(status: number): SendFailure | undefined {
 
 // OTLP partialSuccess: proto3 JSON writes the int64 count as a string, some collectors as a number.
 export function partialRejection(body: unknown): { message?: string, rejected: number } | undefined {
-	try {
-		const partial: unknown = typeof body === "object" && body !== null ? Reflect.get(body, "partialSuccess") : undefined;
+	const partial: unknown = typeof body === "object" && body !== null ? Reflect.get(body, "partialSuccess") : undefined;
 
-		if (typeof partial !== "object" || partial === null) return undefined;
+	if (typeof partial !== "object" || partial === null) return undefined;
 
-		const rejected = Number(Reflect.get(partial, "rejectedLogRecords") ?? Reflect.get(partial, "rejectedSpans") ?? 0);
+	const count: unknown = Reflect.get(partial, "rejectedLogRecords") ?? Reflect.get(partial, "rejectedSpans");
+	const rejected = typeof count === "number" ? count : typeof count === "string" ? Number(count) : 0;
 
-		return rejected > 0 ? { message: stringField(partial, "errorMessage"), rejected } : undefined;
-	} catch {
-		// Number() throws on a count such as {"valueOf":1,"toString":2}; the batch was still delivered.
-		return undefined;
-	}
+	return rejected > 0 ? { message: stringField(partial, "errorMessage"), rejected } : undefined;
 }
