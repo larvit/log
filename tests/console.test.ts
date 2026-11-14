@@ -256,7 +256,23 @@ test("format takes a formatter function, inherited by clones and children", t =>
 
 	base.log.clone({ format: "text" }).info("plain");
 	t.ok(base.stdout[0].includes("inf") && base.stdout[0].endsWith(" plain"), "a clone switches a function format back to text");
-	t.strictEqual(new Log({ format: formatter, parentLog: new Log({ format: "json" }) }).conf.format, undefined, "a child's own function formatter leaves it no inherited format to read back");
+	t.strictEqual(new Log({ format: formatter, parentLog: new Log({ format: "json" }) }).conf.format, undefined, "a child with its own function formatter doesn't read back its parent's format");
+	t.end();
+});
+
+test("a null formatter from untyped code replaces the inherited one, as 2.x did", t => {
+	const untypedNull = null as never;
+	const { log, stdout } = capture({ format: () => "FN" });
+	const child = new Log({ format: untypedNull, parentLog: log });
+	const oldKeyChild = new Log({ entryFormatter: untypedNull, parentLog: log });
+
+	t.strictEqual(new Log({ format: untypedNull }).conf.format, null, "a null format reads back as passed");
+	t.strictEqual(child.conf.format, null, "and so does a child's");
+	t.strictEqual(oldKeyChild.conf.format, "text", "a null entryFormatter leaves the default format");
+	child.info("child");
+	log.clone({ format: untypedNull }).info("clone");
+	oldKeyChild.info("old key");
+	t.deepEqual(stdout.map(line => line.includes("inf") && !line.includes("FN")), [true, true, true], "each writes default text, not the parent's function");
 	t.end();
 });
 

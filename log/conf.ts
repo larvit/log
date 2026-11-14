@@ -120,8 +120,9 @@ function ownConf(options: LogOptions | LogLevel | "none" | undefined): { conf: L
 	const conf: LogConf = {
 		...rest,
 		...context === undefined ? {} : { context: withoutUndefined(context) },
-		...typeof format === "string" ? { format } : {},
-		...formatter ? { entryFormatter: formatter } : {},
+		// Only undefined is unset, as in orDefault: a null from untyped code still replaces the source's formatter.
+		...format === undefined || typeof format === "function" ? {} : { format },
+		...formatter === undefined ? {} : { entryFormatter: formatter },
 	};
 
 	return { conf, deprecation: entryFormatterDeprecation(copy) };
@@ -223,7 +224,7 @@ function withDefaults(given: LogConf): ResolvedLogConf {
 		randomBytes: orDefault(rest.randomBytes, platformRandomBytes),
 		stderr: orDefault(rest.stderr, console.error),
 		stdout: orDefault(rest.stdout, console.log),
-		...rest.format === undefined && entryFormatter === undefined ? { format: "text" as const } : {},
+		...rest.format === undefined && !entryFormatter ? { format: "text" as const } : {},
 	};
 
 	attachFormatter(conf, entryFormatter);
