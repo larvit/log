@@ -1,6 +1,6 @@
-import { isCredentialHeaderName } from "../credentials/header-names.js";
-import { byKind, type OtlpPayload } from "./payloads.js";
-import type { ResolvedQueueConf } from "./queue-types.js";
+import { isCredentialHeaderName } from "../../credentials/header-names.js";
+import { byKind, type OtlpPayload } from "../payloads.js";
+import type { ResolvedQueueConf } from "../queue/queue-types.js";
 
 type EndpointConf = Pick<ResolvedQueueConf, "acceptPlainHttpCredentials" | "otlpAdditionalHeaders" | "otlpHttpBaseURI">;
 
@@ -34,7 +34,6 @@ function basicAuth(base: URL): string | undefined {
 
 // RFC 9110 § 5.6.2: the grammar every valid header name follows.
 const HEADER_NAME_TOKEN = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
-
 
 function setsAuthorization(headers: Record<string, string> | undefined): boolean {
 	return Object.keys(headers ?? {}).some(name => name.toLowerCase() === "authorization");

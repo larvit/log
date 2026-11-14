@@ -1,6 +1,6 @@
-import type { Clock } from "../primitives/clock.js";
-import type { Metadata } from "../primitives/metadata.js";
-import type { OtlpPayload } from "./payloads.js";
+import type { Clock } from "../../primitives/clock.js";
+import type { Metadata } from "../../primitives/metadata.js";
+import type { OtlpPayload } from "../payloads.js";
 
 // What Log exports through. Queue is the shipped implementation; any { enqueue, flush } will do.
 export type OtlpQueue = {

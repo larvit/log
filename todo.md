@@ -234,7 +234,7 @@ principle "Keep It Simple, Stupid", and code health.
 
 ### 149. Keep a queue's storage read from rejecting when `restore` throws.
 
-`StoredQueue.read` (`otlp/queue-storage.ts`) calls `restore`, and `Queue.restore` calls `scheduler.schedule()`, which calls the clock's `setTimeout`. Nothing on that path catches a throw. So an injected clock whose `setTimeout` throws rejects `readable` and `loaded`. That leaves `void this.write(...)` as an unhandled rejection, and rejects every round's `ready`. `ExportScheduler`'s `roundDone` step already guards against such a clock. The prose pass on item 43's chunk found this; the path predates that chunk.
+`StoredQueue.read` (`otlp/queue/queue-storage.ts`) calls `restore`, and `Queue.restore` calls `scheduler.schedule()`, which calls the clock's `setTimeout`. Nothing on that path catches a throw. So an injected clock whose `setTimeout` throws rejects `readable` and `loaded`. That leaves `void this.write(...)` as an unhandled rejection, and rejects every round's `ready`. `ExportScheduler`'s `roundDone` step already guards against such a clock. The prose pass on item 43's chunk found this; the path predates that chunk.
 
 ### 82. Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.
 
@@ -396,7 +396,7 @@ the default queue's recognition in `log/default-queue.ts` → `isDefaultQueueFor
 takes. Shape's seats also named `credentials/path.ts` → `redactedPath`, item 146. No item yet
 takes `credentials/span-values.ts` → `failureMessage` and `traceableUrl`,
 or `credentials/text.ts` → `redactTextQueryKeys`; the 2.7.0 release review reworked
-`otlp/export-scheduler.ts` → `transitionRound` and `tracing/fetch.ts` → `fetchFailure`. This item's tagline names
+`otlp/queue/export-scheduler.ts` → `transitionRound` and `tracing/fetch.ts` → `fetchFailure`. This item's tagline names
 the floor, so its chunk runs the four-seat scoring run. Where a dimension or the overall stays under
 7.0, file items for the places the seats name, lowest dimension first, and a copy of this item
 blocked by them. Where every score reaches 7.0, it doesn't file anything, and the run replaces the

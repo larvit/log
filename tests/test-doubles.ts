@@ -1,4 +1,6 @@
-import { Log, type LogOptions, type Metadata, type QueueStorage, type TimerHandle } from "../index.js";
+import { Log, type LogOptions, type Metadata, type OtlpQueue, type QueueStorage, type TimerHandle } from "../index.js";
+import { type FetchTrace, traceFetch } from "../tracing/fetch.js";
+import { openSpan } from "../tracing/spans.js";
 
 // Resolves after one macrotask, so every callback of an already settled promise runs first. It uses
 // no timer, so a test never waits on the wall clock.
@@ -138,12 +140,13 @@ export function response({ headers, json = { partialSuccess: {} }, status = 200 
 
 export type StubResponse = ReturnType<typeof response>;
 
-// Replace global fetch with a recording stub (Node + browser), so the OTLP transport is asserted
-// without a real server. The harness restores globalThis.fetch after each test.
-export function stubFetch(responder?: (path: string, body: unknown) => StubResponse | Promise<StubResponse | undefined> | undefined) {
-	const calls: { body: any, contentType: string | null, headers: any, keepalive: unknown, path: string, rawBody: any, url: string }[] = [];
+type Responder = (path: string, body: unknown) => StubResponse | Promise<StubResponse | undefined> | undefined;
 
-	globalThis.fetch = (async (url: string, init: { body?: any, headers?: HeadersInit, keepalive?: boolean } = {}) => {
+type RecordedCall = { body: any, contentType: string | null, headers: any, keepalive: unknown, path: string, rawBody: any, url: string };
+
+// A fetch that records each call in `calls` and answers with `responder`'s response, else a 200.
+function recordingFetch(calls: RecordedCall[], responder?: Responder): typeof fetch {
+	return (async (url: string, init: { body?: any, headers?: HeadersInit, keepalive?: boolean } = {}) => {
 		const contentType = new Headers(init.headers ?? {}).get("Content-Type");
 		const path = new URL(String(url)).pathname;
 		// Only JSON bodies are parsed; protobuf bodies are raw bytes, inspected via rawBody.
@@ -153,8 +156,53 @@ export function stubFetch(responder?: (path: string, body: unknown) => StubRespo
 
 		return await responder?.(path, body) ?? response();
 	}) as unknown as typeof fetch;
+}
+
+// Replace global fetch with a recording stub (Node + browser), so the OTLP transport is asserted
+// without a real server. The harness restores globalThis.fetch after each test.
+export function stubFetch(responder?: Responder) {
+	const calls: RecordedCall[] = [];
+
+	globalThis.fetch = recordingFetch(calls, responder);
 
 	return { calls };
+}
+
+// What log.fetch's tracing reads of a Log, for testing it without one. `fetch` records each call in
+// `calls` as stubFetch does, and the queue records each span payload there as the /v1/traces call a
+// Log's queue would send, so `clientSpan(calls)` reads it. `warnings` holds what `warn` was handed.
+export function testFetchTrace(over: Partial<FetchTrace> = {}, responder?: Responder) {
+	const calls: RecordedCall[] = [];
+	const warnings: string[] = [];
+	const clock = { clearTimeout: () => {}, now: () => 1700000000000, setTimeout: () => 1 };
+	let draws = 0;
+	// A fresh fill per draw, so a child span's id differs from its parent's.
+	const randomBytes = (size: number) => new Uint8Array(size).fill(++draws);
+	const { sampled, span } = openSpan({ clock, randomBytes });
+	const otlpQueue: OtlpQueue = {
+		enqueue: payload => {
+			const body = JSON.parse(JSON.stringify(payload));
+
+			calls.push({ body, contentType: "application/json", headers: {}, keepalive: undefined, path: "/v1/traces", rawBody: undefined, url: "http://127.0.0.1:4318/v1/traces" });
+		},
+		flush: async () => {},
+	};
+	const trace: FetchTrace = {
+		clock,
+		context: { "service.name": "svc" },
+		fetch: recordingFetch(calls, responder),
+		otlpQueue,
+		randomBytes,
+		sampled,
+		span,
+		warn: msg => { warnings.push(msg); },
+		...over,
+	};
+
+	// log.fetch as a Log runs it on this trace.
+	const logFetch = (input: string | URL, init?: RequestInit) => traceFetch(trace, input, init, () => {});
+
+	return { calls, logFetch, trace, warnings };
 }
 
 // Read a header from a recorded call, normalising plain-object and Headers shapes.

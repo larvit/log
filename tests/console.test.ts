@@ -78,20 +78,26 @@ test("colors unset in code follows the process env, defaulting to on; set in cod
 	t.end();
 });
 
-test("respects the configured log-level threshold", t => {
-	const def = capture(); // default level is info
+test("the default level, info, writes info but not verbose or debug", t => {
+	const def = capture();
 
 	def.log.info("x");
 	def.log.verbose("x");
 	def.log.debug("x");
 	t.strictEqual(def.stdout.length, 1, "default level passes info but not verbose/debug");
+	t.end();
+});
 
-	const logger: Logger = def.log;
+test("enabled() is true at and above the threshold, and false below it", t => {
+	const logger: Logger = capture().log;
 
 	t.strictEqual(logger.enabled("info"), true, "enabled() is true at the threshold");
 	t.strictEqual(logger.enabled("error"), true, "enabled() is true above the threshold");
 	t.strictEqual(logger.enabled("verbose"), false, "enabled() is false below the threshold");
+	t.end();
+});
 
+test("level error suppresses everything below it, warn included, and writes error", t => {
 	const err = capture("error");
 
 	err.log.silly("x");
@@ -101,20 +107,30 @@ test("respects the configured log-level threshold", t => {
 	t.strictEqual(err.stdout.length + err.stderr.length, 0, "everything below error (incl. warn) is suppressed");
 	err.log.error("x");
 	t.strictEqual(err.stderr.length, 1, "error passes at level error");
+	t.end();
+});
 
+test("level silly writes debug", t => {
 	const silly = capture("silly");
 
 	silly.log.debug("x");
 	t.strictEqual(silly.stdout.length, 1, "debug passes at the lowest level");
+	t.end();
+});
 
+test("level none writes nothing, not even error, and enabled() is false", t => {
 	const none = capture("none");
 
 	none.log.error("x");
 	t.strictEqual(none.stderr.length, 0, "nothing is written at level none, not even error");
 	t.strictEqual(none.log.enabled("error"), false, "enabled() is false for every level at none");
+	t.end();
+});
 
-	// What a JavaScript consumer passes from LOG_LEVEL=trace (pino) or http (winston).
-	const unknownLevel: any = "trace";
+// What a JavaScript consumer passes from LOG_LEVEL=trace (pino) or http (winston).
+const unknownLevel: any = "trace";
+
+test("an unknown logLevel logs at info and warns once per sink and value", t => {
 	const unknown = capture({ colors: false, logLevel: unknownLevel });
 
 	t.doesNotThrow(() => {
@@ -130,14 +146,20 @@ test("respects the configured log-level threshold", t => {
 	unknown.log.conf.logLevel = unknownLevel;
 	unknown.log.info("x");
 	t.strictEqual(unknown.stderr.length, 2, "the warning is written once per sink and value");
+	t.end();
+});
 
+test("a null logLevel warns like any other bad value, and a null colors is kept", t => {
 	// A JavaScript caller can pass null, which the types forbid.
 	const nulled = capture({ colors: null as unknown as boolean, logLevel: null as unknown as LogLevel });
 
 	nulled.log.info("x");
 	t.ok(nulled.stderr[0]?.includes("logLevel null is not a level"), "a null logLevel is not unset: it warns like any other bad value");
 	t.strictEqual(nulled.log.conf.colors, null, "and a null colors is kept, not replaced by the default");
+	t.end();
+});
 
+test("enabled() treats an unknown logLevel as info and never warns, while a level method warns", t => {
 	const asked = capture({ colors: false, logLevel: unknownLevel });
 
 	t.strictEqual(asked.log.enabled("info"), true, "enabled() treats an unknown logLevel as info");
@@ -145,42 +167,30 @@ test("respects the configured log-level threshold", t => {
 	t.strictEqual(asked.stderr.length, 0, "enabled() never writes a warning");
 	asked.log.silly("x");
 	t.strictEqual(asked.stderr.length, 1, "a level method warns even for a call below the threshold");
-
-	const live = capture({ colors: false, context: { requestId: "01a0d9b5-8ddc-743e-8555-76c9875b7d9d" } });
-	const prototypeKey: any = "constructor";
-	const numericLevel: any = 30;
-
-	live.log.conf.logLevel = prototypeKey;
-	live.log.info("x");
-	t.strictEqual(live.stdout.length, 1, "a live write is checked where a line is written, and a prototype key is no level");
-	t.ok(live.stderr[0].includes("logLevel \"constructor\" is not a level"), "and warns");
-	t.notOk(live.stderr[0].includes("01a0d9b5-8ddc-743e-8555-76c9875b7d9d"), "a config warning carries no instance context");
-	live.log.conf.logLevel = numericLevel;
-	live.log.info("x");
-	t.ok(live.stderr[1].includes("logLevel 30 is not a level"), "a number is quoted as a number");
-
-	const arrayLevel: any = ["debug"];
-	const hostileLevel: any = { toString() { throw new Error("toString called"); } };
-	const nullLevel: any = null;
-
-	live.log.conf.logLevel = arrayLevel;
-	live.log.debug("x");
-	t.strictEqual(live.stdout.length, 2, "an array holding a level is no level");
-	t.ok(live.stderr[2].includes("logLevel [\"debug\"] is not a level"), "and warns, naming the strings it holds");
-	live.log.conf.logLevel = hostileLevel;
-	t.doesNotThrow(() => live.log.info("x"), "a value's own toString is never called");
-	t.ok(live.stderr[3].includes("logLevel [object Object] is not a level"), "and warns");
-	live.log.conf.logLevel = nullLevel;
-	live.log.info("x");
-	t.ok(live.stderr[4].includes("logLevel null is not a level"), "null is printed as null");
-
-	const trapLevel: any = new Proxy([], { get() { throw new Error("trap called"); } });
-
-	live.log.conf.logLevel = trapLevel;
-	t.doesNotThrow(() => live.log.info("x"), "a value that throws while it is described never throws from a level method");
-	t.ok(live.stderr[5].includes("logLevel (a value that cannot be printed) is not a level"), "and still warns");
 	t.end();
 });
+
+// A logLevel written to log.conf after construction, each checked where a line is written. `lines`:
+// what the call writes to stdout, which an invalid level makes the default, info.
+for (const [name, level, method, lines, warning] of [
+	["a prototype key is no level", "constructor", "info", 1, "logLevel \"constructor\" is not a level"],
+	["a number is quoted as a number", 30, "info", 1, "logLevel 30 is not a level"],
+	["an array holding a level is no level, and its strings are named", ["debug"], "debug", 0, "logLevel [\"debug\"] is not a level"],
+	["a value's own toString is never called", { toString() { throw new Error("toString called"); } }, "info", 1, "logLevel [object Object] is not a level"],
+	["null is printed as null", null, "info", 1, "logLevel null is not a level"],
+	["a value that throws while it is described still warns", new Proxy([], { get() { throw new Error("trap called"); } }), "info", 1, "logLevel (a value that cannot be printed) is not a level"],
+] as [string, any, "debug" | "info", number, string][]) {
+	test(`a live logLevel: ${name}`, t => {
+		const live = capture({ colors: false, context: { requestId: "01a0d9b5-8ddc-743e-8555-76c9875b7d9d" } });
+
+		live.log.conf.logLevel = level;
+		t.doesNotThrow(() => live.log[method]("x"), "the level method never throws");
+		t.strictEqual(live.stdout.length, lines, "the line is written at info");
+		t.ok(live.stderr[0].includes(warning), "and warns");
+		t.notOk(live.stderr[0].includes("01a0d9b5-8ddc-743e-8555-76c9875b7d9d"), "a config warning carries no instance context");
+		t.end();
+	});
+}
 
 test("metadata and context appear in the output", t => {
 	const meta = capture("info");

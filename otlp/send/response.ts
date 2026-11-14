@@ -1,4 +1,4 @@
-import { stringField } from "../primitives/failure-fields.js";
+import { stringField } from "../../primitives/failure-fields.js";
 
 // Why a batch was not delivered: whether to retry it, and what to report.
 export type SendFailure = { message: string, reportAs?: string, retry: boolean, status?: number };

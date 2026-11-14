@@ -1,7 +1,7 @@
 import { buildUrlFull, redactHeaderCredential, traceableUrl } from "../credentials/span-values.js";
 import { type OtlpSpan, SPAN_KIND_CLIENT, STATUS_CODE_ERROR, STATUS_CODE_UNSET } from "../otlp/payloads.js";
 import type { Metadata } from "../primitives/metadata.js";
-import { childSpan, endSpan, fetchErrorType, type SpanFailure, type SpanHost } from "./spans.js";
+import { childSpan, exportSpan, fetchErrorType, spanEnd, type SpanFailure, type SpanHost } from "./spans.js";
 import { formatTraceparent } from "./traceparent.js";
 
 // What log.fetch reads of its Log, as plain values a test can hand it.
@@ -10,6 +10,8 @@ export type FetchTrace = SpanHost & {
 	captureRequestHeaders?: string[],
 	captureResponseHeaders?: string[],
 	context: Metadata,
+	// The platform's fetch, which every request goes through, traced or not.
+	fetch: (input: Request | URL | string, init?: RequestInit) => Promise<Response>,
 	warn: (msg: string) => void,
 };
 
@@ -82,30 +84,32 @@ function outgoing(url: URL, init: RequestInit | undefined, traceparent: string):
 
 // A throwing clock or queue costs the span, never the platform's result.
 async function tracedFetch(trace: FetchTrace, url: URL, init: RequestInit | undefined): Promise<Response> {
-	let span: OtlpSpan;
+	let started: OtlpSpan;
 
 	try {
-		span = childSpan(trace, url.host, SPAN_KIND_CLIENT);
+		started = childSpan(trace, url.host, SPAN_KIND_CLIENT);
 	} catch {
-		return globalThis.fetch(url, init);
+		return trace.fetch(url, init);
 	}
 
+	let name = url.host;
+	let statusCode = STATUS_CODE_UNSET;
 	let attributes: Metadata = { ...trace.context };
 	let failure: SpanFailure | undefined;
 
 	try {
 		const method = (init?.method ?? "GET").toUpperCase();
 
-		span.name = `${method} ${url.host}`;
+		name = `${method} ${url.host}`;
 		attributes = requestAttributes(trace, url, method);
 
-		const { headers, request } = outgoing(url, init, formatTraceparent(span.traceId, span.spanId, trace.sampled));
+		const { headers, request } = outgoing(url, init, formatTraceparent(started.traceId, started.spanId, trace.sampled));
 
 		attributes = { ...attributes, ...capturedHeaders(trace, "captureRequestHeaders", headers) };
 
-		const res = await (request ? globalThis.fetch(request) : globalThis.fetch(url, { ...init, headers }));
+		const res = await (request ? trace.fetch(request) : trace.fetch(url, { ...init, headers }));
 
-		span.status.code = spanStatusCode(res.status);
+		statusCode = spanStatusCode(res.status);
 		attributes = { ...attributes, ...responseAttributes(trace, res) };
 
 		return res;
@@ -115,7 +119,9 @@ async function tracedFetch(trace: FetchTrace, url: URL, init: RequestInit | unde
 		throw err;
 	} finally {
 		try {
-			endSpan(trace, span, attributes, failure);
+			const end = spanEnd(trace, attributes, failure);
+
+			exportSpan(trace, { ...started, name, status: { code: statusCode }, ...end.fields }, end.attributes);
 		} catch {
 			// The span is dropped.
 		}
@@ -137,7 +143,7 @@ export function traceFetch(trace: FetchTrace, input: string | URL, init: Request
 	const url = traceableUrl(input, pageHref());
 
 	if (!url) {
-		return globalThis.fetch(input, init);
+		return trace.fetch(input, init);
 	}
 
 	// Registered synchronously, so a later await log.flush() delivers a fire-and-forget log.fetch().

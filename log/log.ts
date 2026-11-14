@@ -3,7 +3,7 @@ import { DEFAULT_LOG_LEVEL, type LogLevel, LogLevels, SEVERITY_NUMBERS } from ".
 import { type Metadata, type MetadataInput, withoutUndefined } from "../primitives/metadata.js";
 import { writeOnce } from "../primitives/once-per-sink.js";
 import { type FetchTrace, traceFetch } from "../tracing/fetch.js";
-import { endErrorType, endSpan, openSpan, type SpanHost } from "../tracing/spans.js";
+import { endErrorType, exportSpan, openSpan, spanEnd, type SpanHost } from "../tracing/spans.js";
 import { formatTraceparent } from "../tracing/traceparent.js";
 import { writeConsoleEntry } from "./console-output.js";
 import { confFromOptions, inherited, type LogSettings, resolveSettings } from "./settings.js";
@@ -65,11 +65,16 @@ export class Log implements LogInt {
 		// What is already queued is delivered even when the span's own close throws.
 		try {
 			const error = options?.error;
-
-			endSpan(this.spanHost(), this.span, { ...this.context }, error === undefined || error === null ? undefined : {
+			const end = spanEnd(this.spanHost(), { ...this.context }, error === undefined || error === null ? undefined : {
 				error,
 				errorType: endErrorType(error),
 			});
+
+			// The one writer of `this.span` after the constructor. It writes onto the object, never
+			// replacing it: README documents `log.span` as an instance field, so a reference taken before
+			// end() must see the end time and status too.
+			Object.assign(this.span, end.fields);
+			exportSpan(this.spanHost(), this.span, end.attributes);
 		} finally {
 			await this.flush();
 		}
@@ -167,6 +172,8 @@ export class Log implements LogInt {
 			captureRequestHeaders,
 			captureResponseHeaders,
 			context: this.context,
+			// Read at the call, so a fetch polyfill installed after this Log was made still wins.
+			fetch: (...args) => globalThis.fetch(...args),
 			warn: msg => warnOnceToStderr(this.conf, this.context, msg),
 		};
 	}
