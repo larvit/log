@@ -6,18 +6,18 @@
 
 `Bar = 0.5`
 
-`Next ID = 150`
+`Next ID = 151`
 
 ## Items
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 141 | 2.7.0 |  | principle | **Let `mutate-changes` mutation-test a branch's changed lines, in the repo's container.** | 3 | 1 | 1 | 3 | 4 | code health by 4 | 3.6 |
 | 143 | 2.8.0 |  |  | **Let a reader answer what a `Log`'s conf holds, and how its formatter reaches a child or clone, from one module of `log/`.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
 | 144 | 2.8.0 |  |  | **Let a reader tell from the queue and the conf in front of them whether a `Log` accepts that queue beside the `otlp*` options.** | 2 | 1 | 2 | 3 | 3 | code health by 4 | 4.2 |
 | 147 | 2.8.0 |  |  | **Name `log/stderr-warnings.ts`, `traceableUrl` and `primitives/failure-fields.ts` for what each holds, so a name neither hides nor promises a job.** | 1 | 1 | 1 | 1 | 2 | code health by 2 | 4.2 |
 | 25 | 2.8.0 |  |  | **Publish the artifact the gate tested.** | 2 | 2 | 3 | 5 | 4 | code health by 5 | 3.5 |
 | 145 | 2.8.0 |  |  | **Let a reader check each rule that redacts a credential in a query from the code alone, without working out the rules' order or a run's state by hand.** | 2 | 2 | 4 | 6 | 5 | code health by 6 | 3.4 |
+| 150 | 2.8.0 |  | principle | **Make each of the 19 mutants that survive on the lines changed since v2.6.0 fail a test, or say at its line why none can.** | 2 | 1 | 1 | 2 | 4 | code health by 3 | 3.1 |
 | 138 | 2.8.0 |  | principle | **Sort each module's imports on their first binding, with a lint rule that keeps them so.** | 2 | 1 | 1 | 2 | 3 | code health by 2 | 2.5 |
 | 146 | 2.8.0 |  |  | **Let a reader see from `redactedPath` alone which segments of a request path it keeps.** | 2 | 2 | 4 | 6 | 2 | code health by 3 | 2.3 |
 | 149 | 2.8.0 |  |  | **Keep a queue's storage read from rejecting when `restore` throws.** | 1 | 1 | 2 | 2 | 6 | code health by 3 | 2.3 |
@@ -91,15 +91,6 @@
 | 75 | 3.0.0 | 22 | decision | **Keep credentials off `log.conf` and `queue.conf`.** | 2 | 1 | 2 | 3 | 3 | 3 by 3 | 0.7 |
 
 ## Details
-
-### 141. Let `mutate-changes` mutation-test a branch's changed lines, in the repo's container.
-
-`~/.claude/bin/mutate-changes` runs Stryker for TypeScript, from the project's own
-`@stryker-mutator/core`, and doesn't install one. This project has no Stryker and no Stryker
-config, and its suite runs as one script against the built bundle, which Stryker's runners do not
-start as it stands. So the release review of 2.6.0, which restructured three credential-redaction
-routines, could not run mutation tests on them; a differential fuzz against the old module stood in. The
-technical principle "Every mutant of a changed line fails a test" asks for the run.
 
 ### 143. Let a reader answer what a `Log`'s conf holds, and how its formatter reaches a child or clone, from one module of `log/`.
 
@@ -188,6 +179,21 @@ defect here exposes a credential in an exported span, README → Goals #7, so th
 for each case it touches before it moves. Against the technical principles "Always use explicit
 state machines", "Make invalid states unrepresentable" and "Keep It Simple, Stupid", and code
 health.
+
+### 150. Make each of the 19 mutants that survive on the lines changed since v2.6.0 fail a test, or say at its line why none can.
+
+`npm run test-mutation`, run by `mutate-changes --base v2.6.0` on 2026-11-14, killed 244 of 265 mutants, and 2 timed out.
+These 19 survived:
+
+- `log/log.ts:114`: optional chaining;
+- `otlp/export-scheduler.ts:93`, `:120`, `:129`, `:131`, `:136` (twice) and `:139`: conditions and a string;
+- `otlp/queue-storage.ts:46`, `:57`, `:59` and `:103`: a boolean, two strings and a condition;
+- `otlp/sender.ts:116`, `:144` and `:231` (twice): conditions and strings;
+- `tracing/fetch.ts:56`, `:75` and `:95`: a regex, a condition and an object literal.
+
+A surviving string is often a message no test reads. The technical principle "Every mutant of a
+changed line fails a test" asks for each. `ExportScheduler.flush` is a place the comprehension
+seats found hard: a test that pins its `running`/`pending` interplay makes it easier to read.
 
 ### 138. Sort each module's imports on their first binding, with a lint rule that keeps them so.
 
