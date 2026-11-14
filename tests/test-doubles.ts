@@ -1,7 +1,7 @@
 import { Log, type LogOptions, type Metadata, type QueueStorage, type TimerHandle } from "../index.js";
 
-// One macrotask: every promise already settled runs first, and no timer is involved, so a test
-// never waits on the wall clock.
+// Resolves after one macrotask, so every callback of an already settled promise runs first. It uses
+// no timer, so a test never waits on the wall clock.
 export function nextTurn(): Promise<void> {
 	return new Promise(resolve => {
 		const channel = new MessageChannel();
@@ -14,7 +14,7 @@ export function nextTurn(): Promise<void> {
 	});
 }
 
-// Bounded by turns, not time: a condition that waits on a real timer fails here instead of passing slowly.
+// Bounded by turns, so a condition only a real timer can make true fails here instead of passing slowly.
 export const WAIT_FOR_TURNS = 1000;
 
 export async function waitFor(done: () => boolean): Promise<void> {

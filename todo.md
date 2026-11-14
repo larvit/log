@@ -6,7 +6,7 @@
 
 `Bar = 0.5`
 
-`Next ID = 149`
+`Next ID = 150`
 
 ## Items
 
@@ -20,6 +20,7 @@
 | 145 | 2.8.0 |  |  | **Let a reader check each rule that redacts a credential in a query from the code alone, without working out the rules' order or a run's state by hand.** | 2 | 2 | 4 | 6 | 5 | code health by 6 | 3.4 |
 | 138 | 2.8.0 |  | principle | **Sort each module's imports on their first binding, with a lint rule that keeps them so.** | 2 | 1 | 1 | 2 | 3 | code health by 2 | 2.5 |
 | 146 | 2.8.0 |  |  | **Let a reader see from `redactedPath` alone which segments of a request path it keeps.** | 2 | 2 | 4 | 6 | 2 | code health by 3 | 2.3 |
+| 149 | 2.8.0 |  |  | **Keep a queue's storage read from rejecting when `restore` throws.** | 1 | 1 | 2 | 2 | 6 | code health by 3 | 2.3 |
 | 82 | 2.8.0 |  |  | **Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.** | 1 | 2 | 1 | 2 | 1 | 3 by 5 | 2.3 |
 | 19 | 2.8.0 |  | defect | **Leave a `Request` untraced in `log.fetch`.** | 1 | 1 | 2 | 2 | 2 | 2.1 by 6 | 2.1 |
 | 114 | 2.8.0 |  |  | **Move `package.json`'s build and test one-liners into named scripts, and let the OTLP test read its collector's port, image and container name from the environment, today's values as defaults.** | 1 | 1 | 1 | 1 | 2 | code health by 1 | 2.1 |
@@ -206,6 +207,10 @@ together to say what a given path keeps.
 What is redacted stays as README → "Credentials in a captured value" sets it, and a defect here
 exposes a credential in an exported span's `url.full`, README → Goals #7. Against the technical
 principle "Keep It Simple, Stupid", and code health.
+
+### 149. Keep a queue's storage read from rejecting when `restore` throws.
+
+`StoredQueue.read` (`otlp/queue-storage.ts`) calls `restore`, and `Queue.restore` calls `scheduler.schedule()`, which calls the clock's `setTimeout`. Nothing on that path catches a throw. So an injected clock whose `setTimeout` throws rejects `readable` and `loaded`. That leaves `void this.write(...)` as an unhandled rejection, and rejects every round's `ready`. `ExportScheduler`'s `roundDone` step already guards against such a clock. The prose pass on item 43's chunk found this; the path predates that chunk.
 
 ### 82. Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.
 

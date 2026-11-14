@@ -128,8 +128,8 @@ test("log.fetch captureQuery reads a value up to eight encodings and eight neste
 	t.end();
 });
 
-// The pairs from a key opening userinfo up to the last @ before a delimiter record REDACTED, and a
-// value opening a url, or a delimiter before the @, leaves the rest be.
+// Where a key opens userinfo, every pair from that key up to the last @ before a delimiter records
+// REDACTED. Where a value opens a url, or a delimiter comes before the @, the pairs stay as written.
 const redactedPairs = (count: number) => Array.from({ length: count }, () => "REDACTED=REDACTED").join("&");
 const SPLIT_USERINFO_QUERIES: [string, string][] = [
 	["a=1&//u:pw60&w@h.test&b=2", `a=1&${redactedPairs(2)}&b=2`],
@@ -159,12 +159,12 @@ const SPLIT_USERINFO_QUERIES: [string, string][] = [
 	["//u:pw83&a%2Fb&w@h.test&m=1", `${redactedPairs(3)}&m=1`],
 	["//u:pw84&a%3Fb&w@h.test&m=1", `${redactedPairs(3)}&m=1`],
 	["//u:pw85&a%23b&w@h.test&m=1", `${redactedPairs(3)}&m=1`],
-	// A tab, newline or carriage return that a consumer's decoding turns out of `%09`, `%0A` or `%0D` is dropped by its url parser.
+	// A consumer that decodes `%09`, `%0A` or `%0D` gets a tab, newline or carriage return, which a url parser drops.
 	["//us%09er:pw86&w%40h.test&m=1", `${redactedPairs(2)}&m=1`],
 	["//u:pw87&w%09x%40h.test&m=1", `${redactedPairs(2)}&m=1`],
 	["//u:pw88&w%0Ax%40h.test&m=1", `${redactedPairs(2)}&m=1`],
 	["\\\\us%0Der:pw89&w%40h.test&m=1", `${redactedPairs(2)}&m=1`],
-	// A no-break space or other whitespace a parser keeps doesn't end a run, a plain space does.
+	// A no-break space, or other whitespace a url parser keeps, doesn't end the userinfo. A plain space does.
 	["//&u:p@host", redactedPairs(2)],
 	["%5C%5C&u:p@host", redactedPairs(2)],
 	["%2F%2Fu:p%C2%A0x&w@host", redactedPairs(2)],
@@ -190,7 +190,7 @@ const SPLIT_USERINFO_QUERIES: [string, string][] = [
 
 for (const [query, expected] of SPLIT_USERINFO_QUERIES) {
 	test(`buildUrlFull with captureQuery records ?${query} as ?${expected}`, t => {
-		t.strictEqual(buildUrlFull(new URL(`https://api.test/x?${query}`), true), `https://api.test/x?${expected}`, "userinfo split across & is redacted");
+		t.strictEqual(buildUrlFull(new URL(`https://api.test/x?${query}`), true), `https://api.test/x?${expected}`, "records the expected url");
 		t.end();
 	});
 }
@@ -265,7 +265,7 @@ const NESTED_URL_PATHS: Record<string, string> = {
 
 for (const [path, expected] of Object.entries(NESTED_URL_PATHS)) {
 	test(`buildUrlFull records the path ${path} as ${expected}`, t => {
-		t.strictEqual(buildUrlFull(new URL(`https://proxy.test${path}`), false), `https://proxy.test${expected}`, "a credential in a url nested in the path is redacted");
+		t.strictEqual(buildUrlFull(new URL(`https://proxy.test${path}`), false), `https://proxy.test${expected}`, "records the expected path");
 		t.end();
 	});
 }
@@ -285,8 +285,8 @@ test("log.fetch exports a url nested base64-encoded in the request path as writt
 	t.end();
 });
 
-// Each is long, or deeply encoded or nested, where a redaction that rescans its input would take
-// quadratic time; tap's per-test timeout stops one that does.
+// Each url below is long, deeply encoded or deeply nested. A redaction that rescans its input takes
+// quadratic time on it, and tap's per-test timeout fails that test.
 const deepPercent = `%${"25".repeat(16384)}41`;
 const nestedSevenDeep = Array.from({ length: 7 }).reduce<string>(nested => `https://a/?${encodeURIComponent(nested)}=b`, `https://t/?x=${"a".repeat(40000)}`);
 

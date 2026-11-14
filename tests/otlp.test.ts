@@ -163,7 +163,7 @@ for (const conf of [
 
 		log.info("x");
 		await log.flush();
-		t.deepEqual(quiet.lines, [], "https:, a loopback host and acceptPlainHttpCredentials are silent");
+		t.deepEqual(quiet.lines, [], "no warning is reported");
 		t.end();
 	});
 }
@@ -1456,7 +1456,7 @@ for (const status of [300, 400, 404, 413]) {
 
 for (const status of [401, 403]) {
 	test(`statusFailure reports a ${status} status as unauthorized and doesn't retry it`, t => {
-		t.deepEqual(statusFailure(status), { message: "Non-ok return status", reportAs: "OTLP export unauthorized, batch dropped", retry: false, status }, "reported once, then dropped");
+		t.deepEqual(statusFailure(status), { message: "Non-ok return status", reportAs: "OTLP export unauthorized, batch dropped", retry: false, status }, "reported as unauthorized, and not retried");
 		t.end();
 	});
 }
