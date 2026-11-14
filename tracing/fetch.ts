@@ -54,7 +54,7 @@ export function requestAttributes(trace: FetchTrace, url: URL, method: string): 
 		"server.address": url.hostname,
 		...url.port ? { "server.port": Number(url.port) } : {},
 		"url.full": buildUrlFull(url, trace.captureQuery === true),
-		// A protocol holds one `:`, its last character, so no test tells `/:$/` from `/:/`.
+		// A protocol holds one `:`, its last character, so no test can tell `/:$/` from `/:/`.
 		"url.scheme": url.protocol.replace(/:$/, ""),
 	};
 }

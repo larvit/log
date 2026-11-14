@@ -43,7 +43,7 @@ export function decodings(text: string): Decodings {
 // A parser drops a tab, newline or carriage return: `si%09g` reads as `sig`.
 export const withoutDropped = (text: string) => text.replace(/[\t\n\r]/g, "");
 
-// The `?? ""` never answers: a query opening with `=` always has an empty key to get.
+// The `?? ""` is never reached: a query opening with `=` always has an empty key, so `get("")` returns a string.
 export const formDecoded = (text: string) => new URLSearchParams(`=${text}`).get("") ?? "";
 
 export const changesInAnyDecoding = (text: string, redact: (decoding: string) => string) => inAnyDecoding(decodings(text), decoding => redact(decoding) !== decoding);

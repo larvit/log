@@ -667,7 +667,7 @@ test("log.fetch with an invalid header rejects but never hangs end()", async t =
 	t.end();
 });
 
-test("log.fetch keeps the log's context on the error span of a request whose method cannot be read", async t => {
+test("log.fetch keeps the log's context on the error span of a request whose method is not a string", async t => {
 	const { calls, logFetch } = testFetchTrace({ context: { tenant: "acme" } });
 
 	await logFetch("https://api.test/x", { method: 5 as unknown as string }).catch(() => {});

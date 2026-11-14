@@ -10,7 +10,7 @@ function parsedUrl(text: string): URL | undefined {
 	try {
 		return new URL(text);
 	} catch {
-		// Reaching the function's end answers `undefined` too, so no test tells this line from its absence.
+		// Without this line the catch ends the function, which returns `undefined` all the same: no test can tell the two apart.
 		return undefined;
 	}
 }
@@ -85,11 +85,11 @@ const PAIR_RULES: ReadonlyArray<(pair: QueryPair, reading: QueryReading) => Pair
 		const joined = `${key}=${value}`;
 		const opensUrl = SCHEME_LED.test(withoutDropped(key));
 
-		// redactQueryPair tests only for "value": no test tells "key and value" from another string.
+		// redactQueryPair reads only "value", and any other string redacts the key too: no test can tell this literal from an empty one.
 		return opensUrl && (reading.depth > MAX_NESTED_URLS || readNestedUrl(key, reading) !== key || readNestedUrl(joined, reading) !== joined) ? "key and value" : undefined;
 	},
 	// A credential in the key. Form-decoded and raw both: a `+` or an escaped delimiter ends the match
-	// in one reading. As in the rule above, no test tells its "key and value" from another string.
+	// in one reading. Its "key and value" is unread, as in the rule above.
 	({ key, rawKey }) => holdsUserinfoInAnyDecoding(key) || holdsUserinfoInAnyDecoding(rawKey) || holdsListedKeyInAnyDecoding(key) ? "key and value" : undefined,
 	// A listed key, or userinfo in the value. It stands before the last rule, whose read of a url under
 	// a listed key would keep that url.
