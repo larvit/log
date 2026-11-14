@@ -1,6 +1,8 @@
 import { type Clock, Log, type Metadata, type OtlpPayload, type OtlpQueue, Queue, type QueueStorage, type TimerHandle } from "../index.js";
-import { ExportScheduler, unref } from "../otlp/export-scheduler.js";
-import { encodeBatch, plainHttpWarnings, statusFailure } from "../otlp/sender.js";
+import { encodeBatch } from "../otlp/batch.js";
+import { plainHttpWarnings } from "../otlp/endpoint.js";
+import { ExportScheduler, transition, unref } from "../otlp/export-scheduler.js";
+import { statusFailure } from "../otlp/response.js";
 import { pbDecode, pbDecodeLogs, pbDecodeSpans, pbMsg } from "./protobuf-decode.js";
 import test from "./tap.js";
 import { callHeader, exportedRecords, exportedSpans, fakeClock, fakeStorage, nanos, reportSink, response, storedRecords, stubFetch, thrown, waitFor } from "./test-doubles.js";
@@ -1403,6 +1405,21 @@ test("a flush() joining a round that rejects still gets a round of its own", asy
 	t.strictEqual(await first.then(() => "", err => String(err)), "Error: round broke", "the first flush() rejects with its round");
 	await joined;
 	t.strictEqual(rounds, 2, "the joined flush() ran a second round");
+	t.end();
+});
+
+test("the scheduler's transition holds a backoff against a joined flush(), and else gives that flush() a round", t => {
+	const delays = { batchDelayMs: 1000, retryDelayMs: 20 };
+	const joined = transition({ batchDue: true, failures: 0, flushRequested: false, name: "running" }, { type: "flush" }, delays);
+
+	t.deepEqual(joined, { effects: [{ type: "joinNextRound" }], state: { batchDue: true, failures: 0, flushRequested: true, name: "running" } }, "a flush() mid-round is recorded in the state");
+	t.deepEqual(transition(joined.state, { type: "roundDone" }, delays), { effects: [{ type: "startRound" }], state: { failures: 0, flushRequested: false, name: "loading" } }, "and the round's end starts the next round, with no batch timer");
+
+	const failed = transition(transition(joined.state, { type: "sendFailed" }, delays).state, { type: "sendFailed" }, delays);
+
+	t.deepEqual(failed.state, { batchDue: true, failures: 2, flushRequested: true, name: "running", retryInMs: 40 }, "each failed send doubles the retry delay, counted in the state");
+	t.deepEqual(transition(failed.state, { type: "roundDone" }, delays), { effects: [{ type: "releaseJoiners" }, { delayMs: 40, type: "armTimer" }], state: { failures: 2, name: "backingOff" } }, "a failed send ends the round in a backoff, which releases the joined flush() without a round");
+	t.deepEqual(transition({ failures: 2, name: "backingOff" }, { type: "flush" }, delays), { effects: [], state: { failures: 2, name: "backingOff" } }, "a flush() doesn't start a round during a backoff");
 	t.end();
 });
 
