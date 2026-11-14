@@ -467,3 +467,20 @@ Read most (opens and searches):
 ## Reading cost, chunk 2fccf09b344f, finished 2026-11-14T22:07:53Z
 
 36391 new input tokens before the first commit.
+
+## Reading cost, chunk 46b84feec7ec, finished 2026-11-14T22:29:49Z
+
+102956 new input tokens before the first commit.
+
+Read most (opens and searches):
+
+- `tests/fetch.test.ts` 6
+- `tests/test-doubles.ts` 3
+- `tests/test.ts` 3
+- `tracing/fetch.ts` 3
+- `credentials/query.ts` 2
+- `README.md` 1
+- `credentials/decodings.ts` 1
+- `credentials/header-names.ts` 1
+- `credentials/query-userinfo-runs.ts` 1
+- `credentials/span-values.ts` 1
