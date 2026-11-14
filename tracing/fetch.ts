@@ -16,7 +16,7 @@ export type FetchTrace = SpanHost & {
 };
 
 // An invalid name makes headers.get throw, which must never cost the platform's result.
-function capturedHeaders(trace: FetchTrace, option: "captureRequestHeaders" | "captureResponseHeaders", headers: Headers): Metadata {
+export function capturedHeaders(trace: FetchTrace, option: "captureRequestHeaders" | "captureResponseHeaders", headers: Headers): Metadata {
 	const prefix = option === "captureRequestHeaders" ? "http.request.header." : "http.response.header.";
 	const captured: Metadata = {};
 
@@ -46,8 +46,8 @@ function capturedHeaders(trace: FetchTrace, option: "captureRequestHeaders" | "c
 	return captured;
 }
 
-// Every attribute known before the request is sent; `headers` already carries the traceparent.
-export function requestAttributes(trace: FetchTrace, url: URL, method: string, headers: Headers): Metadata {
+// Every attribute known from the url and the method alone, so a request that fails to build still records them.
+export function requestAttributes(trace: FetchTrace, url: URL, method: string): Metadata {
 	return {
 		...trace.context,
 		"http.request.method": method,
@@ -55,7 +55,6 @@ export function requestAttributes(trace: FetchTrace, url: URL, method: string, h
 		...url.port ? { "server.port": Number(url.port) } : {},
 		"url.full": buildUrlFull(url, trace.captureQuery === true),
 		"url.scheme": url.protocol.replace(/:$/, ""),
-		...capturedHeaders(trace, "captureRequestHeaders", headers),
 	};
 }
 
@@ -87,6 +86,7 @@ export async function tracedFetch(trace: FetchTrace, url: URL, init: RequestInit
 		const method = (init?.method ?? "GET").toUpperCase();
 
 		span.name = `${method} ${url.host}`;
+		attributes = requestAttributes(trace, url, method);
 
 		// A spread drops a Request's method, body, signal and other settings, which are prototype getters.
 		// So the platform builds the request from it, as fetch(url, init) would, and traceparent goes on that.
@@ -97,7 +97,7 @@ export async function tracedFetch(trace: FetchTrace, url: URL, init: RequestInit
 			headers.set("traceparent", formatTraceparent(span.traceId, span.spanId, trace.sampled));
 		}
 
-		attributes = requestAttributes(trace, url, method, headers);
+		attributes = { ...attributes, ...capturedHeaders(trace, "captureRequestHeaders", headers) };
 
 		const res = await (request ? globalThis.fetch(request) : globalThis.fetch(url, { ...init, headers }));
 
