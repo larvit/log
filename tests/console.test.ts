@@ -184,36 +184,40 @@ test("LogEntry is the type of the entry a formatter takes", t => {
 });
 
 // What a JavaScript consumer passes from LOG_FORMAT=pretty.
-test("a format that is no format writes text and warns once per sink and value", t => {
+test("a format string that is neither text nor json writes text and warns once per sink", t => {
 	const pretty = capture({ colors: false, format: "pretty" as any });
 
 	pretty.log.info("x");
 	pretty.log.info("y");
 	t.deepEqual(pretty.stdout.map(line => line.endsWith("x") || line.endsWith("y")), [true, true], "the lines are written as text");
 	t.strictEqual(pretty.stderr.length, 1, "one warning, however many lines follow");
-	t.ok(pretty.stderr[0].includes("[war] @larvit/log: format \"pretty\" is not a format, writing text; use \"text\", \"json\" or a function"), "the warning names the package, the value and the values to use instead");
-	pretty.log.clone({ stderr: pretty.log.conf.stderr }).info("z");
+	t.ok(pretty.stderr[0].includes("[war] @larvit/log: format is a string other than \"text\" or \"json\""), "the warning names the package and the rule");
+	t.ok(pretty.stderr[0].includes("use \"text\", \"json\" or a function"), "and the values to use instead");
 	pretty.log.clone({ format: "pretty" as any, stderr: pretty.log.conf.stderr });
-	t.strictEqual(pretty.stderr.length, 1, "a clone and a child, which read the same value, don't repeat it on the same sink");
-	new Log({ colors: false, format: "Json" as any, stderr: pretty.log.conf.stderr });
-	t.strictEqual(pretty.stderr.length, 2, "a second bad value warns on the same sink");
-	t.ok(pretty.stderr[1].includes("format \"Json\" is not a format"), "and names the new value");
+	pretty.log.clone({ format: "Json" as any, stderr: pretty.log.conf.stderr });
+	t.strictEqual(pretty.stderr.length, 1, "a clone of any bad value writes the same line, which the sink has seen");
+	new Log({ parentLog: pretty.log, stderr: pretty.log.conf.stderr });
+	t.strictEqual(pretty.stderr.length, 1, "and a child, which only inherits the value, doesn't warn at all");
 	t.end();
 });
 
-test("a format that is a format, or no value at all, doesn't warn", t => {
-	const written: string[] = [];
-	const stderr = (line: string) => { written.push(line); };
+// `format` rows that earn no format warning, each with the lines it writes to stderr.
+for (const [name, options, lines] of [
+	["text", { format: "text" }, 0],
+	["json", { format: "json" }, 0],
+	["unset", { format: undefined }, 0],
+	["a function", { format: (entry: EntryFormatterConf) => entry.msg }, 0],
+	["a string beside entryFormatter, which wins and is only deprecated", { entryFormatter: (entry: EntryFormatterConf) => entry.msg, format: "pretty" }, 1],
+] as [string, LogOptions, number][]) {
+	test(`format ${name} earns no warning about the format`, t => {
+		const written: string[] = [];
 
-	for (const format of ["text", "json", undefined, (entry: EntryFormatterConf) => entry.msg] as LogOptions["format"][]) {
-		new Log({ format, stderr });
-	}
-
-	new Log({ entryFormatter: entry => entry.msg, format: "pretty" as any, stderr });
-	t.deepEqual(written.filter(line => line.includes("is not a format")), [], "a name the library knows, a function and nothing at all are no mistake");
-	t.deepEqual(written.length, 1, "and beside entryFormatter, which wins, a format that is ignored isn't named a mistake either");
-	t.end();
-});
+		new Log({ ...options, stderr: line => { written.push(line); } });
+		t.deepEqual(written.filter(line => line.includes("other than")), [], "the format is no mistake");
+		t.strictEqual(written.length, lines, "and the lines written are the deprecation's alone");
+		t.end();
+	});
+}
 
 // Each row writes an invalid logLevel to log.conf after construction. The Log checks it when it writes a line,
 // falls back to info and warns. `lines`: how many lines the call writes to stdout at info.
