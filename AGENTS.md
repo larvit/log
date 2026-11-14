@@ -53,8 +53,8 @@ In [docs/decisions.md](docs/decisions.md):
 - `index.ts` holds only the public exports. New code joins the module whose file name stays true
   of it, or gets its own. A rule set answering one question — what a reader has to check as a
   whole — lives in one module, or in one folder once it outgrows a module.
-- Imports point one way: `log/` → `tracing/` → `otlp/` → `credentials/` → `primitives/`. The
-  decision log names each import that runs against it.
+- Imports point one way: `log/` → `tracing/` → `otlp/` → `credentials/` → `primitives/`, and
+  inside `otlp/`, `queue/` → `send/`. The decision log names each import that runs against it.
 - A `// --- name ---` banner divides a source module only where a technical limit stops a split.
 - A done `todo.md` item leaves the file: a change a consumer can observe is reworded for them
   under `CHANGELOG.md` → `## Unreleased`; anything else is deleted outright.

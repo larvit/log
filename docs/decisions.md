@@ -168,7 +168,7 @@ while Elastic's default list is the published one.
 ## Every rule on credentials in a span sits in one folder
 
 2026-09-20, the implementing agent: every rule deciding whether a credential reaches a span sits in
-one place, grouped by that question and not by the caller asking it, so `traceableUrl` and
+one place, grouped by that question and not by the caller asking it, so `parseHttpUrl` and
 `buildUrlFull` are there and not beside `log.fetch`. README → Goals #7 is checkable only against
 the whole set, and the rules used to sit in two places ~800 lines apart with the call running
 upward and no comment at either end naming the other. Neither a comment there nor this
@@ -396,7 +396,7 @@ Valid while a url parser keeps such whitespace in userinfo and a query value.
 
 ## A platform read stays a default, and a consumer injects through `colors` and `clock`
 
-2026-11-13, the implementing agent: `colorsFromEnv`, `traceableUrl` and `unref` take the value they
+2026-11-13, the implementing agent: `colorsFromEnv`, `parseHttpUrl` and `unref` take the value they
 read, and `processEnv` and `denoUnrefTimer` read it at their callers. `pageHref` reads the global
 object it is handed, `globalThis` by default. No option is added
 for these reads: a consumer already injects through `colors`, which beats the env, through `clock`,
@@ -412,14 +412,14 @@ consumer needs the page address or the env injected apart from these.
 ## A constructor parameter marked "Not part of the API" carries what only this library passes
 
 2026-11-13, the implementing agent, in the release review of 2.6.0: `Queue`'s second parameter
-`warn` and `Log`'s second parameter `cloneSettings` are each passed only by this library, and each
-says so in the JSDoc its published type carries. `warn` shipped in 2.x, so only a major removes it.
-`cloneSettings` is new in 2.6.0, and marked the same way. `clone()` has to hand its clone a function
-formatter, which options cannot carry beside the inherited `format` string. The other route was a module-level WeakMap
-keyed on whichever object was in hand, which every seat of two comprehension runs named as the
-hardest place to follow. README documents neither parameter, and a caller who passes one gets no
-promise from Goal 8. Serves code health; bounded by README → Goals #8. Valid until 3.0.0, where
-`todo.md` item 142 takes both off the published constructors.
+`warn` and `Log`'s second parameter, `cloneOf` from 2.7.0, are each passed only by this library,
+and each says so in the JSDoc its published type carries. `warn` shipped in 2.x, so only a major
+removes it. 2.6.0's `cloneSettings` took a clone's settings already inherited; 2.7.0's `cloneOf`
+takes the `Log` it clones, so `log/conf.ts` → `resolveConf` reads the caller's options before
+anything is inherited, and holds the whole way from options to conf. README documents neither
+parameter, and a caller who passes one gets no promise from Goal 8. Serves code health; bounded by
+README → Goals #8. Valid until 3.0.0, where `todo.md` item 142 takes both off the published
+constructors.
 
 ## The package publishes one bundled `index.js`, built from a module per part
 

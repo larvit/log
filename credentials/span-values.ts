@@ -1,4 +1,4 @@
-import { stringField } from "../primitives/failure-fields.js";
+import { stringField } from "../primitives/field-reads.js";
 import { isCredentialHeaderName } from "./header-names.js";
 import { redactedPath } from "./path.js";
 import { redactedQuery, redactedWholeUrl } from "./query.js";
@@ -21,7 +21,7 @@ export function redactHeaderCredential(name: string, value: string): string {
 
 // The URL log.fetch traces: a scheme written without "//" parses to an opaque path, where
 // userinfo, or a data: payload, sits in pathname and would ride into url.full.
-export function traceableUrl(input: string | URL, baseHref: string | undefined): URL | undefined {
+export function parseHttpUrl(input: string | URL, baseHref: string | undefined): URL | undefined {
 	let url: URL;
 
 	try {

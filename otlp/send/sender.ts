@@ -1,15 +1,16 @@
-import { stringField } from "../../primitives/failure-fields.js";
+import type { Clock } from "../../primitives/clock.js";
+import { stringField } from "../../primitives/field-reads.js";
 import { type Metadata, withoutUndefined } from "../../primitives/metadata.js";
-import { type QueuedItem, utf8Length } from "../queue/queue-items.js";
-import type { ResolvedQueueConf } from "../queue/queue-types.js";
-import { encodeBatch, KEEPALIVE_MAX_BYTES } from "./batch.js";
-import { otlpPath, plainHttpWarnings, requestHeaders, resolveEndpoint } from "./endpoint.js";
+import { encodeBatch, KEEPALIVE_MAX_BYTES, type QueuedItem, utf8Length } from "./batch.js";
+import { type EndpointConf, otlpPath, plainHttpWarnings, requestHeaders, resolveEndpoint } from "./endpoint.js";
 import { partialRejection, type SendFailure, statusFailure } from "./response.js";
 
 const OTLP_EXPORT_TIMEOUT_MS = 3000;
 
 // Read live, so a rotated otlpAdditionalHeaders reaches the next send.
-type SenderConf = Pick<ResolvedQueueConf, "acceptPlainHttpCredentials" | "clock" | "otlpAdditionalHeaders" | "otlpHttpBaseURI" | "otlpProtocol">;
+type SenderConf = EndpointConf & { clock: Clock, otlpProtocol: "http/json" | "http/protobuf" };
+
+type Report = (msg: string, metadata: Metadata) => void;
 
 // The HTTP send of one batch: the endpoint's headers, the encoded body, a timeout, and what the response means.
 export class OtlpSender {
@@ -17,12 +18,12 @@ export class OtlpSender {
 	private readonly headers: Headers;
 	private readonly plainHttpHost?: string;
 	private readonly protobuf: boolean;
-	private readonly report: ResolvedQueueConf["report"];
+	private readonly report: Report;
 	private readonly url: string;
 	private readonly warn: (msg: string) => void;
 
 	// `report` is the caller's guarded one.
-	constructor(conf: SenderConf, report: ResolvedQueueConf["report"], warn: (msg: string) => void) {
+	constructor(conf: SenderConf, report: Report, warn: (msg: string) => void) {
 		const { authorization, plainHttpHost, url } = resolveEndpoint(conf, warn);
 
 		this.conf = conf;

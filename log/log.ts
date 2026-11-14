@@ -5,10 +5,29 @@ import { writeOnce } from "../primitives/once-per-sink.js";
 import { type FetchTrace, traceFetch } from "../tracing/fetch.js";
 import { endErrorType, exportSpan, openSpan, spanEnd, type SpanHost } from "../tracing/spans.js";
 import { formatTraceparent } from "../tracing/traceparent.js";
+import { resolveConf } from "./conf.js";
 import { writeConsoleEntry } from "./console-output.js";
-import { confFromOptions, inherited, type LogSettings, resolveSettings } from "./settings.js";
-import { describeLogLevel, warnOnceToStderr, writeStderr } from "./stderr-warnings.js";
+import { warnOnceToStderr, writeStderr } from "./stderr-lines.js";
 import type { LogInt, LogOptions, ResolvedLogConf } from "./types.js";
+
+// A configured logLevel that is not a level, as the warning about it prints it.
+function describeLogLevel(value: unknown): string {
+	// A proxy trap, getter or toJSON on the value is caller code, and may throw.
+	try {
+		if (typeof value === "string" || (Array.isArray(value) && value.every(item => typeof item === "string"))) {
+			return JSON.stringify(value);
+		}
+
+		if (value !== null && (typeof value === "object" || typeof value === "function")) {
+			// Object.prototype.toString, so a value's own toString is never called.
+			return Object.prototype.toString.call(value);
+		}
+
+		return String(value);
+	} catch {
+		return "(a value that cannot be printed)";
+	}
+}
 
 export class Log implements LogInt {
 	context: Metadata;
@@ -25,14 +44,14 @@ export class Log implements LogInt {
 	span: OtlpSpan;
 
 	/**
-	 * @param cloneSettings Not part of the API, so leave it out: a value here replaces `options`.
-	 * `clone()` passes its clone's settings, which options cannot carry whole, since `format` holds
-	 * no function beside the inherited format string.
+	 * @param cloneOf Not part of the API, so leave it out: `clone()` passes the Log it clones, so that
+	 * the clone takes what `options` leave unset from that Log.
 	 */
-	constructor(options?: LogOptions | LogLevel | "none", cloneSettings?: LogSettings) {
-		const { conf, deprecations } = resolveSettings(cloneSettings ?? confFromOptions(options));
+	constructor(options?: LogOptions | LogLevel | "none", cloneOf?: Log) {
+		const { conf, deprecations } = resolveConf(options, cloneOf);
 
-		if (typeof options === "string") {
+		// clone() warns about its own string form.
+		if (typeof options === "string" && !cloneOf) {
 			deprecations.unshift("@larvit/log: new Log(\"level\") is deprecated and removed in 3.0.0, use new Log({ logLevel })");
 		}
 
@@ -55,7 +74,7 @@ export class Log implements LogInt {
 			warnOnceToStderr(this.conf, this.context, "@larvit/log: log.clone(\"level\") is deprecated and removed in 3.0.0, use log.clone({ logLevel })");
 		}
 
-		return new Log(undefined, inherited(confFromOptions(options), this, "clone"));
+		return new Log(options, this);
 	}
 
 	public async end(options?: { error?: unknown }): Promise<void> {

@@ -1,8 +1,7 @@
 import { isCredentialHeaderName } from "../../credentials/header-names.js";
 import { byKind, type OtlpPayload } from "../payloads.js";
-import type { ResolvedQueueConf } from "../queue/queue-types.js";
 
-type EndpointConf = Pick<ResolvedQueueConf, "acceptPlainHttpCredentials" | "otlpAdditionalHeaders" | "otlpHttpBaseURI">;
+export type EndpointConf = { acceptPlainHttpCredentials: boolean, otlpAdditionalHeaders?: Record<string, string>, otlpHttpBaseURI: string };
 
 // Where a Queue's batches go, read from otlpHttpBaseURI.
 export type OtlpEndpoint = {

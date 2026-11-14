@@ -1,11 +1,21 @@
-import { stringField } from "../../primitives/failure-fields.js";
+import { stringField } from "../../primitives/field-reads.js";
 import { byKind, type OtlpLogPayload, type OtlpPayload, type OtlpScope, type OtlpSpanPayload } from "../payloads.js";
 import { encodeOtlpProtobuf } from "../protobuf.js";
-import type { QueuedItem } from "../queue/queue-items.js";
 import type { SendFailure } from "./response.js";
 
 // Browsers reject a keepalive request whose body is over 64 KiB.
 export const KEEPALIVE_MAX_BYTES = 65536;
+
+export type QueuedItem = { bytes: number, payload: OtlpPayload };
+
+export function utf8Length(str: string): number {
+	return new TextEncoder().encode(str).length;
+}
+
+// The JSON size bounds the protobuf size too, so one measure serves both encodings.
+export function withBytes(payload: OtlpPayload): QueuedItem {
+	return { bytes: utf8Length(JSON.stringify(payload)), payload };
+}
 
 // Items sharing a key become one, in first-seen order.
 function groupBy<T>(items: T[], keyOf: (item: T) => string, join: (group: T[]) => T): T[] {
