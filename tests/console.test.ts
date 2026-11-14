@@ -410,7 +410,7 @@ for (const uri of ["http://u:s3cr3t/w@127.0.0.1:4318", "otlp:u:s3cr3t@127.0.0.1:
 			caught = err;
 		}
 
-		t.notOk(JSON.stringify(caught, Object.getOwnPropertyNames(caught as object)).includes("s3cr3t"), "cause and input included");
+		t.notOk(JSON.stringify(caught, Object.getOwnPropertyNames(caught as object)).includes("s3cr3t"), "neither the error nor its cause or input holds the password");
 		t.end();
 	});
 }

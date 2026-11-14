@@ -402,8 +402,9 @@ for these reads: a consumer already injects through `colors`, which beats the en
 whose timers `unref` handles, and through an absolute url, which needs no page address. A further
 option would grow the documented surface for what only a default reads. Applies the technical
 principle "Functional core, imperative shell". The suite tests `colorsFromEnv` and `unref` with
-the value passed in, and swaps `globalThis.process` and `Deno` in one test each, to prove the
-default reads them. Serves README → Goals #1 and #5. Valid while no
+the value passed in. It swaps a global by name in one test per default, and no more: `process` to
+prove the colour default reads the env, and `Deno` to prove an injected clock's timer ids never
+reach `Deno.unrefTimer`. Serves README → Goals #1 and #5. Valid while no
 consumer needs the page address or the env injected apart from these.
 
 ## A constructor parameter marked "Not part of the API" carries what only this library passes

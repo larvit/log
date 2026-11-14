@@ -21,17 +21,16 @@ function parseStoredPayloads(raw: string): { error: string | undefined } | { pay
 	return { payloads: parsed };
 }
 
-// `writing`: one write runs. `rewriteDue`: a change came after that write read the items, so one more
-// write follows it. `unreadable`: a getItem threw, and what storage holds stays untouched, since a
+// `writing`: one write runs. `rewriteDue`: one more write follows this one. `unreadable`: a getItem threw, and what storage holds stays untouched, since a
 // later read may return it.
 type SaveState = "idle" | "rewriteDue" | "unreadable" | "writing";
 
 // A queue's copy in `conf.storage`: read once, when the queue starts, and rewritten after each change
 // by one writer at a time.
 export class StoredQueue {
-	// The one read, restore included, which every write waits for. It never rejects.
+	// The one read, restore included.
 	readonly loaded: Promise<void>;
-	// Whether the read could reach storage.
+	// The same read: whether it reached storage. Every write waits for it.
 	private readonly readable: Promise<boolean>;
 	private state: SaveState = "idle";
 

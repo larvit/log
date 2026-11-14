@@ -20,21 +20,21 @@ export function unref(timer: TimerHandle, unrefNumericTimer: ((id: number) => vo
 	}
 }
 
-// What is pending decides what each call does. Each call is an event, and every change of state
-// goes through `transition`.
+// An event is a public call (`flush`, `schedule`, `backoff`) or an internal step (loaded, round
+// done, timer fired). The state decides what each event does, and only `transition` changes it.
 type SchedulerState =
 	// Nothing is pending.
 	| { name: "idle" }
-	// A batch timer will start a round; flush() starts it now.
+	// A batch timer will start a round; a flush() starts the round now.
 	| { name: "waiting", timer: TimerHandle }
-	// A round waits for storage to load, and will send what is scheduled meanwhile. A flush() arriving
-	// now joins `next`, the one round after it.
+	// A round waits for `ready`, and will send what is scheduled meanwhile. A flush() arriving now
+	// joins `next`, the one round after it.
 	| { name: "loading", next?: Promise<void>, round: Promise<void> }
 	// The round sends. `next` as above. `batchDue`: a payload was scheduled meanwhile, so a batch timer
 	// follows the round. `retryInMs`: a send failed, so a retry timer follows instead, and a flush()
-	// arriving after that waits for this round only.
+	// arriving between the failure and the round's end waits for this round only.
 	| { batchDue: boolean, name: "running", next?: Promise<void>, retryInMs?: number, round: Promise<void> }
-	// A retry timer will start a round, and flush() must not jump it.
+	// A retry timer will start a round, and a flush() doesn't start one early.
 	| { name: "backingOff", timer: TimerHandle };
 
 type SchedulerEvent = "flush" | "loaded" | "roundDone" | "schedule" | "timerFired" | { retryInMs: number };
@@ -44,7 +44,7 @@ type SchedulerConf = Pick<ResolvedQueueConf, "batchDelayMs" | "clock" | "retryDe
 // One round runs at a time, and one timer at most starts the next.
 export class ExportScheduler {
 	private readonly conf: SchedulerConf;
-	// Consecutive failed sends, which set the next backoff. A count, not a state: it outlives rounds.
+	// Consecutive failed sends, which set the next backoff. Kept out of `SchedulerState`, since it outlives rounds.
 	private failures = 0;
 	private readonly ready: Promise<void>;
 	private readonly round: () => Promise<void>;
@@ -80,7 +80,7 @@ export class ExportScheduler {
 		return retryInMs;
 	}
 
-	// Returns what a flush() caller waits for; the other events ignore it.
+	// Returns what a flush() caller waits for; callers of other events ignore it.
 	private transition(event: SchedulerEvent): Promise<void> {
 		const state = this.state;
 
@@ -114,7 +114,7 @@ export class ExportScheduler {
 					return state.round;
 				}
 
-				// Both outcomes: a flush() joining a round that rejects still gets a round of its own.
+				// On fulfil and reject alike, so a flush() joining a round that rejects still gets a round of its own.
 				state.next ??= state.round.then(() => this.flush(), () => this.flush());
 
 				return state.next;
@@ -150,7 +150,7 @@ export class ExportScheduler {
 		return state.round;
 	}
 
-	// The round sends what a pending timer was waiting for, so that timer goes.
+	// The round sends what a pending timer was waiting for, so it clears that timer.
 	private startRound(): Promise<void> {
 		const state = this.state;
 
