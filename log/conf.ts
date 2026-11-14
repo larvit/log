@@ -205,6 +205,7 @@ function processEnv(): unknown {
 // property into an accessor, which drops every conf into V8's slow dictionary mode and past README →
 // Footprint.
 function attachFormatter<T extends object>(conf: T, formatter: EntryFormatter | undefined): asserts conf is T & Pick<ResolvedLogConf, "entryFormatter"> {
+	// Only a function gets an entry, which costs each instance about 42 bytes against README → Footprint.
 	if (formatter) {
 		functionFormatters.set(conf, formatter);
 	}
