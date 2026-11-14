@@ -412,14 +412,16 @@ consumer needs the page address or the env injected apart from these.
 ## A constructor parameter marked "Not part of the API" carries what only this library passes
 
 2026-11-13, the implementing agent, in the release review of 2.6.0: `Queue`'s second parameter
-`warn` and `Log`'s second parameter, `cloneOf` from 2.7.0, are each passed only by this library,
-and each says so in the JSDoc its published type carries. `warn` shipped in 2.x, so only a major
-removes it. 2.6.0's `cloneSettings` took a clone's settings already inherited; 2.7.0's `cloneOf`
-takes the `Log` it clones, so `log/conf.ts` → `resolveConf` reads the caller's options before
-anything is inherited, and holds the whole way from options to conf. README documents neither
-parameter, and a caller who passes one gets no promise from Goal 8. Serves code health; bounded by
-README → Goals #8. Valid until 3.0.0, where `todo.md` item 142 takes both off the published
-constructors.
+`warn` and `Log`'s second parameter are each passed only by this library, and each says so in the
+JSDoc its published type carries. README documents neither, and a caller who passes one gets no
+promise from Goal 8. Only a major removes either parameter, but a minor may change what one
+carries.
+
+2026-11-14, the implementing agent, in item 143: `Log`'s second parameter changes from 2.6.0's
+`cloneSettings`, a clone's settings already inherited, to 2.7.0's `cloneOf`, the `Log` it clones.
+`log/conf.ts` → `resolveConf` can then read the caller's options before it inherits anything, so
+one function makes the whole conf. Serves code health; bounded by README → Goals #8. Valid until
+3.0.0, where `todo.md` item 142 takes both off the published constructors.
 
 ## The package publishes one bundled `index.js`, built from a module per part
 

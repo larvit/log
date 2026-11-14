@@ -6,14 +6,11 @@ import { attachDefaultQueue, OTLP_ENDPOINT_KEYS, rejectQueueBesideShorthand } fr
 import { colorsFromEnv, msgJsonFormatter, msgTextFormatter } from "./entry-format.js";
 import type { EntryFormatter, LogConf, LogOptions, ResolvedLogConf } from "./types.js";
 
-// How a Log's conf is made, all in resolveConf: the caller's options become a LogConf (ownConf). It
-// takes each key the caller left unset from the Log it clones, then from its parentLog (inherited),
-// then the defaults (withDefaults), then the default queue (attachDefaultQueue).
-//
 // A conf holds the formatter in two keys, as 2.x documents: `format`, "json" or "text", and
-// `entryFormatter`, a function formatter, which wins. A function passed as `format` moves to
-// entryFormatter. On a Log's own conf, entryFormatter is an accessor that reads the formatter in use
-// and keeps the function in functionFormatters, so that conf.format still reads back a string.
+// `entryFormatter`, a function formatter, which takes precedence over format. A function passed as
+// `format` moves to entryFormatter, so that conf.format keeps its 2.x read type. On a Log's own conf,
+// entryFormatter is an accessor: it keeps the function in functionFormatters, and reads the built-in
+// formatter that format names where there is no function.
 
 type Derivation = "child" | "clone";
 
@@ -60,7 +57,8 @@ function builtInFormatter(format: LogConf["format"]): EntryFormatter {
 	return format === "json" ? msgJsonFormatter : msgTextFormatter;
 }
 
-// The formatter a conf writes with: its entryFormatter, which wins, else the built-in its format names.
+// The formatter a conf writes with. A Log's own conf always reads one from entryFormatter; the built-in
+// that format names serves a conf built by hand.
 export function resolveFormatter(conf: LogConf): EntryFormatter {
 	return conf.entryFormatter ?? builtInFormatter(conf.format);
 }
@@ -83,9 +81,9 @@ function builtHere(conf: LogConf): boolean {
 	return Object.getOwnPropertyDescriptor(conf, "entryFormatter")?.get === ENTRY_FORMATTER_ALIAS.get;
 }
 
-// The function formatter a conf hands on. The entryFormatter of a conf built here reads a built-in
-// formatter when it has no function, and a child or clone must not take that, so that it follows its
-// own format.
+// The function formatter a source conf hands on. A conf built here reads a built-in formatter from
+// entryFormatter when it has no function. A child or clone must not take that built-in, so that the
+// child or clone follows its own format.
 function functionFormatterOf(conf: LogConf): EntryFormatter | undefined {
 	return functionFormatters.get(conf) ?? (builtHere(conf) ? undefined : conf.entryFormatter);
 }
@@ -120,7 +118,8 @@ function ownConf(options: LogOptions | LogLevel | "none" | undefined): { conf: L
 	const conf: LogConf = {
 		...rest,
 		...context === undefined ? {} : { context: withoutUndefined(context) },
-		// Only undefined is unset, as in orDefault: a null from untyped code still replaces the source's formatter.
+		// Only undefined is unset, as in orDefault: a null from untyped code still replaces the
+		// source's formatter.
 		...format === undefined || typeof format === "function" ? {} : { format },
 		...formatter === undefined ? {} : { entryFormatter: formatter },
 	};
@@ -170,7 +169,9 @@ function inherited(conf: LogConf, source: Source, derivation: Derivation): LogCo
 	const taken: LogConf = {};
 
 	for (const key of LOG_CONF_KEYS) {
-		// Read off the source itself, since a hand-written LogInt's conf may hold a key behind a getter.
+		// Read each key off source.conf, not a spread of it: a hand-written LogInt's conf may hold a key
+		// behind a getter, which a spread drops. entryFormatter goes through functionFormatterOf, which
+		// leaves out the built-in formatter a conf built here reads back.
 		const from = key === "entryFormatter" ? { entryFormatter: functionFormatterOf(source.conf) } : source.conf;
 
 		if (INHERITED_BY[key].includes(derivation) && !skip.has(key) && conf[key] === undefined && from[key] !== undefined) {
@@ -202,11 +203,12 @@ function processEnv(): unknown {
 	}
 }
 
-// Defined after the conf is built: writing entryFormatter into it first and redefining it turns a data
+// attachFormatter runs after the conf is built: writing entryFormatter into it first and redefining it turns a data
 // property into an accessor, which drops every conf into V8's slow dictionary mode and past README →
 // Footprint.
 function attachFormatter<T extends object>(conf: T, formatter: EntryFormatter | undefined): asserts conf is T & Pick<ResolvedLogConf, "entryFormatter"> {
-	// Only a function gets an entry, which costs each instance about 42 bytes against README → Footprint.
+	// A Log with no function formatter stays out of functionFormatters: a place in it costs about 42
+	// bytes against README → Footprint.
 	if (formatter) {
 		functionFormatters.set(conf, formatter);
 	}

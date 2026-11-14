@@ -44,8 +44,7 @@ export class Log implements LogInt {
 	span: OtlpSpan;
 
 	/**
-	 * @param cloneOf Not part of the API, so leave it out: `clone()` passes the Log it clones, so that
-	 * the clone takes what `options` leave unset from that Log.
+	 * @param cloneOf Not part of the API, so leave it out: `clone()` passes the Log it clones.
 	 */
 	constructor(options?: LogOptions | LogLevel | "none", cloneOf?: Log) {
 		const { conf, deprecations } = resolveConf(options, cloneOf);

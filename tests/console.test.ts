@@ -182,7 +182,7 @@ for (const [name, level, method, lines, warning] of [
 	["an array holding a level is no level, and its strings are named", ["debug"], "debug", 0, "logLevel [\"debug\"] is not a level"],
 	["a value's own toString is never called", { toString() { throw new Error("toString called"); } }, "info", 1, "logLevel [object Object] is not a level"],
 	["null is printed as null", null, "info", 1, "logLevel null is not a level"],
-	["an array holding anything but strings is printed as an array, never as its items", ["debug", 1], "info", 1, "logLevel [object Array] is not a level"],
+	["an array holding anything but strings is printed as [object Array], never as its items", ["debug", 1], "info", 1, "logLevel [object Array] is not a level"],
 	["a function's own source is never printed", function level() { return "debug"; }, "info", 1, "logLevel [object Function] is not a level"],
 	["a value that throws while it is described still warns", new Proxy([], { get() { throw new Error("trap called"); } }), "info", 1, "logLevel (a value that cannot be printed) is not a level"],
 ] as [string, any, "debug" | "info", number, string][]) {
