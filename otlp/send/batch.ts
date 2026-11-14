@@ -1,7 +1,7 @@
-import { stringField } from "../primitives/failure-fields.js";
-import { byKind, type OtlpLogPayload, type OtlpPayload, type OtlpScope, type OtlpSpanPayload } from "./payloads.js";
-import { encodeOtlpProtobuf } from "./protobuf.js";
-import type { QueuedItem } from "./queue-items.js";
+import { stringField } from "../../primitives/failure-fields.js";
+import { byKind, type OtlpLogPayload, type OtlpPayload, type OtlpScope, type OtlpSpanPayload } from "../payloads.js";
+import { encodeOtlpProtobuf } from "../protobuf.js";
+import type { QueuedItem } from "../queue/queue-items.js";
 import type { SendFailure } from "./response.js";
 
 // Browsers reject a keepalive request whose body is over 64 KiB.

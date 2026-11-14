@@ -1,9 +1,9 @@
-import { stringField } from "../primitives/failure-fields.js";
-import { type Metadata, withoutUndefined } from "../primitives/metadata.js";
+import { stringField } from "../../primitives/failure-fields.js";
+import { type Metadata, withoutUndefined } from "../../primitives/metadata.js";
+import { type QueuedItem, utf8Length } from "../queue/queue-items.js";
+import type { ResolvedQueueConf } from "../queue/queue-types.js";
 import { encodeBatch, KEEPALIVE_MAX_BYTES } from "./batch.js";
 import { otlpPath, plainHttpWarnings, requestHeaders, resolveEndpoint } from "./endpoint.js";
-import { type QueuedItem, utf8Length } from "./queue-items.js";
-import type { ResolvedQueueConf } from "./queue-types.js";
 import { partialRejection, type SendFailure, statusFailure } from "./response.js";
 
 const OTLP_EXPORT_TIMEOUT_MS = 3000;

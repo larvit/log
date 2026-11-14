@@ -1,6 +1,6 @@
 import { failureMessage } from "../credentials/span-values.js";
 import { attributesOf, buildSpanPayload, getNsTimestamp, type OtlpSpan, SPAN_KIND_INTERNAL, STATUS_CODE_ERROR, STATUS_CODE_UNSET } from "../otlp/payloads.js";
-import type { OtlpQueue } from "../otlp/queue-types.js";
+import type { OtlpQueue } from "../otlp/queue/queue-types.js";
 import type { Clock } from "../primitives/clock.js";
 import { numberFieldAsString, stringField } from "../primitives/failure-fields.js";
 import type { Metadata } from "../primitives/metadata.js";
@@ -33,7 +33,7 @@ export type SpanOrigin = {
 	traceparent?: string,
 };
 
-// What childSpan and endSpan read of a Log: the Log's clock, randomness, queue, sampled flag and own span.
+// What childSpan, spanEnd and exportSpan read of a Log: the Log's clock, randomness, queue, sampled flag and own span.
 export type SpanHost = Pick<SpanOrigin, "clock" | "randomBytes"> & { otlpQueue?: OtlpQueue, sampled: boolean, span: OtlpSpan };
 
 export function openSpan(conf: SpanOrigin): { sampled: boolean, span: OtlpSpan } {
@@ -78,22 +78,26 @@ export function endErrorType(err: unknown): string {
 	return stringField(err, "code") ?? stringField(err, "name") ?? "_OTHER";
 }
 
-export function endSpan(host: Pick<SpanHost, "clock" | "otlpQueue" | "sampled">, span: OtlpSpan, attributes: Metadata, failure?: SpanFailure): void {
-	span.endTimeUnixNano = getNsTimestamp(host.clock.now());
+// How a span ends: `fields`, what its end sets on it, and `attributes`, what it exports with. `fields`
+// holds `attributes` only where the span is sampled and has any: README → Audience puts each documented
+// span attribute on `log.span` as on the wire.
+export interface SpanEnd {
+	attributes: Metadata,
+	fields: Pick<OtlpSpan, "endTimeUnixNano"> & Partial<Pick<OtlpSpan, "attributes" | "status">>,
+}
 
-	if (failure) {
-		span.status = { code: STATUS_CODE_ERROR, message: failureMessage(failure.error, failure.url) };
-	}
+export function spanEnd(host: Pick<SpanHost, "clock" | "sampled">, attributes: Metadata, failure?: SpanFailure): SpanEnd {
+	const endTimeUnixNano = getNsTimestamp(host.clock.now());
+	const status = failure ? { status: { code: STATUS_CODE_ERROR, message: failureMessage(failure.error, failure.url) } } : {};
+	const ended = failure ? { ...attributes, "error.type": failure.errorType } : attributes;
+	const spanAttributes = host.sampled ? attributesOf(ended) : [];
 
+	return { attributes: ended, fields: { endTimeUnixNano, ...status, ...spanAttributes.length ? { attributes: spanAttributes } : {} } };
+}
+
+// Queues an ended span, where its trace is sampled.
+export function exportSpan(host: Pick<SpanHost, "otlpQueue" | "sampled">, span: OtlpSpan, attributes: Metadata): void {
 	if (host.sampled) {
-		const ended = failure ? { ...attributes, "error.type": failure.errorType } : attributes;
-		const spanAttributes = attributesOf(ended);
-
-		// README → Audience: each documented span attribute is on `log.span` as on the wire.
-		if (spanAttributes.length) {
-			span.attributes = spanAttributes;
-		}
-
-		host.otlpQueue?.enqueue(buildSpanPayload({ attributes: ended, span }));
+		host.otlpQueue?.enqueue(buildSpanPayload({ attributes, span }));
 	}
 }

@@ -1,6 +1,6 @@
-import { stringField } from "../primitives/failure-fields.js";
-import { type Metadata, withoutUndefined } from "../primitives/metadata.js";
-import { isOtlpPayload, type OtlpPayload } from "./payloads.js";
+import { stringField } from "../../primitives/failure-fields.js";
+import { type Metadata, withoutUndefined } from "../../primitives/metadata.js";
+import { isOtlpPayload, type OtlpPayload } from "../payloads.js";
 import type { QueuedItem } from "./queue-items.js";
 import type { QueueStorage, ResolvedQueueConf } from "./queue-types.js";
 
@@ -24,6 +24,30 @@ function parseStoredPayloads(raw: string): { error: string | undefined } | { pay
 // `writing`: one write runs. `rewriteDue`: one more write follows this one. `unreadable`: a getItem threw, and what storage holds stays untouched, since a
 // later read may return it.
 type SaveState = "idle" | "rewriteDue" | "unreadable" | "writing";
+
+// `save`: the queue changed. `unreadable`: a write found that the read failed. `writeStarted`: a write
+// reads the items, so it covers every save made before. `writeDone`: a write ended, stored or failed.
+type SaveEvent = "save" | "unreadable" | "writeDone" | "writeStarted";
+
+// The whole save machine. `startWrite`: a write starts next, from save() or as one more pass of the running write.
+export function saveTransition(state: SaveState, event: SaveEvent): { startWrite: boolean, state: SaveState } {
+	switch (event) {
+		case "save":
+			if (state === "idle") {
+				return { startWrite: true, state: "writing" };
+			}
+
+			return { startWrite: false, state: state === "writing" ? "rewriteDue" : state };
+		case "unreadable":
+			return { startWrite: false, state: "unreadable" };
+		case "writeStarted":
+			return { startWrite: false, state: "writing" };
+		case "writeDone":
+			return state === "rewriteDue" ? { startWrite: true, state: "writing" } : { startWrite: false, state: "idle" };
+		default:
+			return event satisfies never;
+	}
+}
 
 // A queue's copy in `conf.storage`: read once, when the queue starts, and rewritten after each change
 // by one writer at a time.
@@ -53,12 +77,18 @@ export class StoredQueue {
 			return;
 		}
 
-		if (this.state === "idle") {
-			this.state = "writing";
+		if (this.dispatch("save")) {
 			void this.write(this.conf.storage);
-		} else if (this.state === "writing") {
-			this.state = "rewriteDue";
 		}
+	}
+
+	// `saveTransition` decides; this returns whether a write starts next.
+	private dispatch(event: SaveEvent): boolean {
+		const { startWrite, state } = saveTransition(this.state, event);
+
+		this.state = state;
+
+		return startWrite;
 	}
 
 	private async read(storage: QueueStorage, restore: (payloads: OtlpPayload[]) => void): Promise<boolean> {
@@ -100,13 +130,13 @@ export class StoredQueue {
 		const { key } = this.conf;
 
 		if (!await this.readable) {
-			this.state = "unreadable";
+			this.dispatch("unreadable");
 
 			return;
 		}
 
 		do {
-			this.state = "writing";
+			this.dispatch("writeStarted");
 
 			try {
 				const persisted = this.items();
@@ -119,9 +149,6 @@ export class StoredQueue {
 			} catch (err) {
 				this.report("OTLP queue storage write failed", withoutUndefined({ error: stringField(err, "message"), key }));
 			}
-			// save() may have set it during the await, which TypeScript's narrowing doesn't see.
-		} while ((this.state as SaveState) === "rewriteDue");
-
-		this.state = "idle";
+		} while (this.dispatch("writeDone"));
 	}
 }

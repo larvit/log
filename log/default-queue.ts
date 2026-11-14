@@ -1,5 +1,5 @@
-import { Queue } from "../otlp/queue.js";
-import { DEFAULT_OTLP_PROTOCOL, type OtlpQueue } from "../otlp/queue-types.js";
+import { Queue } from "../otlp/queue/queue.js";
+import { DEFAULT_OTLP_PROTOCOL, type OtlpQueue } from "../otlp/queue/queue-types.js";
 import type { Metadata } from "../primitives/metadata.js";
 import { warnOnceToStderr, writeStderr } from "./stderr-warnings.js";
 import type { LogConf, ResolvedLogConf } from "./types.js";

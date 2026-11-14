@@ -2,33 +2,29 @@ import { isCredentialHeaderName } from "../credentials/header-names.js";
 import { buildUrlFull } from "../credentials/span-values.js";
 import { formatTraceparent, generateSpanId, generateTraceId, Log, parseTraceparent, type TimerHandle } from "../index.js";
 import { STATUS_CODE_ERROR, STATUS_CODE_UNSET } from "../otlp/payloads.js";
-import { capturedHeaders, fetchFailure, type FetchTrace, requestAttributes, responseAttributes, spanStatusCode } from "../tracing/fetch.js";
-import { openSpan } from "../tracing/spans.js";
+import { capturedHeaders, fetchFailure, requestAttributes, responseAttributes, spanStatusCode } from "../tracing/fetch.js";
 import test from "./tap.js";
-import { callHeader, capture, clientSpan, exportedRecords, exportedSpans, response, stubFetch, waitFor } from "./test-doubles.js";
+import { callHeader, capture, clientSpan, exportedRecords, exportedSpans, response, stubFetch, testFetchTrace, waitFor } from "./test-doubles.js";
 
 test("log.fetch traces a successful call and drops the query by default", async t => {
-	const { calls } = stubFetch();
-	const log = new Log({ context: { "service.name": "svc", tenant: "acme" }, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+	const { calls, logFetch, trace } = testFetchTrace({ context: { "service.name": "svc", tenant: "acme" } });
 
-	const res = await log.fetch("https://api.test:8443/users?token=secret&q=hi", { method: "POST" });
-
-	await log.end();
+	const res = await logFetch("https://api.test:8443/users?token=secret&q=hi", { method: "POST" });
 
 	t.strictEqual(res.status, 200, "the underlying response is returned");
 
 	// The outgoing request continues this log's trace under a fresh child span.
 	const sent = parseTraceparent(callHeader(calls.find(call => call.path === "/users")!, "traceparent") ?? "");
 
-	t.strictEqual(sent?.traceId, log.span.traceId, "outgoing request continues this log's trace");
-	t.notStrictEqual(sent?.spanId, log.span.spanId, "a fresh child span id is propagated, not the calling span's");
+	t.strictEqual(sent?.traceId, trace.span.traceId, "outgoing request continues this log's trace");
+	t.notStrictEqual(sent?.spanId, trace.span.spanId, "a fresh child span id is propagated, not the calling span's");
 
 	const span = clientSpan(calls);
 	const attr = (key: string) => span.attributes.find((attribute: any) => attribute.key === key)?.value.stringValue;
 
 	t.strictEqual(span.kind, 3, "client span kind");
 	t.strictEqual(span.name, "POST api.test:8443", "low-cardinality name (method + host)");
-	t.strictEqual(span.parentSpanId, log.span.spanId, "span nests under the calling log span");
+	t.strictEqual(span.parentSpanId, trace.span.spanId, "span nests under the calling log span");
 	t.strictEqual(span.spanId, sent?.spanId, "the propagated span id is the exported span");
 	t.strictEqual(attr("http.request.method"), "POST", "method attribute");
 	t.strictEqual(attr("url.full"), "https://api.test:8443/users", "url.full drops query and userinfo");
@@ -42,19 +38,18 @@ test("log.fetch traces a successful call and drops the query by default", async 
 
 test("log.fetch sends a Request passed as init with its own method, body, signal and headers", async t => {
 	const sent: Request[] = [];
-
 	// What the platform's fetch(url, init) builds from its two arguments, whichever shape init has.
-	globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
-		sent.push(new Request(input, init));
+	const { logFetch, trace } = testFetchTrace({
+		fetch: async (input, init) => {
+			sent.push(new Request(input, init));
 
-		return response();
-	}) as unknown as typeof fetch;
-
+			return response() as unknown as Response;
+		},
+	});
 	const controller = new AbortController();
-	const log = new Log({ stderr: () => {} });
 	const request = new Request("https://api.test/x", { body: "payload", headers: { "x-keep": "kept" }, method: "POST", signal: controller.signal });
 
-	await log.fetch("https://api.test/x", request);
+	await logFetch("https://api.test/x", request);
 	controller.abort();
 
 	t.strictEqual(sent.length, 1, "one request is sent");
@@ -62,8 +57,7 @@ test("log.fetch sends a Request passed as init with its own method, body, signal
 	t.strictEqual(await sent[0].text(), "payload", "the Request's body is kept");
 	t.strictEqual(sent[0].signal.aborted, true, "the Request's signal is kept");
 	t.strictEqual(sent[0].headers.get("x-keep"), "kept", "the Request's headers are kept");
-	t.strictEqual(sent[0].headers.get("traceparent")?.split("-")[1], log.span.traceId, "the request continues the log's trace");
-	await log.end();
+	t.strictEqual(sent[0].headers.get("traceparent")?.split("-")[1], trace.span.traceId, "the request continues the log's trace");
 	t.end();
 });
 
@@ -74,51 +68,51 @@ for (const key of [...["GoogleAccessId", "X-Amz-Credential", "X-Amz-Security-Tok
 	});
 }
 
-test("log.fetch captureQuery keeps the query but redacts known-sensitive keys and url credentials", async t => {
-	const { calls } = stubFetch();
-	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+// One url breaking every captureQuery rule at once; each row below is one rule its url.full keeps.
+const CAPTURE_QUERY_URL = "https://api.test/fetch/https://myuser:pwpath@cb.test/x?q=hi&Signature=abc&Signature=def&next=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&deep=https%253A%252F%252Fmyuser%253Apwdeep%2540cb.test%252Fx&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAEXAMPLE%2F20260923%2Feu-north-1%2Fs3%2Faws4_request&X-Amz-Security-Token=FwoGZXIvYXdz&X-Amz-Signature=8b1c9f&X-Goog-Credential=svc%40proj.iam.gserviceaccount.com%2F20260923%2Fauto%2Fstorage%2Fgoog4_request&GoogleAccessId=svc%40proj.iam.gserviceaccount.com&access_token=ya29tok&API_KEY=k1api&apikey=k2api&key=k3api&Token=k4tok&access-token=v0cred&AccessToken=v1cred&api-key=v2cred&auth_token=v3cred&client_secret=v4cred&id_token=v5cred&password=v6cred&refresh_token=v7cred&Secret=v8cred&Subscription-Key=v9cred&authToken=w0cred&client-secret=w1cred&X_Amz_Signature=w2cred&apiKey=w3cred&x-api-key=u0cred&code=u1cred&id_token_hint=u2cred&auth=u3cred&old_password=u4cred&Passphrase=u5cred&consumer_id=u6cred&PrivateKeyId=u7cred&pwd=u8cred&X-Custom-Signed=u9cred&urn:secret=u10cred&pword=u11cred&new_password2=u14cred&_code=u12cred&https://u:pw47@h.test/x/token=u13cred&zipcode=kept2&X-Amz-SignedHeaders=host&keyword=kept&?kept=1&https://a@b=pw20@evil.test&https://dXNlcg==:pw21@evil.test&https://t.test/x?token=k5tok&then=https://t.test/y?sig=k6sig&n2=https://my+user:pw9@cb.test/x&n6=https%3A%2F%2Ft.test%2Fx%3Fnext2%3Dhttps%253A%252F%252Fu.test%252F%253Ftoken%253Dk10tok&https://t.test/x?next=https%3A%2F%2Fuser%3Ap%2523w40%40h.test%2F&https://t.test/y?next=https%3A%2F%2Fuser%3Ap%252Fw41%40h.test%2F&https%3A%2F%2Ft.test%2Fx%3Fnext%3Dhttps%253A%252F%252Fuser%253Apw42%2540h.test=%3C&https://user:pa=ss43@host&%20https://user:pa=ss44@host&h%09ttps://user:pa=ss45@host&%01https://user:pa=ss46@host&flow=1&redirect_uri=https%3A%2F%2Flocalhost%3A3000&scope=openid&login_hint=bob%40x.test&next2=myapp:///cb%3Faccess_token%3Dk20tok&q2=a:b&//u:pw50@h.test=v&//u:p=w51@h.test&//u:p=w52@h.test/x?n=//x:y@z&d10=db%20postgres://u:pw53%5Cw@h&d9=%25252525252525252525252541&https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fz";
 
-	await log.fetch("https://api.test/fetch/https://myuser:pwpath@cb.test/x?q=hi&Signature=abc&Signature=def&next=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&deep=https%253A%252F%252Fmyuser%253Apwdeep%2540cb.test%252Fx&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAEXAMPLE%2F20260923%2Feu-north-1%2Fs3%2Faws4_request&X-Amz-Security-Token=FwoGZXIvYXdz&X-Amz-Signature=8b1c9f&X-Goog-Credential=svc%40proj.iam.gserviceaccount.com%2F20260923%2Fauto%2Fstorage%2Fgoog4_request&GoogleAccessId=svc%40proj.iam.gserviceaccount.com&access_token=ya29tok&API_KEY=k1api&apikey=k2api&key=k3api&Token=k4tok&access-token=v0cred&AccessToken=v1cred&api-key=v2cred&auth_token=v3cred&client_secret=v4cred&id_token=v5cred&password=v6cred&refresh_token=v7cred&Secret=v8cred&Subscription-Key=v9cred&authToken=w0cred&client-secret=w1cred&X_Amz_Signature=w2cred&apiKey=w3cred&x-api-key=u0cred&code=u1cred&id_token_hint=u2cred&auth=u3cred&old_password=u4cred&Passphrase=u5cred&consumer_id=u6cred&PrivateKeyId=u7cred&pwd=u8cred&X-Custom-Signed=u9cred&urn:secret=u10cred&pword=u11cred&new_password2=u14cred&_code=u12cred&https://u:pw47@h.test/x/token=u13cred&zipcode=kept2&X-Amz-SignedHeaders=host&keyword=kept&?kept=1&https://a@b=pw20@evil.test&https://dXNlcg==:pw21@evil.test&https://t.test/x?token=k5tok&then=https://t.test/y?sig=k6sig&n2=https://my+user:pw9@cb.test/x&n6=https%3A%2F%2Ft.test%2Fx%3Fnext2%3Dhttps%253A%252F%252Fu.test%252F%253Ftoken%253Dk10tok&https://t.test/x?next=https%3A%2F%2Fuser%3Ap%2523w40%40h.test%2F&https://t.test/y?next=https%3A%2F%2Fuser%3Ap%252Fw41%40h.test%2F&https%3A%2F%2Ft.test%2Fx%3Fnext%3Dhttps%253A%252F%252Fuser%253Apw42%2540h.test=%3C&https://user:pa=ss43@host&%20https://user:pa=ss44@host&h%09ttps://user:pa=ss45@host&%01https://user:pa=ss46@host&flow=1&redirect_uri=https%3A%2F%2Flocalhost%3A3000&scope=openid&login_hint=bob%40x.test&next2=myapp:///cb%3Faccess_token%3Dk20tok&q2=a:b&//u:pw50@h.test=v&//u:p=w51@h.test&//u:p=w52@h.test/x?n=//x:y@z&d10=db%20postgres://u:pw53%5Cw@h&d9=%25252525252525252525252541&https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fz");
-	await log.end();
+for (const [rule, holds] of [
+	["a url nested in the request path records REDACTED, and a non-sensitive query param is kept", urlFull => urlFull.startsWith("https://api.test/fetch/REDACTED?q=hi&")],
+	["a repeated sensitive key keeps one redaction per occurrence", urlFull => urlFull.includes("Signature=REDACTED&Signature=REDACTED")],
+	["neither sensitive value is leaked", urlFull => !urlFull.includes("abc") && !urlFull.includes("def")],
+	["a query value parsing as a url with userinfo once decoded records REDACTED", urlFull => urlFull.includes("&next=REDACTED&")],
+	["a url percent-encoded twice records REDACTED", urlFull => urlFull.includes("&deep=REDACTED&")],
+	["a credentialed url written as a bare query key is redacted, its value with it", urlFull => urlFull.endsWith("&REDACTED=REDACTED")],
+	["the nested password is not leaked", urlFull => !urlFull.includes("hunter2")],
+	["a presigned url's non-credential params are kept", urlFull => urlFull.includes("X-Amz-Algorithm=AWS4-HMAC-SHA256")],
+	["no presigned credential value is leaked", urlFull => !/AKIAEXAMPLE|FwoGZXIvYXdz|8b1c9f|gserviceaccount/.test(urlFull)],
+	["no token value is leaked, nor the userinfo of a url key ending in a term, a spelling with `-` or `_` dropped or added included", urlFull => !/ya29tok|k1api|k2api|k3api|k4tok|[uvw]\d+cred|pw47/.test(urlFull)],
+	["a key merely starting with a listed name is kept, and a key's leading ? with it", urlFull => urlFull.includes("keyword=kept&%3Fkept=1&")],
+	["a key ending in an exact-only name, or holding a term short of its end, is kept", urlFull => urlFull.includes("&zipcode=kept2&X-Amz-SignedHeaders=host&")],
+	["a url in a query key is read with its value: userinfo running across `=` or a listed key in it redacts both", urlFull => urlFull.includes("&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&then=") && !/pw2[01]|k5tok/.test(urlFull)],
+	["a url nested in a query value has its listed key redacted", urlFull => urlFull.includes("&then=https%3A%2F%2Ft.test%2Fy%3Fsig%3DREDACTED&")],
+	["userinfo holding a space is redacted", urlFull => urlFull.includes("&n2=REDACTED&")],
+	["a url nested two deep has its listed key redacted", urlFull => urlFull.includes("&n6=https%3A%2F%2Ft.test%2Fx%3Fnext2%3Dhttps%253A%252F%252Fu.test%252F%253Ftoken%253DREDACTED&")],
+	["a url in a query key is read alone too, where its value breaks the joined reading, and a key cut short by an = in its password is read with its value, whitespace or a control character the parser drops included", urlFull => urlFull.includes("&n6=https%3A%2F%2Ft.test%2Fx%3Fnext2%3Dhttps%253A%252F%252Fu.test%252F%253Ftoken%253DREDACTED&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&flow=1&") && !/w4[01]|pw42|ss4[3-6]/.test(urlFull)],
+	["a url without a host has its listed key redacted, and a scheme alone leaves a value be", urlFull => urlFull.includes("&next2=myapp%3A%2F%2F%2Fcb%3Faccess_token%3DREDACTED&q2=a%3Ab&")],
+	["userinfo in a key, or across its =, redacts both, and a value past eight encodings records REDACTED", urlFull => urlFull.includes("&q2=a%3Ab&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&d10=REDACTED&d9=REDACTED&") && !/pw5[0-3]/.test(urlFull)],
+	["an encoded url in a value leaves the pairs after it alone", urlFull => urlFull.includes("&flow=1&redirect_uri=https%3A%2F%2Flocalhost%3A3000&scope=openid&login_hint=bob%40x.test&")],
+] as [string, (urlFull: string) => boolean][]) {
+	test(`log.fetch captureQuery: ${rule}`, async t => {
+		const { calls, logFetch } = testFetchTrace({ captureQuery: true });
 
-	const urlFull = clientSpan(calls).attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue;
-
-	t.ok(urlFull.startsWith("https://api.test/fetch/REDACTED?q=hi&"), "a url nested in the request path records REDACTED, and a non-sensitive query param is kept");
-	t.ok(urlFull.includes("Signature=REDACTED&Signature=REDACTED"), "a repeated sensitive key keeps one redaction per occurrence");
-	t.ok(!urlFull.includes("abc") && !urlFull.includes("def"), "neither sensitive value is leaked");
-	t.ok(urlFull.includes("&next=REDACTED&"), "a query value parsing as a url with userinfo once decoded records REDACTED");
-	t.ok(urlFull.includes("&deep=REDACTED&"), "a url percent-encoded twice records REDACTED");
-	t.ok(urlFull.endsWith("&REDACTED=REDACTED"), "a credentialed url written as a bare query key is redacted, its value with it");
-	t.ok(!urlFull.includes("hunter2"), "the nested password is not leaked");
-	t.ok(urlFull.includes("X-Amz-Algorithm=AWS4-HMAC-SHA256"), "a presigned url's non-credential params are kept");
-	t.ok(!/AKIAEXAMPLE|FwoGZXIvYXdz|8b1c9f|gserviceaccount/.test(urlFull), "no presigned credential value is leaked");
-	t.ok(!/ya29tok|k1api|k2api|k3api|k4tok|[uvw]\d+cred|pw47/.test(urlFull), "no token value is leaked, nor the userinfo of a url key ending in a term, a spelling with `-` or `_` dropped or added included");
-	t.ok(urlFull.includes("keyword=kept&%3Fkept=1&"), "a key merely starting with a listed name is kept, and a key's leading ? with it");
-	t.ok(urlFull.includes("&zipcode=kept2&X-Amz-SignedHeaders=host&"), "a key ending in an exact-only name, or holding a term short of its end, is kept");
-	t.ok(urlFull.includes("&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&then=") && !/pw2[01]|k5tok/.test(urlFull), "a url in a query key is read with its value: userinfo running across `=` or a listed key in it redacts both");
-	t.ok(urlFull.includes("&then=https%3A%2F%2Ft.test%2Fy%3Fsig%3DREDACTED&"), "a url nested in a query value has its listed key redacted");
-	t.ok(urlFull.includes("&n2=REDACTED&"), "userinfo holding a space is redacted");
-	t.ok(urlFull.includes("&n6=https%3A%2F%2Ft.test%2Fx%3Fnext2%3Dhttps%253A%252F%252Fu.test%252F%253Ftoken%253DREDACTED&"), "a url nested two deep has its listed key redacted");
-	t.ok(urlFull.includes("&n6=https%3A%2F%2Ft.test%2Fx%3Fnext2%3Dhttps%253A%252F%252Fu.test%252F%253Ftoken%253DREDACTED&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&flow=1&") && !/w4[01]|pw42|ss4[3-6]/.test(urlFull), "a url in a query key is read alone too, where its value breaks the joined reading, and a key cut short by an = in its password is read with its value, whitespace or a control character the parser drops included");
-	t.ok(urlFull.includes("&next2=myapp%3A%2F%2F%2Fcb%3Faccess_token%3DREDACTED&q2=a%3Ab&"), "a url without a host has its listed key redacted, and a scheme alone leaves a value be");
-	t.ok(urlFull.includes("&q2=a%3Ab&REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&d10=REDACTED&d9=REDACTED&") && !/pw5[0-3]/.test(urlFull), "userinfo in a key, or across its =, redacts both, and a value past eight encodings records REDACTED");
-	t.ok(urlFull.includes("&flow=1&redirect_uri=https%3A%2F%2Flocalhost%3A3000&scope=openid&login_hint=bob%40x.test&"), "an encoded url in a value leaves the pairs after it alone");
-	t.end();
-});
+		await logFetch(CAPTURE_QUERY_URL);
+		t.ok(holds(clientSpan(calls).attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue), rule);
+		t.end();
+	});
+}
 
 test("log.fetch captureQuery reads a value up to eight encodings and eight nested urls deep", async t => {
-	const { calls } = stubFetch();
-	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+	const { calls, logFetch } = testFetchTrace({ captureQuery: true });
 	let encoded = "a/b";
 
 	for (let i = 0; i < 8; i++) encoded = encodeURIComponent(encoded);
 
 	const chain = (depth: number) => `${"https://h.test/?n=".repeat(depth - 1)}https://h.test/?q=1`;
 
-	await log.fetch(`https://api.test/x?v8=${encoded}&v9=${encodeURIComponent(encoded)}`);
-	await log.fetch(`https://api.test/x?n=${chain(8)}`);
-	await log.fetch(`https://api.test/x?n=${chain(9)}`);
-	await log.end();
+	await logFetch(`https://api.test/x?v8=${encoded}&v9=${encodeURIComponent(encoded)}`);
+	await logFetch(`https://api.test/x?n=${chain(8)}`);
+	await logFetch(`https://api.test/x?n=${chain(9)}`);
 
 	const urlFulls = exportedSpans(calls).filter(span => span.kind === 3).map(span => span.attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue);
 
@@ -196,11 +190,9 @@ for (const [query, expected] of SPLIT_USERINFO_QUERIES) {
 }
 
 test("log.fetch captureQuery redacts a url key whose scheme holds a tab the parser drops", async t => {
-	const { calls } = stubFetch();
-	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+	const { calls, logFetch } = testFetchTrace({ captureQuery: true });
 
-	await log.fetch("https://api.test/x?a=1&ht%09tps://h.test/p?code=pw90&b=2");
-	await log.end();
+	await logFetch("https://api.test/x?a=1&ht%09tps://h.test/p?code=pw90&b=2");
 
 	const urlFull = clientSpan(calls).attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue;
 
@@ -209,11 +201,9 @@ test("log.fetch captureQuery redacts a url key whose scheme holds a tab the pars
 });
 
 test("log.fetch captureQuery redacts a listed key after a ? in a kept value's fragment", async t => {
-	const { calls } = stubFetch();
-	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+	const { calls, logFetch } = testFetchTrace({ captureQuery: true });
 
-	await log.fetch("https://api.test/x?a=1&back=https%3A%2F%2Fh.test%2Fx%23a%3Ftoken%3Dpwfrag&b=2");
-	await log.end();
+	await logFetch("https://api.test/x?a=1&back=https%3A%2F%2Fh.test%2Fx%23a%3Ftoken%3Dpwfrag&b=2");
 
 	const urlFull = clientSpan(calls).attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue;
 
@@ -222,11 +212,9 @@ test("log.fetch captureQuery redacts a listed key after a ? in a kept value's fr
 });
 
 test("log.fetch captureQuery redacts a listed key opening a kept value's fragment", async t => {
-	const { calls } = stubFetch();
-	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+	const { calls, logFetch } = testFetchTrace({ captureQuery: true });
 
-	await log.fetch("https://api.test/x?a=1&back=https%3A%2F%2Fh.test%2Fcb%23access_token%3Dpwfrag2%26token_type%3Dbearer&b=2");
-	await log.end();
+	await logFetch("https://api.test/x?a=1&back=https%3A%2F%2Fh.test%2Fcb%23access_token%3Dpwfrag2%26token_type%3Dbearer&b=2");
 
 	const urlFull = clientSpan(calls).attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue;
 
@@ -271,13 +259,11 @@ for (const [path, expected] of Object.entries(NESTED_URL_PATHS)) {
 }
 
 test("log.fetch exports a url nested base64-encoded in the request path as written", async t => {
-	const { calls } = stubFetch();
-	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+	const { calls, logFetch } = testFetchTrace();
 	// base64url of https://s3.test/photo.jpg?sig=SECRET, as an image proxy takes it.
 	const path = "/insecure/rs:fit:300/aHR0cHM6Ly9zMy50ZXN0L3Bob3RvLmpwZz9zaWc9U0VDUkVU";
 
-	await log.fetch(`https://proxy.test${path}`);
-	await log.end();
+	await logFetch(`https://proxy.test${path}`);
 
 	const [span] = exportedSpans(calls).filter(exported => exported.kind === 3);
 
@@ -292,27 +278,23 @@ const nestedSevenDeep = Array.from({ length: 7 }).reduce<string>(nested => `http
 
 for (const query of ["?u=https://a/?".repeat(16384), "?https://a/?".repeat(16384), `?${nestedSevenDeep}`, `${"/a:".repeat(16384)}%3F`, `${deepPercent}/https:/${deepPercent}?q=${deepPercent}`, `?q=${"\\".repeat(32768)} x`, `?q=//${"\\".repeat(32768)} x`, `${"%5C".repeat(32768)}%20x`, `?//u:p${"&a@".repeat(16384)}`, `?//u:p=/${"&a@".repeat(16384)}`, `?${"//u:p&a@&".repeat(8192)}`]) {
 	test(`log.fetch redacts and exports the long url https://proxy.test/${query.slice(0, 13)}…`, async t => {
-		const { calls } = stubFetch();
-		const log = new Log({ captureQuery: true, captureRequestHeaders: ["x-deep"], otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+		const { calls, logFetch } = testFetchTrace({ captureQuery: true, captureRequestHeaders: ["x-deep"] });
 
-		await log.fetch(`https://proxy.test/${query}`, { headers: { "x-deep": deepPercent } });
-		await log.end();
+		await logFetch(`https://proxy.test/${query}`, { headers: { "x-deep": deepPercent } });
 		t.strictEqual(exportedSpans(calls).filter(span => span.kind === 3).length, 1, "its span is exported");
 		t.end();
 	});
 }
 
 test("log.fetch leaves a non-http(s) URL untraced", async t => {
-	const { calls } = stubFetch();
-	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+	const { calls, logFetch } = testFetchTrace({ captureQuery: true });
 
-	await log.fetch("myapp:user:hunter2@api.test/x");
-	await log.fetch("data:text/plain,secret-payload");
-	await log.end();
+	await logFetch("myapp:user:hunter2@api.test/x");
+	await logFetch("data:text/plain,secret-payload");
 
 	const exported = JSON.stringify(calls.filter(call => call.path.startsWith("/v1/")));
 
-	t.strictEqual(exportedSpans(calls).length, 1, "only the root span is exported, no client span");
+	t.strictEqual(exportedSpans(calls).length, 0, "no client span is exported");
 	t.ok(!exported.includes("hunter2"), "userinfo never reaches the collector");
 	t.ok(!exported.includes("secret-payload"), "a data: payload never reaches the collector");
 
@@ -324,19 +306,12 @@ test("log.fetch leaves a non-http(s) URL untraced", async t => {
 });
 
 test("log.fetch keeps a url's credentials off the exported span", async t => {
-	const runtimeFetch = globalThis.fetch.bind(globalThis);
-	const { calls } = stubFetch();
-	const exportFetch = globalThis.fetch;
-
-	// Only the export is stubbed: the traced call reaches the runtime's own fetch, which refuses a
-	// url carrying credentials while building the Request, so nothing leaves the machine.
-	globalThis.fetch = ((input: string | URL, init?: RequestInit) => new URL(String(input)).port === "4318" ? exportFetch(input, init) : runtimeFetch(input, init)) as typeof fetch;
-
-	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+	// The traced call reaches the runtime's own fetch, which refuses a url carrying credentials while
+	// building the Request, so nothing leaves the machine.
+	const { calls, logFetch } = testFetchTrace({ fetch: globalThis.fetch.bind(globalThis) });
 	let rejection = "";
 
-	await log.fetch("http://myuser:hunter2@127.0.0.1:45231/x?access_token=s3cr3t").catch((err: Error) => { rejection = err.message; });
-	await log.end();
+	await logFetch("http://myuser:hunter2@127.0.0.1:45231/x?access_token=s3cr3t").catch((err: Error) => { rejection = err.message; });
 
 	const span = clientSpan(calls);
 	const urlFull = span.attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue;
@@ -355,16 +330,14 @@ test("log.fetch keeps a url's credentials off the exported span", async t => {
 
 test("log.fetch redacts its url in a runtime's rejection that parses as a url whole", async t => {
 	const href = "https://myuser:hunter2@api.test/fetch/https:%2F%2Fcb.test%2Fy%3Ftoken%3Dnested1?token=s3cr3t";
-	const { calls } = stubFetch(path => {
+	const { calls, logFetch } = testFetchTrace({}, path => {
 		if (path.startsWith("/fetch/")) {
 			// Firefox's wording, whose `Window.fetch:` prefix is a scheme.
 			throw new TypeError(`Window.fetch: ${href} is an url with embedded credentials.`);
 		}
 	});
-	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 
-	await log.fetch(href).catch(() => {});
-	await log.end();
+	await logFetch(href).catch(() => {});
 
 	const exported = JSON.stringify(calls.filter(call => call.path.startsWith("/v1/")));
 
@@ -373,16 +346,12 @@ test("log.fetch redacts its url in a runtime's rejection that parses as a url wh
 });
 
 test("log.fetch redacts a listed query key in a header value or kept query value that no url parser reads whole", async t => {
-	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ link: "</next?page=2&access_token=hunter2>; rel=next", location: "/cb?token=hunter2", "x-cursor": "page=2&sig=hunter2", "x-enc": "cb%3Ftoken%3Dhunter2", "x-keyword": "/search?keyword=kept&q=a", "x-matrix": "/cdn/img;sig=hunter2", "x-nested": "/login?next=/cb?token=hunter2", "x-plain": "text/html; q=0.9", "x-semi": "/cdn/img;v;code=hunter2", "x-tab": "/cb?to\tken=hunter2" }) }) : undefined);
-	const log = new Log({
+	const { calls, logFetch } = testFetchTrace({
 		captureQuery: true,
 		captureResponseHeaders: ["link", "location", "x-cursor", "x-enc", "x-keyword", "x-matrix", "x-nested", "x-plain", "x-semi", "x-tab"],
-		otlpHttpBaseURI: "http://127.0.0.1:4318",
-		stderr: () => {},
-	});
+	}, path => path === "/h" ? response({ headers: new Headers({ link: "</next?page=2&access_token=hunter2>; rel=next", location: "/cb?token=hunter2", "x-cursor": "page=2&sig=hunter2", "x-enc": "cb%3Ftoken%3Dhunter2", "x-keyword": "/search?keyword=kept&q=a", "x-matrix": "/cdn/img;sig=hunter2", "x-nested": "/login?next=/cb?token=hunter2", "x-plain": "text/html; q=0.9", "x-semi": "/cdn/img;v;code=hunter2", "x-tab": "/cb?to\tken=hunter2" }) }) : undefined);
 
-	await log.fetch("https://api.test/h?src=%2F%2Fcdn.test%2Fk%3Fsig%3Dhunter2&via=cdn.test%2Fk%3Fx-amz-signature%3Dhunter2%26a%3Db&%2F%2Fcdn.test%2Fk%3Fsig%3Dhunter2&plain=cdn.test%2Fk%3Fpage%3D2&n=%2F%2Fcdn.test%2Fk%3Ftoken%3DREDACTED&v=%2Flogin%3Fnext%3D%2Fcb%3Ftoken%3Dhunter2&w=/cb?my%20token=hunter2");
-	await log.end();
+	await logFetch("https://api.test/h?src=%2F%2Fcdn.test%2Fk%3Fsig%3Dhunter2&via=cdn.test%2Fk%3Fx-amz-signature%3Dhunter2%26a%3Db&%2F%2Fcdn.test%2Fk%3Fsig%3Dhunter2&plain=cdn.test%2Fk%3Fpage%3D2&n=%2F%2Fcdn.test%2Fk%3Ftoken%3DREDACTED&v=%2Flogin%3Fnext%3D%2Fcb%3Ftoken%3Dhunter2&w=/cb?my%20token=hunter2");
 
 	const span = clientSpan(calls);
 	const attr = (key: string) => span.attributes.find((attribute: any) => attribute.key === key)?.value.stringValue;
@@ -410,12 +379,10 @@ test("log.fetch redacts a listed query key in a header value or kept query value
 });
 
 test("log.fetch redacts userinfo holding a tab the parser drops, in a captured header value and the request path", async t => {
-	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ "x-tab": "retry https://admin:hun\tter2@db.test/x", "x-tab2": "db \\\\admin:hun\tter2@h" }) }) : undefined);
-	const log = new Log({ captureResponseHeaders: ["x-tab", "x-tab2"], otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+	const { calls, logFetch } = testFetchTrace({ captureResponseHeaders: ["x-tab", "x-tab2"] }, path => path === "/h" ? response({ headers: new Headers({ "x-tab": "retry https://admin:hun\tter2@db.test/x", "x-tab2": "db \\\\admin:hun\tter2@h" }) }) : undefined);
 
-	await log.fetch("https://api.test/h");
-	await log.fetch("https://api.test/p/%2F%2Fusr:pa%09ssw0rd@h.test/z");
-	await log.end();
+	await logFetch("https://api.test/h");
+	await logFetch("https://api.test/p/%2F%2Fusr:pa%09ssw0rd@h.test/z");
 
 	const spans = exportedSpans(calls).filter(span => span.kind === 3);
 	const attr = (span: any, key: string) => span.attributes.find((attribute: any) => attribute.key === key)?.value.stringValue;
@@ -460,11 +427,9 @@ test("a plain space still ends userinfo in a status message", async t => {
 });
 
 test("log.fetch redacts userinfo holding a no-break space in a captured header value", async t => {
-	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ "x-nbsp": "retry https://admin:hun\u00a0ter2@db.test/x", "x-nbsp2": "db \\\\admin:hun\u00a0ter2@h" }) }) : undefined);
-	const log = new Log({ captureResponseHeaders: ["x-nbsp", "x-nbsp2"], otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+	const { calls, logFetch } = testFetchTrace({ captureResponseHeaders: ["x-nbsp", "x-nbsp2"] }, path => path === "/h" ? response({ headers: new Headers({ "x-nbsp": "retry https://admin:hun\u00a0ter2@db.test/x", "x-nbsp2": "db \\\\admin:hun\u00a0ter2@h" }) }) : undefined);
 
-	await log.fetch("https://api.test/h");
-	await log.end();
+	await logFetch("https://api.test/h");
 
 	const span = exportedSpans(calls).find(exported => exported.kind === 3);
 	const attr = (key: string) => span.attributes.find((attribute: any) => attribute.key === key)?.value.stringValue;
@@ -475,16 +440,12 @@ test("log.fetch redacts userinfo holding a no-break space in a captured header v
 });
 
 test("log.fetch captures allow-listed request and response headers only, never a credential", async t => {
-	const { calls } = stubFetch(path => path === "/h" ? response({ headers: new Headers({ link: "<https://user:pwlink@cdn.test>; rel=preconnect", location: "https://idp.test/authorize?redirect_uri=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&state=a%b", "set-cookie": "sid=hunter2", "x-app": "myapp:///cb?access_token=hunter2", "x-callback": "https%3A%2F%2F%C5ke%3Apwenc%40cb.test%2Fx", "x-db": "db=postgres://u:pw\\db@h", "x-db2": "see <https:/\\u:pwmix1@h>; rel=x", "x-deep": "https%253A%252F%252Fu%253Apwdeep%2540h.test", "x-frag": "https://h.test/x#a?token=pwfrag", "x-frag2": "https://h.test/cb#access_token=pwfrag2&token_type=bearer", "x-next": "https://api.test/page?token=hunter2", "x-opaque": "http:u:pwopaque@h.test/x", "x-resp": "rv", "x-secret": "nope", "x-slash": "https:/u:pwslash@h.test/x" }) }) : undefined);
-	const log = new Log({
+	const { calls, logFetch } = testFetchTrace({
 		captureRequestHeaders: ["Authorization", "cookie", "referer", "x-amz-security-token", "X-Api-Key", "x-keyboard", "x-password", "x-req"],
 		captureResponseHeaders: ["link", "location", "set-cookie", "x-app", "x-callback", "x-db", "x-db2", "x-deep", "x-frag", "x-frag2", "x-next", "x-opaque", "x-resp", "x-slash"],
-		otlpHttpBaseURI: "http://127.0.0.1:4318",
-		stderr: () => {},
-	});
+	}, path => path === "/h" ? response({ headers: new Headers({ link: "<https://user:pwlink@cdn.test>; rel=preconnect", location: "https://idp.test/authorize?redirect_uri=https%3A%2F%2Fmyuser%3Ahunter2%40cb.test%2Fx&state=a%b", "set-cookie": "sid=hunter2", "x-app": "myapp:///cb?access_token=hunter2", "x-callback": "https%3A%2F%2F%C5ke%3Apwenc%40cb.test%2Fx", "x-db": "db=postgres://u:pw\\db@h", "x-db2": "see <https:/\\u:pwmix1@h>; rel=x", "x-deep": "https%253A%252F%252Fu%253Apwdeep%2540h.test", "x-frag": "https://h.test/x#a?token=pwfrag", "x-frag2": "https://h.test/cb#access_token=pwfrag2&token_type=bearer", "x-next": "https://api.test/page?token=hunter2", "x-opaque": "http:u:pwopaque@h.test/x", "x-resp": "rv", "x-secret": "nope", "x-slash": "https:/u:pwslash@h.test/x" }) }) : undefined);
 
-	await log.fetch("https://api.test/h", { headers: { authorization: "Bearer hunter2", cookie: "sid=hunter2", referer: "https://myuser:hunter2@cb.test/x", "x-amz-security-token": "hunter2", "x-api-key": "hunter2", "x-keyboard": "dvorak", "x-other": "ignored", "x-password": "kept", "x-req": "MyBot/1.0 (+https://mybot.test; ops@mybot.test)" } });
-	await log.end();
+	await logFetch("https://api.test/h", { headers: { authorization: "Bearer hunter2", cookie: "sid=hunter2", referer: "https://myuser:hunter2@cb.test/x", "x-amz-security-token": "hunter2", "x-api-key": "hunter2", "x-keyboard": "dvorak", "x-other": "ignored", "x-password": "kept", "x-req": "MyBot/1.0 (+https://mybot.test; ops@mybot.test)" } });
 
 	const span = clientSpan(calls);
 	const attr = (key: string) => span.attributes.find((attribute: any) => attribute.key === key)?.value.stringValue;
@@ -518,7 +479,7 @@ test("log.fetch captures allow-listed request and response headers only, never a
 });
 
 test("log.fetch marks error spans for 4xx and for network failures, propagating each outcome", async t => {
-	const { calls } = stubFetch(path => {
+	const { calls, logFetch } = testFetchTrace({}, path => {
 		if (path === "/missing") return response({ status: 404 });
 		if (path === "/boom") throw Object.assign(new Error("down"), { code: "ECONNREFUSED" });
 		if (path === "/abort") throw new DOMException("aborted", "AbortError");
@@ -527,10 +488,9 @@ test("log.fetch marks error spans for 4xx and for network failures, propagating 
 
 		return undefined;
 	});
-	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 
 	// A 4xx is a returned response, not an exception.
-	const res = await log.fetch("https://api.test/missing");
+	const res = await logFetch("https://api.test/missing");
 
 	t.strictEqual(res.status, 404, "a 4xx response is still returned");
 
@@ -538,16 +498,15 @@ test("log.fetch marks error spans for 4xx and for network failures, propagating 
 	let threw = false;
 
 	try {
-		await log.fetch("https://api.test/boom");
+		await logFetch("https://api.test/boom");
 	} catch {
 		threw = true;
 	}
 	t.ok(threw, "the underlying network error propagates to the caller");
 
-	await log.fetch("https://api.test/abort").catch(() => {});
-	await log.fetch("https://api.test/bare").catch(() => {});
-	await log.fetch("https://api.test/a/https:%2F%2Fu:hunter3%40z/b").catch(() => {});
-	await log.end();
+	await logFetch("https://api.test/abort").catch(() => {});
+	await logFetch("https://api.test/bare").catch(() => {});
+	await logFetch("https://api.test/a/https:%2F%2Fu:hunter3%40z/b").catch(() => {});
 
 	const spans = exportedSpans(calls);
 	const attr = (span: any, key: string) => span.attributes.find((attribute: any) => attribute.key === key)?.value.stringValue;
@@ -564,12 +523,10 @@ test("log.fetch marks error spans for 4xx and for network failures, propagating 
 });
 
 test("log.fetch keeps a caller-supplied traceparent", async t => {
-	const { calls } = stubFetch();
-	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+	const { calls, logFetch } = testFetchTrace();
 	const supplied = formatTraceparent(generateTraceId(), generateSpanId());
 
-	await log.fetch("https://api.test/x", { headers: { traceparent: supplied } });
-	await log.end();
+	await logFetch("https://api.test/x", { headers: { traceparent: supplied } });
 
 	t.strictEqual(callHeader(calls.find(call => call.path === "/x")!, "traceparent"), supplied, "the caller's traceparent is not overwritten");
 	t.end();
@@ -608,9 +565,8 @@ test("log.fetch skips an invalid name in captureRequestHeaders or captureRespons
 	const { calls } = stubFetch(path => path === "/x" ? response({ headers: new Headers({ "x-resp": "rv" }) }) : undefined);
 	const { log, stderr } = capture({ captureRequestHeaders: ["X-Api-Key: hunter2", "x-req"], captureResponseHeaders: ["x-resp", "bad\nname"], format: "json", otlpHttpBaseURI: "http://127.0.0.1:4318" });
 
-	for (let i = 0; i < 2; i++) {
-		t.strictEqual((await log.fetch("https://api.test/x", { headers: { "x-req": "rq" } })).status, 200, `call ${i + 1} resolves with the platform's response`);
-	}
+	t.strictEqual((await log.fetch("https://api.test/x", { headers: { "x-req": "rq" } })).status, 200, "call 1 resolves with the platform's response");
+	t.strictEqual((await log.fetch("https://api.test/x", { headers: { "x-req": "rq" } })).status, 200, "call 2 resolves with the platform's response");
 
 	await log.end();
 
@@ -622,11 +578,21 @@ test("log.fetch skips an invalid name in captureRequestHeaders or captureRespons
 		["warn", "@larvit/log: captureRequestHeaders[0] is not a valid header name, so log.fetch skips it"],
 		["warn", "@larvit/log: captureResponseHeaders[1] is not a valid header name, so log.fetch skips it"],
 	], "each invalid name warns once per stderr, by index, never echoing it");
+	t.end();
+});
+
+test("log.fetch skips a captureResponseHeaders name that is no string, with its warning", async t => {
+	stubFetch();
 
 	const untyped = capture({ captureResponseHeaders: [null as unknown as string] });
 
 	t.strictEqual((await untyped.log.fetch("https://api.test/x")).status, 200, "a name that is no string is skipped too");
 	t.strictEqual(untyped.stderr.length, 1, "with its warning");
+	t.end();
+});
+
+test("a stderr that throws on log.fetch's header-name warning never changes the result", async t => {
+	stubFetch();
 
 	const broken = new Log({ captureRequestHeaders: ["bad name"], stderr: () => { throw new Error("stderr closed"); } });
 
@@ -655,24 +621,29 @@ test("log.fetch with an invalid header rejects but never hangs end()", async t =
 	t.end();
 });
 
-test("a clock whose now() is fractional or throws never changes a log.fetch result or hangs end()", async t => {
+// The platform's timers, for a test clock that replaces only now().
+const platformTimers = { clearTimeout: (timer?: TimerHandle) => clearTimeout(timer), setTimeout: (callback: () => void, delayMs: number) => setTimeout(callback, delayMs) };
+
+test("a clock whose now() is fractional keeps the fraction on a log.fetch span", async t => {
 	const { calls } = stubFetch();
-	const timers = { clearTimeout: (timer?: TimerHandle) => clearTimeout(timer), setTimeout: (callback: () => void, delayMs: number) => setTimeout(callback, delayMs) };
-	const fractional = new Log({ clock: { ...timers, now: () => 1758150000000.3 }, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {}, stdout: () => {} });
+	const fractional = new Log({ clock: { ...platformTimers, now: () => 1758150000000.3 }, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {}, stdout: () => {} });
 
 	fractional.info("record");
 	await fractional.fetch("https://api.test/x");
 	await fractional.end();
 	t.ok(clientSpan(calls).startTimeUnixNano.startsWith("1758150000000300"), "a fraction of a millisecond is kept");
 	t.deepEqual(exportedRecords(calls), ["record"], "and the record is exported");
+	t.end();
+});
 
+test("a clock whose now() throws never changes a log.fetch result or hangs end()", async t => {
 	let broken = false;
 	const brokenNow = () => {
 		if (broken) throw new Error("clock broke");
 
 		return Date.now();
 	};
-	const throwing = new Log({ clock: { ...timers, now: brokenNow }, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {}, stdout: () => {} });
+	const throwing = new Log({ clock: { ...platformTimers, now: brokenNow }, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {}, stdout: () => {} });
 
 	throwing.info("before");
 	stubFetch(path => {
@@ -698,6 +669,16 @@ test("log.fetch throws when the log is already ended", async t => {
 	t.end();
 });
 
+test("log.fetch reads the platform's fetch at the call, so one installed after the Log was made sends the request", async t => {
+	const log = new Log({ stderr: () => {} });
+	const { calls } = stubFetch();
+
+	await log.fetch("https://api.test/x");
+	t.deepEqual(calls.map(call => call.url), ["https://api.test/x"], "the fetch in place at the call sent it");
+	await log.end();
+	t.end();
+});
+
 test("log.fetch works without OTLP, still injecting a traceparent", async t => {
 	const { calls } = stubFetch();
 	const log = new Log({ stderr: () => {} });
@@ -718,17 +699,8 @@ test("isCredentialHeaderName tells a credential header from any other, read from
 	t.end();
 });
 
-function fetchTrace(over: Partial<FetchTrace> = {}): FetchTrace & { warnings: string[] } {
-	const warnings: string[] = [];
-	const clock = { clearTimeout: () => {}, now: () => 1700000000000, setTimeout: () => 1 };
-	const randomBytes = (size: number) => new Uint8Array(size).fill(7);
-	const { sampled, span } = openSpan({ clock, randomBytes });
-
-	return { clock, context: { "service.name": "svc" }, randomBytes, sampled, span, warn: msg => { warnings.push(msg); }, warnings, ...over };
-}
-
 test("requestAttributes drops the query and keeps the port, scheme and context", t => {
-	const attributes = requestAttributes(fetchTrace(), new URL("https://api.test:8443/users?token=secret"), "GET");
+	const attributes = requestAttributes(testFetchTrace().trace, new URL("https://api.test:8443/users?token=secret"), "GET");
 
 	t.deepEqual(attributes, {
 		"http.request.method": "GET",
@@ -743,7 +715,7 @@ test("requestAttributes drops the query and keeps the port, scheme and context",
 
 test("capturedHeaders captures a named request header and redacts a credential one", t => {
 	const headers = new Headers({ Authorization: "Bearer abc", "X-Request-Id": "r1" });
-	const attributes = capturedHeaders(fetchTrace({ captureRequestHeaders: ["X-Request-Id", "Authorization"] }), "captureRequestHeaders", headers);
+	const attributes = capturedHeaders(testFetchTrace({ captureRequestHeaders: ["X-Request-Id", "Authorization"] }).trace, "captureRequestHeaders", headers);
 
 	t.strictEqual(attributes["http.request.header.x-request-id"], "r1", "the plain header is captured");
 	t.strictEqual(attributes["http.request.header.authorization"], "REDACTED", "the credential is not");
@@ -751,17 +723,17 @@ test("capturedHeaders captures a named request header and redacts a credential o
 });
 
 test("capturedHeaders warns of a header name it can't read, by position and not by name", t => {
-	const trace = fetchTrace({ captureRequestHeaders: ["bad name: value"] });
+	const { trace, warnings } = testFetchTrace({ captureRequestHeaders: ["bad name: value"] });
 
 	capturedHeaders(trace, "captureRequestHeaders", new Headers());
-	t.deepEqual(trace.warnings, ["@larvit/log: captureRequestHeaders[0] is not a valid header name, so log.fetch skips it"], "the index stands in for the name");
+	t.deepEqual(warnings, ["@larvit/log: captureRequestHeaders[0] is not a valid header name, so log.fetch skips it"], "the index stands in for the name");
 	t.end();
 });
 
 test("responseAttributes records the status and a captured response header", t => {
 	const res = new Response(null, { headers: { "X-Trace": "t1" }, status: 503 });
 
-	t.deepEqual(responseAttributes(fetchTrace({ captureResponseHeaders: ["X-Trace"] }), res), { "http.response.header.x-trace": "t1", "http.response.status_code": 503 }, "status and header");
+	t.deepEqual(responseAttributes(testFetchTrace({ captureResponseHeaders: ["X-Trace"] }).trace, res), { "http.response.header.x-trace": "t1", "http.response.status_code": 503 }, "status and header");
 	t.end();
 });
 

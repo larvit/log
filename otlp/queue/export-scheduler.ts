@@ -1,4 +1,4 @@
-import { systemClock, type TimerHandle } from "../primitives/clock.js";
+import { systemClock, type TimerHandle } from "../../primitives/clock.js";
 import type { ResolvedQueueConf } from "./queue-types.js";
 
 const RETRY_DELAY_MAX_MS = 30000;
@@ -40,9 +40,10 @@ type SchedulerState = { failures: number } & (
 	| { name: "backingOff" }
 );
 
-// A public call (`flush`, `schedule`, `backoff` as sendFailed, `resetBackoff` as sendSucceeded) or an
-// internal step of a round or a timer.
+// A public call (`flush`, `schedule`, `backoff` as sendFailed, `resetBackoff` as sendSucceeded), an
+// internal step of a round or a timer, or an effect that threw, such as a clock's.
 type SchedulerEvent =
+	| { error: unknown, type: "effectFailed" }
 	| { type: "flush" }
 	| { type: "loaded" }
 	| { type: "roundDone" }
@@ -57,6 +58,8 @@ type SchedulerEffect =
 	| { delayMs: number, type: "armTimer" }
 	// The flush() caller waits for the round after the one in flight.
 	| { type: "joinNextRound" }
+	// The flush() callers that joined reject with the error.
+	| { error: unknown, type: "rejectJoiners" }
 	// No round follows for the flush() callers that joined, so they stop waiting.
 	| { type: "releaseJoiners" }
 	// Clear the timer and start a round, which the flush() caller and those that joined wait for.
@@ -98,6 +101,9 @@ export function transition(state: SchedulerState, event: SchedulerEvent, delays:
 	const round = state.name === "loading" || state.name === "running";
 
 	switch (event.type) {
+		// No round stays marked as running, no timer as armed and no flush() waiting.
+		case "effectFailed":
+			return { effects: [{ error: event.error, type: "rejectJoiners" }], state: { failures: state.failures, name: "idle" } };
 		case "flush":
 			if (round) {
 				return { effects: [{ type: "joinNextRound" }], state: { ...state, flushRequested: true } };
@@ -179,12 +185,7 @@ export class ExportScheduler {
 				awaited = this.carryOut(effect) ?? awaited;
 			}
 		} catch (err) {
-			// A clock that throws leaves no round marked as running, no timer marked as armed and no flush() waiting.
-			this.state = { failures: state.failures, name: "idle" };
-
-			if (this.joiners) {
-				this.settleJoiners(Promise.reject(err));
-			}
+			void this.dispatch({ error: err, type: "effectFailed" });
 
 			throw err;
 		}
@@ -200,6 +201,13 @@ export class ExportScheduler {
 				return undefined;
 			case "joinNextRound":
 				return this.joinNextRound();
+			case "rejectJoiners":
+				// Only where a flush() joined, since nobody would handle the rejection otherwise.
+				if (this.joiners) {
+					this.settleJoiners(Promise.reject(effect.error));
+				}
+
+				return undefined;
 			case "releaseJoiners":
 				this.settleJoiners();
 

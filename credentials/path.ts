@@ -48,7 +48,6 @@ export function redactedPath(pathname: string): string {
 	const cutAt = urlAt === -1 ? listedKeyAt : urlAt;
 	const kept = cutAt === -1 ? pathname : [...segments.slice(0, cutAt), "REDACTED"].join("/");
 
-
 	// Userinfo after `//`, `\\`, `/\` or `\/` needs no scheme and no query key, so both cuts can miss it.
 	// That userinfo may sit in a decoding that maps to no raw segment, so the whole path goes.
 	return holdsUserinfoInAnyDecoding(kept) ? "/REDACTED" : kept;

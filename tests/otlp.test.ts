@@ -1,8 +1,9 @@
 import { type Clock, Log, type Metadata, type OtlpPayload, type OtlpQueue, Queue, type QueueStorage, type TimerHandle } from "../index.js";
-import { encodeBatch } from "../otlp/batch.js";
-import { plainHttpWarnings } from "../otlp/endpoint.js";
-import { ExportScheduler, transition, unref } from "../otlp/export-scheduler.js";
-import { statusFailure } from "../otlp/response.js";
+import { ExportScheduler, transition, unref } from "../otlp/queue/export-scheduler.js";
+import { saveTransition } from "../otlp/queue/queue-storage.js";
+import { encodeBatch } from "../otlp/send/batch.js";
+import { plainHttpWarnings } from "../otlp/send/endpoint.js";
+import { statusFailure } from "../otlp/send/response.js";
 import { pbDecode, pbDecodeLogs, pbDecodeSpans, pbMsg } from "./protobuf-decode.js";
 import test from "./tap.js";
 import { callHeader, exportedRecords, exportedSpans, fakeClock, fakeStorage, nanos, reportSink, response, storedRecords, stubFetch, thrown, waitFor } from "./test-doubles.js";
@@ -143,9 +144,10 @@ test("user:pass@ in otlpHttpBaseURI beside an Authorization in otlpAdditionalHea
 	const stderr: string[] = [];
 	const toStderr = (line: string) => { stderr.push(line); };
 
-	for (let i = 0; i < 2; i++) {
-		new Log({ format: "json", otlpAdditionalHeaders: { Authorization: "Bearer t0ken" }, otlpHttpBaseURI: "https://collector:s3cret@collector.test", stderr: toStderr });
-	}
+	const bothToStderr = { format: "json", otlpAdditionalHeaders: { Authorization: "Bearer t0ken" }, otlpHttpBaseURI: "https://collector:s3cret@collector.test", stderr: toStderr } as const;
+
+	new Log(bothToStderr);
+	new Log(bothToStderr);
 
 	t.deepEqual(stderr.map(line => [JSON.parse(line).logLevel, JSON.parse(line).msg]), [["warn", warning]], "a Log-built queue warns once per stderr, at warn");
 	t.end();
@@ -219,12 +221,13 @@ test("an Authorization sent over plain http: to a non-loopback host warns once p
 	const stderr: string[] = [];
 	const toStderr = (line: string) => { stderr.push(line); };
 
-	for (const msg of ["x", "y"]) {
-		const log = new Log({ format: "json", otlpHttpBaseURI: "http://collector:s3cret@collector.test:4318", stderr: toStderr });
+	const first = new Log({ format: "json", otlpHttpBaseURI: "http://collector:s3cret@collector.test:4318", stderr: toStderr });
+	const second = new Log({ format: "json", otlpHttpBaseURI: "http://collector:s3cret@collector.test:4318", stderr: toStderr });
 
-		log.info(msg);
-		await log.flush();
-	}
+	first.info("x");
+	await first.flush();
+	second.info("y");
+	await second.flush();
 
 	const { logLevel, msg } = JSON.parse(stderr[0]);
 
@@ -430,9 +433,9 @@ test("Queue sends at once when its bytes reach maxBatchBytes, whatever batches a
 
 	const batched = logTo(queueFor());
 
-	for (let i = 0; i < 3; i++) {
-		batched.info("abc");
-	}
+	batched.info("abc");
+	batched.info("abc");
+	batched.info("abc");
 
 	await clock.settle();
 	t.deepEqual(calls.map(call => call.body.resourceLogs[0].scopeLogs[0].logRecords.length), [2, 1], "three records go out as a batch that fits and the one left behind");
@@ -464,10 +467,10 @@ test("Queue hands its warnings to the warn function it is given, once per messag
 	const queue = new Queue({ otlpHttpBaseURI: "http://u:p@collector.test:4318", report: reports.report }, msg => { warned.push(msg); });
 	const log = new Log({ otlpQueue: queue, stderr: () => {} });
 
-	for (const text of ["x", "y"]) {
-		log.info(text);
-		await log.flush();
-	}
+	log.info("x");
+	await log.flush();
+	log.info("y");
+	await log.flush();
 
 	t.strictEqual(warned.length, 1, "the credential warning goes to warn, once");
 	t.deepEqual(reports.lines, [], "and not to report");
@@ -848,9 +851,8 @@ test("Queue flushed while storage loads sends the leftovers and leaves no batch 
 	t.end();
 });
 
-test("Queue with storage survives a restart: leftovers go first and storage empties on delivery", async t => {
-	for (const async of [false, true]) {
-		const label = async ? "async storage" : "sync storage";
+for (const async of [false, true]) {
+	test(`Queue with ${async ? "async" : "sync"} storage survives a restart: leftovers go first and storage empties on delivery`, async t => {
 		const storage = fakeStorage(async);
 		const otlpHttpBaseURI = "http://127.0.0.1:4318";
 
@@ -860,7 +862,7 @@ test("Queue with storage survives a restart: leftovers go first and storage empt
 		before.info("before restart");
 		await before.end();
 		await waitFor(() => (storage.data.get("@larvit/log:otlp-queue") ?? "").includes("before restart"));
-		t.strictEqual(storage.data.size, 1, `${label}: the undelivered records and span are persisted under the default key`);
+		t.strictEqual(storage.data.size, 1, "the undelivered records and span are persisted under the default key");
 
 		const { calls } = stubFetch();
 		const afterReports = reportSink();
@@ -868,13 +870,16 @@ test("Queue with storage survives a restart: leftovers go first and storage empt
 
 		after.info("after restart");
 		await after.flush();
-		t.deepEqual(exportedRecords(calls), ["before restart", "after restart"], `${label}: leftovers are sent before new records`);
-		t.strictEqual(exportedSpans(calls).length, 1, `${label}: the persisted span is delivered too`);
+		t.deepEqual(exportedRecords(calls), ["before restart", "after restart"], "leftovers are sent before new records");
+		t.strictEqual(exportedSpans(calls).length, 1, "the persisted span is delivered too");
 		await waitFor(() => storage.data.size === 0);
-		t.strictEqual(storage.data.size, 0, `${label}: storage is cleared once everything is delivered`);
-		t.deepEqual(afterReports.lines, [], `${label}: a readable store is reported nowhere`);
-	}
+		t.strictEqual(storage.data.size, 0, "storage is cleared once everything is delivered");
+		t.deepEqual(afterReports.lines, [], "a readable store is reported nowhere");
+		t.end();
+	});
+}
 
+test("Queue reports corrupt stored data once, discards it from its custom key and still exports", async t => {
 	const corrupt = fakeStorage(false);
 	const reports = reportSink();
 
@@ -888,14 +893,24 @@ test("Queue with storage survives a restart: leftovers go first and storage empt
 	t.deepEqual(exportedRecords(calls), ["still works"], "corrupt stored data does not block new records");
 	t.deepEqual(reports.lines.map(line => line.msg), ["OTLP queue storage unreadable, discarded"], "corrupt data is reported once");
 	t.strictEqual(typeof reports.lines[0]?.error, "string", "and says why");
+	await waitFor(() => corrupt.data.size === 0);
+	t.strictEqual(corrupt.data.size, 0, "the custom key is cleared");
+	t.end();
+});
+
+test("Queue never sends an enqueued payload of unknown kind, and reports it by the rule stored data meets", async t => {
+	const { calls } = stubFetch();
+	const reports = reportSink();
+	const queue = new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report, storage: fakeStorage(false) });
 
 	Reflect.apply(queue.enqueue, queue, [{ resourceMetrics: [] }]);
 	await queue.flush();
-	t.strictEqual(calls.length, 1, "an enqueued payload of unknown kind is never sent");
-	t.deepEqual(reports.lines.slice(1), [{ msg: "OTLP payload of unknown kind, dropped" }], "and is reported by the same rule stored data meets");
-	await waitFor(() => corrupt.data.size === 0);
-	t.strictEqual(corrupt.data.size, 0, "the custom key is cleared");
+	t.strictEqual(calls.length, 0, "an enqueued payload of unknown kind is never sent");
+	t.deepEqual(reports.lines, [{ msg: "OTLP payload of unknown kind, dropped" }], "and is reported by the same rule stored data meets");
+	t.end();
+});
 
+test("Queue reports and discards stored JSON that is not a list of payloads", async t => {
 	const notAList = fakeStorage(false);
 	const notAListReports = reportSink();
 
@@ -903,6 +918,11 @@ test("Queue with storage survives a restart: leftovers go first and storage empt
 	new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", report: notAListReports.report, storage: notAList });
 	await waitFor(() => notAList.data.size === 0);
 	t.deepEqual(notAListReports.lines, [{ error: "not a list of OTLP payloads", key: "@larvit/log:otlp-queue", msg: "OTLP queue storage unreadable, discarded" }], "stored JSON that is not a list of payloads is reported and cleared");
+	t.end();
+});
+
+test("Queue loads a stored list too long to pass as call arguments without a report", async t => {
+	stubFetch();
 
 	const long = fakeStorage(false);
 	const longReports = reportSink();
@@ -910,12 +930,15 @@ test("Queue with storage survives a restart: leftovers go first and storage empt
 	long.data.set("@larvit/log:otlp-queue", JSON.stringify(Array.from({ length: 150000 }, () => ({ resourceLogs: [] }))));
 	await new Queue({ maxItems: 150000, otlpHttpBaseURI: "http://127.0.0.1:4318", report: longReports.report, storage: long }).flush();
 	t.deepEqual(longReports.lines, [], "a stored list too long to pass as call arguments loads without a report");
+	t.end();
+});
 
+test("Queue still exports to a storage that cannot be written, and reports the write failure", async t => {
+	const { calls } = stubFetch();
 	const broken = fakeStorage(false);
 	const brokenReports = reportSink();
 
 	broken.setItem = () => { throw new Error("quota exceeded"); };
-	calls.length = 0;
 	const unsaved = new Log({ otlpQueue: new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", report: brokenReports.report, storage: broken }), stderr: () => {} });
 
 	unsaved.info("delivered anyway");
@@ -1422,6 +1445,34 @@ test("the scheduler's transition holds a backoff against a joined flush(), and e
 	t.deepEqual(transition({ failures: 2, name: "backingOff" }, { type: "flush" }, delays), { effects: [], state: { failures: 2, name: "backingOff" } }, "a flush() doesn't start a round during a backoff");
 	t.end();
 });
+
+test("the scheduler's transition, on an effect that threw, goes idle and rejects the joined flush() callers", t => {
+	const error = new Error("clock broke");
+
+	t.deepEqual(
+		transition({ batchDue: true, failures: 3, flushRequested: true, name: "running" }, { error, type: "effectFailed" }, { batchDelayMs: 1000, retryDelayMs: 20 }),
+		{ effects: [{ error, type: "rejectJoiners" }], state: { failures: 3, name: "idle" } },
+		"idle keeps the failure count, and the joiners get the error",
+	);
+	t.end();
+});
+
+for (const [state, event, expected, name] of [
+	["idle", "save", { startWrite: true, state: "writing" }, "a save while idle starts a write"],
+	["writing", "save", { startWrite: false, state: "rewriteDue" }, "a save during a write books one more write"],
+	["rewriteDue", "save", { startWrite: false, state: "rewriteDue" }, "a save with a rewrite booked adds nothing"],
+	["unreadable", "save", { startWrite: false, state: "unreadable" }, "a save after an unreadable read writes nothing"],
+	["writing", "unreadable", { startWrite: false, state: "unreadable" }, "a write that finds storage unreadable stops"],
+	["rewriteDue", "unreadable", { startWrite: false, state: "unreadable" }, "a booked rewrite that finds storage unreadable stops"],
+	["rewriteDue", "writeStarted", { startWrite: false, state: "writing" }, "a write that starts covers the rewrite booked before it"],
+	["writing", "writeDone", { startWrite: false, state: "idle" }, "a write done with none booked goes idle"],
+	["rewriteDue", "writeDone", { startWrite: true, state: "writing" }, "a write done with a rewrite booked starts it"],
+] as const) {
+	test(`saveTransition: ${name}`, t => {
+		t.deepEqual(saveTransition(state, event), expected, `${state} + ${event}`);
+		t.end();
+	});
+}
 
 test("unref hands a numeric timer id to the runtime's unrefTimer", t => {
 	const unrefed: unknown[] = [];

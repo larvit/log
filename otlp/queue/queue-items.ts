@@ -1,4 +1,4 @@
-import type { OtlpPayload } from "./payloads.js";
+import type { OtlpPayload } from "../payloads.js";
 
 export type QueuedItem = { bytes: number, payload: OtlpPayload };
 

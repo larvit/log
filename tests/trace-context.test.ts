@@ -1,7 +1,7 @@
 import { formatTraceparent, generateSpanId, generateTraceId, Log, type LogInt, type Metadata, type OtlpSpan, parseTraceparent, Queue } from "../index.js";
 import { pbDecode, pbMsg } from "./protobuf-decode.js";
 import test from "./tap.js";
-import { callHeader, exportedRecords, exportedSpans, stubFetch } from "./test-doubles.js";
+import { callHeader, exportedRecords, exportedSpans, fakeClock, stubFetch } from "./test-doubles.js";
 
 test("spans of different names share one scopeSpans entry in a POST", async t => {
 	const { calls } = stubFetch();
@@ -24,13 +24,16 @@ test("a batch merges per scope, keeping a v2.4.0 stored payload's apart", async 
 	const span = (name: string): OtlpSpan => ({ attributes: [], droppedAttributesCount: 0, droppedEventsCount: 0, droppedLinksCount: 0, endTimeUnixNano: "2", events: [], kind: 1, links: [], name, spanId: generateSpanId(), startTimeUnixNano: "1", status: { code: 0 }, traceId: generateTraceId() });
 	const scope = { name: "@larvit/log", version: "2.5.0" };
 
-	for (const [msg, logScope] of [["new", scope], ["stored", undefined], ["new too", scope]] as const) {
-		queue.enqueue({ resourceLogs: [{ resource, scopeLogs: [{ logRecords: [record(msg)], ...logScope ? { scope: logScope } : {} }] }] });
-	}
+	const logsPayload = (scopeLog: { logRecords: ReturnType<typeof record>[], scope?: typeof scope }) => ({ resourceLogs: [{ resource, scopeLogs: [scopeLog] }] });
+	const spansPayload = (spanScope: { name: string, version?: string }, name: string) => ({ resourceSpans: [{ resource: { ...resource, droppedAttributesCount: 0 }, scopeSpans: [{ scope: spanScope, spans: [span(name)] }] }] });
 
-	for (const [name, spanScope] of [["new", scope], ["stored", { name: "stored" }], ["new too", scope]] as const) {
-		queue.enqueue({ resourceSpans: [{ resource: { ...resource, droppedAttributesCount: 0 }, scopeSpans: [{ scope: spanScope, spans: [span(name)] }] }] });
-	}
+	queue.enqueue(logsPayload({ logRecords: [record("new")], scope }));
+	// A v2.4.0 stored payload carries no scope.
+	queue.enqueue(logsPayload({ logRecords: [record("stored")] }));
+	queue.enqueue(logsPayload({ logRecords: [record("new too")], scope }));
+	queue.enqueue(spansPayload(scope, "new"));
+	queue.enqueue(spansPayload({ name: "stored" }, "stored"));
+	queue.enqueue(spansPayload(scope, "new too"));
 
 	await queue.flush();
 
@@ -120,6 +123,20 @@ test("traceparent adoption: incoming joins; malformed, parentLog and clone do no
 	t.notStrictEqual(adopted.clone().span.traceId, adopted.span.traceId, "clone starts its own trace");
 	t.strictEqual(adopted.conf.traceparent, formatTraceparent(traceId, spanId), "the instance given it reads it back");
 	t.strictEqual(new Log({ parentLog: adopted }).conf.traceparent, undefined, "a child does not inherit it");
+	t.end();
+});
+
+test("a log.span reference taken before end() sees the end time, status and attributes", async t => {
+	const clock = fakeClock();
+	const log = new Log({ clock, context: { job: "nightly" }, stderr: () => {} });
+	const span = log.span;
+
+	await clock.advance(5);
+	await log.end({ error: new Error("job failed") });
+	t.strictEqual(log.span, span, "log.span is the same object");
+	t.deepEqual([span.startTimeUnixNano, span.endTimeUnixNano], ["1758150000000000000", "1758150000005000000"], "the reference carries the end time");
+	t.deepEqual(span.status, { code: 2, message: "job failed" }, "the reference carries the error status");
+	t.deepEqual(span.attributes.map(attribute => attribute.key), ["job", "error.type"], "the reference carries the attributes");
 	t.end();
 });
 
