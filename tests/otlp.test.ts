@@ -3,7 +3,7 @@ import { ExportScheduler, transition, unref } from "../otlp/queue/export-schedul
 import { saveTransition } from "../otlp/queue/queue-storage.js";
 import { encodeBatch } from "../otlp/send/batch.js";
 import { plainHttpWarnings } from "../otlp/send/endpoint.js";
-import { statusFailure } from "../otlp/send/response.js";
+import { partialRejection, statusFailure } from "../otlp/send/response.js";
 import { systemClock } from "../primitives/clock.js";
 import { pbDecode, pbDecodeLogs, pbDecodeSpans, pbMsg } from "./protobuf-decode.js";
 import test from "./tap.js";
@@ -1675,6 +1675,228 @@ test("encodeBatch hands back a failure that is not retried when a payload cannot
 	t.end();
 });
 
+test("encodeBatch names a payload that throws something other than an Error as unencodable", t => {
+	const unencodable = { payload: { resourceLogs: [{ get resource(): never { throw Object.freeze({ reason: "corrupt" }); } }] } } as unknown as Parameters<typeof encodeBatch>[0][number];
+
+	t.deepEqual(encodeBatch([unencodable], false), { failure: { message: "Unencodable OTLP payload", retry: false } }, "the fallback message, and dropped");
+	t.end();
+});
+
+const resourceLogsOf = (service: string): OtlpPayload => ({
+	resourceLogs: [{ resource: { attributes: [{ key: "service.name", value: { stringValue: service } }] }, scopeLogs: [{ logRecords: [], scope: { name: "s" } }] }],
+});
+const resourceSpansOf = (service: string): OtlpPayload => ({
+	resourceSpans: [{ resource: { attributes: [{ key: "service.name", value: { stringValue: service } }], droppedAttributesCount: 0 }, scopeSpans: [{ scope: { name: "s" }, spans: [] }] }],
+});
+const encodedJson = (payloads: OtlpPayload[]): unknown => JSON.parse(String(Reflect.get(encodeBatch(payloads.map(payload => ({ bytes: 0, payload })), false), "body")));
+
+test("encodeBatch keeps payloads of different resources apart", t => {
+	t.deepEqual(encodedJson([resourceLogsOf("a"), resourceLogsOf("b")]), { resourceLogs: [...Reflect.get(resourceLogsOf("a"), "resourceLogs"), ...Reflect.get(resourceLogsOf("b"), "resourceLogs")] }, "one resourceLogs entry per resource");
+	t.end();
+});
+
+for (const [payloads, expected, name] of [
+	[[resourceLogsOf("a"), resourceSpansOf("b")], resourceLogsOf("a"), "logs"],
+	[[resourceSpansOf("b"), resourceLogsOf("a")], resourceSpansOf("b"), "spans"],
+] as const) {
+	test(`encodeBatch encodes only the first payload's kind: ${name}`, t => {
+		t.deepEqual(encodedJson([...payloads]), expected, "the other kind is left out");
+		t.end();
+	});
+}
+
+test("statusFailure doesn't count a status under 200 as delivered", t => {
+	t.deepEqual(statusFailure(199), { message: "Non-ok return status", retry: false, status: 199 }, "dropped, not delivered");
+	t.end();
+});
+
+for (const [body, name] of [
+	[null, "a null body"],
+	["text", "a body that is not an object"],
+	[{}, "a body without partialSuccess"],
+	[{ partialSuccess: null }, "a null partialSuccess"],
+	[{ partialSuccess: "text" }, "a partialSuccess that is not an object"],
+	[JSON.parse("{\"partialSuccess\":{\"rejectedLogRecords\":{\"valueOf\":1,\"toString\":2}}}") as unknown, "a count that cannot become a number"],
+] as const) {
+	test(`partialRejection finds no rejection in ${name}`, t => {
+		t.strictEqual(partialRejection(body), undefined, "nothing rejected");
+		t.end();
+	});
+}
+
+for (const [otlpHttpBaseURI, expected] of [
+	["http://u:s3/cret@collector.test", "Error: otlpHttpBaseURI is not a valid URI; it needs an http:// or https:// prefix, and any / ? # \\ in a password percent-encoded"],
+	["ftp://u:s3cret@collector.test", "Error: otlpHttpBaseURI must be an http:// or https:// URI"],
+] as const) {
+	test(`the Queue constructor rejects ${otlpHttpBaseURI} with a message that leaves the URI out`, t => {
+		t.strictEqual(thrown(() => new Queue({ otlpHttpBaseURI })), expected, "the documented message, without the password");
+		t.end();
+	});
+}
+
+test("user:pass@ in otlpHttpBaseURI beside a non-credential otlpAdditionalHeaders header raises no warning", t => {
+	const sink = reportSink();
+
+	new Queue({ otlpAdditionalHeaders: { "x-tenant": "acme" }, otlpHttpBaseURI: "https://collector:s3cret@collector.test", report: sink.report });
+	t.deepEqual(sink.lines, [], "only an Authorization header competes with the userinfo");
+	t.end();
+});
+
+for (const otlpHttpBaseURI of ["http://u:p@mylocalhost:4318", "http://u:p@localhost.evil.test"]) {
+	test(`credentials sent to ${otlpHttpBaseURI}, a name that only contains localhost, raise the plain-http warning`, async t => {
+		stubFetch();
+		const sink = reportSink();
+		const queue = new Queue({ otlpHttpBaseURI, report: sink.report });
+
+		queue.enqueue(resourceLogsOf("a"));
+		await queue.flush();
+		t.strictEqual(sink.lines.length, 1, "one warning");
+		t.end();
+	});
+}
+
+// A record payload whose JSON body is `bytes` long in UTF-8, made of `char`, which JSON leaves unescaped.
+const payloadOfBytes = (bytes: number, char: string) => recordPayload(char.repeat((bytes - recordPayload("").bytes) / new TextEncoder().encode(char).length)).payload;
+
+for (const [payload, keepalive, name] of [
+	[() => payloadOfBytes(65536, "a"), true, "a body of exactly 64 KiB"],
+	[() => payloadOfBytes(65537, "a"), false, "a body one byte over 64 KiB"],
+	[() => payloadOfBytes(80000, "é"), false, "a body under 64 Ki characters but over 64 KiB in UTF-8"],
+] as const) {
+	test(`keepalive is ${keepalive} for ${name}`, async t => {
+		const { calls } = stubFetch();
+		const queue = new Queue({ clock: fakeClock(), otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {} });
+
+		queue.enqueue(payload());
+		await queue.flush();
+		t.strictEqual(calls[0].keepalive, keepalive, "browsers reject a keepalive body over 64 KiB");
+		t.end();
+	});
+}
+
+test("keepalive is true for a protobuf body under 64 KiB", async t => {
+	const { calls } = stubFetch();
+	const queue = new Queue({ clock: fakeClock(), otlpHttpBaseURI: "http://127.0.0.1:4318", otlpProtocol: "http/protobuf", report: () => {} });
+
+	queue.enqueue(recordPayload("a".repeat(30000)).payload);
+	await queue.flush();
+	t.strictEqual(calls[0].keepalive, true, "the protobuf body's own byte length counts");
+	t.end();
+});
+
+test("Queue posts each batch", async t => {
+	const { calls } = stubFetch();
+	const queue = new Queue({ clock: fakeClock(), otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {} });
+
+	queue.enqueue(resourceLogsOf("a"));
+	await queue.flush();
+	t.strictEqual(calls[0].method, "POST", "OTLP/HTTP takes a POST");
+	t.end();
+});
+
+test("a protobuf Queue doesn't read a partialSuccess from the response", async t => {
+	stubFetch(() => response({ json: { partialSuccess: { errorMessage: "bad record", rejectedLogRecords: 1 } } }));
+	const sink = reportSink();
+	const queue = new Queue({ clock: fakeClock(), otlpHttpBaseURI: "http://127.0.0.1:4318", otlpProtocol: "http/protobuf", report: sink.report });
+
+	queue.enqueue(resourceLogsOf("a"));
+	await queue.flush();
+	t.deepEqual(sink.lines, [], "a protobuf response is binary, so nothing is reported");
+	t.end();
+});
+
+test("a send that fails with something other than an Error reports an unknown error", async t => {
+	stubFetch(() => { throw Object.freeze({ reason: "offline" }); });
+	const sink = reportSink();
+	const queue = new Queue({ clock: fakeClock(), otlpHttpBaseURI: "http://127.0.0.1:4318", report: sink.report });
+
+	queue.enqueue(resourceLogsOf("a"));
+	await queue.flush();
+	t.deepEqual(sink.lines.map(line => [line.msg, line.error]), [["OTLP export failed, will retry", "Unknown error sending to OTLP"]], "the fallback message");
+	t.end();
+});
+
+test("Queue drops and reports a stored payload that cannot be encoded, and sends nothing", async t => {
+	const { calls } = stubFetch();
+	const storage = fakeStorage(false);
+	const sink = reportSink();
+
+	storage.data.set("@larvit/log:otlp-queue", JSON.stringify([{ resourceLogs: [{}] }]));
+
+	const queue = new Queue({ clock: fakeClock(), otlpHttpBaseURI: "http://127.0.0.1:4318", report: sink.report, storage });
+
+	await queue.flush();
+	t.deepEqual(sink.lines.map(line => line.msg), ["OTLP export rejected, batch dropped"], "reported as dropped");
+	t.strictEqual(calls.length, 0, "nothing is sent");
+	t.end();
+});
+
+test("a Queue with no otlpProtocol reads back http/json", t => {
+	t.strictEqual(new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318" }).conf.otlpProtocol, "http/json", "README's default");
+	t.end();
+});
+
+test("queue.conf.storage is hidden from stringify and spread, and otherwise a plain conf key", t => {
+	const storage = fakeStorage(false);
+
+	t.deepEqual(Object.getOwnPropertyDescriptor(new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", storage }).conf, "storage"), { configurable: true, enumerable: false, value: storage, writable: true }, "non-enumerable is its one difference");
+	t.end();
+});
+
+test("a retried batch put back over maxItems leaves the oldest other item out of storage too", async t => {
+	let released = false;
+	const { calls } = stubFetch(async () => {
+		await waitFor(() => released);
+
+		throw new Error("connection refused");
+	});
+	const clock = fakeClock();
+	const storage = fakeStorage(false);
+	const queue = new Queue({ clock, maxItems: 2, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, storage });
+	const log = new Log({ clock, otlpQueue: queue, stderr: () => {} });
+
+	log.info("a");
+
+	const round = queue.flush();
+
+	await waitFor(() => calls.length === 1);
+	log.info("b");
+	log.info("c");
+	released = true;
+	await round;
+	await waitFor(() => storedRecords(storage).join() === "a,c");
+	t.deepEqual(storedRecords(storage), ["a", "c"], "the retried batch stays, and the oldest other item goes");
+	t.end();
+});
+
+test("a delivered batch resets the retry delay", async t => {
+	const clock = fakeClock();
+	const sink = reportSink();
+	const queue = new Queue({ clock, otlpHttpBaseURI: "http://127.0.0.1:4318", report: sink.report, retryDelayMs: 20 });
+
+	stubFetch(() => { throw new Error("connection refused"); });
+	queue.enqueue(resourceLogsOf("first"));
+	await queue.flush();
+	stubFetch();
+	await clock.advance(20);
+	stubFetch(() => { throw new Error("connection refused"); });
+	queue.enqueue(resourceLogsOf("second"));
+	await queue.flush();
+	t.deepEqual(sink.lines.map(line => line.retryInMs), [20, 20], "the failure after a delivery waits retryDelayMs again");
+	t.end();
+});
+
+test("Queue loading an empty stored list arms no batch timer", async t => {
+	const clock = fakeClock();
+	const storage = fakeStorage(false);
+
+	storage.data.set("@larvit/log:otlp-queue", "[]");
+	new Queue({ clock, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, storage });
+	await clock.settle();
+	t.strictEqual(clock.pending.size, 0, "nothing loaded, nothing to send");
+	t.end();
+});
+
 test("an export the collector doesn't answer is aborted after 3 s and retried", async t => {
 	const clock = fakeClock();
 	const sink = reportSink();
@@ -1696,12 +1918,16 @@ test("an export the collector doesn't answer is aborted after 3 s and retried", 
 	t.end();
 });
 
-test("a clock missing one of now, setTimeout and clearTimeout is rejected by the Queue constructor", t => {
-	const clock = { now: () => 0, setTimeout: () => 1 } as unknown as Clock;
-
-	t.ok(thrown(() => new Queue({ clock, otlpHttpBaseURI: "http://127.0.0.1:4318" })).includes("clock must be { now, setTimeout, clearTimeout }"), "the error names the shape a clock takes");
-	t.end();
-});
+for (const [clock, missing] of [
+	[{ now: () => 0, setTimeout: () => 1 }, "clearTimeout"],
+	[{ clearTimeout: () => {}, setTimeout: () => 1 }, "now"],
+	[{ clearTimeout: () => {}, now: () => 0 }, "setTimeout"],
+] as const) {
+	test(`a clock missing ${missing} is rejected by the Queue constructor`, t => {
+		t.ok(thrown(() => new Queue({ clock: clock as unknown as Clock, otlpHttpBaseURI: "http://127.0.0.1:4318" })).includes("clock must be { now, setTimeout, clearTimeout }"), "the error names the shape a clock takes");
+		t.end();
+	});
+}
 
 test("a malformed percent escape in the endpoint's password is sent as written in the Basic credential", async t => {
 	const { calls } = stubFetch();

@@ -164,17 +164,17 @@ export type StubResponse = ReturnType<typeof response>;
 
 type Responder = (path: string, body: unknown) => StubResponse | Promise<StubResponse | undefined> | undefined;
 
-type RecordedCall = { body: any, contentType: string | null, headers: any, keepalive: unknown, path: string, rawBody: any, url: string };
+type RecordedCall = { body: any, contentType: string | null, headers: any, keepalive: unknown, method?: string, path: string, rawBody: any, url: string };
 
 // A fetch that records each call in `calls` and answers with `responder`'s response, else a 200.
 function recordingFetch(calls: RecordedCall[], responder?: Responder): typeof fetch {
-	return (async (url: string, init: { body?: any, headers?: HeadersInit, keepalive?: boolean } = {}) => {
+	return (async (url: string, init: { body?: any, headers?: HeadersInit, keepalive?: boolean, method?: string } = {}) => {
 		const contentType = new Headers(init.headers ?? {}).get("Content-Type");
 		const path = new URL(String(url)).pathname;
 		// Only JSON bodies are parsed; protobuf bodies are raw bytes, inspected via rawBody.
 		const body = init.body !== undefined && contentType === "application/json" ? JSON.parse(init.body) : undefined;
 
-		calls.push({ body, contentType, headers: init.headers, keepalive: init.keepalive, path, rawBody: init.body, url: String(url) });
+		calls.push({ body, contentType, headers: init.headers, keepalive: init.keepalive, method: init.method, path, rawBody: init.body, url: String(url) });
 
 		return await responder?.(path, body) ?? response();
 	}) as unknown as typeof fetch;

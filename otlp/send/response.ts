@@ -28,6 +28,7 @@ export function partialRejection(body: unknown): { message?: string, rejected: n
 
 		return rejected > 0 ? { message: stringField(partial, "errorMessage"), rejected } : undefined;
 	} catch {
+		// Number() throws on a count such as {"valueOf":1,"toString":2}; the batch was still delivered.
 		return undefined;
 	}
 }
