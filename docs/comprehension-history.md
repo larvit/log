@@ -362,3 +362,108 @@ Inherited architect, would restructure first:
 - Navigation: `credentials/span-values.ts:24` `traceableUrl`: it gates the scheme and redacts nothing, in a module of credential rules
 - Navigation: `primitives/failure-fields.ts:2` `failure-fields.ts`: total field reads used by the sender, the storage and the span failure, under a name that says failure
 - Overall: `otlp/export-scheduler.ts:44` `ExportScheduler.flush`: `running`/`pending` join with a retry timer that blocks new attempts
+
+## 2026-11-14T15:48:02Z, PR #367 at 39d7c0a
+
+| Seat | Navigation | Locality | Shape | Self-sufficiency | Overall |
+|---|---|---|---|---|---|
+| Junior A | 7.5 | 6.5 | 7 | 6.5 | 7 |
+| Mid A | 7.5 | 6 | 6.5 | 6.5 | 6.5 |
+| Maintainability senior | 8 | 7 | 7.5 | 7 | 7.5 |
+| Inherited architect | 7.5 | 6.5 | 7 | 7 | 7 |
+| Mean | 7.63 | 6.50 | 7.00 | 6.75 | 7.00 |
+
+Junior A, hardest first:
+
+- Overall, Locality, Self-sufficiency: `credentials/query.ts:114` `redactedSearch`: a three-function cycle with a depth-keyed memo, three readings and four ordered rules; `?//u:p=w@host` could not be predicted without a hand trace
+- Overall, Shape: `credentials/query-userinfo-runs.ts:26` `step`: one pair can close a run and open another, with a whole-pair special case tested first
+- Locality, Shape: `log/formatter-setting.ts:48` `inheritedFormatter`: getter identity as a provenance marker beside a WeakMap, one formatter under five names
+- Locality: `log/settings.ts:75` `inherited`: the table, a skip set from another module and `ownsFormatter` decide what a child takes
+- Shape, Self-sufficiency: `credentials/path.ts:36` `redactedPath`: index arithmetic with a -1 sentinel, needing README's path bullet open beside it
+- Overall: `otlp/export-scheduler.ts:108` `transitionRound`: `state.next` re-enters `flush`, and the retry event arrives through `default:`
+- Locality: `log/default-queue.ts:46` `isDefaultQueueFor`: five conditions, one comparing headers by reference
+- Self-sufficiency: `tracing/fetch.ts:66` `fetchFailure`: cites a plan item for why its fallback differs
+
+Mid A, hardest first:
+
+- Overall, Locality, Shape: `credentials/query-userinfo-runs.ts:26` `step`: about six cases held at once, and its names (`Run`, `readInto`, `open`, `closed`) don't state the invariant
+- Overall, Locality: `credentials/query.ts:114` `redactedSearch`: a cycle per nested url, a memo shared through `deeper`, order-dependent rules and four readings
+- Self-sufficiency, Shape: `credentials/path.ts:36` `redactedPath`: two cut points, a skipped segment 0 and a whole-path fallback
+- Locality: `log/formatter-setting.ts:48` `inheritedFormatter`: hidden state keyed on object identity whose effect shows in a child or clone
+- Locality: `log/settings.ts:75` `inherited`: the skip set comes from `default-queue.ts`, and a clone merges context where a child doesn't
+- Shape: `credentials/span-values.ts:44` `failureMessage`: four ordered redaction layers, rebuilding the known url then overwriting `pathname`
+- Shape: `credentials/text.ts:29` `redactTextQueryKeys`: a `lastIndex` loop with a separate `copied` cursor
+- Navigation: `credentials/span-values.ts:24` `traceableUrl`: decides what `log.fetch` traces, yet lives in the credentials folder
+- Self-sufficiency: `tracing/fetch.ts:66` `fetchFailure`: points into the plan for its reason
+
+Maintainability senior, hardest first:
+
+- Overall, Locality: `credentials/query.ts:80` `PAIR_RULES`: order is semantic, rules mix raw and decoded readings, and why rule 2 asks "holds" where rule 3 asks "is" is unstated
+- Overall: `credentials/query-userinfo-runs.ts:26` `step`: a -1 sentinel quietly handled by `Math.max` at :61, believed only after a hand trace
+- Navigation, Shape: `log/formatter-setting.ts:48` `inheritedFormatter`: five names for one formatter, a WeakMap side table and getter identity
+- Locality: `log/settings.ts:75` `inherited`: a conf pipeline split across three modules
+- Overall: `otlp/export-scheduler.ts:108` `transitionRound`: `next` joins a mid-round flush, and `default:` is the retry event
+- Shape: `credentials/path.ts:36` `redactedPath`: `-1` means three things across three variables
+- Locality: `log/default-queue.ts:46` `isDefaultQueueFor`: a WeakSet plus headers identity, and a conf mutated after its defaults
+- Self-sufficiency: `AGENTS.md:73` "Working here": the mutation-testing line points at a tool in the maintainer's home folder
+
+Inherited architect, would restructure first:
+
+- Shape, Navigation: `otlp/sender.ts:54` `mergeLogPayloads`: the sender holds payload merging, basic auth, partial-success parsing, status classification and plain-http warnings
+- Locality, Shape: `log/formatter-setting.ts:48` `inheritedFormatter`: five names over three modules, a WeakMap and a non-enumerable accessor
+- Navigation: `credentials/text.ts:16` `SENSITIVE_QUERY_KEY`: the query-key list sits in `text.ts`, and `query.ts` holds the whole-url rule used outside queries
+- Shape, Overall: `credentials/query-userinfo-runs.ts:26` `step`: the module name says nothing until `step` is read
+- Locality: `credentials/query.ts:80` `PAIR_RULES`: order-dependent rules in a cycle bounded only by depth and a memo
+- Navigation: `credentials/span-values.ts:24` `traceableUrl`: the fetch filter skips `tracing/` and lives in credentials
+- Navigation: `log/entry-format.ts:24` `colorsFromEnv`: an env read in the formatters module
+- Self-sufficiency: `AGENTS.md:73` "Working here": the mutation step needs tooling that isn't in the repo
+
+## 2026-11-14T15:50:57Z, PR #367 rerun at 39d7c0a
+
+| Seat | Navigation | Locality | Shape | Self-sufficiency | Overall |
+|---|---|---|---|---|---|
+| Junior A | 7.5 | 6 | 6.5 | 6 | 6.5 |
+| Mid A | 7.5 | 6 | 6.5 | 7 | 6.5 |
+| Maintainability senior | 8 | 6.5 | 7.5 | 7 | 7 |
+| Inherited architect | 8 | 7 | 7.5 | 8 | 7.5 |
+| Mean | 7.75 | 6.38 | 7.00 | 7.00 | 6.88 |
+
+Junior A, hardest first:
+
+- Overall, Locality, Shape: `credentials/query.ts:80` `PAIR_RULES`: three functions recurse, rule order is load-bearing, and a query is read three ways before the rules run
+- Overall, Locality: `credentials/query-userinfo-runs.ts:26` `step`: a `lastAt: -1` sentinel turned into "no pairs" by `Math.max`, and one pair closing a run and opening another
+- Locality, Shape: `log/formatter-setting.ts:48` `inheritedFormatter`: five names, a WeakMap and getter identity as provenance
+- Overall: `otlp/export-scheduler.ts:108` `transitionRound`: `default:` is the retry event, and `next` re-enters `flush`
+- Self-sufficiency: `credentials/path.ts:36` `redactedPath`: three indices and a whole-path fallback, read with the README bullet open
+- Locality: `log/default-queue.ts:46` `isDefaultQueueFor`: a WeakSet plus headers identity, action at a distance
+- Self-sufficiency: `tracing/fetch.ts:66` `fetchFailure`: cites a plan item
+
+Mid A, hardest first:
+
+- Overall, Locality, Shape: `credentials/query.ts:114` `redactedSearch`: recursion per nested url, a depth-keyed memo, three readings unioned and first-rule-wins order
+- Overall, Locality: `credentials/query-userinfo-runs.ts:26` `step`: the whole-pair special case made sense only after decoding the example by hand
+- Shape: `credentials/path.ts:36` `redactedPath`: two cut points, an `opened` cap and a whole-path backstop
+- Locality, Shape: `log/formatter-setting.ts:48` `inheritedFormatter`: one concept under five names in a module-level WeakMap
+- Locality: `log/settings.ts:75` `inherited`: OTLP skip rules from another module, and the queue recognised by WeakSet and identity
+- Overall: `otlp/export-scheduler.ts:108` `transitionRound`: state mutated in place, and `backoff()` called inside the round it changes
+- Self-sufficiency: `AGENTS.md:73` "Working here": the mutation-testing line depends on a tool outside the repo
+
+Maintainability senior, hardest first:
+
+- Overall, Locality: `credentials/query.ts:80` `PAIR_RULES`: four rules, three readings and a depth cap held at once; a query's result needs a hand trace
+- Overall: `credentials/query-userinfo-runs.ts:26` `step`: the guard `continued.open || !opensUserinfo(key)` and a pre-test patching a case `readInto` misses
+- Shape: `log/formatter-setting.ts:4` "formatter names": one formatter under six names behind a non-enumerable accessor
+- Locality: `log/settings.ts:75` `inherited`: child and clone tables, a two-source skip set and a live context merge
+- Locality: `log/default-queue.ts:46` `isDefaultQueueFor`: why a shorthand may sit beside `otlpQueue` lives two hops away
+- Shape: `credentials/path.ts:36` `redactedPath`: a listed-key cut and a scheme-url cut interact
+- Self-sufficiency: `AGENTS.md:73` "Working here": the `mutate-changes` recipe is meaningless without the tool
+
+Inherited architect, would restructure first:
+
+- Navigation, Shape: `otlp/sender.ts:54` `mergeLogPayloads`: the sender also holds basic auth, endpoint validation, plain-http warnings and payload merging
+- Shape: `log/formatter-setting.ts:4` "formatter names": six names for one formatter, with four conf shapes
+- Locality: `credentials/query.ts:80` `PAIR_RULES`: order-dependent, and each new bypass adds a rule whose position matters
+- Navigation: `log/default-queue.ts:24` `otlpKeysNotToInherit`: OTLP-key inheritance lives outside the inheritance table
+- Navigation: `credentials/query.ts:37` `QueryReading`: "reading" names both a decoding and the nested-url walk state
+- Navigation: `log/stderr-warnings.ts:25` `writeStderr`: the module name says warnings, yet it writes error-level reports
+- Self-sufficiency: `tracing/fetch.ts:66` `fetchFailure`: sends the reader to the plan
