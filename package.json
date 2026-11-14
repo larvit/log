@@ -18,7 +18,7 @@
     "test": "npm run test-docker && npm run test-browser",
     "test-browser": "docker build -t larvit-log-test-browser --build-arg BASE_IMAGE=mcr.microsoft.com/playwright:v$(node -p \"require('./package.json').devDependencies.playwright\")-noble . && docker run --rm --init --ipc=host larvit-log-test-browser npm run ci-browser",
     "test-docker": "docker build -t larvit-log-test-node ${NODE_IMAGE:+--build-arg BASE_IMAGE=\"$NODE_IMAGE\"} . && docker run --rm larvit-log-test-node npm run ci",
-    "test-mutation": "docker build -q -t larvit-log-test-node . >/dev/null && docker run --rm --memory 4g --memory-swap 4g larvit-log-test-node npx stryker run",
+    "test-mutation": "docker run --rm --memory 4g --memory-swap 4g \"$(docker build -q .)\" npx stryker run",
     "test-node": "node .tmp/test/tests/test.js",
     "test-otlp": "docker build -t larvit-log-test-node . && docker run --rm larvit-log-test-node sh -c \"npm run build >/dev/null && cat index.js\" > index.js && node e2e-tests/run-otlp-tests.mjs"
   },
