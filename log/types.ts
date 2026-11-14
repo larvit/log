@@ -15,6 +15,9 @@ export type EntryFormatterConf = {
 	msTimestamp?: number;
 };
 
+// 3.0.0 renames EntryFormatterConf to this; use it now and the rename needs no change.
+export type LogEntry = EntryFormatterConf;
+
 export type LogConf = {
 	captureQuery?: boolean;
 	captureRequestHeaders?: string[];

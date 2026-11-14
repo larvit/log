@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+A `format` that isn't `"text"`, `"json"` or a function now warns, and the type of the entry a
+formatter takes has the name 3.0.0 gives it. Nothing here needs a change in your code.
+
+- **Get a warning, once per `stderr` sink, when `format` is a string other than `"text"` or
+  `"json"`.** `new Log({ format: process.env.LOG_FORMAT })` used to write text without a word for
+  `"pretty"`; it still writes text, and now says so.
+- **Import `LogEntry`, the entry a formatter takes, ahead of 3.0.0.** It is `EntryFormatterConf`
+  under the name that release gives it, so moving to it now needs no change then.
+
 ## v2.6.1
 
 The code behind the OTLP export and `log.fetch` is reorganised so it is easier to read and test.

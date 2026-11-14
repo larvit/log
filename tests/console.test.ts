@@ -1,4 +1,4 @@
-import { type EntryFormatter, type EntryFormatterConf, generateSpanId, generateTraceId, Log, type LogConf, type Logger, type LogInt, type LogLevel, LogLevels, type LogOptions, type Metadata, msgJsonFormatter, msgTextFormatter, Queue, type ResolvedLogConf, resolveFormatter } from "../index.js";
+import { type EntryFormatter, type EntryFormatterConf, generateSpanId, generateTraceId, Log, type LogConf, type LogEntry, type Logger, type LogInt, type LogLevel, LogLevels, type LogOptions, type Metadata, msgJsonFormatter, msgTextFormatter, Queue, type ResolvedLogConf, resolveFormatter } from "../index.js";
 import { colorsFromEnv } from "../log/entry-format.js";
 import test from "./tap.js";
 import { capture, clientSpan, fakeClock, stubFetch, thrown } from "./test-doubles.js";
@@ -171,6 +171,47 @@ test("enabled() treats an unknown logLevel as info and never warns, while a leve
 	t.strictEqual(asked.stderr.length, 0, "enabled() never writes a warning");
 	asked.log.silly("x");
 	t.strictEqual(asked.stderr.length, 1, "a level method warns even for a call below the threshold");
+	t.end();
+});
+
+test("LogEntry is the type of the entry a formatter takes", t => {
+	const formatter: EntryFormatter = (entry: LogEntry) => entry.msg;
+	const asEntry: LogEntry = { logLevel: "info", msg: "x" } satisfies EntryFormatterConf;
+	const asConf: EntryFormatterConf = asEntry;
+
+	t.strictEqual(formatter(asConf), "x", "a LogEntry and an EntryFormatterConf are one type, so each goes where the other does");
+	t.end();
+});
+
+// What a JavaScript consumer passes from LOG_FORMAT=pretty.
+test("a format that is no format writes text and warns once per sink and value", t => {
+	const pretty = capture({ colors: false, format: "pretty" as any });
+
+	pretty.log.info("x");
+	pretty.log.info("y");
+	t.deepEqual(pretty.stdout.map(line => line.endsWith("x") || line.endsWith("y")), [true, true], "the lines are written as text");
+	t.strictEqual(pretty.stderr.length, 1, "one warning, however many lines follow");
+	t.ok(pretty.stderr[0].includes("[war] @larvit/log: format \"pretty\" is not a format, writing text; use \"text\", \"json\" or a function"), "the warning names the package, the value and the values to use instead");
+	pretty.log.clone({ stderr: pretty.log.conf.stderr }).info("z");
+	pretty.log.clone({ format: "pretty" as any, stderr: pretty.log.conf.stderr });
+	t.strictEqual(pretty.stderr.length, 1, "a clone and a child, which read the same value, don't repeat it on the same sink");
+	new Log({ colors: false, format: "Json" as any, stderr: pretty.log.conf.stderr });
+	t.strictEqual(pretty.stderr.length, 2, "a second bad value warns on the same sink");
+	t.ok(pretty.stderr[1].includes("format \"Json\" is not a format"), "and names the new value");
+	t.end();
+});
+
+test("a format that is a format, or no value at all, doesn't warn", t => {
+	const written: string[] = [];
+	const stderr = (line: string) => { written.push(line); };
+
+	for (const format of ["text", "json", undefined, (entry: EntryFormatterConf) => entry.msg] as LogOptions["format"][]) {
+		new Log({ format, stderr });
+	}
+
+	new Log({ entryFormatter: entry => entry.msg, format: "pretty" as any, stderr });
+	t.deepEqual(written.filter(line => line.includes("is not a format")), [], "a name the library knows, a function and nothing at all are no mistake");
+	t.deepEqual(written.length, 1, "and beside entryFormatter, which wins, a format that is ignored isn't named a mistake either");
 	t.end();
 });
 

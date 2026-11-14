@@ -484,3 +484,20 @@ Read most (opens and searches):
 - `credentials/header-names.ts` 1
 - `credentials/query-userinfo-runs.ts` 1
 - `credentials/span-values.ts` 1
+
+## Reading cost, chunk 7df00f09b4f4, finished 2026-11-14T23:13:39Z
+
+132944 new input tokens before the first commit.
+
+Read most (opens and searches):
+
+- `docs/decisions.md` 7
+- `log/log.ts` 5
+- `README.md` 4
+- `log/conf.ts` 3
+- `otlp/queue/queue-types.ts` 3
+- `otlp/send/batch.ts` 3
+- `otlp/send/sender.ts` 3
+- `AGENTS.md` 2
+- `index.ts` 2
+- `log/console-output.ts` 2

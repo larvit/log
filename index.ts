@@ -1,6 +1,6 @@
 // Sorted on the first name each line exports.
 export type { Clock, TimerHandle } from "./primitives/clock.js";
-export type { EntryFormatter, EntryFormatterConf, LogConf, Logger, LogInt, LogOptions, LogShorthand, ResolvedLogConf } from "./log/types.js";
+export type { EntryFormatter, EntryFormatterConf, LogConf, LogEntry, Logger, LogInt, LogOptions, LogShorthand, ResolvedLogConf } from "./log/types.js";
 export { formatTraceparent, generateSpanId, generateTraceId, parseTraceparent } from "./tracing/traceparent.js";
 export { Log } from "./log/log.js";
 export type { LogLevel } from "./primitives/levels.js";
