@@ -25,8 +25,7 @@ jobs:
             echo "Release tag ${{ github.ref_name }} does not match package.json version $PKG_VERSION"
             exit 1
           fi
-      # The Push run for this commit built the package in its Node 26 container and ran the suite
-      # against it. Publish that build: only a run whose every job passed counts.
+      # `--status success` takes only a Push run whose every job passed, lint, browser and OTLP tests included.
       - name: Download the build the Push run tested
         env:
           GH_REPO: ${{ github.repository }}

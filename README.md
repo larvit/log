@@ -578,7 +578,7 @@ needs Node 18+ on the host.
 | Command | |
 |---|---|
 | `npm test` | Node and browser suites. |
-| `npm run test-docker` | Node suite, on the image the `Dockerfile` pins. `NODE_IMAGE=node:18.20.8-bookworm-slim npm run test-docker` picks another; CI runs 18 to 26. `TESTED_BUILD_DIR=<folder>` also copies out the `index.js`, source map and types the suite ran against. |
+| `npm run test-docker` | Node suite, on the image the `Dockerfile` pins. `NODE_IMAGE=node:18.20.8-bookworm-slim npm run test-docker` picks another; CI runs 18 to 26. |
 | `npm run test-browser` | The same suite in Chromium. |
 | `npm run test-otlp` | Export to a real OpenTelemetry Collector, JSON and protobuf. `OTLP_DEBUG=1` prints what it received. |
 | `npm run test-mutation` | Stryker mutation tests of the library, against the Node suite. `npm run test-mutation -- --mutate credentials/path.ts:30-50` mutates only those lines. |
@@ -586,9 +586,10 @@ needs Node 18+ on the host.
 
 ### Releasing
 
-A published GitHub release runs `.github/workflows/publish.yaml`. It doesn't build: it downloads the
-package the `Push` run for the release's commit tested, then runs `npm publish`. It fails when no
-`Push` run for that commit passed, or when that run's upload is past its 90 days of retention.
+A published GitHub release runs `.github/workflows/publish.yaml`, which runs `npm publish` on the
+build that the release commit's `Push` run already tested. It builds nothing. It fails when that
+commit has no passing `Push` run, and a run's build is kept for 90 days, so after that release a
+newer commit.
 It needs an `NPM_TOKEN` repository secret (an npm automation token with publish rights).
 
 1. Add the version to [CHANGELOG.md](CHANGELOG.md).
