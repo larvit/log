@@ -1439,41 +1439,44 @@ test("a flush() joining a round that rejects still gets a round of its own", asy
 
 test("the scheduler's transition holds a backoff against a joined flush(), and else gives that flush() a round", t => {
 	const delays = { batchDelayMs: 1000, retryDelayMs: 20 };
-	const joined = transition({ batchDue: true, failures: 0, flushRequested: false, name: "running" }, { type: "flush" }, delays);
+	const running = { batchDue: true, failures: 0, name: "running" } as const;
 
-	t.deepEqual(joined, { effects: [{ type: "joinNextRound" }], state: { batchDue: true, failures: 0, flushRequested: true, name: "running" } }, "a flush() mid-round is recorded in the state");
-	t.deepEqual(transition(joined.state, { type: "roundDone" }, delays), { effects: [{ type: "startRound" }], state: { failures: 0, flushRequested: false, name: "loading" } }, "and the round's end starts the next round, with no batch timer");
+	t.deepEqual(transition(running, { type: "flush" }, delays, false), { effects: [{ type: "joinNextRound" }], state: running }, "a flush() mid-round joins the next round");
+	t.deepEqual(transition(running, { type: "roundDone" }, delays, true), { effects: [{ type: "startRound" }], state: { failures: 0, name: "loading" } }, "and the round's end starts the next round, with no batch timer");
 
-	const failed = transition(transition(joined.state, { type: "sendFailed" }, delays).state, { type: "sendFailed" }, delays);
+	const failed = transition(transition(running, { type: "sendFailed" }, delays, true).state, { type: "sendFailed" }, delays, true);
 
-	t.deepEqual(failed.state, { batchDue: true, failures: 2, flushRequested: true, name: "running", retryInMs: 40 }, "each failed send doubles the retry delay, counted in the state");
-	t.deepEqual(transition(failed.state, { type: "roundDone" }, delays), { effects: [{ type: "releaseJoiners" }, { delayMs: 40, type: "armTimer" }], state: { failures: 2, name: "backingOff" } }, "a failed send ends the round in a backoff, which releases the joined flush() without a round");
-	t.deepEqual(transition({ failures: 2, name: "backingOff" }, { type: "flush" }, delays), { effects: [], state: { failures: 2, name: "backingOff" } }, "a flush() doesn't start a round during a backoff");
+	t.deepEqual(failed.state, { batchDue: true, failures: 2, name: "running", retryInMs: 40 }, "each failed send doubles the retry delay, counted in the state");
+	t.deepEqual(transition(failed.state, { type: "roundDone" }, delays, true), { effects: [{ type: "releaseJoiners" }, { delayMs: 40, type: "armTimer" }], state: { failures: 2, name: "backingOff" } }, "a failed send ends the round in a backoff, which releases the joined flush() without a round");
+	t.deepEqual(transition({ failures: 2, name: "backingOff" }, { type: "flush" }, delays, false), { effects: [], state: { failures: 2, name: "backingOff" } }, "a flush() doesn't start a round during a backoff");
 	t.end();
 });
 
-test("the scheduler's transition, on an effect that threw, goes idle and rejects the joined flush() callers", t => {
-	const error = new Error("clock broke");
-
-	t.deepEqual(
-		transition({ batchDue: true, failures: 3, flushRequested: true, name: "running" }, { error, type: "effectFailed" }, { batchDelayMs: 1000, retryDelayMs: 20 }),
-		{ effects: [{ error, type: "rejectJoiners" }], state: { failures: 3, name: "idle" } },
-		"idle keeps the failure count, and the joiners get the error",
-	);
-	t.end();
-});
+for (const [joined, effects, name] of [
+	[true, [{ error: "clock broke", type: "rejectJoiners" }], "goes idle and rejects the joined flush() callers"],
+	[false, [], "goes idle and doesn't reject anything where no flush() joined"],
+] as const) {
+	test(`the scheduler's transition, on an effect that threw, ${name}`, t => {
+		t.deepEqual(
+			transition({ batchDue: true, failures: 3, name: "running" }, { error: "clock broke", type: "effectFailed" }, { batchDelayMs: 1000, retryDelayMs: 20 }, joined),
+			{ effects, state: { failures: 3, name: "idle" } },
+			"idle keeps the failure count",
+		);
+		t.end();
+	});
+}
 
 for (const [state, event, expected, name] of [
-	[{ batchDue: true, failures: 0, flushRequested: false, name: "running" }, { type: "roundDone" }, { effects: [{ delayMs: 1000, type: "armTimer" }], state: { failures: 0, name: "waiting" } }, "a round done with a payload scheduled meanwhile arms the batch timer"],
-	[{ failures: 0, flushRequested: false, name: "loading" }, { type: "flush" }, { effects: [{ type: "joinNextRound" }], state: { failures: 0, flushRequested: true, name: "loading" } }, "a flush() while a round loads joins the next round"],
-	[{ failures: 0, name: "waiting" }, { type: "schedule" }, { effects: [], state: { failures: 0, name: "waiting" } }, "a schedule while the batch timer waits changes nothing"],
-	[{ failures: 0, flushRequested: false, name: "loading" }, { type: "schedule" }, { effects: [], state: { failures: 0, flushRequested: false, name: "loading" } }, "a schedule while a round loads changes nothing, since the round sends the payload"],
+	[{ batchDue: true, failures: 0, name: "running" }, { type: "roundDone" }, { effects: [{ delayMs: 1000, type: "armTimer" }], state: { failures: 0, name: "waiting" } }, "a round done with a payload scheduled meanwhile arms the batch timer"],
+	[{ failures: 0, name: "loading" }, { type: "flush" }, { effects: [{ type: "joinNextRound" }], state: { failures: 0, name: "loading" } }, "a flush() while a round loads joins the next round"],
+	[{ failures: 0, name: "waiting" }, { type: "schedule" }, { effects: [], state: { failures: 0, name: "waiting" } }, "a schedule while the batch timer waits doesn't change anything"],
+	[{ failures: 0, name: "loading" }, { type: "schedule" }, { effects: [], state: { failures: 0, name: "loading" } }, "a schedule while a round loads doesn't change anything, since the round sends the payload"],
 	[{ failures: 0, name: "idle" }, { type: "timerFired" }, { effects: [], state: { failures: 0, name: "idle" } }, "a timer firing while idle starts no round"],
 	[{ failures: 0, name: "idle" }, { type: "loaded" }, { effects: [], state: { failures: 0, name: "idle" } }, "a round that loads after an effect failed leaves the scheduler idle"],
 	[{ failures: 0, name: "idle" }, { type: "sendFailed" }, { effects: [], state: { failures: 1, name: "idle" } }, "a send that fails after an effect failed counts the failure and books no retry"],
 ] as const) {
 	test(`the scheduler's transition: ${name}`, t => {
-		t.deepEqual(transition(state, event, { batchDelayMs: 1000, retryDelayMs: 20 }), expected, `${state.name} + ${event.type}`);
+		t.deepEqual(transition(state, event, { batchDelayMs: 1000, retryDelayMs: 20 }, false), expected, `${state.name} + ${event.type}`);
 		t.end();
 	});
 }
@@ -1539,8 +1542,8 @@ test("every flush() that joins a round is released by the next round", async t =
 for (const [state, event, expected, name] of [
 	["idle", "save", { startWrite: true, state: "writing" }, "a save while idle starts a write"],
 	["writing", "save", { startWrite: false, state: "rewriteDue" }, "a save during a write books one more write"],
-	["rewriteDue", "save", { startWrite: false, state: "rewriteDue" }, "a save with a rewrite booked adds nothing"],
-	["unreadable", "save", { startWrite: false, state: "unreadable" }, "a save after an unreadable read writes nothing"],
+	["rewriteDue", "save", { startWrite: false, state: "rewriteDue" }, "a save with a rewrite booked doesn't add anything"],
+	["unreadable", "save", { startWrite: false, state: "unreadable" }, "a save after an unreadable read doesn't write anything"],
 	["writing", "unreadable", { startWrite: false, state: "unreadable" }, "a write that finds storage unreadable stops"],
 	["rewriteDue", "unreadable", { startWrite: false, state: "unreadable" }, "a booked rewrite that finds storage unreadable stops"],
 	["rewriteDue", "writeStarted", { startWrite: false, state: "writing" }, "a write that starts covers the rewrite booked before it"],
@@ -1574,6 +1577,13 @@ test("unref leaves an object timer without its own unref alone", t => {
 	t.end();
 });
 
+for (const [handle, name] of [[undefined, "undefined"], [null, "null"]] as const) {
+	test(`unref leaves a ${name} handle from a clock outside the type alone`, t => {
+		t.doesNotThrow(() => { unref(handle as unknown as TimerHandle, undefined); }, "a clock that hands back no handle worked through 2.6.0");
+		t.end();
+	});
+}
+
 test("unref calls an object timer's own unref, and never the runtime's unrefTimer", t => {
 	const unrefed: unknown[] = [];
 	let unrefs = 0;
@@ -1598,7 +1608,7 @@ test("an injected clock's numeric timer id is never handed to Deno's unrefTimer"
 });
 
 // Deno's setTimeout returns a number, which only Deno.unrefTimer can unref. A scheduler on the system clock stands in for
-// one on Deno, with both globals replaced.
+// one on Deno, with the `Deno` and `setTimeout` globals replaced.
 const onDeno = (deno: unknown, body: (scheduler: ExportScheduler) => void) => {
 	withGlobals({ Deno: deno, setTimeout: () => 7 }, () => {
 		body(new ExportScheduler({ batchDelayMs: 600000, clock: systemClock, retryDelayMs: 600000 }, Promise.resolve(), async () => {}));
@@ -1816,7 +1826,7 @@ test("a send that fails with something other than an Error reports an unknown er
 	t.end();
 });
 
-test("Queue drops and reports a stored payload that cannot be encoded, and sends nothing", async t => {
+test("Queue drops and reports a stored payload that cannot be encoded, and doesn't send anything", async t => {
 	const { calls } = stubFetch();
 	const storage = fakeStorage(false);
 	const sink = reportSink();

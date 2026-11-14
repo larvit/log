@@ -118,7 +118,7 @@ test("level silly writes debug", t => {
 	t.end();
 });
 
-test("level none writes nothing, not even error, and enabled() is false", t => {
+test("level none doesn't write anything, not even error, and enabled() is false", t => {
 	const none = capture("none");
 
 	none.log.error("x");
@@ -146,6 +146,10 @@ test("an unknown logLevel logs at info and warns once per sink and value", t => 
 	unknown.log.conf.logLevel = unknownLevel;
 	unknown.log.info("x");
 	t.strictEqual(unknown.stderr.length, 2, "the warning is written once per sink and value");
+	unknown.log.conf.logLevel = "http" as any;
+	unknown.log.info("x");
+	t.strictEqual(unknown.stderr.length, 3, "a second unknown value warns again on the same sink");
+	t.ok(unknown.stderr[2].includes("logLevel \"http\" is not a level"), "and that warning names the new value");
 	t.end();
 });
 
@@ -170,8 +174,8 @@ test("enabled() treats an unknown logLevel as info and never warns, while a leve
 	t.end();
 });
 
-// A logLevel written to log.conf after construction, each checked where a line is written. `lines`:
-// what the call writes to stdout, which an invalid level makes the default, info.
+// Each row writes an invalid logLevel to log.conf after construction. The Log checks it when it writes a line,
+// falls back to info and warns. `lines`: how many lines the call writes to stdout at info.
 for (const [name, level, method, lines, warning] of [
 	["a prototype key is no level", "constructor", "info", 1, "logLevel \"constructor\" is not a level"],
 	["a number is quoted as a number", 30, "info", 1, "logLevel 30 is not a level"],
@@ -185,7 +189,7 @@ for (const [name, level, method, lines, warning] of [
 
 		live.log.conf.logLevel = level;
 		t.doesNotThrow(() => live.log[method]("x"), "the level method never throws");
-		t.strictEqual(live.stdout.length, lines, "the line is written at info");
+		t.strictEqual(live.stdout.length, lines, "the call is filtered as at info");
 		t.ok(live.stderr[0].includes(warning), "and warns");
 		t.notOk(live.stderr[0].includes("01a0d9b5-8ddc-743e-8555-76c9875b7d9d"), "a config warning carries no instance context");
 		t.end();

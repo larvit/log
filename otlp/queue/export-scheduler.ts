@@ -15,7 +15,8 @@ function denoUnrefTimer(): ((id: number) => void) | undefined {
 export function unref(timer: TimerHandle, unrefNumericTimer: ((id: number) => void) | undefined): void {
 	if (typeof timer === "number") {
 		unrefNumericTimer?.(timer);
-	} else if (typeof timer.unref === "function") {
+	// The object check is for a clock that hands back no handle at all: outside the type, but 2.6.0 accepted it.
+	} else if (typeof timer === "object" && timer !== null && typeof timer.unref === "function") {
 		timer.unref();
 	}
 }
@@ -30,18 +31,17 @@ type SchedulerState = { failures: number } & (
 	| { name: "idle" }
 	// A batch timer will start a round; a flush() starts the round now.
 	| { name: "waiting" }
-	// A round waits for `ready`, and will send what is scheduled meanwhile. `flushRequested`: a flush()
-	// arrived meanwhile, so one more round follows this one.
-	| { flushRequested: boolean, name: "loading" }
-	// The round sends. `flushRequested` as above. `batchDue`: a payload was scheduled meanwhile, so a batch
-	// timer follows the round. `retryInMs`: a send failed, so a retry timer follows instead.
-	| { batchDue: boolean, flushRequested: boolean, name: "running", retryInMs?: number }
+	// A round waits for `ready`, and will send what is scheduled meanwhile.
+	| { name: "loading" }
+	// The round sends. `batchDue`: a payload was scheduled meanwhile, so a batch timer follows the round.
+	// `retryInMs`: a send failed, so a retry timer follows instead.
+	| { batchDue: boolean, name: "running", retryInMs?: number }
 	// A retry timer will start a round, and a flush() doesn't start one early.
 	| { name: "backingOff" }
 );
 
-// A public call (`flush`, `schedule`, `backoff` as sendFailed, `resetBackoff` as sendSucceeded), an
-// internal step of a round or a timer, or an effect that threw, such as a clock's.
+// An event is a public call (`flush` or `schedule`; `backoff` and `resetBackoff` arrive as `sendFailed` and
+// `sendSucceeded`), a step of a round or of the timer, or an effect that threw, such as a clock's `setTimeout`.
 type SchedulerEvent =
 	| { error: unknown, type: "effectFailed" }
 	| { type: "flush" }
@@ -52,7 +52,7 @@ type SchedulerEvent =
 	| { type: "sendSucceeded" }
 	| { type: "timerFired" };
 
-// What the scheduler does after a transition, in the order listed.
+// What the scheduler does after a transition, in the order of the `effects` array.
 type SchedulerEffect =
 	// Arm the one timer, whose firing is the timerFired event.
 	| { delayMs: number, type: "armTimer" }
@@ -67,29 +67,29 @@ type SchedulerEffect =
 
 type Transition = { effects: SchedulerEffect[], state: SchedulerState };
 
-// The delay doubles with each consecutive failed send, up to the cap.
 const retryDelay = (failures: number, delays: SchedulerDelays) => Math.min(delays.retryDelayMs * (2 ** (failures - 1)), RETRY_DELAY_MAX_MS);
 
 const stay = (state: SchedulerState): Transition => ({ effects: [], state });
 
 function startRound(failures: number): Transition {
-	return { effects: [{ type: "startRound" }], state: { failures, flushRequested: false, name: "loading" } };
+	return { effects: [{ type: "startRound" }], state: { failures, name: "loading" } };
 }
 
-function afterRound(state: Extract<SchedulerState, { name: "loading" | "running" }>, delays: SchedulerDelays): Transition {
+function afterRound(state: Extract<SchedulerState, { name: "loading" | "running" }>, delays: SchedulerDelays, joined: boolean): Transition {
 	const { failures } = state;
 
-	// The backoff holds even against a flush() that joined. The name check is for the type: a loading state has no retryInMs, so no test can drop it.
+	// The backoff holds even against a flush() that joined. The name check only satisfies the type: a loading state has no
+	// `retryInMs`, so removing the check doesn't fail any test.
 	if (state.name === "running" && state.retryInMs !== undefined) {
 		return { effects: [{ type: "releaseJoiners" }, { delayMs: state.retryInMs, type: "armTimer" }], state: { failures, name: "backingOff" } };
 	}
 
 	// On a round that rejected too, so a flush() that joined it still gets a round of its own.
-	if (state.flushRequested) {
+	if (joined) {
 		return startRound(failures);
 	}
 
-	// The name check is for the type: a loading state has no batchDue, so no test can drop it.
+	// The name check only satisfies the type: a loading state has no `batchDue`, so removing the check doesn't fail any test.
 	if (state.name === "running" && state.batchDue) {
 		return { effects: [{ delayMs: delays.batchDelayMs, type: "armTimer" }], state: { failures, name: "waiting" } };
 	}
@@ -98,16 +98,19 @@ function afterRound(state: Extract<SchedulerState, { name: "loading" | "running"
 }
 
 // The whole state machine: what each event does in each state. An event a state has no use for leaves it as it is.
-export function transition(state: SchedulerState, event: SchedulerEvent, delays: SchedulerDelays): Transition {
+// `joined`: a flush() waits for the round after the one in flight. The shell holds the promise those callers
+// wait on, so it owns that fact and hands it in.
+export function transition(state: SchedulerState, event: SchedulerEvent, delays: SchedulerDelays, joined: boolean): Transition {
 	const round = state.name === "loading" || state.name === "running";
 
 	switch (event.type) {
 		// No round stays marked as running, no timer as armed and no flush() waiting.
 		case "effectFailed":
-			return { effects: [{ error: event.error, type: "rejectJoiners" }], state: { failures: state.failures, name: "idle" } };
+			// Only where a flush() joined, since nobody would handle the rejection otherwise.
+			return { effects: joined ? [{ error: event.error, type: "rejectJoiners" }] : [], state: { failures: state.failures, name: "idle" } };
 		case "flush":
 			if (round) {
-				return { effects: [{ type: "joinNextRound" }], state: { ...state, flushRequested: true } };
+				return { effects: [{ type: "joinNextRound" }], state };
 			}
 
 			return state.name === "backingOff" ? stay(state) : startRound(state.failures);
@@ -121,9 +124,9 @@ export function transition(state: SchedulerState, event: SchedulerEvent, delays:
 		case "timerFired":
 			return state.name === "waiting" || state.name === "backingOff" ? startRound(state.failures) : stay(state);
 		case "loaded":
-			return stay(state.name === "loading" ? { batchDue: false, failures: state.failures, flushRequested: state.flushRequested, name: "running" } : state);
+			return stay(state.name === "loading" ? { batchDue: false, failures: state.failures, name: "running" } : state);
 		case "roundDone":
-			return round ? afterRound(state, delays) : stay(state);
+			return round ? afterRound(state, delays, joined) : stay(state);
 		case "sendFailed": {
 			const failures = state.failures + 1;
 
@@ -174,7 +177,7 @@ export class ExportScheduler {
 
 	// Returns what a flush() caller waits for, where the event gave it something to wait for.
 	private dispatch(event: SchedulerEvent): Promise<void> | undefined {
-		const { effects, state } = transition(this.state, event, this.conf);
+		const { effects, state } = transition(this.state, event, this.conf, this.joiners !== undefined);
 		let awaited: Promise<void> | undefined;
 
 		this.state = state;
@@ -201,10 +204,7 @@ export class ExportScheduler {
 			case "joinNextRound":
 				return this.joinNextRound();
 			case "rejectJoiners":
-				// Only where a flush() joined, since nobody would handle the rejection otherwise.
-				if (this.joiners) {
-					this.settleJoiners(Promise.reject(effect.error));
-				}
+				this.settleJoiners(Promise.reject(effect.error));
 
 				return undefined;
 			case "releaseJoiners":
