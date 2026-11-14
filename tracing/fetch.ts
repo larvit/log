@@ -129,15 +129,20 @@ async function tracedFetch(trace: FetchTrace, url: URL, init: RequestInit | unde
 }
 
 // The page's address, which a relative url resolves against; undefined outside a browser, or where the getter throws.
-function pageHref(): string | undefined {
-	try {
-		const location: unknown = Reflect.get(globalThis, "location");
-		const href: unknown = typeof location === "object" && location !== null ? Reflect.get(location, "href") : undefined;
+// `scope` is the global object, which a test replaces.
+export function pageHref(scope: object = globalThis): string | undefined {
+	let href: unknown;
 
-		return typeof href === "string" ? href : undefined;
+	try {
+		const location: unknown = Reflect.get(scope, "location");
+
+		// The guard is for the type: Reflect.get throws on a non-object, which the catch makes undefined too, so no test can drop it.
+		href = typeof location === "object" && location !== null ? Reflect.get(location, "href") : undefined;
 	} catch {
-		return undefined;
+		// The address stays undefined.
 	}
+
+	return typeof href === "string" ? href : undefined;
 }
 
 // log.fetch as a whole: a url the credentials/ rule declines goes to the platform untraced, and any other is traced.
@@ -151,10 +156,9 @@ export function traceFetch(trace: FetchTrace, input: string | URL, init: Request
 
 	// Registered synchronously, so a later await log.flush() delivers a fire-and-forget log.fetch().
 	// Settled on the caller's promise, never tracked from it: a handler there would mark its rejection handled.
-	// The executor runs at once, so `settle` is always set by the time the fetch settles.
-	let settle: (() => void) | undefined;
+	let settle: () => void = () => {};
 
 	track(new Promise<void>(resolve => { settle = resolve; }));
 
-	return tracedFetch(trace, url, init).finally(() => settle?.());
+	return tracedFetch(trace, url, init).finally(() => { settle(); });
 }

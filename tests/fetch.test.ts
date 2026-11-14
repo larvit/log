@@ -2,9 +2,9 @@ import { isCredentialHeaderName } from "../credentials/header-names.js";
 import { buildUrlFull } from "../credentials/span-values.js";
 import { formatTraceparent, generateSpanId, generateTraceId, Log, parseTraceparent, type TimerHandle } from "../index.js";
 import { STATUS_CODE_ERROR, STATUS_CODE_UNSET } from "../otlp/payloads.js";
-import { capturedHeaders, fetchFailure, requestAttributes, responseAttributes, spanStatusCode } from "../tracing/fetch.js";
+import { capturedHeaders, fetchFailure, pageHref, requestAttributes, responseAttributes, spanStatusCode } from "../tracing/fetch.js";
 import test from "./tap.js";
-import { callHeader, capture, clientSpan, exportedRecords, exportedSpans, response, stubFetch, testFetchTrace, waitFor } from "./test-doubles.js";
+import { callHeader, capture, clientSpan, exportedRecords, exportedSpans, nextTurn, response, stubFetch, testFetchTrace, waitFor } from "./test-doubles.js";
 
 test("log.fetch traces a successful call and drops the query by default", async t => {
 	const { calls, logFetch, trace } = testFetchTrace({ context: { "service.name": "svc", tenant: "acme" } });
@@ -560,6 +560,39 @@ test("await log.end() drains a fire-and-forget log.fetch span, and its rejection
 	t.strictEqual(unhandled.length, 1, "a rejection nobody awaited reaches the runtime, as plain fetch's would");
 	t.end();
 });
+
+test("await log.flush() waits for a fire-and-forget log.fetch still in flight, and delivers its span", async t => {
+	let released = false;
+	let flushed = false;
+	const { calls } = stubFetch(async () => {
+		await waitFor(() => released);
+
+		return undefined;
+	});
+	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+
+	void log.fetch("https://api.test/slow"); // deliberately NOT awaited
+	const flushing = log.flush().then(() => { flushed = true; });
+
+	await nextTurn();
+	t.notOk(flushed, "flush() waits while the request is in flight");
+	released = true;
+	await flushing;
+	t.strictEqual(exportedSpans(calls).find(span => span.kind === 3)?.name, "GET api.test", "and resolves once the client span is delivered");
+	t.end();
+});
+
+for (const [scope, expected, name] of [
+	[{ location: { href: "https://app.test/page" } }, "https://app.test/page", "a page's location"],
+	[{}, undefined, "no location"],
+	[{ location: { href: 5 } }, undefined, "a location whose href is not a string"],
+	[Object.defineProperty({}, "location", { get: () => { throw new Error("blocked"); } }), undefined, "a location getter that throws"],
+] as const) {
+	test(`pageHref reads ${name}`, t => {
+		t.strictEqual(pageHref(scope), expected, name);
+		t.end();
+	});
+}
 
 test("log.fetch skips an invalid name in captureRequestHeaders or captureResponseHeaders and warns once per stderr", async t => {
 	const { calls } = stubFetch(path => path === "/x" ? response({ headers: new Headers({ "x-resp": "rv" }) }) : undefined);

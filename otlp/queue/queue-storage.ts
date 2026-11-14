@@ -44,8 +44,6 @@ export function saveTransition(state: SaveState, event: SaveEvent): { startWrite
 			return { startWrite: false, state: "writing" };
 		case "writeDone":
 			return state === "rewriteDue" ? { startWrite: true, state: "writing" } : { startWrite: false, state: "idle" };
-		default:
-			return event satisfies never;
 	}
 }
 
@@ -67,6 +65,7 @@ export class StoredQueue {
 		private readonly items: () => readonly QueuedItem[],
 		restore: (payloads: OtlpPayload[]) => void,
 	) {
+		// Without storage nothing writes, so nothing reads the `true` and no test can tell it from `false`.
 		this.readable = conf.storage ? this.read(conf.storage, restore) : Promise.resolve(true);
 		this.loaded = this.readable.then(() => undefined);
 	}

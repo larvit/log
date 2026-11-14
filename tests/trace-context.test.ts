@@ -140,6 +140,15 @@ test("a log.span reference taken before end() sees the end time, status and attr
 	t.end();
 });
 
+test("an unsampled log.span carries no attributes after end()", async t => {
+	const traceparent = formatTraceparent(generateTraceId(), generateSpanId(), false);
+	const log = new Log({ context: { job: "nightly" }, stderr: () => {}, stdout: () => {}, traceparent });
+
+	await log.end();
+	t.deepEqual(log.span.attributes, [], "the context stays off the span");
+	t.end();
+});
+
 test("log.traceparent() emits the current span context", t => {
 	const log = new Log();
 
