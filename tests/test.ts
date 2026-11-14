@@ -1,5 +1,9 @@
 import { isCredentialHeaderName } from "../credentials/header-names.js";
 import { type EntryFormatter, type EntryFormatterConf, formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, type Logger, type LogInt, type LogLevel, LogLevels, type LogOptions, type Metadata, msgJsonFormatter, msgTextFormatter, type OtlpPayload, type OtlpQueue, type OtlpSpan, parseTraceparent, Queue, type QueueStorage, type ResolvedLogConf, resolveFormatter, type TimerHandle } from "../index.js";
+import { STATUS_CODE_ERROR, STATUS_CODE_UNSET } from "../otlp/payloads.js";
+import { encodeBatch, plainHttpWarnings, statusFailure } from "../otlp/sender.js";
+import { fetchFailure, type FetchTrace, requestAttributes, responseAttributes, spanStatusCode, tracedFetch } from "../tracing/fetch.js";
+import { openSpan } from "../tracing/spans.js";
 import test from "./tap.js";
 
 // --- helpers ---------------------------------------------------------------
@@ -3189,5 +3193,132 @@ test("an injected clock's numeric timer id is never handed to Deno's unrefTimer"
 test("isCredentialHeaderName tells a credential header from any other, read from its own module", t => {
 	t.strictEqual(isCredentialHeaderName("Authorization"), true, "Authorization is a credential header");
 	t.strictEqual(isCredentialHeaderName("Content-Type"), false, "Content-Type is not");
+	t.end();
+});
+
+test("statusFailure counts a 2xx status as delivered", t => {
+	t.strictEqual(statusFailure(204), undefined, "no failure to act on");
+	t.end();
+});
+
+for (const status of [408, 429, 500, 503]) {
+	test(`statusFailure retries a ${status} status`, t => {
+		t.strictEqual(statusFailure(status)?.retry, true, "the batch is retried");
+		t.end();
+	});
+}
+
+for (const status of [400, 404, 413]) {
+	test(`statusFailure drops the batch on a ${status} status`, t => {
+		t.strictEqual(statusFailure(status)?.retry, false, "the batch is not retried");
+		t.end();
+	});
+}
+
+for (const status of [401, 403]) {
+	test(`statusFailure reports a ${status} status as unauthorized and doesn't retry it`, t => {
+		t.deepEqual(statusFailure(status), { message: "Non-ok return status", reportAs: "OTLP export unauthorized, batch dropped", retry: false, status }, "reported once, then dropped");
+		t.end();
+	});
+}
+
+test("plainHttpWarnings names each credential header and never its value", t => {
+	const warnings = plainHttpWarnings(new Headers({ Authorization: "Basic c2VjcmV0", "Content-Type": "application/json", "X-Api-Key": "k-123" }), "collector.test", { "X-Api-Key": "k-123" });
+
+	t.strictEqual(warnings.length, 2, "authorization and x-api-key, not content-type");
+	t.ok(warnings.every(warning => warning.includes("collector.test")), "each names the host");
+	t.notOk(warnings.some(warning => warning.includes("k-123") || warning.includes("c2VjcmV0")), "no value is quoted");
+	t.end();
+});
+
+test("plainHttpWarnings blames the endpoint's userinfo for an Authorization header the additional headers don't set", t => {
+	const [warning] = plainHttpWarnings(new Headers({ Authorization: "Basic c2VjcmV0" }), "collector.test", undefined);
+
+	t.ok(warning.includes("user:pass@ in otlpHttpBaseURI"), "the source is the userinfo");
+	t.end();
+});
+
+test("encodeBatch hands back a failure that is not retried for a payload it cannot encode", t => {
+	const unencodable = { payload: { resourceLogs: [{ resource: {}, scopeLogs: [{ logRecords: [{ get body(): never { throw new Error("corrupt"); } }] }] }] } } as unknown as Parameters<typeof encodeBatch>[0][number];
+
+	t.deepEqual(encodeBatch([unencodable], false), { failure: { message: "corrupt", retry: false } }, "corrupt and dropped");
+	t.end();
+});
+
+// A FetchTrace built from plain values: no Log, no queue, no network.
+function fetchTrace(over: Partial<FetchTrace> = {}): FetchTrace & { warnings: string[] } {
+	const warnings: string[] = [];
+	const clock = { clearTimeout: () => {}, now: () => 1700000000000, setTimeout: () => 1 };
+	const randomBytes = (size: number) => new Uint8Array(size).fill(7);
+	const { sampled, span } = openSpan({ clock, randomBytes });
+
+	return { clock, context: { "service.name": "svc" }, randomBytes, sampled, span, warn: msg => { warnings.push(msg); }, warnings, ...over };
+}
+
+test("requestAttributes drops the query and keeps the port, scheme and context", t => {
+	const attributes = requestAttributes(fetchTrace(), new URL("https://api.test:8443/users?token=secret"), "GET", new Headers());
+
+	t.deepEqual(attributes, {
+		"http.request.method": "GET",
+		"server.address": "api.test",
+		"server.port": 8443,
+		"service.name": "svc",
+		"url.full": "https://api.test:8443/users",
+		"url.scheme": "https",
+	}, "no token, no query");
+	t.end();
+});
+
+test("requestAttributes captures a named request header and redacts a credential one", t => {
+	const headers = new Headers({ Authorization: "Bearer abc", "X-Request-Id": "r1" });
+	const attributes = requestAttributes(fetchTrace({ captureRequestHeaders: ["X-Request-Id", "Authorization"] }), new URL("https://api.test/"), "GET", headers);
+
+	t.strictEqual(attributes["http.request.header.x-request-id"], "r1", "the plain header is captured");
+	t.strictEqual(attributes["http.request.header.authorization"], "REDACTED", "the credential is not");
+	t.end();
+});
+
+test("requestAttributes warns of a header name it can't read, by position and not by name", t => {
+	const trace = fetchTrace({ captureRequestHeaders: ["bad name: value"] });
+
+	requestAttributes(trace, new URL("https://api.test/"), "GET", new Headers());
+	t.deepEqual(trace.warnings, ["@larvit/log: captureRequestHeaders[0] is not a valid header name, so log.fetch skips it"], "the index stands in for the name");
+	t.end();
+});
+
+test("responseAttributes records the status and a captured response header", t => {
+	const res = new Response(null, { headers: { "X-Trace": "t1" }, status: 503 });
+
+	t.deepEqual(responseAttributes(fetchTrace({ captureResponseHeaders: ["X-Trace"] }), res), { "http.response.header.x-trace": "t1", "http.response.status_code": 503 }, "status and header");
+	t.end();
+});
+
+test("spanStatusCode leaves a 399 status unset", t => {
+	t.strictEqual(spanStatusCode(399), STATUS_CODE_UNSET, "not an error");
+	t.end();
+});
+
+test("spanStatusCode marks a 400 status as an error", t => {
+	t.strictEqual(spanStatusCode(400), STATUS_CODE_ERROR, "an error");
+	t.end();
+});
+
+test("fetchFailure names the error by its code, else its name, else fetch_error", t => {
+	const url = new URL("https://api.test/");
+	const named = Object.assign(new TypeError("x"), { code: "ECONNREFUSED" });
+
+	t.strictEqual(fetchFailure(named, url).errorType, "ECONNREFUSED", "code first");
+	t.strictEqual(fetchFailure(new TypeError("x"), url).errorType, "TypeError", "then name");
+	t.strictEqual(fetchFailure("boom", url).errorType, "fetch_error", "then the fallback");
+	t.end();
+});
+
+test("tracedFetch ends a span on a queue it was handed, with no Log in sight", async t => {
+	const payloads: OtlpPayload[] = [];
+
+	stubFetch();
+	await tracedFetch(fetchTrace({ otlpQueue: { enqueue: payload => { payloads.push(payload); }, flush: async () => {} } }), new URL("https://api.test/users"), undefined);
+
+	t.strictEqual(payloads.length, 1, "one span queued");
 	t.end();
 });

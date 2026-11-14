@@ -111,6 +111,40 @@ function setsAuthorization(headers: Record<string, string> | undefined): boolean
 	return Object.keys(headers ?? {}).some(name => name.toLowerCase() === "authorization");
 }
 
+// What a response status means for its batch: undefined when delivered, else whether to retry and what to report.
+export function statusFailure(status: number): SendFailure | undefined {
+	if (status >= 200 && status < 300) {
+		return undefined;
+	}
+
+	return {
+		message: "Non-ok return status",
+		...status === 401 || status === 403 ? { reportAs: "OTLP export unauthorized, batch dropped" } : {},
+		retry: status === 408 || status === 429 || status >= 500,
+		status,
+	};
+}
+
+// One warning per credential header going over plain http:. It names the header and never its value, since a value may be the credential.
+export function plainHttpWarnings(headers: Headers, host: string, additionalHeaders: Record<string, string> | undefined): string[] {
+	return [...headers].filter(([name]) => isCredentialHeaderName(name)).map(([name]) => {
+		const source = name === "authorization" && !setsAuthorization(additionalHeaders) ? "user:pass@ in otlpHttpBaseURI" : "otlpAdditionalHeaders";
+
+		return `@larvit/log: the ${name} header from ${source} goes over plain http: to ${host}, readable by anything on the network path; use an https: endpoint, or on a network you trust set acceptPlainHttpCredentials: true on the Queue`;
+	});
+}
+
+// A payload that cannot be encoded (a corrupt stored item, no TextEncoder) never becomes sendable.
+export function encodeBatch(batch: QueuedItem[], protobuf: boolean): { body: string | Uint8Array<ArrayBuffer> } | { failure: SendFailure } {
+	try {
+		const payload = mergePayloads(batch.map(item => item.payload));
+
+		return { body: protobuf ? encodeOtlpProtobuf(payload) : JSON.stringify(payload) };
+	} catch (err) {
+		return { failure: { message: stringField(err, "message") ?? "Unencodable OTLP payload", retry: false } };
+	}
+}
+
 export class OtlpSender {
 	private readonly conf: SenderConf;
 	private readonly headers: Headers;
@@ -187,27 +221,18 @@ export class OtlpSender {
 		}
 
 		if (this.plainHttpHost !== undefined) {
-			// The message names the header and never its value, since a value may be the credential.
-			for (const [name] of headers) {
-				if (isCredentialHeaderName(name)) {
-					const source = name === "authorization" && !setsAuthorization(this.conf.otlpAdditionalHeaders) ? "user:pass@ in otlpHttpBaseURI" : "otlpAdditionalHeaders";
-
-					this.warn(`@larvit/log: the ${name} header from ${source} goes over plain http: to ${this.plainHttpHost}, readable by anything on the network path; use an https: endpoint, or on a network you trust set acceptPlainHttpCredentials: true on the Queue`);
-				}
+			for (const msg of plainHttpWarnings(headers, this.plainHttpHost, this.conf.otlpAdditionalHeaders)) {
+				this.warn(msg);
 			}
 		}
 
-		let body: string | Uint8Array<ArrayBuffer>;
+		const encoded = encodeBatch(batch, this.protobuf);
 
-		// A payload that cannot be encoded (a corrupt stored item, no TextEncoder) never becomes sendable.
-		try {
-			const payload = mergePayloads(batch.map(item => item.payload));
-
-			body = this.protobuf ? encodeOtlpProtobuf(payload) : JSON.stringify(payload);
-		} catch (err) {
-			return { message: stringField(err, "message") ?? "Unencodable OTLP payload", retry: false };
+		if ("failure" in encoded) {
+			return encoded.failure;
 		}
 
+		const { body } = encoded;
 		const bytes = typeof body === "string" ? utf8Length(body) : body.length;
 
 		// AbortController + cleared timer works in browsers and Node, and never leaves a dangling timer.
@@ -223,13 +248,10 @@ export class OtlpSender {
 				signal: controller.signal,
 			});
 
-			if (!res.ok) {
-				return {
-					message: "Non-ok return status",
-					...res.status === 401 || res.status === 403 ? { reportAs: "OTLP export unauthorized, batch dropped" } : {},
-					retry: res.status === 408 || res.status === 429 || res.status >= 500,
-					status: res.status,
-				};
+			const rejected = statusFailure(res.status);
+
+			if (rejected) {
+				return rejected;
 			}
 
 			// Protobuf responses are binary; only the JSON encoding reads the body, for a partialSuccess.

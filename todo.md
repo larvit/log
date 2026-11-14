@@ -12,11 +12,9 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 36 | 2.7.0 |  | principle | **Reach the retry decision and a `log.fetch` span's attributes without a network call.** | 2 | 1 | 1 | 2 | 5 | code health by 5 | 4.5 |
 | 43 | 2.7.0 |  | principle | **Give `ExportScheduler` and save coalescing named states.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
 | 48 | 2.7.0 |  | principle | **Test the untested failure paths.** | 2 | 1 | 1 | 2 | 4 | code health by 4 | 4.2 |
 | 109 | 2.7.0 |  | principle | **Test without the wall clock: no sleep, no real timer and no time bound.** | 2 | 1 | 1 | 2 | 4 | code health by 4 | 4.2 |
-| 136 | 2.7.0 |  | decision | **Stop `tracing/` importing `log/`, so imports run one way from `log/` down to `primitives/`.** | 2 | 1 | 2 | 3 | 3 | code health by 4 | 4.2 |
 | 137 | 2.7.0 |  |  | **Give each part's tests a file of their own under `tests/`, beside the helpers they share.** | 2 | 1 | 1 | 2 | 4 | code health by 4 | 4.2 |
 | 110 | 2.7.0 |  | principle | **Register one test per case where a test loops over its cases or checks many behaviours.** | 1 | 1 | 1 | 1 | 4 | code health by 3 | 3.7 |
 | 140 | 2.7.0 |  | principle | **Test each platform default with its value passed in, and swap a global in at most one test per default.** | 2 | 1 | 1 | 2 | 3 | code health by 3 | 3.7 |
@@ -99,14 +97,6 @@
 
 ## Details
 
-### 36. Reach the retry decision and a `log.fetch` span's attributes without a network call.
-
-`OtlpSender.send` holds the plain-http warning, encoding, the send and the status decision in one
-method, and `tracedFetch` builds and redacts attributes around the live call. Principle: Functional
-core, imperative shell. `tracedFetch` is also 56 lines tracking seven values across a try, a catch
-and a finally, which the principles pass of 2.6.0's release review raised against "About seven
-things per level".
-
 ### 43. Give `ExportScheduler` and save coalescing named states.
 
 `timer.retry`, `running`, `pending` and `failures`, and `dirty` with `saving`, combine into states
@@ -132,22 +122,6 @@ should have automated tests.
 `log.fetch redacts a long query within 250 ms` asserts on `performance.now()`, `waitFor` polls with a
 real `setTimeout`, one test sleeps 10 ms and one runs a real 20 ms retry timer. Principle: a test
 neither sleeps nor asserts on the wall clock (`~/.claude/principles/technical-principles.md`).
-
-### 136. Stop `tracing/` importing `log/`, so imports run one way from `log/` down to `primitives/`.
-
-`tracing/spans.ts` and `tracing/fetch.ts` take the `Log` that calls them, as a type import of
-`log/log.ts`, and read its `conf`, `context`, `sampled` and `span`. `tracing/spans.ts` also imports
-`ResolvedLogConf` from `log/types.ts`, and `tracing/fetch.ts` `warnOnceToStderr` from
-`log/stderr-warnings.ts`. So the callee knows its caller, and neither can be read or tested without
-`log/`. Found by the stability review of the module split, 2026-11-13, against the technical
-principle "Compose, do not entangle". AGENTS.md → "Working here" states the direction, and
-`docs/decisions.md` → "The package publishes one bundled `index.js`" names these imports as the
-exception this item ends.
-
-The architecture pass of 2.6.0's release review proposed a shape: `childSpan`, `endSpan` and
-`tracedFetch` take one value the `Log` builds, holding the capture settings, `clock`, `context`,
-the queue, `randomBytes`, `sampled`, `span` and a `warn` function. `tracing/` then doesn't import anything from `log/`, and a test can hand `tracedFetch` a
-fake of that value, which item 36 needs.
 
 ### 137. Give each part's tests a file of their own under `tests/`, beside the helpers they share.
 
@@ -236,8 +210,7 @@ inherited architect named three places whose names say less or more than they do
 - `primitives/failure-fields.ts`: total field reads that the sender, the storage and a span's
   failure all use, under a name that says failure.
 
-None is exported, so a rename doesn't change the API. Item 136 also touches the imports of
-`log/stderr-warnings.ts`. Code health.
+None is exported, so a rename doesn't change the API. Code health.
 
 ### 25. Publish the artifact the gate tested.
 
@@ -450,8 +423,7 @@ queue's recognition in `log/default-queue.ts` → `isDefaultQueueFor`, which ite
 query rules in `credentials/query.ts` → `redactedSearch` and `PAIR_RULES`, which item 145 takes
 with `credentials/query-userinfo-runs.ts` → `step`. Shape's seats also named
 `credentials/path.ts` → `redactedPath`, item 146, and Navigation's three misleading names, item
-147. Item 43 takes `otlp/export-scheduler.ts` → `ExportScheduler.flush`, and item 136 the imports
-of `log/` from `tracing/`, both named again. This item's tagline names the floor, so its chunk runs
+147. Item 43 takes `otlp/export-scheduler.ts` → `ExportScheduler.flush`, named again. This item's tagline names the floor, so its chunk runs
 the four-seat scoring run. Where a dimension or the overall stays under 7.0, file items for the
 places the seats name, lowest dimension first, and a copy of this item blocked by them. Where every
 score reaches 7.0, it doesn't file anything, and the run replaces the comprehension baseline.

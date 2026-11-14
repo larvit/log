@@ -431,7 +431,8 @@ single source file. Declarations are not bundled:
 `types/` mirrors the modules, and `types/index.d.ts` names the public ones. The suite tests the
 bundle through `index.js`. A test that imports a module directly runs tsc's output for that module,
 not the bundle, so it suits a pure rule and never what the bundler or minifier could change.
-Imports point one way, `log/` → `tracing/` → `otlp/` → `credentials/` → `primitives/`, with one
-exception: `tracing/` imports `log/` until `todo.md` item 136 ends that. Serves code health and
+Imports point one way, `log/` → `tracing/` → `otlp/` → `credentials/` → `primitives/`, with no
+exception: `Log` hands `tracing/` a `SpanHost` or a `FetchTrace` of plain values, and a warning
+function, so `tracing/` never names `Log`. That cost 224 bytes gzipped, 11608 to 11832. Serves code health and
 README → Goals #5; applies the technical principle "Compose, do not entangle". Valid while every
 supported runtime loads one ESM file.

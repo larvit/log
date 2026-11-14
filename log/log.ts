@@ -4,8 +4,8 @@ import { stringField } from "../primitives/failure-fields.js";
 import { DEFAULT_LOG_LEVEL, type LogLevel, LogLevels, SEVERITY_NUMBERS } from "../primitives/levels.js";
 import { type Metadata, type MetadataInput, withoutUndefined } from "../primitives/metadata.js";
 import { writeOnce } from "../primitives/once-per-sink.js";
-import { tracedFetch } from "../tracing/fetch.js";
-import { endSpan, openSpan } from "../tracing/spans.js";
+import { type FetchTrace, tracedFetch } from "../tracing/fetch.js";
+import { endSpan, openSpan, type SpanHost } from "../tracing/spans.js";
 import { formatTraceparent } from "../tracing/traceparent.js";
 import { writeConsoleEntry } from "./console-output.js";
 import { confFromOptions, inherited, type LogSettings, resolveSettings } from "./settings.js";
@@ -77,7 +77,7 @@ export class Log implements LogInt {
 		try {
 			const error = options?.error;
 
-			endSpan(this, this.span, { ...this.context }, error === undefined || error === null ? undefined : {
+			endSpan(this.spanHost(), this.span, { ...this.context }, error === undefined || error === null ? undefined : {
 				error,
 				errorType: stringField(error, "code") ?? stringField(error, "name") ?? "_OTHER",
 			});
@@ -111,7 +111,7 @@ export class Log implements LogInt {
 
 		this.track(new Promise<void>(resolve => { settle = resolve; }));
 
-		return tracedFetch(this, url, init).finally(() => settle?.());
+		return tracedFetch(this.fetchTrace(), url, init).finally(() => settle?.());
 	}
 
 	// Never writes, so a library author's `if (log.enabled(...))` emits no line; log() warns of an unknown logLevel.
@@ -176,6 +176,24 @@ export class Log implements LogInt {
 		const span = this.conf.parentLog?.span.spanId ? this.conf.parentLog.span : this.span;
 
 		this.conf.otlpQueue.enqueue(buildLogPayload({ attributes, logLevel, msTimestamp, msg, span }));
+	}
+
+	// The values tracing/ needs of this Log, which it never imports.
+	private spanHost(): SpanHost {
+		return { clock: this.conf.clock, otlpQueue: this.conf.otlpQueue, randomBytes: this.conf.randomBytes, sampled: this.sampled, span: this.span };
+	}
+
+	private fetchTrace(): FetchTrace {
+		const { captureQuery, captureRequestHeaders, captureResponseHeaders } = this.conf;
+
+		return {
+			...this.spanHost(),
+			captureQuery,
+			captureRequestHeaders,
+			captureResponseHeaders,
+			context: this.context,
+			warn: msg => warnOnceToStderr(this.conf, this.context, msg),
+		};
 	}
 
 	private track(promise: Promise<unknown>): void {
