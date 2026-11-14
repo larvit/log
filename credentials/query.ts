@@ -10,6 +10,7 @@ function parsedUrl(text: string): URL | undefined {
 	try {
 		return new URL(text);
 	} catch {
+		// Reaching the function's end answers `undefined` too, so no test tells this line from its absence.
 		return undefined;
 	}
 }
@@ -72,6 +73,7 @@ function readNestedUrl(part: string, reading: QueryReading): string {
 	return read;
 }
 
+// redactQueryPair tests only for "value", so no test tells "key and value" from any other string.
 type PairRedaction = "key and value" | "value";
 
 // What one pair, read alone, loses. The first rule to answer decides, so reordering the rules changes

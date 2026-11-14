@@ -667,6 +667,35 @@ test("log.fetch with an invalid header rejects but never hangs end()", async t =
 	t.end();
 });
 
+test("log.fetch keeps the log's context on the error span of a request whose method cannot be read", async t => {
+	const { calls, logFetch } = testFetchTrace({ context: { tenant: "acme" } });
+
+	await logFetch("https://api.test/x", { method: 5 as unknown as string }).catch(() => {});
+
+	const span = clientSpan(calls);
+
+	t.strictEqual(span.attributes.find((attribute: any) => attribute.key === "tenant")?.value.stringValue, "acme", "the context rides on the span");
+	t.strictEqual(span.status.code, 2, "the span is an error");
+	t.end();
+});
+
+test("log.fetch traces a call on a runtime with no Request", async t => {
+	const { calls, logFetch } = testFetchTrace();
+	const original = Object.getOwnPropertyDescriptor(globalThis, "Request")!;
+
+	Reflect.set(globalThis, "Request", undefined);
+
+	try {
+		await logFetch("https://api.test/x", { headers: { "x-keep": "kept" } });
+	} finally {
+		Object.defineProperty(globalThis, "Request", original);
+	}
+
+	t.strictEqual(callHeader(calls.find(call => call.path === "/x")!, "x-keep"), "kept", "the call goes out with its headers");
+	t.strictEqual(clientSpan(calls).kind, 3, "its client span is exported");
+	t.end();
+});
+
 // The platform's timers, for a test clock that replaces only now().
 const platformTimers = { clearTimeout: (timer?: TimerHandle) => clearTimeout(timer), setTimeout: (callback: () => void, delayMs: number) => setTimeout(callback, delayMs) };
 

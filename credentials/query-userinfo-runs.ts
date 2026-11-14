@@ -28,6 +28,7 @@ function step(open: Run | undefined, [key, value]: [string, string], index: numb
 	const continued = open ? readInto(open, pair, index, holdsAtSign) : {};
 
 	if (continued.open || !opensUserinfo(key)) {
+		// The `[]` is the one no test can tell from an entry that is no Run: see `runs` below.
 		return { closed: continued.closed ? [continued.closed] : [], open: continued.open };
 	}
 
@@ -45,6 +46,8 @@ function step(open: Run | undefined, [key, value]: [string, string], index: numb
 // one; a run that a backslash opens may then redact a pair holding no credential. A value opening
 // userinfo is a url of its own, so `?next=https://h&q=a@b` is kept.
 export function pairsInUserinfoRuns(pairs: Array<[string, string]>, holdsAtSign: (text: string) => boolean): Set<number> {
+	// An entry that is no Run, here or in `step`'s `closed`, spans no pair: `lastAt - start` is NaN, so
+	// no test tells it from none.
 	const runs: Run[] = [];
 	let open: Run | undefined;
 
