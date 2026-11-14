@@ -121,6 +121,7 @@ function ownConf(options: LogOptions | LogLevel | "none" | undefined): { conf: L
 		// Only undefined is unset, as in orDefault: a null from untyped code still replaces the
 		// source's formatter.
 		...format === undefined || typeof format === "function" ? {} : { format },
+		// No test sees an undefined here: withDefaults splits entryFormatter off before the conf is built.
 		...formatter === undefined ? {} : { entryFormatter: formatter },
 	};
 
