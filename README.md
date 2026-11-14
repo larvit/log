@@ -578,7 +578,7 @@ needs Node 18+ on the host.
 | Command | |
 |---|---|
 | `npm test` | Node and browser suites. |
-| `npm run test-docker` | Node suite, on the image the `Dockerfile` pins. `NODE_IMAGE=node:18.20.8-bookworm-slim npm run test-docker` picks another; CI runs 18 to 26. |
+| `npm run test-docker` | Node suite, on the image the `Dockerfile` pins. `NODE_IMAGE=node:18.20.8-bookworm-slim npm run test-docker` picks another; CI runs 18 to 26. `TESTED_BUILD_DIR=<folder>` also copies out the `index.js`, source map and types the suite ran against. |
 | `npm run test-browser` | The same suite in Chromium. |
 | `npm run test-otlp` | Export to a real OpenTelemetry Collector, JSON and protobuf. `OTLP_DEBUG=1` prints what it received. |
 | `npm run test-mutation` | Stryker mutation tests of the library, against the Node suite. `npm run test-mutation -- --mutate credentials/path.ts:30-50` mutates only those lines. |
@@ -586,10 +586,13 @@ needs Node 18+ on the host.
 
 ### Releasing
 
-A published GitHub release runs `.github/workflows/publish.yaml`: build, test, lint, `npm publish`.
+A published GitHub release runs `.github/workflows/publish.yaml`. It doesn't build: it downloads the
+package the `Push` run for the release's commit tested, then runs `npm publish`. It fails when no
+`Push` run for that commit passed, or when that run's upload is past its 90 days of retention.
 It needs an `NPM_TOKEN` repository secret (an npm automation token with publish rights).
 
 1. Add the version to [CHANGELOG.md](CHANGELOG.md).
 2. `npm version <major|minor|patch>`. Breaking changes bump the major.
 3. Merge to `main` through a PR.
-4. Create a GitHub release with tag `vX.Y.Z` matching `package.json`; the workflow fails when they differ.
+4. Once the merge's `Push` run on `main` has passed, create a GitHub release with tag `vX.Y.Z` matching
+   `package.json`; the workflow fails when they differ.
