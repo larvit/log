@@ -430,3 +430,20 @@ Read most (opens and searches):
 - `log/types.ts` 2
 - `otlp/queue-types.ts` 2
 - `package.json` 2
+
+## Reading cost, chunk 23fd1552c038, finished 2026-11-14T15:16:46Z
+
+72923 new input tokens before the first commit.
+
+Read most (opens and searches):
+
+- `otlp/export-scheduler.ts` 9
+- `tests/test.ts` 9
+- `todo.md` 4
+- `otlp/queue-storage.ts` 3
+- `README.md` 2
+- `otlp/queue.ts` 2
+- `e2e-tests/run-browser-tests.mjs` 1
+- `package.json` 1
+- `tests/tap.ts` 1
+- `tsconfig.test.json` 1
