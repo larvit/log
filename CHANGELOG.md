@@ -2,14 +2,14 @@
 
 ## Unreleased
 
-A `format` that isn't `"text"`, `"json"` or a function now warns, and the type of the entry a
-formatter takes has the name 3.0.0 gives it. Nothing here needs a change in your code.
+A string `format` other than `"text"` or `"json"` now warns, and the entry a formatter takes has a
+new name, `LogEntry`, which 3.0.0 gives the old one. Nothing here needs a change in your code.
 
-- **Get a warning, once per `stderr` sink, when `format` is a string other than `"text"` or
-  `"json"`.** `new Log({ format: process.env.LOG_FORMAT })` used to write text without a word for
-  `"pretty"`; it still writes text, and now says so.
-- **Import `LogEntry`, the entry a formatter takes, ahead of 3.0.0.** It is `EntryFormatterConf`
-  under the name that release gives it, so moving to it now needs no change then.
+- **Get a warning, once per `stderr` sink, for a `format` string other than `"text"` or `"json"`.**
+  `new Log({ format: process.env.LOG_FORMAT })` wrote text, without a word, for `"pretty"`. It still
+  writes text, and now says why.
+- **Import `LogEntry`, and stop using `EntryFormatterConf`, which 3.0.0 removes.** Both name the same
+  type, so switching now changes nothing at runtime and leaves nothing to do in 3.0.0.
 
 ## v2.6.1
 
