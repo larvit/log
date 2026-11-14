@@ -434,6 +434,6 @@ not the bundle, so it suits a pure rule and never what the bundler or minifier c
 Imports point one way, `log/` → `tracing/` → `otlp/` → `credentials/` → `primitives/`, and no
 import runs against it: `Log` hands `tracing/` plain values (`SpanOrigin`, `SpanHost`, and
 `FetchTrace` with its `warn` function), so `tracing/` never names `Log`. Building those values added
-224 bytes gzipped, 11608 to 11832. Serves code health and
+263 bytes gzipped, 11608 to 11871. Serves code health and
 README → Goals #5; applies the technical principle "Compose, do not entangle". Valid while every
 supported runtime loads one ESM file.
