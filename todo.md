@@ -6,7 +6,7 @@
 
 `Bar = 0.5`
 
-`Next ID = 152`
+`Next ID = 153`
 
 ## Items
 
@@ -16,6 +16,7 @@
 | 143 | 2.8.0 |  |  | **Let a reader answer what a `Log`'s conf holds, and how its formatter reaches a child or clone, from one module of `log/`.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
 | 144 | 2.8.0 |  |  | **Let a reader tell from the queue and the conf in front of them whether a `Log` accepts that queue beside the `otlp*` options.** | 2 | 1 | 2 | 3 | 3 | code health by 4 | 4.2 |
 | 147 | 2.8.0 |  |  | **Name `log/stderr-warnings.ts`, `traceableUrl` and `primitives/failure-fields.ts` for what each holds, so a name neither hides nor promises a job.** | 1 | 1 | 1 | 1 | 2 | code health by 2 | 4.2 |
+| 152 | 2.8.0 |  | principle | **Make the imports between `otlp/queue/` and `otlp/send/` point one way.** | 2 | 1 | 1 | 2 | 3 | code health by 3 | 3.7 |
 | 25 | 2.8.0 |  |  | **Publish the artifact the gate tested.** | 2 | 2 | 3 | 5 | 4 | code health by 5 | 3.5 |
 | 145 | 2.8.0 |  |  | **Let a reader check each rule that redacts a credential in a query from the code alone, without working out the rules' order or a run's state by hand.** | 2 | 2 | 4 | 6 | 5 | code health by 6 | 3.4 |
 | 150 | 2.8.0 |  | principle | **Make each of the 3 mutants that survive on the lines changed since v2.6.0 fail a test, or say at its line why none can.** | 2 | 1 | 1 | 2 | 4 | code health by 3 | 3.1 |
@@ -163,6 +164,10 @@ inherited architect named three places whose names say less or more than they do
   failure all use, under a name that says failure.
 
 None is exported, so a rename doesn't change the API. Code health.
+
+### 152. Make the imports between `otlp/queue/` and `otlp/send/` point one way.
+
+The 2.7.0 release review split `otlp/` into `queue/` and `send/`, and the two folders import each other: `otlp/queue/queue.ts` imports `OtlpSender` and `KEEPALIVE_MAX_BYTES` from `send/`, while `otlp/send/sender.ts`, `send/batch.ts` and `send/endpoint.ts` import `queue/queue-items.ts` and `queue/queue-types.ts`. Both seats of that release's paired ruling named it: the folder split says nothing about which way dependencies flow. AGENTS.md → "Working here" asks imports to point one way between the top folders; this is the same rule one level down. Technical principle: "Compose, do not entangle".
 
 ### 25. Publish the artifact the gate tested.
 
