@@ -12,7 +12,7 @@ function denoUnrefTimer(): ((id: number) => void) | undefined {
 }
 
 // A pending batch or retry must not keep a finished Node or Deno process alive.
-function unref(timer: TimerHandle, unrefNumericTimer: ((id: number) => void) | undefined): void {
+export function unref(timer: TimerHandle, unrefNumericTimer: ((id: number) => void) | undefined): void {
 	if (typeof timer === "object" && typeof timer.unref === "function") {
 		timer.unref();
 	} else if (typeof timer === "number") {

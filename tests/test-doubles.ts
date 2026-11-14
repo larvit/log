@@ -1,17 +1,29 @@
 import { Log, type LogOptions, type Metadata, type QueueStorage, type TimerHandle } from "../index.js";
 
-// Bounded below tap's 10 s timeout: an abandoned poll keeps Node's loop alive and hangs the whole run.
-export const WAIT_FOR_TIMEOUT_MS = 5000;
+// One macrotask: every promise already settled runs first, and no timer is involved, so a test
+// never waits on the wall clock.
+export function nextTurn(): Promise<void> {
+	return new Promise(resolve => {
+		const channel = new MessageChannel();
+
+		channel.port1.onmessage = () => {
+			channel.port1.close();
+			resolve();
+		};
+		channel.port2.postMessage(undefined);
+	});
+}
+
+// Bounded by turns, not time: a condition that waits on a real timer fails here instead of passing slowly.
+export const WAIT_FOR_TURNS = 1000;
 
 export async function waitFor(done: () => boolean): Promise<void> {
-	const deadline = Date.now() + WAIT_FOR_TIMEOUT_MS;
-
-	while (!done()) {
-		if (Date.now() >= deadline) {
+	for (let turn = 0; !done(); turn++) {
+		if (turn === WAIT_FOR_TURNS) {
 			throw new Error("waitFor: the condition never held");
 		}
 
-		await new Promise(resolve => setTimeout(resolve, 5));
+		await nextTurn();
 	}
 }
 
@@ -70,8 +82,8 @@ export function fakeClock(startMs = 1758150000000) {
 	let now = startMs;
 	let nextTimer = 1;
 
-	// One macrotask tick, which drains the queue's awaited work: it is promises all the way down.
-	const settle = () => new Promise(resolve => setTimeout(resolve, 0));
+	// The queue's awaited work is promises all the way down, so one turn drains it.
+	const settle = nextTurn;
 
 	return {
 		advance: async (deltaMs: number) => {

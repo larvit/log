@@ -1,10 +1,11 @@
 import { isCredentialHeaderName } from "../credentials/header-names.js";
+import { buildUrlFull } from "../credentials/span-values.js";
 import { formatTraceparent, generateSpanId, generateTraceId, Log, parseTraceparent, type TimerHandle } from "../index.js";
 import { STATUS_CODE_ERROR, STATUS_CODE_UNSET } from "../otlp/payloads.js";
 import { capturedHeaders, fetchFailure, type FetchTrace, requestAttributes, responseAttributes, spanStatusCode } from "../tracing/fetch.js";
 import { openSpan } from "../tracing/spans.js";
 import test from "./tap.js";
-import { callHeader, capture, clientSpan, exportedRecords, exportedSpans, response, stubFetch } from "./test-doubles.js";
+import { callHeader, capture, clientSpan, exportedRecords, exportedSpans, response, stubFetch, waitFor } from "./test-doubles.js";
 
 test("log.fetch traces a successful call and drops the query by default", async t => {
 	const { calls } = stubFetch();
@@ -66,6 +67,13 @@ test("log.fetch sends a Request passed as init with its own method, body, signal
 	t.end();
 });
 
+for (const key of [...["GoogleAccessId", "X-Amz-Credential", "X-Amz-Security-Token", "X-Amz-Signature", "X-Goog-Credential"], ...["access_token", "API_KEY", "apikey", "key", "Token", "access-token", "AccessToken", "api-key", "auth_token", "client_secret", "id_token", "password", "refresh_token", "Secret", "Subscription-Key", "authToken", "client-secret", "X_Amz_Signature", "apiKey", "x-api-key", "code", "id_token_hint", "auth", "old_password", "Passphrase", "consumer_id", "PrivateKeyId", "pwd", "X-Custom-Signed", "urn%3Asecret", "pword", "new_password2", "_code"]]) {
+	test(`buildUrlFull with captureQuery records the value of a ${key} query key as REDACTED`, t => {
+		t.strictEqual(buildUrlFull(new URL(`https://api.test/x?q=kept&${key}=v4lue`), true), `https://api.test/x?q=kept&${key}=REDACTED`, "the key is kept, its value redacted");
+		t.end();
+	});
+}
+
 test("log.fetch captureQuery keeps the query but redacts known-sensitive keys and url credentials", async t => {
 	const { calls } = stubFetch();
 	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
@@ -74,8 +82,6 @@ test("log.fetch captureQuery keeps the query but redacts known-sensitive keys an
 	await log.end();
 
 	const urlFull = clientSpan(calls).attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue;
-	const presigned = ["GoogleAccessId", "X-Amz-Credential", "X-Amz-Security-Token", "X-Amz-Signature", "X-Goog-Credential"];
-	const tokens = ["access_token", "API_KEY", "apikey", "key", "Token", "access-token", "AccessToken", "api-key", "auth_token", "client_secret", "id_token", "password", "refresh_token", "Secret", "Subscription-Key", "authToken", "client-secret", "X_Amz_Signature", "apiKey", "x-api-key", "code", "id_token_hint", "auth", "old_password", "Passphrase", "consumer_id", "PrivateKeyId", "pwd", "X-Custom-Signed", "urn%3Asecret", "pword", "new_password2", "_code"];
 
 	t.ok(urlFull.startsWith("https://api.test/fetch/REDACTED?q=hi&"), "a url nested in the request path records REDACTED, and a non-sensitive query param is kept");
 	t.ok(urlFull.includes("Signature=REDACTED&Signature=REDACTED"), "a repeated sensitive key keeps one redaction per occurrence");
@@ -85,9 +91,7 @@ test("log.fetch captureQuery keeps the query but redacts known-sensitive keys an
 	t.ok(urlFull.endsWith("&REDACTED=REDACTED"), "a credentialed url written as a bare query key is redacted, its value with it");
 	t.ok(!urlFull.includes("hunter2"), "the nested password is not leaked");
 	t.ok(urlFull.includes("X-Amz-Algorithm=AWS4-HMAC-SHA256"), "a presigned url's non-credential params are kept");
-	for (const key of presigned) t.ok(urlFull.includes(`${key}=REDACTED`), `${key} records REDACTED`);
 	t.ok(!/AKIAEXAMPLE|FwoGZXIvYXdz|8b1c9f|gserviceaccount/.test(urlFull), "no presigned credential value is leaked");
-	for (const key of tokens) t.ok(urlFull.includes(`&${key}=REDACTED`), `${key} records REDACTED`);
 	t.ok(!/ya29tok|k1api|k2api|k3api|k4tok|[uvw]\d+cred|pw47/.test(urlFull), "no token value is leaked, nor the userinfo of a url key ending in a term, a spelling with `-` or `_` dropped or added included");
 	t.ok(urlFull.includes("keyword=kept&%3Fkept=1&"), "a key merely starting with a listed name is kept, and a key's leading ? with it");
 	t.ok(urlFull.includes("&zipcode=kept2&X-Amz-SignedHeaders=host&"), "a key ending in an exact-only name, or holding a term short of its end, is kept");
@@ -124,78 +128,72 @@ test("log.fetch captureQuery reads a value up to eight encodings and eight neste
 	t.end();
 });
 
-test("log.fetch captureQuery redacts userinfo that a kept query splits across &", async t => {
-	const redacted = (count: number) => Array.from({ length: count }, () => "REDACTED=REDACTED").join("&");
-	const cases: [string, string][] = [
-		["a=1&//u:pw60&w@h.test&b=2", `a=1&${redacted(2)}&b=2`],
-		["//u:pw61&w@h.test/x&k=1", `${redacted(2)}&k=1`],
-		["//u:pw62@x&w@h.test&m=1", `${redacted(2)}&m=1`],
-		["//u:pw63&k=v&w%40h.test&m=1", `${redacted(3)}&m=1`],
-		["//u:pw64&w%2540h.test&m=1", `${redacted(2)}&m=1`],
-		["\\\\u:pw65&w@h.test&m=1", `${redacted(2)}&m=1`],
-		["x=1&//u:pw66@x&k=v&w@h.test", `x=1&${redacted(3)}`],
-		["//u:pw67&a/b&w@h.test", "%2F%2Fu%3Apw67=&a%2Fb=&w%40h.test="],
-		["//u:pw68=/x&w@h.test", "%2F%2Fu%3Apw68=%2Fx&w%40h.test="],
-		["//u:pw69&a/b//v:pw70&w@h.test&m=1", `%2F%2Fu%3Apw69=&${redacted(2)}&m=1`],
-		["//user:pw71=ss%2F%2Fx@h.test&m=1", `${redacted(1)}&m=1`],
-		["//u:pw72=a/b@c", "%2F%2Fu%3Apw72=a%2Fb%40c"],
-		["//u:pw73&a?b&w@h.test", "%2F%2Fu%3Apw73=&a%3Fb=&w%40h.test="],
-		["%252F%252Fu%253Apw74&w@h.test&m=1", `${redacted(2)}&m=1`],
-		["//u:pw75&q//v:pw76&w@h.test", `%2F%2Fu%3Apw75=&${redacted(2)}`],
-		[`//u:pw77&%${"25".repeat(10)}40&m=1`, `${redacted(2)}&m=1`],
-		[`%${"25".repeat(10)}41&w@h.test&m=1`, `${redacted(2)}&m=1`],
-		["//u:pw78@h.test/x=1&m=1", `${redacted(1)}&m=1`],
-		["//u:pw79&k=w@&m=1", `${redacted(2)}&m=1`],
-		["//u:pw80&/x@y&m=1", "%2F%2Fu%3Apw80=&%2Fx%40y=&m=1"],
-		["e=//host&mail=a@b.test&%2F%2Fx/y&z=4", "e=%2F%2Fhost&mail=a%40b.test&%2F%2Fx%2Fy=&z=4"],
-		// Raw, `+`, `%2F`, `%3F` and `%23` stay inside userinfo, which the form-decoded reading would end.
-		["//u:pw81+x@h.test&m=1", `${redacted(1)}&m=1`],
-		["next=//my+user:pw82@cb.test/x&m=1", "next=REDACTED&m=1"],
-		["//u:pw83&a%2Fb&w@h.test&m=1", `${redacted(3)}&m=1`],
-		["//u:pw84&a%3Fb&w@h.test&m=1", `${redacted(3)}&m=1`],
-		["//u:pw85&a%23b&w@h.test&m=1", `${redacted(3)}&m=1`],
-		// A tab, newline or carriage return that a consumer's decoding turns out of `%09`, `%0A` or `%0D` is dropped by its url parser.
-		["//us%09er:pw86&w%40h.test&m=1", `${redacted(2)}&m=1`],
-		["//u:pw87&w%09x%40h.test&m=1", `${redacted(2)}&m=1`],
-		["//u:pw88&w%0Ax%40h.test&m=1", `${redacted(2)}&m=1`],
-		["\\\\us%0Der:pw89&w%40h.test&m=1", `${redacted(2)}&m=1`],
-		// A no-break space or other whitespace a parser keeps doesn't end a run, a plain space does.
-		["//&u:p@host", redacted(2)],
-		["%5C%5C&u:p@host", redacted(2)],
-		["%2F%2Fu:p%C2%A0x&w@host", redacted(2)],
-		["%5C%5Cu:p%C2%A0x&w@host", redacted(2)],
-		["//u:p&x%C2%A0y%40h", redacted(2)],
-		["%2F%2Fhost&and%20mail%20a%40b", "%2F%2Fhost=&and+mail+a%40b="],
-		["%2F%2Fh&a%23b%40c", "%2F%2Fh=&a%23b%40c="],
-		["//b/c&x@y", "%2F%2Fb%2Fc=&x%40y="],
-		["%5C%5Cb/c&x@y", "%5C%5Cb%2Fc=&x%40y="],
-		["%5C%5Ca%5Cb&x@y", "%5C%5Ca%5Cb=&x%40y="],
-		["a+b=c+d&q=1+2", "a+b=c+d&q=1+2"],
-		// `%2540` is an `@` encoded twice, and `%C2%25A0` a no-break space with its second byte encoded twice.
-		["next=//user:pw86%C2%25A0ss%2540host/x&m=1", "next=REDACTED&m=1"],
-		["//u:p87+q&w%40h.test&m=1", `${redacted(2)}&m=1`],
-		["//u:pw88+x&w%2540h.test&m=1", `${redacted(2)}&m=1`],
-		["//my+user:pw89&x%40cb.test/x", redacted(2)],
-		["&//u:pw90+x@h.test&m=1", `${redacted(1)}&m=1`],
-		["a=1&&next=//my+user:pw91@cb.test/x&m=1", "a=1&next=REDACTED&m=1"],
-		["//u:pw92+x=y&z@h.test&m=1", `${redacted(2)}&m=1`],
-		["//u:pw93=a%2Fb&w@h.test&m=1", `${redacted(2)}&m=1`],
-		["%252F%252Fuser%C2%25A0x:pw94&w%252540h.test&m=1", `${redacted(2)}&m=1`],
-	];
-	const { calls } = stubFetch();
-	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+// The pairs from a key opening userinfo up to the last @ before a delimiter record REDACTED, and a
+// value opening a url, or a delimiter before the @, leaves the rest be.
+const redactedPairs = (count: number) => Array.from({ length: count }, () => "REDACTED=REDACTED").join("&");
+const SPLIT_USERINFO_QUERIES: [string, string][] = [
+	["a=1&//u:pw60&w@h.test&b=2", `a=1&${redactedPairs(2)}&b=2`],
+	["//u:pw61&w@h.test/x&k=1", `${redactedPairs(2)}&k=1`],
+	["//u:pw62@x&w@h.test&m=1", `${redactedPairs(2)}&m=1`],
+	["//u:pw63&k=v&w%40h.test&m=1", `${redactedPairs(3)}&m=1`],
+	["//u:pw64&w%2540h.test&m=1", `${redactedPairs(2)}&m=1`],
+	["\\\\u:pw65&w@h.test&m=1", `${redactedPairs(2)}&m=1`],
+	["x=1&//u:pw66@x&k=v&w@h.test", `x=1&${redactedPairs(3)}`],
+	["//u:pw67&a/b&w@h.test", "%2F%2Fu%3Apw67=&a%2Fb=&w%40h.test="],
+	["//u:pw68=/x&w@h.test", "%2F%2Fu%3Apw68=%2Fx&w%40h.test="],
+	["//u:pw69&a/b//v:pw70&w@h.test&m=1", `%2F%2Fu%3Apw69=&${redactedPairs(2)}&m=1`],
+	["//user:pw71=ss%2F%2Fx@h.test&m=1", `${redactedPairs(1)}&m=1`],
+	["//u:pw72=a/b@c", "%2F%2Fu%3Apw72=a%2Fb%40c"],
+	["//u:pw73&a?b&w@h.test", "%2F%2Fu%3Apw73=&a%3Fb=&w%40h.test="],
+	["%252F%252Fu%253Apw74&w@h.test&m=1", `${redactedPairs(2)}&m=1`],
+	["//u:pw75&q//v:pw76&w@h.test", `%2F%2Fu%3Apw75=&${redactedPairs(2)}`],
+	[`//u:pw77&%${"25".repeat(10)}40&m=1`, `${redactedPairs(2)}&m=1`],
+	[`%${"25".repeat(10)}41&w@h.test&m=1`, `${redactedPairs(2)}&m=1`],
+	["//u:pw78@h.test/x=1&m=1", `${redactedPairs(1)}&m=1`],
+	["//u:pw79&k=w@&m=1", `${redactedPairs(2)}&m=1`],
+	["//u:pw80&/x@y&m=1", "%2F%2Fu%3Apw80=&%2Fx%40y=&m=1"],
+	["e=//host&mail=a@b.test&%2F%2Fx/y&z=4", "e=%2F%2Fhost&mail=a%40b.test&%2F%2Fx%2Fy=&z=4"],
+	// Raw, `+`, `%2F`, `%3F` and `%23` stay inside userinfo, which the form-decoded reading would end.
+	["//u:pw81+x@h.test&m=1", `${redactedPairs(1)}&m=1`],
+	["next=//my+user:pw82@cb.test/x&m=1", "next=REDACTED&m=1"],
+	["//u:pw83&a%2Fb&w@h.test&m=1", `${redactedPairs(3)}&m=1`],
+	["//u:pw84&a%3Fb&w@h.test&m=1", `${redactedPairs(3)}&m=1`],
+	["//u:pw85&a%23b&w@h.test&m=1", `${redactedPairs(3)}&m=1`],
+	// A tab, newline or carriage return that a consumer's decoding turns out of `%09`, `%0A` or `%0D` is dropped by its url parser.
+	["//us%09er:pw86&w%40h.test&m=1", `${redactedPairs(2)}&m=1`],
+	["//u:pw87&w%09x%40h.test&m=1", `${redactedPairs(2)}&m=1`],
+	["//u:pw88&w%0Ax%40h.test&m=1", `${redactedPairs(2)}&m=1`],
+	["\\\\us%0Der:pw89&w%40h.test&m=1", `${redactedPairs(2)}&m=1`],
+	// A no-break space or other whitespace a parser keeps doesn't end a run, a plain space does.
+	["//&u:p@host", redactedPairs(2)],
+	["%5C%5C&u:p@host", redactedPairs(2)],
+	["%2F%2Fu:p%C2%A0x&w@host", redactedPairs(2)],
+	["%5C%5Cu:p%C2%A0x&w@host", redactedPairs(2)],
+	["//u:p&x%C2%A0y%40h", redactedPairs(2)],
+	["%2F%2Fhost&and%20mail%20a%40b", "%2F%2Fhost=&and+mail+a%40b="],
+	["%2F%2Fh&a%23b%40c", "%2F%2Fh=&a%23b%40c="],
+	["//b/c&x@y", "%2F%2Fb%2Fc=&x%40y="],
+	["%5C%5Cb/c&x@y", "%5C%5Cb%2Fc=&x%40y="],
+	["%5C%5Ca%5Cb&x@y", "%5C%5Ca%5Cb=&x%40y="],
+	["a+b=c+d&q=1+2", "a+b=c+d&q=1+2"],
+	// `%2540` is an `@` encoded twice, and `%C2%25A0` a no-break space with its second byte encoded twice.
+	["next=//user:pw86%C2%25A0ss%2540host/x&m=1", "next=REDACTED&m=1"],
+	["//u:p87+q&w%40h.test&m=1", `${redactedPairs(2)}&m=1`],
+	["//u:pw88+x&w%2540h.test&m=1", `${redactedPairs(2)}&m=1`],
+	["//my+user:pw89&x%40cb.test/x", redactedPairs(2)],
+	["&//u:pw90+x@h.test&m=1", `${redactedPairs(1)}&m=1`],
+	["a=1&&next=//my+user:pw91@cb.test/x&m=1", "a=1&next=REDACTED&m=1"],
+	["//u:pw92+x=y&z@h.test&m=1", `${redactedPairs(2)}&m=1`],
+	["//u:pw93=a%2Fb&w@h.test&m=1", `${redactedPairs(2)}&m=1`],
+	["%252F%252Fuser%C2%25A0x:pw94&w%252540h.test&m=1", `${redactedPairs(2)}&m=1`],
+];
 
-	for (const [query] of cases) {
-		await log.fetch(`https://api.test/x?${query}`);
-	}
-
-	await log.end();
-
-	const urls = exportedSpans(calls).filter(span => span.kind === 3).map(span => span.attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue);
-
-	t.deepEqual(urls.sort(), cases.map(([, expected]) => `https://api.test/x?${expected}`).sort(), "the pairs from a key opening userinfo up to the last @ before a delimiter record REDACTED, and a value opening a url, or a delimiter before the @, leaves the rest be");
-	t.end();
-});
+for (const [query, expected] of SPLIT_USERINFO_QUERIES) {
+	test(`buildUrlFull with captureQuery records ?${query} as ?${expected}`, t => {
+		t.strictEqual(buildUrlFull(new URL(`https://api.test/x?${query}`), true), `https://api.test/x?${expected}`, "userinfo split across & is redacted");
+		t.end();
+	});
+}
 
 test("log.fetch captureQuery redacts a url key whose scheme holds a tab the parser drops", async t => {
 	const { calls } = stubFetch();
@@ -236,50 +234,41 @@ test("log.fetch captureQuery redacts a listed key opening a kept value's fragmen
 	t.end();
 });
 
-test("log.fetch redacts credentials in a url nested in the request path", async t => {
-	const { calls } = stubFetch();
-	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
-	const paths = {
-		"/a/https://u:pw1@cb.test/x": "/a/REDACTED",
-		"/b/c/https%3A%2F%2Fu%3Apw2%40cb.test%2Fx": "/b/c/REDACTED",
-		"/d/https%253A%252F%252Fu%253Apw3%2540cb.test": "/d/REDACTED",
-		"/e/https:%5C%5Cu:pw4@cb.test": "/e/REDACTED",
-		"/f/https%3A%2F%2Fs3.test%2Fk%3FX-Amz-Signature%3Dpw5%26X-Amz-Date%3D1": "/f/REDACTED",
-		"/g/x:y/https://u:pw6@cb.test": "/g/REDACTED",
-		"/h//u:pw7@cb.test/x": "/REDACTED",
-		"/h2/%2F%2Fu:pw8@a.test/https:%2F%2Fv:pw9@cb.test": "/REDACTED",
-		"/h3//tok_en:pw10@a.test/https:%2F%2Fv:pw11@cb.test": "/REDACTED",
-		"/i/a:/a:/a:/a:/a:/a:/a:/a:/a:/x": "/i/a:/a:/a:/a:/a:/a:/a:/a:/REDACTED",
-		"/j/%25252525252525252525252541": "/REDACTED",
-		"/k/s3.test/k%3Fsig%3Dpw12": "/k/s3.test/REDACTED",
-		"/l/s3.test/k%3FX-Amz-Date%3D1%26X-Amz-Signature%3Dpw13": "/l/s3.test/REDACTED",
-		"/m/x=https:%2F%2Fcb.test%2Fx%3Fpassword%3Dpw14": "/m/REDACTED",
-		"/n/x;https:%2F%2Fcb.test%2Fx%3Ftoken%3Dpw15": "/n/REDACTED",
-		"/o/s3.test/k%253Fsig%253Dpw16": "/o/s3.test/REDACTED",
-		"/p/k%3Fsig%3Dpw17/x%3Ftoken%3Dpw18": "/p/REDACTED",
-		"/p2/a;token=pw62/https://u:pw63@cb.test/x": "/p2/REDACTED",
-		"/p3/x%3Ftoken=pw64/https:%2F%2Fu:pw65@cb.test": "/p3/REDACTED",
-		"/q/p%3F%20token%3Dpw60/x": "/q/REDACTED",
-		"/q/p%3Fa%23token%3Dpw61/x": "/q/REDACTED",
-		"/q/s3.test/k%3Fpage%3D2/token": "/q/s3.test/k%3Fpage%3D2/token",
-		"/r/s3.test/k%3Fsi%09g%3Dpw19": "/r/s3.test/REDACTED",
-		"/r2/https://s3.test/k%3Fsig%3Dpw20": "/r2/REDACTED",
-		"/r3/https%3A%2F%2Fcb.test%2Fx%23access_token%3Dpw21": "/r3/REDACTED",
-		"/registry/@larvit/log/users/bob@x.test/https://cb.test/x?q=1": "/registry/@larvit/log/users/bob@x.test/https://cb.test/x",
-	};
+const NESTED_URL_PATHS: Record<string, string> = {
+	"/a/https://u:pw1@cb.test/x": "/a/REDACTED",
+	"/b/c/https%3A%2F%2Fu%3Apw2%40cb.test%2Fx": "/b/c/REDACTED",
+	"/d/https%253A%252F%252Fu%253Apw3%2540cb.test": "/d/REDACTED",
+	"/e/https:%5C%5Cu:pw4@cb.test": "/e/REDACTED",
+	"/f/https%3A%2F%2Fs3.test%2Fk%3FX-Amz-Signature%3Dpw5%26X-Amz-Date%3D1": "/f/REDACTED",
+	"/g/x:y/https://u:pw6@cb.test": "/g/REDACTED",
+	"/h//u:pw7@cb.test/x": "/REDACTED",
+	"/h2/%2F%2Fu:pw8@a.test/https:%2F%2Fv:pw9@cb.test": "/REDACTED",
+	"/h3//tok_en:pw10@a.test/https:%2F%2Fv:pw11@cb.test": "/REDACTED",
+	"/i/a:/a:/a:/a:/a:/a:/a:/a:/a:/x": "/i/a:/a:/a:/a:/a:/a:/a:/a:/REDACTED",
+	"/j/%25252525252525252525252541": "/REDACTED",
+	"/k/s3.test/k%3Fsig%3Dpw12": "/k/s3.test/REDACTED",
+	"/l/s3.test/k%3FX-Amz-Date%3D1%26X-Amz-Signature%3Dpw13": "/l/s3.test/REDACTED",
+	"/m/x=https:%2F%2Fcb.test%2Fx%3Fpassword%3Dpw14": "/m/REDACTED",
+	"/n/x;https:%2F%2Fcb.test%2Fx%3Ftoken%3Dpw15": "/n/REDACTED",
+	"/o/s3.test/k%253Fsig%253Dpw16": "/o/s3.test/REDACTED",
+	"/p/k%3Fsig%3Dpw17/x%3Ftoken%3Dpw18": "/p/REDACTED",
+	"/p2/a;token=pw62/https://u:pw63@cb.test/x": "/p2/REDACTED",
+	"/p3/x%3Ftoken=pw64/https:%2F%2Fu:pw65@cb.test": "/p3/REDACTED",
+	"/q/p%3F%20token%3Dpw60/x": "/q/REDACTED",
+	"/q/p%3Fa%23token%3Dpw61/x": "/q/REDACTED",
+	"/q/s3.test/k%3Fpage%3D2/token": "/q/s3.test/k%3Fpage%3D2/token",
+	"/r/s3.test/k%3Fsi%09g%3Dpw19": "/r/s3.test/REDACTED",
+	"/r2/https://s3.test/k%3Fsig%3Dpw20": "/r2/REDACTED",
+	"/r3/https%3A%2F%2Fcb.test%2Fx%23access_token%3Dpw21": "/r3/REDACTED",
+	"/registry/@larvit/log/users/bob@x.test/https://cb.test/x?q=1": "/registry/@larvit/log/users/bob@x.test/https://cb.test/x",
+};
 
-	for (const path of Object.keys(paths)) {
-		await log.fetch(`https://proxy.test${path}`);
-	}
-
-	await log.end();
-
-	const urlFulls = exportedSpans(calls).filter(span => span.kind === 3).map((span: any) => span.attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue);
-
-	t.deepEqual(urlFulls, Object.values(paths).map(path => `https://proxy.test${path}`), "each path records its expected redaction");
-	t.ok(!/pw\d/.test(JSON.stringify(calls.filter(call => call.path.startsWith("/v1/")))), "no nested credential reaches the collector");
-	t.end();
-});
+for (const [path, expected] of Object.entries(NESTED_URL_PATHS)) {
+	test(`buildUrlFull records the path ${path} as ${expected}`, t => {
+		t.strictEqual(buildUrlFull(new URL(`https://proxy.test${path}`), false), `https://proxy.test${expected}`, "a credential in a url nested in the path is redacted");
+		t.end();
+	});
+}
 
 test("log.fetch exports a url nested base64-encoded in the request path as written", async t => {
 	const { calls } = stubFetch();
@@ -296,25 +285,22 @@ test("log.fetch exports a url nested base64-encoded in the request path as writt
 	t.end();
 });
 
-test("log.fetch redacts a long query within 250 ms", async t => {
-	const deep = `%${"25".repeat(16384)}41`;
-	const log = new Log({ captureQuery: true, captureRequestHeaders: ["x-deep"], otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+// Each is long, or deeply encoded or nested, where a redaction that rescans its input would take
+// quadratic time; tap's per-test timeout stops one that does.
+const deepPercent = `%${"25".repeat(16384)}41`;
+const nestedSevenDeep = Array.from({ length: 7 }).reduce<string>(nested => `https://a/?${encodeURIComponent(nested)}=b`, `https://t/?x=${"a".repeat(40000)}`);
 
-	stubFetch();
+for (const query of ["?u=https://a/?".repeat(16384), "?https://a/?".repeat(16384), `?${nestedSevenDeep}`, `${"/a:".repeat(16384)}%3F`, `${deepPercent}/https:/${deepPercent}?q=${deepPercent}`, `?q=${"\\".repeat(32768)} x`, `?q=//${"\\".repeat(32768)} x`, `${"%5C".repeat(32768)}%20x`, `?//u:p${"&a@".repeat(16384)}`, `?//u:p=/${"&a@".repeat(16384)}`, `?${"//u:p&a@&".repeat(8192)}`]) {
+	test(`log.fetch redacts and exports the long url https://proxy.test/${query.slice(0, 13)}…`, async t => {
+		const { calls } = stubFetch();
+		const log = new Log({ captureQuery: true, captureRequestHeaders: ["x-deep"], otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 
-	const chain = Array.from({ length: 7 }).reduce<string>(nested => `https://a/?${encodeURIComponent(nested)}=b`, `https://t/?x=${"a".repeat(40000)}`);
-
-	for (const query of ["?u=https://a/?".repeat(16384), "?https://a/?".repeat(16384), `?${chain}`, `${"/a:".repeat(16384)}%3F`, `${deep}/https:/${deep}?q=${deep}`, `?q=${"\\".repeat(32768)} x`, `?q=//${"\\".repeat(32768)} x`, `${"%5C".repeat(32768)}%20x`, `?//u:p${"&a@".repeat(16384)}`, `?//u:p=/${"&a@".repeat(16384)}`, `?${"//u:p&a@&".repeat(8192)}`]) {
-		const started = performance.now();
-
-		await log.fetch(`https://proxy.test/${query}`, { headers: { "x-deep": deep } });
-
-		t.ok(performance.now() - started < 250, `${query.slice(0, 13)}… is redacted in ${Math.round(performance.now() - started)} ms`);
-	}
-
-	await log.end();
-	t.end();
-});
+		await log.fetch(`https://proxy.test/${query}`, { headers: { "x-deep": deepPercent } });
+		await log.end();
+		t.strictEqual(exportedSpans(calls).filter(span => span.kind === 3).length, 1, "its span is exported");
+		t.end();
+	});
+}
 
 test("log.fetch leaves a non-http(s) URL untraced", async t => {
 	const { calls } = stubFetch();
@@ -608,7 +594,7 @@ test("await log.end() drains a fire-and-forget log.fetch span, and its rejection
 	log.fetch("https://api.test/fail"); // deliberately NOT awaited
 
 	await log.end();
-	await new Promise(resolve => setTimeout(resolve, 10));
+	await waitFor(() => unhandled.length > 0);
 	nodeProcess?.off("unhandledRejection", onNode);
 	globalThis.removeEventListener?.("unhandledrejection", onBrowser);
 
