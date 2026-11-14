@@ -1,4 +1,5 @@
 import { Log, type Metadata, type OtlpPayload, type OtlpQueue, Queue, type QueueStorage, type TimerHandle } from "../index.js";
+import { unref } from "../otlp/export-scheduler.js";
 import { encodeBatch, plainHttpWarnings, statusFailure } from "../otlp/sender.js";
 import { pbDecode, pbDecodeLogs, pbDecodeSpans, pbMsg } from "./protobuf-decode.js";
 import test from "./tap.js";
@@ -6,8 +7,9 @@ import { callHeader, exportedRecords, exportedSpans, fakeClock, fakeStorage, nan
 
 test("a transient export failure keeps the batch queued, reports one line and the retry delivers it", async t => {
 	stubFetch(() => { throw new Error("connection refused"); });
+	const clock = fakeClock();
 	const stderr: string[] = [];
-	const log = new Log({ otlpQueue: new Queue({ otlpHttpBaseURI: "http://127.0.0.1:1", report: (msg, metadata) => stderr.push(`${msg} ${JSON.stringify(metadata)}`), retryDelayMs: 20 }), stderr: () => {} });
+	const log = new Log({ otlpQueue: new Queue({ clock, otlpHttpBaseURI: "http://127.0.0.1:1", report: (msg, metadata) => stderr.push(`${msg} ${JSON.stringify(metadata)}`), retryDelayMs: 20 }), stderr: () => {} });
 
 	log.info("will fail to export");
 	log.info("so will this");
@@ -23,7 +25,7 @@ test("a transient export failure keeps the batch queued, reports one line and th
 
 	await log.flush();
 	t.strictEqual(calls.length, 0, "flush() while a retry is pending attempts nothing; the backoff holds");
-	await waitFor(() => calls.length === 2);
+	await clock.advance(20);
 	t.deepEqual(calls.map(call => call.path), ["/v1/logs", "/v1/traces"], "the retry delivers the kept records, then the span");
 	t.deepEqual(exportedRecords(calls), ["will fail to export", "so will this"], "both records survived the failure in order");
 	t.end();
@@ -46,8 +48,8 @@ test("the Log-built queue reports through the instance's stderr and formatter", 
 	t.end();
 });
 
-test("a 401 or 403 export reports unauthorized and drops the batch", async t => {
-	for (const status of [401, 403]) {
+for (const status of [401, 403]) {
+	test(`a ${status} export reports unauthorized once and drops the batch without a retry`, async t => {
 		const { calls } = stubFetch(() => response({ status }));
 		const sink = reportSink();
 		const log = new Log({ otlpQueue: new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", report: sink.report }), stderr: () => {} });
@@ -55,12 +57,11 @@ test("a 401 or 403 export reports unauthorized and drops the batch", async t => 
 		log.info("x");
 		await log.flush();
 		await log.flush();
-		t.deepEqual(sink.lines.map(line => [line.msg, line.status]), [["OTLP export unauthorized, batch dropped", status]], `${status} reports once, as unauthorized`);
-		t.strictEqual(calls.length, 1, `${status} is never retried`);
-	}
-
-	t.end();
-});
+		t.deepEqual(sink.lines.map(line => [line.msg, line.status]), [["OTLP export unauthorized, batch dropped", status]], "reported once, as unauthorized");
+		t.strictEqual(calls.length, 1, "never retried");
+		t.end();
+	});
+}
 
 test("a rejected export (4xx) drops the batch, reports one line per batch and does not retry", async t => {
 	const { calls } = stubFetch(() => response({ status: 400 }));
@@ -148,6 +149,25 @@ test("user:pass@ in otlpHttpBaseURI beside an Authorization in otlpAdditionalHea
 	t.end();
 });
 
+for (const conf of [
+	{ otlpHttpBaseURI: "https://u:p@collector.test" },
+	{ otlpHttpBaseURI: "http://u:p@localhost:4318" },
+	{ otlpHttpBaseURI: "http://u:p@127.8.9.10" },
+	{ otlpHttpBaseURI: "http://u:p@[::1]:4318" },
+	{ acceptPlainHttpCredentials: true, otlpHttpBaseURI: "http://u:p@collector.test:4318" },
+]) {
+	test(`credentials sent to ${JSON.stringify(conf)} raise no plain-http warning`, async t => {
+		stubFetch();
+		const quiet = reportSink();
+		const log = new Log({ otlpQueue: new Queue({ ...conf, report: quiet.report }), stderr: () => {} });
+
+		log.info("x");
+		await log.flush();
+		t.deepEqual(quiet.lines, [], "https:, a loopback host and acceptPlainHttpCredentials are silent");
+		t.end();
+	});
+}
+
 test("an Authorization sent over plain http: to a non-loopback host warns once per report sink, and still goes", async t => {
 	const { calls } = stubFetch();
 	const warning = (source: string, header = "authorization") => `@larvit/log: the ${header} header from ${source} goes over plain http: to collector.test:4318, readable by anything on the network path; use an https: endpoint, or on a network you trust set acceptPlainHttpCredentials: true on the Queue`;
@@ -171,15 +191,6 @@ test("an Authorization sent over plain http: to a non-loopback host warns once p
 	headers.authorization = "Bearer t0ken";
 	await send(queue);
 	t.deepEqual(header.lines, [{ msg: warning("otlpAdditionalHeaders") }], "an Authorization header set after construction warns, whatever its casing");
-
-	const quiet = reportSink();
-
-	for (const otlpHttpBaseURI of ["https://u:p@collector.test", "http://u:p@localhost:4318", "http://u:p@127.8.9.10", "http://u:p@[::1]:4318"]) {
-		await send(new Queue({ otlpHttpBaseURI, report: quiet.report }));
-	}
-
-	await send(new Queue({ acceptPlainHttpCredentials: true, otlpHttpBaseURI: "http://u:p@collector.test:4318", report: quiet.report }));
-	t.deepEqual(quiet.lines, [], "https:, a loopback host and acceptPlainHttpCredentials are silent");
 
 	const lookalike = reportSink();
 
@@ -221,7 +232,7 @@ test("an Authorization sent over plain http: to a non-loopback host warns once p
 
 	broken.info("z");
 	t.strictEqual(await broken.flush().then(() => "", err => String(err)), "", "a stderr that throws on the warning never rejects flush()");
-	t.strictEqual(calls.length, 15, "every request still goes");
+	t.strictEqual(calls.length, 10, "every request still goes");
 	t.end();
 });
 
@@ -1378,6 +1389,30 @@ test("a pending batch timer never holds the process, including one set by a reco
 	t.end();
 });
 
+test("unref hands a numeric timer id to the runtime's unrefTimer", t => {
+	const unrefed: unknown[] = [];
+
+	unref(7, id => { unrefed.push(id); });
+	t.deepEqual(unrefed, [7], "the id reaches unrefTimer");
+	t.end();
+});
+
+test("unref leaves a numeric timer id alone where the runtime has no unrefTimer", t => {
+	t.doesNotThrow(() => { unref(7, undefined); }, "nothing to call, and nothing thrown");
+	t.end();
+});
+
+test("unref calls an object timer's own unref, and never the runtime's unrefTimer", t => {
+	const unrefed: unknown[] = [];
+	let unrefs = 0;
+
+	unref({ unref: () => { unrefs++; } } as unknown as TimerHandle, id => { unrefed.push(id); });
+	t.strictEqual(unrefs, 1, "the timer's unref ran once");
+	t.deepEqual(unrefed, [], "unrefTimer was not called");
+	t.end();
+});
+
+// The one test that swaps the Deno global, to prove an injected clock's ids never reach it.
 test("an injected clock's numeric timer id is never handed to Deno's unrefTimer", async t => {
 	const unrefed: unknown[] = [];
 	const original: unknown = Reflect.get(globalThis, "Deno");

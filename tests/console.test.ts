@@ -1,24 +1,26 @@
 import { type EntryFormatter, type EntryFormatterConf, generateSpanId, generateTraceId, Log, type LogConf, type Logger, type LogInt, type LogLevel, LogLevels, type LogOptions, type Metadata, msgJsonFormatter, msgTextFormatter, Queue, type ResolvedLogConf, resolveFormatter } from "../index.js";
+import { colorsFromEnv } from "../log/entry-format.js";
 import test from "./tap.js";
 import { capture, clientSpan, fakeClock, stubFetch, thrown } from "./test-doubles.js";
 
-test("each level writes its colored token to the right stream", t => {
-	const cases: { level: LogLevel, stream: "stderr" | "stdout", token: string }[] = [
-		{ level: "error", stream: "stderr", token: "\x1b[1;31merr\x1b[0m" },
-		{ level: "warn", stream: "stderr", token: "\x1b[1;33mwar\x1b[0m" },
-		{ level: "info", stream: "stdout", token: "\x1b[1;32minf\x1b[0m" },
-		{ level: "verbose", stream: "stdout", token: "\x1b[1;34mver\x1b[0m" },
-		{ level: "debug", stream: "stdout", token: "\x1b[1;35mdeb\x1b[0m" },
-		{ level: "silly", stream: "stdout", token: "\x1b[1;37msil\x1b[0m" },
-	];
-
-	for (const { level, stream, token } of cases) {
+for (const { level, stream, token } of [
+	{ level: "error", stream: "stderr", token: "\x1b[1;31merr\x1b[0m" },
+	{ level: "warn", stream: "stderr", token: "\x1b[1;33mwar\x1b[0m" },
+	{ level: "info", stream: "stdout", token: "\x1b[1;32minf\x1b[0m" },
+	{ level: "verbose", stream: "stdout", token: "\x1b[1;34mver\x1b[0m" },
+	{ level: "debug", stream: "stdout", token: "\x1b[1;35mdeb\x1b[0m" },
+	{ level: "silly", stream: "stdout", token: "\x1b[1;37msil\x1b[0m" },
+] as const) {
+	test(`${level} writes its colored token to ${stream}`, t => {
 		const cap = capture({ colors: true, logLevel: "silly" }); // silly passes every level through the filter
 
 		cap.log[level]("msg");
 		t.strictEqual(cap[stream][0]?.substring(23), `Z [${token}] msg`, `${level} -> ${stream} with its token`);
-	}
+		t.end();
+	});
+}
 
+test("colors: false writes the bare tag, and msgTextFormatter colours unless it is false", t => {
 	const plain = capture({ colors: false });
 
 	plain.log.info("msg");
@@ -28,29 +30,51 @@ test("each level writes its colored token to the right stream", t => {
 	t.end();
 });
 
-test("colors unset in code follows NO_COLOR and FORCE_COLOR; set in code it ignores them", t => {
-	const original: unknown = Reflect.get(globalThis, "process");
-	const setProcess = (value: unknown) => value === undefined ? Reflect.deleteProperty(globalThis, "process") : Reflect.set(globalThis, "process", value);
-	const colorsWith = (env: Record<string, string> | undefined, conf?: LogConf) => {
-		setProcess(env && { env });
-		try {
-			return new Log(conf).conf.colors;
-		} finally {
-			setProcess(original);
-		}
-	};
+const throwingEnv = new Proxy({}, { get: () => { throw new Error("permission denied"); } });
 
-	t.strictEqual(colorsWith({}), true, "on by default");
-	t.strictEqual(colorsWith(undefined), true, "on without a process global (browsers)");
-	t.strictEqual(colorsWith({ NO_COLOR: "1" }), false, "NO_COLOR turns it off");
-	t.strictEqual(colorsWith({ NO_COLOR: "" }), true, "an empty NO_COLOR does not count");
-	t.strictEqual(colorsWith({ FORCE_COLOR: "1" }), true, "FORCE_COLOR turns it on");
-	t.strictEqual(colorsWith({ FORCE_COLOR: "" }), true, "an empty FORCE_COLOR turns it on, as in Node");
-	t.strictEqual(colorsWith({ FORCE_COLOR: "0" }), false, "FORCE_COLOR=0 turns it off");
-	t.strictEqual(colorsWith({ FORCE_COLOR: "false" }), false, "FORCE_COLOR=false turns it off");
-	t.strictEqual(colorsWith({ FORCE_COLOR: "1", NO_COLOR: "1" }), false, "NO_COLOR wins over FORCE_COLOR");
-	t.strictEqual(colorsWith({ NO_COLOR: "1" }, { colors: true }), true, "colors: true in code wins over NO_COLOR");
-	t.strictEqual(colorsWith({ FORCE_COLOR: "1" }, { colors: false }), false, "colors: false in code wins over FORCE_COLOR");
+for (const [env, expected, name] of [
+	[undefined, undefined, "no env, as in a browser, leaves the default"],
+	[{}, undefined, "neither variable leaves the default"],
+	[{ NO_COLOR: "1" }, false, "NO_COLOR turns colour off"],
+	[{ NO_COLOR: "" }, undefined, "an empty NO_COLOR does not count"],
+	[{ FORCE_COLOR: "1" }, true, "FORCE_COLOR turns colour on"],
+	[{ FORCE_COLOR: "" }, true, "an empty FORCE_COLOR turns colour on, as in Node"],
+	[{ FORCE_COLOR: "0" }, false, "FORCE_COLOR=0 turns colour off"],
+	[{ FORCE_COLOR: "false" }, false, "FORCE_COLOR=false turns colour off"],
+	[{ FORCE_COLOR: "1", NO_COLOR: "1" }, false, "NO_COLOR wins over FORCE_COLOR"],
+	[throwingEnv, undefined, "an env that throws on read leaves the default"],
+] as const) {
+	test(`colorsFromEnv: ${name}`, t => {
+		t.strictEqual(colorsFromEnv(env), expected, name);
+		t.end();
+	});
+}
+
+// The one test that swaps the process global, to prove the default reads it.
+test("colors unset in code follows the process env, defaulting to on; set in code it ignores the env", t => {
+	const original: unknown = Reflect.get(globalThis, "process");
+	const env: Record<string, string> = { NO_COLOR: "1" };
+	let fromEnv: boolean;
+	let inCode: boolean;
+	let unset: boolean;
+
+	Reflect.set(globalThis, "process", { env });
+	try {
+		fromEnv = new Log().conf.colors;
+		inCode = new Log({ colors: true }).conf.colors;
+		delete env.NO_COLOR;
+		unset = new Log().conf.colors;
+	} finally {
+		if (original === undefined) {
+			Reflect.deleteProperty(globalThis, "process");
+		} else {
+			Reflect.set(globalThis, "process", original);
+		}
+	}
+
+	t.strictEqual(fromEnv, false, "NO_COLOR in the process env turns it off");
+	t.strictEqual(inCode, true, "colors: true in code wins over NO_COLOR");
+	t.strictEqual(unset, true, "on when the env says nothing");
 	t.end();
 });
 
@@ -372,8 +396,12 @@ test("constructor throws on malformed otlpHttpBaseURI", t => {
 	t.throws(() => new Log({ otlpHttpBaseURI: "not a valid uri" }), "malformed otlpHttpBaseURI throws at construction");
 	// "otlp:" parses to an opaque path, which leaves the credentials sitting in pathname.
 	t.throws(() => new Log({ otlpHttpBaseURI: "otlp:u:s3cr3t@127.0.0.1:4318" }), "a scheme other than http(s) throws at construction");
+	t.doesNotThrow(() => new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318" }), "valid uri does not throw");
+	t.end();
+});
 
-	for (const uri of ["http://u:s3cr3t/w@127.0.0.1:4318", "otlp:u:s3cr3t@127.0.0.1:4318"]) {
+for (const uri of ["http://u:s3cr3t/w@127.0.0.1:4318", "otlp:u:s3cr3t@127.0.0.1:4318"]) {
+	test(`the error a malformed ${uri.slice(0, 5)} otlpHttpBaseURI throws carries no part of the URI`, t => {
 		let caught: unknown;
 
 		try {
@@ -382,11 +410,10 @@ test("constructor throws on malformed otlpHttpBaseURI", t => {
 			caught = err;
 		}
 
-		t.notOk(JSON.stringify(caught, Object.getOwnPropertyNames(caught as object)).includes("s3cr3t"), `the error thrown for ${uri.slice(0, 5)} carries no part of the URI, cause and input included`);
-	}
-	t.doesNotThrow(() => new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318" }), "valid uri does not throw");
-	t.end();
-});
+		t.notOk(JSON.stringify(caught, Object.getOwnPropertyNames(caught as object)).includes("s3cr3t"), "cause and input included");
+		t.end();
+	});
+}
 
 test("the constructor and clone copy the caller's options object instead of filling it", t => {
 	const conf: LogConf = { context: { service: "x" }, format: "json" };
