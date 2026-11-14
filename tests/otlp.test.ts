@@ -1,4 +1,4 @@
-import { Log, type Metadata, type OtlpPayload, type OtlpQueue, Queue, type QueueStorage, type TimerHandle } from "../index.js";
+import { type Clock, Log, type Metadata, type OtlpPayload, type OtlpQueue, Queue, type QueueStorage, type TimerHandle } from "../index.js";
 import { unref } from "../otlp/export-scheduler.js";
 import { encodeBatch, plainHttpWarnings, statusFailure } from "../otlp/sender.js";
 import { pbDecode, pbDecodeLogs, pbDecodeSpans, pbMsg } from "./protobuf-decode.js";
@@ -1481,5 +1481,76 @@ test("encodeBatch hands back a failure that is not retried when a payload cannot
 	const unencodable = { payload: { resourceLogs: [{ resource: {}, scopeLogs: [{ logRecords: [{ get body(): never { throw new Error("corrupt"); } }] }] }] } } as unknown as Parameters<typeof encodeBatch>[0][number];
 
 	t.deepEqual(encodeBatch([unencodable], false), { failure: { message: "corrupt", retry: false } }, "corrupt and dropped");
+	t.end();
+});
+
+test("an export the collector doesn't answer is aborted after 3 s and retried", async t => {
+	const clock = fakeClock();
+	const sink = reportSink();
+	const queue = new Queue({ clock, otlpHttpBaseURI: "http://127.0.0.1:4318", report: sink.report });
+
+	let sent = false;
+
+	globalThis.fetch = ((_url: string, init: { signal: AbortSignal }) => new Promise((_resolve, reject) => {
+		sent = true;
+		init.signal.addEventListener("abort", () => { reject(new Error("aborted")); });
+	})) as unknown as typeof fetch;
+	new Log({ otlpQueue: queue, stderr: () => {} }).info("x");
+	void queue.flush();
+	await waitFor(() => sent);
+	await clock.advance(2999);
+	t.deepEqual(sink.lines, [], "nothing is reported before 3 s");
+	await clock.advance(1);
+	t.deepEqual(sink.lines.map(line => [line.msg, line.error]), [["OTLP export failed, will retry", "aborted"]], "at 3 s the send is aborted, and the batch kept for a retry");
+	t.end();
+});
+
+test("a clock missing one of now, setTimeout and clearTimeout is rejected by the Queue constructor", t => {
+	const clock = { now: () => 0, setTimeout: () => 1 } as unknown as Clock;
+
+	t.ok(thrown(() => new Queue({ clock, otlpHttpBaseURI: "http://127.0.0.1:4318" })).includes("clock must be { now, setTimeout, clearTimeout }"), "the error names the shape a clock takes");
+	t.end();
+});
+
+test("a malformed percent escape in the endpoint's password is sent as written in the Basic credential", async t => {
+	const { calls } = stubFetch();
+	const queue = new Queue({ otlpHttpBaseURI: "http://user:p%zz@127.0.0.1:4318", report: () => {} });
+
+	new Log({ otlpQueue: queue, stderr: () => {} }).info("x");
+	await queue.flush();
+	t.strictEqual(callHeader(calls[0], "authorization"), `Basic ${btoa("user:p%zz")}`, "the escape stays undecoded, and the constructor did not throw");
+	t.end();
+});
+
+test("a removeItem that throws while discarding an unreadable stored queue is not reported, and the next save overwrites it", async t => {
+	stubFetch(() => response({ status: 503 }));
+	const storage = fakeStorage(false);
+	const sink = reportSink();
+
+	storage.data.set("@larvit/log:otlp-queue", "{ not json");
+	storage.removeItem = () => { throw new Error("removeItem broke"); };
+
+	const queue = new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", report: sink.report, retryDelayMs: 600000, storage });
+
+	new Log({ otlpQueue: queue, stderr: () => {} }).info("kept");
+	await queue.flush();
+	t.deepEqual(sink.lines.map(line => line.msg).filter(msg => String(msg).startsWith("OTLP queue storage")), ["OTLP queue storage unreadable, discarded"], "only the discard is reported");
+	t.deepEqual(storedRecords(storage), ["kept"], "the next save overwrote the unreadable value");
+	t.end();
+});
+
+test("a removeItem that throws once the queue empties is reported as a failed write", async t => {
+	stubFetch();
+	const storage = fakeStorage(false);
+	const sink = reportSink();
+
+	storage.removeItem = () => { throw new Error("removeItem broke"); };
+
+	const queue = new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", report: sink.report, storage });
+
+	new Log({ otlpQueue: queue, stderr: () => {} }).info("x");
+	await queue.flush();
+	await waitFor(() => sink.lines.length > 0);
+	t.deepEqual(sink.lines, [{ error: "removeItem broke", key: "@larvit/log:otlp-queue", msg: "OTLP queue storage write failed" }], "the failed removal is reported with its error");
 	t.end();
 });

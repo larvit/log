@@ -629,3 +629,19 @@ test("child log does not share its context object with the parent", t => {
 	t.strictEqual(parent.context.extra, undefined, "child context mutation does not leak to parent");
 	t.end();
 });
+
+test("end() on an ended log rejects", async t => {
+	const { log } = capture();
+
+	await log.end();
+	t.strictEqual(await log.end().then(() => "", (err: unknown) => String(err)), "Error: Logging instance is already ended", "the second end() rejects, naming why");
+	t.end();
+});
+
+test("a level method on an ended log throws", async t => {
+	const { log } = capture();
+
+	await log.end();
+	t.strictEqual(thrown(() => { log.info("x"); }), "Error: Logging instance is already ended", "logging after end() throws, naming why");
+	t.end();
+});
