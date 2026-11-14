@@ -1,5 +1,5 @@
 import { type Clock, Log, type Metadata, type OtlpPayload, type OtlpQueue, Queue, type QueueStorage, type TimerHandle } from "../index.js";
-import { unref } from "../otlp/export-scheduler.js";
+import { ExportScheduler, unref } from "../otlp/export-scheduler.js";
 import { encodeBatch, plainHttpWarnings, statusFailure } from "../otlp/sender.js";
 import { pbDecode, pbDecodeLogs, pbDecodeSpans, pbMsg } from "./protobuf-decode.js";
 import test from "./tap.js";
@@ -1385,7 +1385,24 @@ test("a pending batch timer never holds the process, including one set by a reco
 
 	released = true;
 	await round;
+	t.strictEqual(timers.length, 2, "the record logged mid-export sets a second batch timer once the round ends");
 	t.ok(timers.every(timer => timer.unrefs === 1), "every batch timer set is unref'd once");
+	t.end();
+});
+
+test("a flush() joining a round that rejects still gets a round of its own", async t => {
+	let rounds = 0;
+	const scheduler = new ExportScheduler({ batchDelayMs: 600000, clock: fakeClock(), retryDelayMs: 600000 }, Promise.resolve(), async () => {
+		rounds++;
+
+		if (rounds === 1) throw new Error("round broke");
+	});
+	const first = scheduler.flush();
+	const joined = scheduler.flush();
+
+	t.strictEqual(await first.then(() => "", err => String(err)), "Error: round broke", "the first flush() rejects with its round");
+	await joined;
+	t.strictEqual(rounds, 2, "the joined flush() ran a second round");
 	t.end();
 });
 
@@ -1514,7 +1531,7 @@ test("a clock missing one of now, setTimeout and clearTimeout is rejected by the
 
 test("a malformed percent escape in the endpoint's password is sent as written in the Basic credential", async t => {
 	const { calls } = stubFetch();
-	const queue = new Queue({ otlpHttpBaseURI: "http://user:p%zz@127.0.0.1:4318", report: () => {} });
+	const queue = new Queue({ clock: fakeClock(), otlpHttpBaseURI: "http://user:p%zz@127.0.0.1:4318", report: () => {} });
 
 	new Log({ otlpQueue: queue, stderr: () => {} }).info("x");
 	await queue.flush();
@@ -1530,7 +1547,7 @@ test("a removeItem that throws while discarding an unreadable stored queue is no
 	storage.data.set("@larvit/log:otlp-queue", "{ not json");
 	storage.removeItem = () => { throw new Error("removeItem broke"); };
 
-	const queue = new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", report: sink.report, retryDelayMs: 600000, storage });
+	const queue = new Queue({ clock: fakeClock(), otlpHttpBaseURI: "http://127.0.0.1:4318", report: sink.report, retryDelayMs: 600000, storage });
 
 	new Log({ otlpQueue: queue, stderr: () => {} }).info("kept");
 	await queue.flush();
@@ -1546,7 +1563,7 @@ test("a removeItem that throws once the queue empties is reported as a failed wr
 
 	storage.removeItem = () => { throw new Error("removeItem broke"); };
 
-	const queue = new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", report: sink.report, storage });
+	const queue = new Queue({ clock: fakeClock(), otlpHttpBaseURI: "http://127.0.0.1:4318", report: sink.report, storage });
 
 	new Log({ otlpQueue: queue, stderr: () => {} }).info("x");
 	await queue.flush();

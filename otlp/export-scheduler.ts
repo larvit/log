@@ -21,7 +21,8 @@ export function unref(timer: TimerHandle, unrefNumericTimer: ((id: number) => vo
 }
 
 // An event is a public call (`flush`, `schedule`, `backoff`) or an internal step (loaded, round
-// done, timer fired). The state decides what each event does, and only `transition` changes it.
+// done, timer fired). The state decides what each event does, and the state changes only within a
+// `transition` call.
 type SchedulerState =
 	// Nothing is pending.
 	| { name: "idle" }
@@ -31,8 +32,7 @@ type SchedulerState =
 	// joins `next`, the one round after it.
 	| { name: "loading", next?: Promise<void>, round: Promise<void> }
 	// The round sends. `next` as above. `batchDue`: a payload was scheduled meanwhile, so a batch timer
-	// follows the round. `retryInMs`: a send failed, so a retry timer follows instead, and a flush()
-	// arriving between the failure and the round's end waits for this round only.
+	// follows the round. `retryInMs`: a send failed, so a retry timer follows instead.
 	| { batchDue: boolean, name: "running", next?: Promise<void>, retryInMs?: number, round: Promise<void> }
 	// A retry timer will start a round, and a flush() doesn't start one early.
 	| { name: "backingOff", timer: TimerHandle };
@@ -106,14 +106,8 @@ export class ExportScheduler {
 	}
 
 	private transitionRound(state: Extract<SchedulerState, { name: "loading" | "running" }>, event: SchedulerEvent): Promise<void> {
-		const failed = state.name === "running" && state.retryInMs !== undefined;
-
 		switch (event) {
 			case "flush":
-				if (failed) {
-					return state.round;
-				}
-
 				// On fulfil and reject alike, so a flush() joining a round that rejects still gets a round of its own.
 				state.next ??= state.round.then(() => this.flush(), () => this.flush());
 
