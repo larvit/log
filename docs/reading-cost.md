@@ -405,3 +405,7 @@ Read most (opens and searches):
 - `package.json` 1
 - `tests/tap.ts` 1
 - `tsconfig.test.json` 1
+
+## Reading cost, chunk 789ebc7d2b9a, finished 2026-11-14T14:16:08Z
+
+35901 new input tokens before the first commit.
