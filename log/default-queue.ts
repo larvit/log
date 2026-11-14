@@ -9,12 +9,12 @@ import type { LogConf, ResolvedLogConf } from "./types.js";
 
 export const OTLP_ENDPOINT_KEYS = ["otlpAdditionalHeaders", "otlpHttpBaseURI", "otlpProtocol"] as const;
 
-// Its class is the mark that a Log built it.
+// The class of every queue a Log builds from its otlp* shorthand, and so the mark of one.
 class DefaultQueue extends Queue {}
 
-// A queue may sit beside the shorthand only where a Log built it from that same endpoint, as its own
-// conf holds it now. The headers must be the same object: a token rotated in place then reaches the
-// queue, which an equal copy would miss.
+// A queue may sit beside the shorthand only where it is a DefaultQueue whose conf holds the endpoint
+// that `conf` holds now. The headers must be the same object: a token rotated in place then reaches
+// the queue, which an equal copy would miss.
 function isDefaultQueueFor(queue: OtlpQueue, conf: LogConf): boolean {
 	return queue instanceof DefaultQueue
 		&& queue.conf.otlpHttpBaseURI === conf.otlpHttpBaseURI
