@@ -21,15 +21,19 @@ function parseStoredPayloads(raw: string): { error: string | undefined } | { pay
 	return { payloads: parsed };
 }
 
+// `writing`: one write runs. `rewriteDue`: a change came after that write read the items, so one more
+// write follows it. `unreadable`: a getItem threw, and what storage holds stays untouched, since a
+// later read may return it.
+type SaveState = "idle" | "rewriteDue" | "unreadable" | "writing";
+
 // A queue's copy in `conf.storage`: read once, when the queue starts, and rewritten after each change
 // by one writer at a time.
 export class StoredQueue {
-	private dirty = false;
 	// The one read, restore included, which every write waits for. It never rejects.
 	readonly loaded: Promise<void>;
-	private saving?: Promise<void>;
-	// A getItem that threw: what storage holds stays untouched, since a later read may return it.
-	private unreadable = false;
+	// Whether the read could reach storage.
+	private readonly readable: Promise<boolean>;
+	private state: SaveState = "idle";
 
 	// `items` is what a write persists. It is read as the write starts, so one write covers every
 	// change made before it. `restore` is handed the payloads storage holds, if it holds any that can
@@ -40,7 +44,8 @@ export class StoredQueue {
 		private readonly items: () => readonly QueuedItem[],
 		restore: (payloads: OtlpPayload[]) => void,
 	) {
-		this.loaded = conf.storage ? this.read(conf.storage, restore) : Promise.resolve();
+		this.readable = conf.storage ? this.read(conf.storage, restore) : Promise.resolve(true);
+		this.loaded = this.readable.then(() => undefined);
 	}
 
 	// Saves coalesce: a change made while a write runs is covered by one more write after it.
@@ -49,25 +54,28 @@ export class StoredQueue {
 			return;
 		}
 
-		this.dirty = true;
-		this.saving ??= this.write(this.conf.storage);
+		if (this.state === "idle") {
+			this.state = "writing";
+			void this.write(this.conf.storage);
+		} else if (this.state === "writing") {
+			this.state = "rewriteDue";
+		}
 	}
 
-	private async read(storage: QueueStorage, restore: (payloads: OtlpPayload[]) => void): Promise<void> {
+	private async read(storage: QueueStorage, restore: (payloads: OtlpPayload[]) => void): Promise<boolean> {
 		const { key } = this.conf;
 		let raw: string | null | undefined;
 
 		try {
 			raw = await storage.getItem(key);
 		} catch (err) {
-			this.unreadable = true;
 			this.report("OTLP queue storage unreadable, stored queue kept and not written to", withoutUndefined({ error: stringField(err, "message"), key }));
 
-			return;
+			return false;
 		}
 
 		if (!raw) {
-			return;
+			return true;
 		}
 
 		const stored = parseStoredPayloads(raw);
@@ -75,7 +83,7 @@ export class StoredQueue {
 		if ("payloads" in stored) {
 			restore(stored.payloads);
 
-			return;
+			return true;
 		}
 
 		this.report("OTLP queue storage unreadable, discarded", withoutUndefined({ error: stored.error, key }));
@@ -85,15 +93,21 @@ export class StoredQueue {
 		} catch {
 			// The next save overwrites it.
 		}
+
+		return true;
 	}
 
 	private async write(storage: QueueStorage): Promise<void> {
 		const { key } = this.conf;
 
-		await this.loaded;
+		if (!await this.readable) {
+			this.state = "unreadable";
 
-		while (this.dirty && !this.unreadable) {
-			this.dirty = false;
+			return;
+		}
+
+		do {
+			this.state = "writing";
 
 			try {
 				const persisted = this.items();
@@ -106,8 +120,9 @@ export class StoredQueue {
 			} catch (err) {
 				this.report("OTLP queue storage write failed", withoutUndefined({ error: stringField(err, "message"), key }));
 			}
-		}
+			// save() may have set it during the await, which TypeScript's narrowing doesn't see.
+		} while ((this.state as SaveState) === "rewriteDue");
 
-		this.saving = undefined;
+		this.state = "idle";
 	}
 }
