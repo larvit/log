@@ -2,7 +2,7 @@ import { isCredentialHeaderName } from "../credentials/header-names.js";
 import { type EntryFormatter, type EntryFormatterConf, formatTraceparent, generateSpanId, generateTraceId, Log, type LogConf, type Logger, type LogInt, type LogLevel, LogLevels, type LogOptions, type Metadata, msgJsonFormatter, msgTextFormatter, type OtlpPayload, type OtlpQueue, type OtlpSpan, parseTraceparent, Queue, type QueueStorage, type ResolvedLogConf, resolveFormatter, type TimerHandle } from "../index.js";
 import { STATUS_CODE_ERROR, STATUS_CODE_UNSET } from "../otlp/payloads.js";
 import { encodeBatch, plainHttpWarnings, statusFailure } from "../otlp/sender.js";
-import { fetchFailure, type FetchTrace, requestAttributes, responseAttributes, spanStatusCode, tracedFetch } from "../tracing/fetch.js";
+import { capturedHeaders, fetchFailure, type FetchTrace, requestAttributes, responseAttributes, spanStatusCode, tracedFetch } from "../tracing/fetch.js";
 import { openSpan } from "../tracing/spans.js";
 import test from "./tap.js";
 
@@ -3256,7 +3256,7 @@ function fetchTrace(over: Partial<FetchTrace> = {}): FetchTrace & { warnings: st
 }
 
 test("requestAttributes drops the query and keeps the port, scheme and context", t => {
-	const attributes = requestAttributes(fetchTrace(), new URL("https://api.test:8443/users?token=secret"), "GET", new Headers());
+	const attributes = requestAttributes(fetchTrace(), new URL("https://api.test:8443/users?token=secret"), "GET");
 
 	t.deepEqual(attributes, {
 		"http.request.method": "GET",
@@ -3269,19 +3269,19 @@ test("requestAttributes drops the query and keeps the port, scheme and context",
 	t.end();
 });
 
-test("requestAttributes captures a named request header and redacts a credential one", t => {
+test("capturedHeaders captures a named request header and redacts a credential one", t => {
 	const headers = new Headers({ Authorization: "Bearer abc", "X-Request-Id": "r1" });
-	const attributes = requestAttributes(fetchTrace({ captureRequestHeaders: ["X-Request-Id", "Authorization"] }), new URL("https://api.test/"), "GET", headers);
+	const attributes = capturedHeaders(fetchTrace({ captureRequestHeaders: ["X-Request-Id", "Authorization"] }), "captureRequestHeaders", headers);
 
 	t.strictEqual(attributes["http.request.header.x-request-id"], "r1", "the plain header is captured");
 	t.strictEqual(attributes["http.request.header.authorization"], "REDACTED", "the credential is not");
 	t.end();
 });
 
-test("requestAttributes warns of a header name it can't read, by position and not by name", t => {
+test("capturedHeaders warns of a header name it can't read, by position and not by name", t => {
 	const trace = fetchTrace({ captureRequestHeaders: ["bad name: value"] });
 
-	requestAttributes(trace, new URL("https://api.test/"), "GET", new Headers());
+	capturedHeaders(trace, "captureRequestHeaders", new Headers());
 	t.deepEqual(trace.warnings, ["@larvit/log: captureRequestHeaders[0] is not a valid header name, so log.fetch skips it"], "the index stands in for the name");
 	t.end();
 });
