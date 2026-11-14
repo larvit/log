@@ -88,8 +88,6 @@ function functionFormatterOf(conf: LogConf): EntryFormatter | undefined {
 	return functionFormatters.get(conf) ?? (builtHere(conf) ? undefined : conf.entryFormatter);
 }
 
-// The warning the caller's formatter options earn: entryFormatter's deprecation, which names a format
-// beside it as ignored, or a format string that no formatter answers to.
 function formatterWarning(options: LogOptions): string | undefined {
 	if (options.entryFormatter !== undefined) {
 		if (typeof options.format === "string") {
@@ -100,7 +98,7 @@ function formatterWarning(options: LogOptions): string | undefined {
 	}
 
 	if (typeof options.format === "string" && options.format !== "text" && options.format !== "json") {
-		return `@larvit/log: format ${JSON.stringify(options.format)} is not a format, writing text; use "text", "json" or a function`;
+		return "@larvit/log: format is a string other than \"text\" or \"json\", so text is written; use \"text\", \"json\" or a function";
 	}
 
 	return undefined;
