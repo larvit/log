@@ -467,3 +467,32 @@ Inherited architect, would restructure first:
 - Navigation: `credentials/query.ts:37` `QueryReading`: "reading" names both a decoding and the nested-url walk state
 - Navigation: `log/stderr-warnings.ts:25` `writeStderr`: the module name says warnings, yet it writes error-level reports
 - Self-sufficiency: `tracing/fetch.ts:66` `fetchFailure`: sends the reader to the plan
+
+## 2026-11-14T17:38:46Z, PR #368 at 798ca1b, against b143374
+
+Ruling: better
+
+| Seat | Navigation | Locality | Shape | Self-sufficiency | Overall |
+|---|---|---|---|---|---|
+| Mid A | better | better | better | better | better |
+| Inherited architect | better | better | same | same | better |
+
+Mid A, decided by:
+
+- Navigation, Shape: `otlp/send/sender.ts:15` `OtlpSender`: the 279-line sender that mixed URI parsing, Basic auth, header checks, payload merging, status rules and partialSuccess parsing is split into `endpoint.ts`, `batch.ts` and `response.ts`, each named for its question, and `OtlpSender` is a 104-line send loop
+- Navigation, Locality: `tracing/fetch.ts:152` `traceFetch`: the traced-or-untraced choice, the page href and the settle promise sit in one function, where `Log.fetch` and `tracedFetch` split them, and the platform fetch is passed in rather than read in three places
+- Locality, Self-sufficiency: `tracing/spans.ts:70` `fetchErrorType`: both `error.type` fallbacks sit side by side with the reason they differ, where they lived in two modules and one pointed at a todo.md item
+- Locality: `tracing/spans.ts:86` `spanEnd`: pure, returning the fields, with `Log.end` named as the one writer of `this.span`, where `endSpan` mutated its span and also enqueued it
+- Locality, Shape: `otlp/queue/export-scheduler.ts:103` `transition`: one pure function covers every event in every state, where promise chains lived in the state; it costs 90 lines and two vocabularies of 8 events and 5 effects, a mild net gain
+- Shape: `otlp/send/endpoint.ts:3` the imports of `queue/`: `send/` and `queue/` import each other, so the folder split gives no one-way boundary
+- Self-sufficiency: `otlp/queue/export-scheduler.ts:81` `afterRound`: equivalent-mutant comments here, at `otlp/queue/queue.ts:232` and at `tracing/fetch.ts:139` describe the tests, not the code; they don't outweigh the removed todo.md reference
+
+Inherited architect, decided by:
+
+- Navigation, Shape: `otlp/send/endpoint.ts:43` `resolveEndpoint`: with `otlp/send/response.ts:21` `partialRejection` and `otlp/send/batch.ts:62` `encodeBatch`, a 3am question about an unauthorized drop or a partial rejection leads by file name to a 30-line `response.ts`, where all sat in one 279-line `otlp/sender.ts`
+- Navigation, Locality: `tracing/fetch.ts:152` `traceFetch`: all of `log.fetch` lives in one function, where it was split between `Log.fetch` and `tracedFetch`, and `tracedFetch` read `globalThis.fetch` out of sight of `FetchTrace`
+- Locality: `log/log.ts:76` `end`: the span is written in plain sight by `Object.assign`, with its reason, where `endSpan` and `tracedFetch` changed spans at a distance; the cost is that `spanEnd` and `exportSpan` must each be called
+- Locality: `otlp/queue/export-scheduler.ts:103` `transition`: one pure switch holds every state change, and a joined flush is a named effect, where it was a promise in the state that called `flush()` again
+- Shape: `otlp/queue/export-scheduler.ts:143` `ExportScheduler`: grew from 176 to 268 lines with 8 events, 5 effects and a `dispatch` that calls itself from its catch; `otlp/queue/queue-storage.ts:33` `saveTransition` puts the same pattern on a save loop that was clear before
+- Shape: `otlp/queue/queue.ts:5` the imports of `send/`: the new folders import each other both ways, so the split says nothing about dependency direction
+- Self-sufficiency: `tracing/spans.ts:68` `fetchErrorType`: both rules side by side with README citations, where `fetchFailure` pointed at a todo.md item; against that, mutation-testing notes at `otlp/queue/export-scheduler.ts:81`, `otlp/queue/queue.ts:232` and `tracing/fetch.ts:139` cost a re-read of each guard
