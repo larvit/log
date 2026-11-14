@@ -70,10 +70,6 @@ In [docs/decisions.md](docs/decisions.md):
   entry the Node and browser runs load. The suite injects `stdout`/`stderr` and stubs the global
   `fetch`, so the same tests cover console + OTLP in both runtimes.
 - See [README](README.md) for build/test/release commands.
-- Mutation-test a branch's changed lines with `~/.claude/bin/mutate-changes --prefix 'shift 5; npm
-  run --silent test-mutation --'`. `test-mutation` runs `stryker run` in the image the `Dockerfile`
-  builds, so `shift 5` drops the five words of `npx --no --package=@stryker-mutator/core stryker
-  run` that `mutate-changes` hands the prefix, keeping the options after them.
 - Don't wait on CodeRabbit: under 10 stars it reviews only when triggered by hand.
 
 ## Words
