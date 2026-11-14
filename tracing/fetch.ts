@@ -5,8 +5,7 @@ import type { Metadata } from "../primitives/metadata.js";
 import { childSpan, endSpan, type SpanFailure, type SpanHost } from "./spans.js";
 import { formatTraceparent } from "./traceparent.js";
 
-// What log.fetch reads of its Log: the span's host, the capture settings and context, and the
-// Log's own way to warn. `tracing/` never names `Log`, so a test hands it plain values.
+// What log.fetch reads of its Log, as plain values a test can hand it.
 export type FetchTrace = SpanHost & {
 	captureQuery?: boolean,
 	captureRequestHeaders?: string[],
@@ -64,9 +63,23 @@ export function responseAttributes(trace: FetchTrace, res: Pick<Response, "heade
 
 export const spanStatusCode = (status: number) => status >= 400 ? STATUS_CODE_ERROR : STATUS_CODE_UNSET;
 
-// README's value: the error's code, else its name, else fetch_error. end() applies semconv's `_OTHER` fallback instead; that waits for 3.0.0.
+// README's value: the error's code (a string, else a number), else its name, else fetch_error. Log.end() applies semconv's `_OTHER` fallback instead; todo.md item 59 ends the difference in 3.0.0.
 export function fetchFailure(err: unknown, url: URL): SpanFailure {
 	return { error: err, errorType: stringField(err, "code") ?? numberFieldAsString(err, "code") ?? stringField(err, "name") ?? "fetch_error", url };
+}
+
+// What goes to the platform's fetch, carrying `traceparent` unless the caller set one.
+// A spread drops a Request's method, body, signal and other settings, which are prototype getters.
+// So the platform builds the request from it, as fetch(url, init) would, and traceparent goes on that.
+function outgoing(url: URL, init: RequestInit | undefined, traceparent: string): { headers: Headers, request?: Request } {
+	const request = typeof Request === "function" && init instanceof Request ? new Request(url, init) : undefined;
+	const headers = request?.headers ?? new Headers(init?.headers);
+
+	if (!headers.has("traceparent")) {
+		headers.set("traceparent", traceparent);
+	}
+
+	return { headers, request };
 }
 
 // A throwing clock or queue costs the span, never the platform's result.
@@ -88,14 +101,7 @@ export async function tracedFetch(trace: FetchTrace, url: URL, init: RequestInit
 		span.name = `${method} ${url.host}`;
 		attributes = requestAttributes(trace, url, method);
 
-		// A spread drops a Request's method, body, signal and other settings, which are prototype getters.
-		// So the platform builds the request from it, as fetch(url, init) would, and traceparent goes on that.
-		const request = typeof Request === "function" && init instanceof Request ? new Request(url, init) : undefined;
-		const headers = request?.headers ?? new Headers(init?.headers);
-
-		if (!headers.has("traceparent")) {
-			headers.set("traceparent", formatTraceparent(span.traceId, span.spanId, trace.sampled));
-		}
+		const { headers, request } = outgoing(url, init, formatTraceparent(span.traceId, span.spanId, trace.sampled));
 
 		attributes = { ...attributes, ...capturedHeaders(trace, "captureRequestHeaders", headers) };
 

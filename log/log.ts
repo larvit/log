@@ -178,7 +178,6 @@ export class Log implements LogInt {
 		this.conf.otlpQueue.enqueue(buildLogPayload({ attributes, logLevel, msTimestamp, msg, span }));
 	}
 
-	// The values tracing/ needs of this Log, which it never imports.
 	private spanHost(): SpanHost {
 		return { clock: this.conf.clock, otlpQueue: this.conf.otlpQueue, randomBytes: this.conf.randomBytes, sampled: this.sampled, span: this.span };
 	}
