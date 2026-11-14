@@ -73,24 +73,23 @@ function readNestedUrl(part: string, walk: NestedUrlWalk): string {
 	return read;
 }
 
-// A pair whose key and value both go. Either rule alone is enough, in any order. Userinfo spanning pairs
-// or the `=`, as in `?//u:p=w@host`, is not theirs to find: `redactedSearch` redacts it first, with
-// `pairsInUserinfoRunsOfAnyReading`.
+// Whether a pair loses its key and its value. Any one of the conditions below is enough, in any order.
+// Userinfo spanning pairs or the `=`, as in `?//u:p=w@host`, isn't found here: `redactedSearch`
+// redacts it first, with `pairsInUserinfoRunsOfAnyReading`.
 const redactsKeyAndValue = ({ formKey, formValue, rawKey }: QueryPair, walk: NestedUrlWalk): boolean => {
-	// A key opening a url that holds a credential, alone or joined to its value: a server taking
-	// `?<url>` reads the pair as one url, where an `=` in a password ends the key.
+	// A key opening a url, alone or joined to its value, where that url holds a credential: a server
+	// taking `?<url>` reads the pair as one url, where an `=` in a password ends the key.
 	const joined = `${formKey}=${formValue}`;
-	const opensUrl = SCHEME_LED.test(withoutDropped(formKey)) && (walk.depth > MAX_NESTED_URLS || readNestedUrl(formKey, walk) !== formKey || readNestedUrl(joined, walk) !== joined);
+	const opensUrlHoldingCredential = SCHEME_LED.test(withoutDropped(formKey)) && (walk.depth > MAX_NESTED_URLS || readNestedUrl(formKey, walk) !== formKey || readNestedUrl(joined, walk) !== joined);
 
 	// A credential in the key. Form-decoded and raw both: a `+` or an escaped delimiter ends the match
 	// in one reading.
-	return opensUrl || holdsUserinfoInAnyDecoding(formKey) || holdsUserinfoInAnyDecoding(rawKey) || holdsListedKeyInAnyDecoding(formKey);
+	return opensUrlHoldingCredential || holdsUserinfoInAnyDecoding(formKey) || holdsUserinfoInAnyDecoding(rawKey) || holdsListedKeyInAnyDecoding(formKey);
 };
 
-// A pair whose value goes and whose key stays. Either rule alone is enough, in any order.
-// `redactQueryPair` asks `redactsKeyAndValue` first, so a pair both rules find loses its key too.
+// Whether a pair that `redactsKeyAndValue` keeps loses its value alone. Any one of the conditions
+// below is enough, in any order.
 const redactsValueOnly = ({ formKey, formValue, rawValue }: QueryPair, walk: NestedUrlWalk): boolean =>
-	// A listed key, or userinfo in the value.
 	isListedQueryKey(formKey) || holdsUserinfoInAnyDecoding(formValue) || holdsUserinfoInAnyDecoding(rawValue)
 	// A listed key still in the value after its nested url is read: it sits where a url's own query
 	// rules don't reach, such as a fragment.
