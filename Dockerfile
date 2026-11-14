@@ -10,6 +10,10 @@ ENV HOME=/app
 
 WORKDIR /app
 
+# Stryker (`npm run test-mutation`) ends each test run's process tree with `ps`, which the slim
+# Node images lack.
+RUN command -v ps >/dev/null || (apt-get update && apt-get install -y --no-install-recommends procps && rm -rf /var/lib/apt/lists/*)
+
 # Install and test as an unprivileged user, not root. A fresh "app" user works on both base images
 # (Playwright's browsers under /ms-playwright are world-accessible).
 RUN groupadd -r app && useradd -r -g app -d /app app && chown app:app /app

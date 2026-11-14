@@ -1,7 +1,9 @@
 .git
+.stryker-tmp
 .tmp
 index.js
 index.js.map
 node_modules
 npm-debug.log*
+reports
 types/

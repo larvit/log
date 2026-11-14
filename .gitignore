@@ -1,12 +1,14 @@
 .claude
 .env
 .env.test
+.stryker-tmp/
 .tmp/
 .yarn-integrity
 index.js
 index.js.map
 node_modules/
 npm-debug.log*
+reports/
 types/
 yarn-debug.log*
 yarn-error.log*
