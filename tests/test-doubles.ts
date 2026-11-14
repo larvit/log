@@ -40,6 +40,28 @@ export function thrown(construct: () => void): string {
 	}
 }
 
+// Runs `body` with each named global replaced, then puts the originals back. Never replace `location`:
+// in a browser, setting it navigates away.
+export function withGlobals(globals: Record<string, unknown>, body: () => void): void {
+	const originals = Object.keys(globals).map(name => [name, Object.getOwnPropertyDescriptor(globalThis, name)] as const);
+
+	for (const [name, value] of Object.entries(globals)) {
+		Reflect.set(globalThis, name, value);
+	}
+
+	try {
+		body();
+	} finally {
+		for (const [name, descriptor] of originals) {
+			if (descriptor) {
+				Object.defineProperty(globalThis, name, descriptor);
+			} else {
+				Reflect.deleteProperty(globalThis, name);
+			}
+		}
+	}
+}
+
 // A queue's report sink, flattened to one object per line for deepEqual.
 export function reportSink() {
 	const lines: Metadata[] = [];

@@ -13,10 +13,10 @@ function denoUnrefTimer(): ((id: number) => void) | undefined {
 
 // A pending batch or retry must not keep a finished Node or Deno process alive.
 export function unref(timer: TimerHandle, unrefNumericTimer: ((id: number) => void) | undefined): void {
-	if (typeof timer === "object" && typeof timer.unref === "function") {
-		timer.unref();
-	} else if (typeof timer === "number") {
+	if (typeof timer === "number") {
 		unrefNumericTimer?.(timer);
+	} else if (typeof timer.unref === "function") {
+		timer.unref();
 	}
 }
 
@@ -79,7 +79,7 @@ function startRound(failures: number): Transition {
 function afterRound(state: Extract<SchedulerState, { name: "loading" | "running" }>, delays: SchedulerDelays): Transition {
 	const { failures } = state;
 
-	// The backoff holds even against a flush() that joined.
+	// The backoff holds even against a flush() that joined. The name check is for the type: a loading state has no retryInMs, so no test can drop it.
 	if (state.name === "running" && state.retryInMs !== undefined) {
 		return { effects: [{ type: "releaseJoiners" }, { delayMs: state.retryInMs, type: "armTimer" }], state: { failures, name: "backingOff" } };
 	}
@@ -89,6 +89,7 @@ function afterRound(state: Extract<SchedulerState, { name: "loading" | "running"
 		return startRound(failures);
 	}
 
+	// The name check is for the type: a loading state has no batchDue, so no test can drop it.
 	if (state.name === "running" && state.batchDue) {
 		return { effects: [{ delayMs: delays.batchDelayMs, type: "armTimer" }], state: { failures, name: "waiting" } };
 	}
@@ -131,8 +132,6 @@ export function transition(state: SchedulerState, event: SchedulerEvent, delays:
 		}
 		case "sendSucceeded":
 			return stay({ ...state, failures: 0 });
-		default:
-			return event satisfies never;
 	}
 }
 
@@ -214,6 +213,7 @@ export class ExportScheduler {
 				return undefined;
 			case "startRound":
 				return this.startRound();
+			// Unreachable, so no test reaches it: it only makes tsc reject an effect left unhandled.
 			default:
 				return effect satisfies never;
 		}

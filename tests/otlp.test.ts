@@ -4,9 +4,10 @@ import { saveTransition } from "../otlp/queue/queue-storage.js";
 import { encodeBatch } from "../otlp/send/batch.js";
 import { plainHttpWarnings } from "../otlp/send/endpoint.js";
 import { statusFailure } from "../otlp/send/response.js";
+import { systemClock } from "../primitives/clock.js";
 import { pbDecode, pbDecodeLogs, pbDecodeSpans, pbMsg } from "./protobuf-decode.js";
 import test from "./tap.js";
-import { callHeader, exportedRecords, exportedSpans, fakeClock, fakeStorage, nanos, reportSink, response, storedRecords, stubFetch, thrown, waitFor } from "./test-doubles.js";
+import { callHeader, exportedRecords, exportedSpans, fakeClock, fakeStorage, nanos, reportSink, response, storedRecords, stubFetch, thrown, waitFor, withGlobals } from "./test-doubles.js";
 
 test("a transient export failure keeps the batch queued, reports one line and the retry delivers it", async t => {
 	stubFetch(() => { throw new Error("connection refused"); });
@@ -892,7 +893,7 @@ test("Queue reports corrupt stored data once, discards it from its custom key an
 	await log.flush();
 	t.deepEqual(exportedRecords(calls), ["still works"], "corrupt stored data does not block new records");
 	t.deepEqual(reports.lines.map(line => line.msg), ["OTLP queue storage unreadable, discarded"], "corrupt data is reported once");
-	t.strictEqual(typeof reports.lines[0]?.error, "string", "and says why");
+	t.strictEqual(`SyntaxError: ${reports.lines[0]?.error}`, thrown(() => JSON.parse("not json")), "and says why in the parser's words");
 	await waitFor(() => corrupt.data.size === 0);
 	t.strictEqual(corrupt.data.size, 0, "the custom key is cleared");
 	t.end();
@@ -910,16 +911,21 @@ test("Queue never sends an enqueued payload of unknown kind, and reports it by t
 	t.end();
 });
 
-test("Queue reports and discards stored JSON that is not a list of payloads", async t => {
-	const notAList = fakeStorage(false);
-	const notAListReports = reportSink();
+for (const [stored, name] of [
+	[{ not: "a list" }, "stored JSON that is not a list"],
+	[[{ resourceLogs: [] }, { not: "a payload" }], "a stored list holding one entry that is not a payload"],
+] as const) {
+	test(`Queue reports and discards ${name}`, async t => {
+		const notAList = fakeStorage(false);
+		const notAListReports = reportSink();
 
-	notAList.data.set("@larvit/log:otlp-queue", JSON.stringify({ not: "a list" }));
-	new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", report: notAListReports.report, storage: notAList });
-	await waitFor(() => notAList.data.size === 0);
-	t.deepEqual(notAListReports.lines, [{ error: "not a list of OTLP payloads", key: "@larvit/log:otlp-queue", msg: "OTLP queue storage unreadable, discarded" }], "stored JSON that is not a list of payloads is reported and cleared");
-	t.end();
-});
+		notAList.data.set("@larvit/log:otlp-queue", JSON.stringify(stored));
+		new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", report: notAListReports.report, storage: notAList });
+		await waitFor(() => notAList.data.size === 0);
+		t.deepEqual(notAListReports.lines, [{ error: "not a list of OTLP payloads", key: "@larvit/log:otlp-queue", msg: "OTLP queue storage unreadable, discarded" }], "reported and cleared");
+		t.end();
+	});
+}
 
 test("Queue loads a stored list too long to pass as call arguments without a report", async t => {
 	stubFetch();
@@ -1458,6 +1464,79 @@ test("the scheduler's transition, on an effect that threw, goes idle and rejects
 });
 
 for (const [state, event, expected, name] of [
+	[{ batchDue: true, failures: 0, flushRequested: false, name: "running" }, { type: "roundDone" }, { effects: [{ delayMs: 1000, type: "armTimer" }], state: { failures: 0, name: "waiting" } }, "a round done with a payload scheduled meanwhile arms the batch timer"],
+	[{ failures: 0, flushRequested: false, name: "loading" }, { type: "flush" }, { effects: [{ type: "joinNextRound" }], state: { failures: 0, flushRequested: true, name: "loading" } }, "a flush() while a round loads joins the next round"],
+	[{ failures: 0, name: "waiting" }, { type: "schedule" }, { effects: [], state: { failures: 0, name: "waiting" } }, "a schedule while the batch timer waits changes nothing"],
+	[{ failures: 0, flushRequested: false, name: "loading" }, { type: "schedule" }, { effects: [], state: { failures: 0, flushRequested: false, name: "loading" } }, "a schedule while a round loads changes nothing, since the round sends the payload"],
+	[{ failures: 0, name: "idle" }, { type: "timerFired" }, { effects: [], state: { failures: 0, name: "idle" } }, "a timer firing while idle starts no round"],
+	[{ failures: 0, name: "idle" }, { type: "loaded" }, { effects: [], state: { failures: 0, name: "idle" } }, "a round that loads after an effect failed leaves the scheduler idle"],
+	[{ failures: 0, name: "idle" }, { type: "sendFailed" }, { effects: [], state: { failures: 1, name: "idle" } }, "a send that fails after an effect failed counts the failure and books no retry"],
+] as const) {
+	test(`the scheduler's transition: ${name}`, t => {
+		t.deepEqual(transition(state, event, { batchDelayMs: 1000, retryDelayMs: 20 }), expected, `${state.name} + ${event.type}`);
+		t.end();
+	});
+}
+
+test("resetBackoff makes the next failed send's retry wait retryDelayMs again", t => {
+	const scheduler = new ExportScheduler({ batchDelayMs: 600000, clock: fakeClock(), retryDelayMs: 20 }, Promise.resolve(), async () => {});
+	const delays = [scheduler.backoff(), scheduler.backoff()];
+
+	scheduler.resetBackoff();
+	t.deepEqual([...delays, scheduler.backoff()], [20, 40, 20], "the delay doubles, and starts over after a success");
+	t.end();
+});
+
+test("schedule() throws what the clock's setTimeout threw", t => {
+	const clock = { ...fakeClock(), setTimeout: () => { throw new Error("clock broke"); } };
+	const scheduler = new ExportScheduler({ batchDelayMs: 600000, clock, retryDelayMs: 600000 }, Promise.resolve(), async () => {});
+
+	t.strictEqual(thrown(() => { scheduler.schedule(); }), "Error: clock broke", "the clock's own error");
+	t.end();
+});
+
+test("a flush() that joined a round rejects with the error of an effect that threw", async t => {
+	const clock: Clock = fakeClock();
+	const scheduler = new ExportScheduler({ batchDelayMs: 600000, clock, retryDelayMs: 600000 }, Promise.resolve(), async () => {});
+	let outcome = "";
+
+	void scheduler.flush().catch(() => {});
+	// The round after the first starts by clearing the timer, which now throws.
+	clock.clearTimeout = () => { throw new Error("clock broke"); };
+	void scheduler.flush().then(() => { outcome = "resolved"; }, err => { outcome = String(err); });
+	await waitFor(() => outcome !== "");
+	t.strictEqual(outcome, "Error: clock broke", "the joined flush() gets the clock's error");
+	t.end();
+});
+
+test("a flush() that joined a round whose send failed resolves without a round of its own", async t => {
+	let rounds = 0;
+	let released = false;
+	const scheduler: ExportScheduler = new ExportScheduler({ batchDelayMs: 600000, clock: fakeClock(), retryDelayMs: 600000 }, Promise.resolve(), async () => {
+		rounds++;
+		scheduler.backoff();
+	});
+
+	void scheduler.flush();
+	void scheduler.flush().then(() => { released = true; });
+	await waitFor(() => released);
+	t.strictEqual(rounds, 1, "the backoff holds, so no second round ran");
+	t.end();
+});
+
+test("every flush() that joins a round is released by the next round", async t => {
+	let settled = 0;
+	const scheduler = new ExportScheduler({ batchDelayMs: 600000, clock: fakeClock(), retryDelayMs: 600000 }, Promise.resolve(), async () => {});
+
+	void scheduler.flush();
+	void scheduler.flush().then(() => { settled++; });
+	void scheduler.flush().then(() => { settled++; });
+	await waitFor(() => settled === 2);
+	t.strictEqual(settled, 2, "both joined flush() calls resolved");
+	t.end();
+});
+
+for (const [state, event, expected, name] of [
 	["idle", "save", { startWrite: true, state: "writing" }, "a save while idle starts a write"],
 	["writing", "save", { startWrite: false, state: "rewriteDue" }, "a save during a write books one more write"],
 	["rewriteDue", "save", { startWrite: false, state: "rewriteDue" }, "a save with a rewrite booked adds nothing"],
@@ -1487,6 +1566,14 @@ test("unref leaves a numeric timer id alone where the runtime has no unrefTimer"
 	t.end();
 });
 
+test("unref leaves an object timer without its own unref alone", t => {
+	const unrefed: unknown[] = [];
+
+	t.doesNotThrow(() => { unref({} as unknown as TimerHandle, id => { unrefed.push(id); }); }, "nothing to call, and nothing thrown");
+	t.deepEqual(unrefed, [], "unrefTimer was not called");
+	t.end();
+});
+
 test("unref calls an object timer's own unref, and never the runtime's unrefTimer", t => {
 	const unrefed: unknown[] = [];
 	let unrefs = 0;
@@ -1497,28 +1584,47 @@ test("unref calls an object timer's own unref, and never the runtime's unrefTime
 	t.end();
 });
 
-// The one test that swaps the Deno global, to prove an injected clock's ids never reach it.
-test("an injected clock's numeric timer id is never handed to Deno's unrefTimer", async t => {
+test("an injected clock's numeric timer id is never handed to Deno's unrefTimer", t => {
 	const unrefed: unknown[] = [];
-	const original: unknown = Reflect.get(globalThis, "Deno");
 	const clock = { clearTimeout: () => {}, now: () => Date.now(), setTimeout: () => 7 };
 
-	Reflect.set(globalThis, "Deno", { unrefTimer: (id: unknown) => { unrefed.push(id); } });
-	try {
+	withGlobals({ Deno: { unrefTimer: (id: unknown) => { unrefed.push(id); } } }, () => {
 		const log = new Log({ otlpQueue: new Queue({ batchDelayMs: 600000, clock, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {} }), stderr: () => {}, stdout: () => {} });
 
 		log.info("first");
-	} finally {
-		if (original === undefined) {
-			Reflect.deleteProperty(globalThis, "Deno");
-		} else {
-			Reflect.set(globalThis, "Deno", original);
-		}
-	}
-
+	});
 	t.deepEqual(unrefed, [], "a stranger's timer id is left alone");
 	t.end();
 });
+
+// Deno's setTimeout returns a number, which only Deno.unrefTimer can unref. A scheduler on the system clock stands in for
+// one on Deno, with both globals replaced.
+const onDeno = (deno: unknown, body: (scheduler: ExportScheduler) => void) => {
+	withGlobals({ Deno: deno, setTimeout: () => 7 }, () => {
+		body(new ExportScheduler({ batchDelayMs: 600000, clock: systemClock, retryDelayMs: 600000 }, Promise.resolve(), async () => {}));
+	});
+};
+
+test("the system clock's numeric timer id is handed to Deno's unrefTimer", t => {
+	const unrefed: unknown[] = [];
+
+	onDeno({ unrefTimer: (id: unknown) => { unrefed.push(id); } }, scheduler => { scheduler.schedule(); });
+	t.deepEqual(unrefed, [7], "the batch timer's id reaches unrefTimer");
+	t.end();
+});
+
+for (const [deno, name] of [
+	[undefined, "no Deno global"],
+	[null, "a null Deno global"],
+	[{ unrefTimer: "not a function" }, "a Deno global whose unrefTimer is not a function"],
+] as const) {
+	test(`the system clock's numeric timer id is left alone under ${name}`, t => {
+		onDeno(deno, scheduler => {
+			t.doesNotThrow(() => { scheduler.schedule(); }, "the batch timer is armed without an unref");
+		});
+		t.end();
+	});
+}
 
 test("statusFailure counts a 2xx status as delivered", t => {
 	t.strictEqual(statusFailure(204), undefined, "no failure to act on");
