@@ -182,6 +182,8 @@ for (const [name, level, method, lines, warning] of [
 	["an array holding a level is no level, and its strings are named", ["debug"], "debug", 0, "logLevel [\"debug\"] is not a level"],
 	["a value's own toString is never called", { toString() { throw new Error("toString called"); } }, "info", 1, "logLevel [object Object] is not a level"],
 	["null is printed as null", null, "info", 1, "logLevel null is not a level"],
+	["an array holding anything but strings is printed as an array, never as its items", ["debug", 1], "info", 1, "logLevel [object Array] is not a level"],
+	["a function's own source is never printed", function level() { return "debug"; }, "info", 1, "logLevel [object Function] is not a level"],
 	["a value that throws while it is described still warns", new Proxy([], { get() { throw new Error("trap called"); } }), "info", 1, "logLevel (a value that cannot be printed) is not a level"],
 ] as [string, any, "debug" | "info", number, string][]) {
 	test(`a live logLevel: ${name}`, t => {
@@ -254,6 +256,7 @@ test("format takes a formatter function, inherited by clones and children", t =>
 
 	base.log.clone({ format: "text" }).info("plain");
 	t.ok(base.stdout[0].includes("inf") && base.stdout[0].endsWith(" plain"), "a clone switches a function format back to text");
+	t.strictEqual(new Log({ format: formatter, parentLog: new Log({ format: "json" }) }).conf.format, undefined, "a child's own function formatter leaves it no inherited format to read back");
 	t.end();
 });
 
@@ -631,6 +634,21 @@ test("conf.entryFormatter reads and writes the formatter until 3.0.0", t => {
 	t.deepEqual(foreignChild.stdout, ["foreign hi"], "a parent's formatter this module did not store is inherited through its entryFormatter, which wins over its format");
 	t.strictEqual(foreignChild.log.conf.format, "json", "and the format beside it reads back on the child");
 	t.deepEqual(foreignChild.stderr, [], "and warns about nothing");
+	t.end();
+});
+
+test("a child and a clone take a key that a hand-written LogInt's conf holds behind a getter", t => {
+	class GetterConf {
+		get logLevel(): LogConf["logLevel"] {
+			return "debug";
+		}
+	}
+
+	const parent = new Log();
+
+	Object.defineProperty(parent, "conf", { value: new GetterConf() });
+	t.strictEqual(new Log({ parentLog: parent }).conf.logLevel, "debug", "a child");
+	t.strictEqual(parent.clone().conf.logLevel, "debug", "a clone");
 	t.end();
 });
 
