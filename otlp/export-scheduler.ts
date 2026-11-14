@@ -33,7 +33,7 @@ type SchedulerState =
 	// The round sends. `next` as above. `batchDue`: a payload was scheduled meanwhile, so a batch timer
 	// follows the round. `retryInMs`: a send failed, so a retry timer follows instead, and a flush()
 	// arriving after that waits for this round only.
-	| { name: "running", batchDue: boolean, next?: Promise<void>, retryInMs?: number, round: Promise<void> }
+	| { batchDue: boolean, name: "running", next?: Promise<void>, retryInMs?: number, round: Promise<void> }
 	// A retry timer will start a round, and flush() must not jump it.
 	| { name: "backingOff", timer: TimerHandle };
 
