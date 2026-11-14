@@ -395,8 +395,8 @@ identity, with what a child inherits in `log/settings.ts` → `inherited`, which
 the default queue's recognition in `log/default-queue.ts` → `isDefaultQueueFor`, which item 144
 takes. Shape's seats also named `credentials/path.ts` → `redactedPath`, item 146. No item yet
 takes `credentials/span-values.ts` → `failureMessage` and `traceableUrl`,
-`credentials/text.ts` → `redactTextQueryKeys`, `otlp/export-scheduler.ts` → `transitionRound`, or
-`tracing/fetch.ts` → `fetchFailure`, whose reason points into the plan. This item's tagline names
+or `credentials/text.ts` → `redactTextQueryKeys`; the 2.7.0 release review reworked
+`otlp/export-scheduler.ts` → `transitionRound` and `tracing/fetch.ts` → `fetchFailure`. This item's tagline names
 the floor, so its chunk runs the four-seat scoring run. Where a dimension or the overall stays under
 7.0, file items for the places the seats name, lowest dimension first, and a copy of this item
 blocked by them. Where every score reaches 7.0, it doesn't file anything, and the run replaces the
