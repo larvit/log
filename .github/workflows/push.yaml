@@ -16,7 +16,7 @@ jobs:
           - { node: "20", image: "node:20.20.2-bookworm-slim" }
           - { node: "22", image: "node:22.23.4-bookworm-slim" }
           - { node: "24", image: "node:24.22.3-bookworm-slim" }
-          - { node: "26", image: "node:26.13.0-bookworm-slim" }
+          - { node: "26", image: "node:26.13.1-bookworm-slim" }
     steps:
       - uses: actions/checkout@v7
         with:
