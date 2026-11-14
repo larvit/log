@@ -27,8 +27,7 @@ jobs:
         env:
           NODE_IMAGE: ${{ matrix.image }}
           TESTED_BUILD_DIR: ${{ runner.temp }}/tested-build
-      # publish.yaml publishes this upload, so the package is the build the Node 26 suite ran against.
-      # Node 26 is the Dockerfile's default and the one that published before this upload existed.
+      # publish.yaml publishes this upload. One Node version uploads, and Node 26 is the Dockerfile's default.
       - name: Keep the tested build
         if: matrix.node == '26'
         uses: actions/upload-artifact@v7
