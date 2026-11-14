@@ -6,12 +6,13 @@
 
 `Bar = 0.5`
 
-`Next ID = 151`
+`Next ID = 152`
 
 ## Items
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
+| 151 | 2.8.0 |  | principle | **Make each of the 31 mutants that survive in `credentials/` fail a test, or say at its line why none can.** | 2 | 1 | 1 | 2 | 4 | 7 by 5, code health by 2 | 6.2 |
 | 143 | 2.8.0 |  |  | **Let a reader answer what a `Log`'s conf holds, and how its formatter reaches a child or clone, from one module of `log/`.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
 | 144 | 2.8.0 |  |  | **Let a reader tell from the queue and the conf in front of them whether a `Log` accepts that queue beside the `otlp*` options.** | 2 | 1 | 2 | 3 | 3 | code health by 4 | 4.2 |
 | 147 | 2.8.0 |  |  | **Name `log/stderr-warnings.ts`, `traceableUrl` and `primitives/failure-fields.ts` for what each holds, so a name neither hides nor promises a job.** | 1 | 1 | 1 | 1 | 2 | code health by 2 | 4.2 |
@@ -91,6 +92,23 @@
 | 75 | 3.0.0 | 22 | decision | **Keep credentials off `log.conf` and `queue.conf`.** | 2 | 1 | 2 | 3 | 3 | 3 by 3 | 0.7 |
 
 ## Details
+
+### 151. Make each of the 31 mutants that survive in `credentials/` fail a test, or say at its line why none can.
+
+`npm run test-mutation -- --mutate 'credentials/**/*.ts'`, run on 2026-11-14 at item 141's head, killed 385 of
+428 mutants, and 12 timed out. 2.6.0's release review restructured these routines but could not run mutation
+tests on them, so this is their first run. The 31 survivors, by file:
+
+- `credentials/query.ts`: 21, at lines 12, 17 (3), 26, 51 (2), 70, 87 (6), 91 (2), 131, 145 (3) and 147. Line 87's
+  six include dropping the `reading.depth > MAX_NESTED_URLS` check, so no test pins redaction past the nesting limit;
+- `credentials/decodings.ts`: 5, at lines 17, 22 (3) and 46;
+- `credentials/query-userinfo-runs.ts`: 2, at lines 31 and 48;
+- `credentials/header-names.ts:2`: dropping the `$` after `set-cookie)` in `SENSITIVE_HEADER_NAME`;
+- `credentials/span-values.ts:29` and `credentials/text.ts:16`: 1 each.
+
+The technical principle "Every mutant of a changed line fails a test" asks for each. A test that kills one pins a
+shape README → Credentials in a captured value promises. `redactedSearch`, `PAIR_RULES` and `step` are places the
+comprehension seats found hard: item 145 restructures them, and its tests can kill these mutants.
 
 ### 143. Let a reader answer what a `Log`'s conf holds, and how its formatter reaches a child or clone, from one module of `log/`.
 
