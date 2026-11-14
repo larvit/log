@@ -447,3 +447,19 @@ Read most (opens and searches):
 - `package.json` 1
 - `tests/tap.ts` 1
 - `tsconfig.test.json` 1
+
+## Reading cost, chunk e369d83c59a6, finished 2026-11-14T15:55:18Z
+
+86831 new input tokens before the first commit.
+
+Read most (opens and searches):
+
+- `package.json` 3
+- `README.md` 2
+- `todo.md` 2
+- `.dockerignore` 1
+- `.gitignore` 1
+- `.npmrc` 1
+- `AGENTS.md` 1
+- `tsconfig.build.json` 1
+- `tsconfig.test.json` 1
