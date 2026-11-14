@@ -45,13 +45,8 @@ class ItemBuffer {
 	}
 
 	remove(gone: ReadonlySet<QueuedItem>): void {
-		this.list = this.list.filter(item => {
-			if (gone.has(item)) {
-				this.total -= item.bytes;
-			}
-
-			return !gone.has(item);
-		});
+		this.list = this.list.filter(item => !gone.has(item));
+		this.total = sumBytes(this.list);
 	}
 }
 
@@ -142,7 +137,7 @@ export class Queue implements OtlpQueue {
 			const failure = await this.sender.send(batch);
 
 			this.batchBeingSent = [];
-			this.retrying = new Set(failure?.retry ? batch : []);
+			this.retrying = failure?.retry ? new Set(batch) : new Set();
 
 			if (failure?.retry) {
 				this.prepend(batch);
@@ -234,6 +229,7 @@ export class Queue implements OtlpQueue {
 	private trim(): void {
 		const excess = this.buffer.items.length - this.conf.maxItems;
 
+		// At 0 the body drops nothing, so no test can tell `>= 0` apart; `> 0` skips the filter on every enqueue under the cap.
 		if (excess > 0) {
 			this.buffer.remove(new Set(this.buffer.items.filter(item => !this.retrying.has(item)).slice(0, excess)));
 			this.dropped += excess;
