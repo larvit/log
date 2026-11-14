@@ -14,7 +14,8 @@ const holdsAtSignInAnyDecoding = (text: string) => inAnyDecoding(decodings(text)
 // last pair holding an `@` so far, and is absent while none does: such a run redacts no pair.
 interface Run { end?: number, start: number }
 
-// What one pair does to the scan: the runs it ends, and the run still going after it.
+// What one pair does to the scan: the runs it ends, and the run still going after it. A stray entry in
+// `ended` or a run with no `end` selects no pair, so no test can tell either from a missing one.
 interface Scan { ended: Run[], going?: Run }
 
 // `run` after the pair at `index`, read as `part`: a part's `@` before its first URL_DELIMITER ends in
