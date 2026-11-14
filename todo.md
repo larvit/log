@@ -12,7 +12,6 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 145 | 2.7.0 |  |  | **Let a reader check each rule that redacts a credential in a query from the code alone, without working out the rules' order or a run's state by hand.** | 2 | 2 | 4 | 6 | 5 | code health by 6 | 3.4 |
 | 82 | 2.7.0 |  |  | **Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.** | 1 | 2 | 1 | 2 | 1 | 1 by 5 | 2.5 |
 | 138 | 2.7.0 |  | principle | **Sort each module's imports on their first binding, with a lint rule that keeps them so.** | 2 | 1 | 1 | 2 | 3 | code health by 2 | 2.5 |
 | 96 | 2.7.0 |  | owner | **Add a list of transports, each handed plain log entries it encodes itself, with console and OTLP as the two this library ships and uses by default.** | 4 | 2 | 3 | 7 | 8 | 2 by 7, 4 by 8 | 1.4 |
@@ -37,7 +36,7 @@
 | 86 | 2.8.0 | 96 |  | **Set `telemetry.sdk.language` to a semconv value, `nodejs` or `webjs`.** | 1 | 1 | 2 | 2 | 2 | 2 by 3 | 1.1 |
 | 29 | 2.8.0 | 96 |  | **Export span events.** | 3 | 1 | 2 | 4 | 5 | 2 by 6 | 1.0 |
 | 87 | 2.8.0 | 96 |  | **Report a protobuf export's `partialSuccess` as the JSON transport does.** | 2 | 1 | 2 | 3 | 4 | 2 by 4 | 0.8 |
-| 148 | 2.9.0 | 145, 146 | owner | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
+| 148 | 2.9.0 | 146 | owner | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
 | 41 | 2.9.0 |  | principle | **Warn once about a negative, zero or `NaN` numeric `QueueConf` option, and use the default.** | 1 | 1 | 1 | 1 | 2 | 1 by 5 | 2.5 |
 | 20 | 2.9.0 |  |  | **Announce in the README and CHANGELOG that 3.0.0 gives a `log.fetch` span `end({ error })`'s `error.type`, so a query on `"20"` for an abort or `"fetch_error"` moves first.** | 1 | 1 | 1 | 1 | 1 | 1 by 3 | 2.3 |
 | 23 | 2.9.0 |  |  | **Settle one marker for a CHANGELOG entry a consumer must act on, and record it in the `AGENTS.md` line beside `### Security`.** | 1 | 1 | 1 | 1 | 1 | 1 by 3 | 2.3 |
@@ -85,34 +84,6 @@
 | 108 | 3.0.0 |  | principle | **Keep two tabs of one web app sharing a `storage` key from sending a record twice or deleting each other's backlog.** | 3 | 2 | 2 | 5 | 5 | 3 by 5 | 0.7 |
 
 ## Details
-
-### 145. Let a reader check each rule that redacts a credential in a query from the code alone, without working out the rules' order or a run's state by hand.
-
-The comprehension run of 2026-11-14, at 78682e7, scored Locality 6.00, Shape 6.63 and
-Self-sufficiency 6.63, and every seat put the query code first or second among its hardest places:
-
-- `credentials/query.ts` → `redactedSearch`, `redactQueryPair` and `readNestedUrl` call each other in
-  a cycle, with a memo keyed by depth, and read one query three ways, raw, percent-decoded and
-  form-decoded. Those readings appear inline and again as `key`, `rawKey`, `rawValue` and `value`,
-  with no name.
-- `credentials/query.ts` → `PAIR_RULES`: four rules where the first to answer decides, so a reader
-  has to work out why rule 3 stands before rule 4. The maintainability senior noted that a wrong
-  edit leaks a credential silently, with the suite as the only oracle.
-- `credentials/query-userinfo-runs.ts` → `step`: a state machine over `Run { lastAt, start }` with
-  a `-1` sentinel, where one pair can close a run and open another, run three times with different
-  decodings. Its name doesn't say what it does, and its comment's example had to be worked on
-  paper.
-- Two seats could judge this code only with README → "Credentials in a captured value" open beside
-  it.
-
-Item 131 made the order and the recursion plain where they act; the seats still name both, so
-saying it in comments was not enough. What is redacted stays as README → "Credentials in a captured
-value" and `docs/decisions.md` → "A query key is redacted by Datadog's suffix rule" set it, and the
-rules stay in `credentials/`, per "Every rule on credentials in a span sits in one folder". A
-defect here exposes a credential in an exported span, README → Goals #7, so the change needs a test
-for each case it touches before it moves. Against the technical principles "Always use explicit
-state machines", "Make invalid states unrepresentable" and "Keep It Simple, Stupid", and code
-health.
 
 ### 82. Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.
 
@@ -304,7 +275,7 @@ Under `http/protobuf` a partially rejected batch counts as delivered.
 The latest run, at 39d7c0a on 2026-11-14 during release 2.6.1, scored Navigation 7.75, Locality
 6.38, Shape 7.00, Self-sufficiency 7.00, overall 6.88. Locality is the lowest. Its seats named the
 query rules in `credentials/query.ts` → `redactedSearch` and `PAIR_RULES`, with
-`credentials/query-userinfo-runs.ts` → `step`, which item 145 takes; the formatter in
+`credentials/query-userinfo-runs.ts` → `step`, which release 2.7.0 reworked; the formatter in
 `log/formatter-setting.ts` → `inheritedFormatter`, held under five names and told apart by getter
 identity, with what a child inherits in `log/settings.ts` → `inherited`; and the default queue's
 recognition in `log/default-queue.ts` → `isDefaultQueueFor`. Release 2.7.0 reworked both into

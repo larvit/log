@@ -518,3 +518,20 @@ Read most (opens and searches):
 - `index.ts` 1
 - `package.json` 1
 - `tests/test-doubles.ts` 1
+
+## Reading cost, chunk 47fc496f425c, finished 2026-11-14T23:41:06Z
+
+56133 new input tokens before the first commit.
+
+Read most (opens and searches):
+
+- `README.md` 5
+- `AGENTS.md` 3
+- `.dockerignore` 2
+- `.github/workflows/publish.yaml` 2
+- `docs/decisions.md` 2
+- `package.json` 2
+- `renovate.json` 2
+- `.github/workflows/push.yaml` 1
+- `.gitignore` 1
+- `eslint.config.js` 1
