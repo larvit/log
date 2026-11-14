@@ -73,7 +73,6 @@ function readNestedUrl(part: string, reading: QueryReading): string {
 	return read;
 }
 
-// redactQueryPair tests only for "value", so no test tells "key and value" from any other string.
 type PairRedaction = "key and value" | "value";
 
 // What one pair, read alone, loses. The first rule to answer decides, so reordering the rules changes
@@ -86,10 +85,11 @@ const PAIR_RULES: ReadonlyArray<(pair: QueryPair, reading: QueryReading) => Pair
 		const joined = `${key}=${value}`;
 		const opensUrl = SCHEME_LED.test(withoutDropped(key));
 
+		// redactQueryPair tests only for "value": no test tells "key and value" from another string.
 		return opensUrl && (reading.depth > MAX_NESTED_URLS || readNestedUrl(key, reading) !== key || readNestedUrl(joined, reading) !== joined) ? "key and value" : undefined;
 	},
 	// A credential in the key. Form-decoded and raw both: a `+` or an escaped delimiter ends the match
-	// in one reading.
+	// in one reading. As in the rule above, no test tells its "key and value" from another string.
 	({ key, rawKey }) => holdsUserinfoInAnyDecoding(key) || holdsUserinfoInAnyDecoding(rawKey) || holdsListedKeyInAnyDecoding(key) ? "key and value" : undefined,
 	// A listed key, or userinfo in the value. It stands before the last rule, whose read of a url under
 	// a listed key would keep that url.
