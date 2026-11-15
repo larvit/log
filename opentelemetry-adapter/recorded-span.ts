@@ -16,9 +16,10 @@ function nsTimestamp(time: TimeInput | undefined, log: Log): string {
 	return getNsTimestamp(processStart !== undefined && time < processStart ? processStart + time : time);
 }
 
-// A span an OpenTelemetry tracer started under a Log, exported through that Log when it ends. It
-// leaves out what an OtlpSpan cannot hold and counts each in the span's dropped counts: an event, a
-// link, and an attribute value that is a list.
+// A span an OpenTelemetry tracer started under a Log, exported through that Log when it ends:
+// once, as a copy, so whatever is set on it later is never exported. It leaves out what an
+// OtlpSpan cannot hold and counts each in the span's dropped counts: an event, a link, and an
+// attribute value that is a list.
 export class RecordedSpan implements Span {
 	private readonly attributes: Metadata;
 	private ended = false;
@@ -49,7 +50,7 @@ export class RecordedSpan implements Span {
 	}
 
 	addEvent(): this {
-		if (!this.ended) this.span.droppedEventsCount++;
+		this.span.droppedEventsCount++;
 
 		return this;
 	}
@@ -59,7 +60,7 @@ export class RecordedSpan implements Span {
 	}
 
 	addLinks(links: unknown[]): this {
-		if (!this.ended) this.span.droppedLinksCount += links.length;
+		this.span.droppedLinksCount += links.length;
 
 		return this;
 	}
@@ -86,7 +87,7 @@ export class RecordedSpan implements Span {
 
 	// OpenTelemetry's API ignores a null or undefined value.
 	setAttribute(key: string, value: AttributeValue | null | undefined): this {
-		if (this.ended || value === undefined || value === null) return this;
+		if (value === undefined || value === null) return this;
 
 		if (typeof value === "boolean" || typeof value === "number" || typeof value === "string") {
 			this.attributes[key] = value;
@@ -107,7 +108,7 @@ export class RecordedSpan implements Span {
 
 	// OpenTelemetry's API: OK is final, UNSET is ignored, and only ERROR carries a message.
 	setStatus({ code, message }: SpanStatus): this {
-		if (this.ended || this.span.status.code === STATUS_CODE_OK || code === STATUS_CODE_UNSET) return this;
+		if (this.span.status.code === STATUS_CODE_OK || code === STATUS_CODE_UNSET) return this;
 
 		// OTLP numbers the status codes as OpenTelemetry's API does.
 		this.span.status = code === STATUS_CODE_ERROR && message ? { code, message } : { code };
@@ -120,7 +121,7 @@ export class RecordedSpan implements Span {
 	}
 
 	updateName(name: string): this {
-		if (!this.ended) this.span.name = name;
+		this.span.name = name;
 
 		return this;
 	}
