@@ -2,8 +2,6 @@
 
 ## Unreleased
 
-- **Record `REDACTED` for a query value opening a url nested past eight levels, even one the runtime cannot parse,** as a key there already did.
-
 A `Log` now sends to a list of transports you choose, and you can write your own. The options the
 list replaces are deprecated and keep working until 3.0.0. A string `format` other than `"text"` or
 `"json"` now warns, and the entry a formatter takes has a new name, `LogEntry`. A second entry
@@ -51,6 +49,9 @@ Nothing here needs a change in your code.
   `enqueue` receives, gains a third payload holding `resourceMetrics`. A queue that forwards
   payloads can pass it on unchanged; one that branches on the payload needs a `default` branch. See
   README → Queue exports.
+- **A query value opening a url nested past eight levels records `REDACTED` even where the runtime
+  cannot parse it.** A key there, and a value the runtime parses, already did, so the change only
+  redacts more: `https://[` nested nine urls deep was exported as written.
 
 ## v2.6.1
 
