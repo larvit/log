@@ -83,6 +83,35 @@ function outgoing(url: URL, init: RequestInit | undefined, traceparent: string):
 	return { headers, request };
 }
 
+// What the span says of a request, beside the platform's response or the error it threw.
+type SpanSoFar = { attributes: Metadata, name: string, statusCode: number };
+type FetchOutcome = SpanSoFar & ({ failure: SpanFailure, res?: undefined } | { failure?: undefined, res: Response });
+
+// Sends the request. A thrown error comes back as `failure`, beside what was known of the request
+// when it was thrown, so the caller exports the span either way.
+async function sendTraced(trace: FetchTrace, url: URL, init: RequestInit | undefined, started: OtlpSpan): Promise<FetchOutcome> {
+	let known: SpanSoFar = { attributes: { ...trace.context }, name: url.host, statusCode: STATUS_CODE_UNSET };
+
+	try {
+		const method = (init?.method ?? "GET").toUpperCase();
+
+		known = { ...known, name: `${method} ${url.host}` };
+		known = { ...known, attributes: requestAttributes(trace, url, method) };
+
+		const { headers, request } = outgoing(url, init, formatTraceparent(started.traceId, started.spanId, trace.sampled));
+
+		known = { ...known, attributes: { ...known.attributes, ...capturedHeaders(trace, "captureRequestHeaders", headers) } };
+
+		const res = await (request ? trace.fetch(request) : trace.fetch(url, { ...init, headers }));
+
+		known = { ...known, statusCode: spanStatusCode(res.status) };
+
+		return { ...known, attributes: { ...known.attributes, ...responseAttributes(trace, res) }, res };
+	} catch (err) {
+		return { ...known, failure: fetchFailure(err, url) };
+	}
+}
+
 // A throwing clock or queue costs the span, never the platform's result.
 async function tracedFetch(trace: FetchTrace, url: URL, init: RequestInit | undefined): Promise<Response> {
 	let started: OtlpSpan;
@@ -93,40 +122,21 @@ async function tracedFetch(trace: FetchTrace, url: URL, init: RequestInit | unde
 		return trace.fetch(url, init);
 	}
 
-	let name = url.host;
-	let statusCode = STATUS_CODE_UNSET;
-	let attributes: Metadata = { ...trace.context };
-	let failure: SpanFailure | undefined;
+	const sent = await sendTraced(trace, url, init, started);
 
 	try {
-		const method = (init?.method ?? "GET").toUpperCase();
+		const end = spanEnd(trace, sent.attributes, sent.failure);
 
-		name = `${method} ${url.host}`;
-		attributes = requestAttributes(trace, url, method);
-
-		const { headers, request } = outgoing(url, init, formatTraceparent(started.traceId, started.spanId, trace.sampled));
-
-		attributes = { ...attributes, ...capturedHeaders(trace, "captureRequestHeaders", headers) };
-
-		const res = await (request ? trace.fetch(request) : trace.fetch(url, { ...init, headers }));
-
-		statusCode = spanStatusCode(res.status);
-		attributes = { ...attributes, ...responseAttributes(trace, res) };
-
-		return res;
-	} catch (err) {
-		failure = fetchFailure(err, url);
-
-		throw err;
-	} finally {
-		try {
-			const end = spanEnd(trace, attributes, failure);
-
-			exportSpan(trace, { ...started, name, status: { code: statusCode }, ...end.fields }, end.attributes);
-		} catch {
-			// The span is dropped.
-		}
+		exportSpan(trace, { ...started, name: sent.name, status: { code: sent.statusCode }, ...end.fields }, end.attributes);
+	} catch {
+		// The span is dropped.
 	}
+
+	if (sent.failure) {
+		throw sent.failure.error;
+	}
+
+	return sent.res;
 }
 
 // The page's address, which a relative url resolves against; undefined outside a browser, where the getter throws,

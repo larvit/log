@@ -19,10 +19,12 @@ jobs:
           node-version: 26.x
           registry-url: https://registry.npmjs.org
       - name: Verify tag matches package.json version
+        env:
+          TAG: ${{ github.ref_name }}
         run: |
           PKG_VERSION="v$(node -p "require('./package.json').version")"
-          if [ "$PKG_VERSION" != "${{ github.ref_name }}" ]; then
-            echo "Release tag ${{ github.ref_name }} does not match package.json version $PKG_VERSION"
+          if [ "$PKG_VERSION" != "$TAG" ]; then
+            echo "Release tag $TAG does not match package.json version $PKG_VERSION"
             exit 1
           fi
       # `--status success` takes only a Push run whose every job passed, lint, browser and OTLP tests included.

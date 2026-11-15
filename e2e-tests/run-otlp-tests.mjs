@@ -13,7 +13,7 @@ import { execFile as execFileCb } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-import { Log } from "../index.js";
+import { Log, otlpTransport } from "../index.js";
 
 const execFile = promisify(execFileCb);
 
@@ -66,11 +66,9 @@ async function readReceived() {
 async function exportTelemetry(protocol, serviceName) {
 	const log = new Log({
 		context: { "service.name": serviceName },
-		otlpHttpBaseURI: ENDPOINT,
-		otlpProtocol: protocol,
 		spanName: `${serviceName}-span`,
 		stderr: line => logSink.push(line),
-		stdout: () => {},
+		transports: [otlpTransport({ baseUrl: ENDPOINT, protocol, report: msg => logSink.push(msg) })],
 	});
 
 	log.error(`hello over ${protocol}`, { active: true, count: 17, foo: "bar" });
