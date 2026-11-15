@@ -228,8 +228,7 @@ export class Queue implements OtlpQueue {
 	private trim(): void {
 		const excess = this.buffer.items.length - this.conf.maxItems;
 
-		// At 0 the body doesn't drop anything, so `>= 0` would pass every test too; `> 0` skips the filter on each enqueue
-		// under the cap.
+		// At 0 the body wouldn't drop anything; `> 0` skips the filter on each enqueue under the cap.
 		if (excess > 0) {
 			this.buffer.remove(new Set(this.buffer.items.filter(item => !this.retrying.has(item)).slice(0, excess)));
 			this.dropped += excess;

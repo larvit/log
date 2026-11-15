@@ -10,7 +10,6 @@ function parsedUrl(text: string): URL | undefined {
 	try {
 		return new URL(text);
 	} catch {
-		// Without this line the catch ends the function, which returns `undefined` all the same: no test can tell the two apart.
 		return undefined;
 	}
 }

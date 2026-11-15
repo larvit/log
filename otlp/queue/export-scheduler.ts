@@ -79,7 +79,7 @@ function afterRound(state: Extract<SchedulerState, { name: "loading" | "running"
 	const { failures } = state;
 
 	// The backoff holds even against a flush() that joined. The name check only satisfies the type: a loading state has no
-	// `retryInMs`, so removing the check doesn't fail any test.
+	// `retryInMs`.
 	if (state.name === "running" && state.retryInMs !== undefined) {
 		return { effects: [{ type: "releaseJoiners" }, { delayMs: state.retryInMs, type: "armTimer" }], state: { failures, name: "backingOff" } };
 	}
@@ -89,7 +89,7 @@ function afterRound(state: Extract<SchedulerState, { name: "loading" | "running"
 		return startRound(failures);
 	}
 
-	// The name check only satisfies the type: a loading state has no `batchDue`, so removing the check doesn't fail any test.
+	// The name check only satisfies the type: a loading state has no `batchDue`.
 	if (state.name === "running" && state.batchDue) {
 		return { effects: [{ delayMs: delays.batchDelayMs, type: "armTimer" }], state: { failures, name: "waiting" } };
 	}
@@ -213,7 +213,7 @@ export class ExportScheduler {
 				return undefined;
 			case "startRound":
 				return this.startRound();
-			// Unreachable, so no test reaches it: it only makes tsc reject an effect left unhandled.
+			// Unreachable: it only makes tsc reject an effect left unhandled.
 			default:
 				return effect satisfies never;
 		}
