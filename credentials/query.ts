@@ -2,11 +2,11 @@ import { formDecoded, withoutDropped } from "./decodings.js";
 import { holdsListedKeyInAnyDecoding, holdsUserinfoInAnyDecoding, isListedQueryKey, opensUserinfoInAnyDecoding, SCHEME_LED } from "./text.js";
 import { pairsInUserinfoRunsOfAnyReading } from "./query-userinfo-runs.js";
 
-// A query is read level by level: a part holding a url is read as that url, whose own query is read
-// the same way one level down. A part's level counts the urls it sits in, so a part of the query
-// `redactedQuery` is handed is at level 1. Past this limit a part opening a url counts as holding a
-// credential, parsed or not, as decodings.ts says of every reading limit; the limit also keeps the
-// stack from running out.
+// A part is a key, a value, or a key joined to its value by its `=`. A query is read level by level:
+// a part that opens with a url's scheme is read as that url, whose own query is read the same way, one
+// level down. A part's level is how many urls hold it: each part of the url `redactedQuery` reads is
+// at level 1. Past this limit a part opening with a scheme counts as holding a credential, parsed or
+// not, as decodings.ts says of every reading limit; the limit also keeps the stack from running out.
 const MAX_NESTED_URLS = 8;
 
 function parsedUrl(text: string): URL | undefined {
@@ -33,12 +33,14 @@ function rawQueryPairs(url: URL): Array<[string, string]> {
 // One pair as two consumers read it: form-decoded, as `searchParams` hands it over, and raw, as typed.
 interface QueryPair { formKey: string, formValue: string, rawKey: string, rawValue: string }
 
-// Userinfo the key opens running on past the `=` into the value, as in `?//u:p=w@host`.
-const holdsUserinfoAcrossEquals = (key: string, value: string) => opensUserinfoInAnyDecoding(key) && holdsUserinfoInAnyDecoding(`${key}=${value}`);
+// Whether the key opens userinfo, and the pair holds userinfo in any decoding, as `?//u:p=ss//x@h`
+// does. The runs in query-userinfo-runs.ts read one decoding at a time and stop at the value's first
+// `/`; this reads the pair whole, so the key is redacted with its value.
+const opensUserinfoInPairHoldingIt = (key: string, value: string) => opensUserinfoInAnyDecoding(key) && holdsUserinfoInAnyDecoding(`${key}=${value}`);
 
-// Reads one query and every url nested in it. It remembers each part it has read, since a url key is
+// Reads one query and every url nested in it. It remembers what each part read to, since a url key is
 // read alone and joined to its value, and in a chain of such keys both readings meet the same parts.
-// The level is part of what it remembers: a part read deeper meets MAX_NESTED_URLS sooner.
+// It remembers a part per level: read deeper, a part meets MAX_NESTED_URLS sooner.
 class NestedQueryReader {
 	private readonly partsRead = new Map<string, string>();
 
@@ -55,17 +57,17 @@ class NestedQueryReader {
 	}
 
 	// One pair, redacted by the bullets of README → Credentials in a captured value. Each condition
-	// below names the bullet it serves; any one is enough. Raw and form-decoded both, where a `+` or an
-	// escaped delimiter would end userinfo in one reading.
+	// below names the bullet it serves; any one is enough. The userinfo conditions read the pair both
+	// raw and form-decoded, since a `+` or an escaped delimiter ends userinfo in one reading only.
 	pair({ formKey, formValue, rawKey, rawValue }: QueryPair, level: number): [string, string] {
 		const joined = `${formKey}=${formValue}`;
 		const keyHoldsCredential =
-			// "A url in a kept query value": a url in the key, read alone and joined to its value, since a
-			// server taking `?<url>` reads the pair as one url, where an `=` in a password ends the key.
+			// "A url in a kept query value": a url in the key, read alone and joined to its value. A
+			// server taking `?<url>` reads the pair as one url, though an `=` in its password ends the key.
 			this.part(formKey, level) !== formKey || this.part(joined, level) !== joined
-			// "Userinfo after `//`…": in the key, or opened by it and running on into the value.
+			// "Userinfo after `//`…": in the key, or in a pair whose key opens userinfo.
 			|| holdsUserinfoInAnyDecoding(formKey) || holdsUserinfoInAnyDecoding(rawKey)
-			|| holdsUserinfoAcrossEquals(formKey, formValue) || holdsUserinfoAcrossEquals(rawKey, rawValue)
+			|| opensUserinfoInPairHoldingIt(formKey, formValue) || opensUserinfoInPairHoldingIt(rawKey, rawValue)
 			// "A matched query key and its `=`…": a listed key inside the key.
 			|| holdsListedKeyInAnyDecoding(formKey);
 
@@ -87,8 +89,9 @@ class NestedQueryReader {
 		return valueHoldsCredential ? [formKey, "REDACTED"] : [formKey, value];
 	}
 
-	// The part with the credentials of the url it opens redacted; the part as written where it opens
-	// no url, or its url holds none.
+	// The part with the credentials of the url it opens redacted: `REDACTED` whole where that url holds
+	// userinfo or sits past MAX_NESTED_URLS. The part as written where it opens no url, or its url holds
+	// no credential.
 	part(text: string, level: number): string {
 		const memoKey = `${level} ${text}`;
 		const known = this.partsRead.get(memoKey);

@@ -75,11 +75,13 @@ test("redactedQuery keeps a url-opening key or value eight levels deep, and reda
 	t.end();
 });
 
-test("redactedQuery reads a run of userinfo across pairs as a parser does", t => {
+test("redactedQuery reads userinfo a key opens, within its pair and across later pairs, as a parser does", t => {
 	t.strictEqual(query("\\\\u:p=w@h.test&m=1"), "REDACTED=REDACTED&m=1", "userinfo a backslash opens, across the =");
 	t.strictEqual(query("\\\\u:p&\\\\v&w@h.test&m=1"), "REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&m=1", "a key opening userinfo inside a run joins it");
 	t.strictEqual(query("\\\\u:p&\\\\v=x@a/b&w@h.test"), "REDACTED=REDACTED&REDACTED=REDACTED&w%40h.test=", "the value that closes a run ends it at its last @");
 	t.strictEqual(query("\\\\u&\\\\v=a/b&w@h.test"), undefined, "a delimiter before any @ closes the run, and the run it closes holds no pair");
+	t.strictEqual(query("x@y\\\\u=1"), undefined, "an @ before the key opens userinfo is no part of it");
+	t.strictEqual(query("//u:p=ss//x@h.test"), "REDACTED=REDACTED", "a key opening userinfo, in a pair holding userinfo past the value's first /");
 	t.strictEqual(query(`//u:p=a/%${"25".repeat(10)}40`), "REDACTED=REDACTED", "a key opening userinfo beside a value encoded past the reading limit, which may hide the @");
 	t.end();
 });
