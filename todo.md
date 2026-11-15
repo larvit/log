@@ -12,11 +12,12 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 159 | 2.7.0 |  |  | **Let a reader state from one place what a child or clone of a `Log` inherits, without tracing four sources.** | 3 | 1 | 2 | 4 | 5 | code health by 6 | 4.2 |
+| 159 | 2.7.0 |  |  | **Let a reader state from one place what a child or clone of a `Log` inherits, without tracing four sources.** | 3 | 1 | 2 | 4 | 5 | code health by 8 | 5.6 |
+| 160 | 2.7.0 |  |  | **Let a reader check by reading why a query key is redacted or kept, with every redaction 2.x makes still made.** | 3 | 2 | 4 | 7 | 5 | code health by 9 | 4.7 |
+| 162 | 2.7.0 |  |  | **Make how a `Log` hands entries to its transports sit in folders and under names that say so.** | 3 | 1 | 2 | 4 | 4 | code health by 6 | 4.7 |
+| 163 | 2.7.0 |  |  | **Let a reader check from the code and its comments when the export scheduler's shell re-enters `dispatch`, and what each re-entry reads.** | 3 | 1 | 2 | 4 | 4 | code health by 6 | 4.7 |
+| 161 | 2.7.0 |  |  | **Make each function in `credentials/` sit in a file, and under a name, that says what it does.** | 2 | 2 | 4 | 6 | 4 | code health by 7 | 4.4 |
 | 158 | 2.7.0 |  | principle | **Let a test hand a `Log` the network it sends through, so no test swaps `globalThis.fetch` except to prove a default reads it.** | 2 | 1 | 2 | 3 | 3 | code health by 3, 1 by 3 | 3.9 |
-| 160 | 2.7.0 |  |  | **Let a reader check by reading why a query key is redacted or kept, with every redaction 2.x makes still made.** | 3 | 2 | 4 | 7 | 5 | code health by 6 | 3.1 |
-| 162 | 2.7.0 |  |  | **Make how a `Log` hands entries to its transports sit in folders and under names that say so.** | 3 | 1 | 2 | 4 | 4 | code health by 4 | 3.1 |
-| 163 | 2.7.0 |  |  | **Let a reader check from the code and its comments when the export scheduler's shell re-enters `dispatch`, and what each re-entry reads.** | 3 | 1 | 2 | 4 | 4 | code health by 4 | 3.1 |
 | 156 | 2.7.0 |  |  | **Lower the reading cost of the files a chunk reads most before its first commit.** | 2 | 2 | 1 | 3 | 4 | code health by 3 | 2.7 |
 | 41 | 2.7.0 |  | principle | **Warn once about a negative, zero or `NaN` numeric `QueueConf` option, and use the default.** | 1 | 1 | 1 | 1 | 2 | 1 by 5 | 2.5 |
 | 149 | 2.7.0 |  |  | **Keep a queue's storage read from rejecting when `restore` throws.** | 1 | 1 | 2 | 2 | 6 | code health by 3 | 2.3 |
@@ -27,7 +28,6 @@
 | 15 | 2.7.0 |  |  | **Warn once when `colors` is unset, `process.stdout.isTTY` is false and neither `NO_COLOR` nor `FORCE_COLOR` is set, where 3.0.0 turns colour off.** | 1 | 1 | 1 | 1 | 2 | 1 by 4 | 2.0 |
 | 17 | 2.7.0 |  |  | **Warn once when an instance with `otlpQueue` set or inherited leaves `spanName` unset.** | 1 | 1 | 1 | 1 | 2 | 1 by 4 | 2.0 |
 | 80 | 2.7.0 |  | principle | **Run the browser suite in WebKit and Firefox as well as Chromium.** | 2 | 1 | 1 | 2 | 3 | 3 by 7 | 2.0 |
-| 161 | 2.7.0 |  |  | **Make each function in `credentials/` sit in a file, and under a name, that says what it does.** | 2 | 2 | 4 | 6 | 4 | code health by 3 | 1.9 |
 | 157 | 2.7.0 |  |  | **Hand a custom transport's `span` method a span in a consumer's shape, and each transport its own copy of an entry and a span.** | 3 | 2 | 3 | 6 | 5 | 1 by 4, 4 by 4 | 1.0 |
 | 164 | 2.8.0 | 159, 160, 161, 162, 163 | owner | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 2 | code health by 3 | 6.2 |
 | 28 | 2.8.0 |  |  | **Export resource attributes beyond `service.name`.** | 2 | 1 | 2 | 3 | 3 | 2 by 7 | 1.7 |
@@ -107,6 +107,87 @@ Make each of these places easier to read. Today's observable behaviour holds, un
 where 3.0.0 can delete it: item 62 removes `entryFormatter` and item 97 the OTLP keys, and this item
 leaves both removals to them.
 
+Ranks ahead of the release's other items because docs/decisions.md → "The comprehension baseline"
+ships comprehension work ahead of them; Moves reflects that the overall score is under the 7.0 floor.
+
+### 160. Let a reader check by reading why a query key is redacted or kept, with every redaction 2.x makes still made.
+
+The query-credential rules were the hardest place of the 2026-11-15 scoring run (PR #391, at
+4f96af8) for every seat, under Overall and Locality, the run's lowest dimension at 5.88:
+
+- `credentials/query.ts:47` `readNestedUrl`, `:78` `redactsKeyAndValue` and `:111`
+  `redactedSearch`: a cycle of three or four functions with a depth-keyed memo. The depth rises
+  only in `redactedSearch` while the cap is checked in two places, and a key is read alone and
+  joined. Seats could not predict an output, nor say which condition covers which README bullet.
+- `credentials/query-userinfo-runs.ts:34` `scanPair` and `:55` `pairsInUserinfoRuns`: a run is
+  tracked across pairs under three readings of the query, and one pair can close a run and open
+  another. Why a key that opens a run is checked against the whole pair stayed opaque, and a
+  comment admits a special case. The senior warned that a local-looking change can open a gap that
+  one reading would have caught.
+
+Make each of these places easier to read. This is security-critical (README → Goals #7): every
+redaction the suite and README → Credentials in a captured value promise still holds. A chunk
+that reworks redaction has let defects escape before (item 84 drew six later fixes), so the chunk
+adds a test for each shape the rework could drop before it changes the code.
+
+Ranks ahead of the release's other items because docs/decisions.md → "The comprehension baseline"
+ships comprehension work ahead of them; Moves reflects that the overall score is under the 7.0 floor.
+
+### 162. Make how a `Log` hands entries to its transports sit in folders and under names that say so.
+
+Seats of the 2026-11-15 scoring run (PR #391, at 4f96af8) found the transport code where its folder
+or comment says something else, under Navigation (7.38) and Shape (6.63):
+
+- `log/deprecated-options/default-transports.ts:9` `transportsOf`: live dispatch, which
+  `opentelemetry-adapter/recorded-span.ts` imports, sits in the folder 3.0.0 cuts down (AGENTS.md →
+  Working here). Two seats named it.
+- `tracing/transport.ts:24` `Transport`: the contract for entries sits in the tracing folder.
+- `log/console-output.ts:7` `writeConsoleEntry`: its comment calls it the one console writer, while
+  `consoleTransport` writes on its own.
+
+Done when each of these places sits where its name, folder and comment say, with imports still
+running one way (AGENTS.md → Working here; the decision log names each import that runs against it).
+What 3.0.0 deletes stays in `log/deprecated-options/`: item 97 removes the OTLP keys and
+`inTransportNames`, and this item leaves them alone. Behaviour doesn't change.
+
+Ranks ahead of the release's other items because docs/decisions.md → "The comprehension baseline"
+ships comprehension work ahead of them; Moves reflects that the overall score is under the 7.0 floor.
+
+### 163. Let a reader check from the code and its comments when the export scheduler's shell re-enters `dispatch`, and what each re-entry reads.
+
+Seats of the 2026-11-15 scoring run (PR #391, at 4f96af8) found the pure `transition` of
+`ExportScheduler` pleasant and its shell hard, under Overall (6.50) and Locality (5.88):
+
+- `otlp/queue/export-scheduler.ts:181` `dispatch`: it re-enters itself from `startRound` and from its
+  catch; `joined` is computed outside the state machine, read before the effects change `joiners`;
+  and `Queue.round` calls `backoff()`, which recomputes, after dispatching.
+
+Make this place easier to read. The 2.x behaviour, the order of rounds, retries and backoff, holds,
+and so do its tests.
+
+Ranks ahead of the release's other items because docs/decisions.md → "The comprehension baseline"
+ships comprehension work ahead of them; Moves reflects that the overall score is under the 7.0 floor.
+
+### 161. Make each function in `credentials/` sit in a file, and under a name, that says what it does.
+
+Seats of the 2026-11-15 scoring run (PR #391, at 4f96af8) found names and files in `credentials/`
+that mislead, under Shape (6.63) and Navigation (7.38):
+
+- `credentials/span-values.ts:45` `failureMessage`, `:85` `redactedAsUrl` and `:103`
+  `redactedRecordedValue`: a status-message redactor serves as the general redactor of recorded
+  values, called on a value that is no failure, behind a made-up base url put on and taken off twice.
+- `credentials/span-values.ts:25` `parseHttpUrl`: the filter for which urls `log.fetch` traces lives
+  in the credentials folder.
+- `credentials/text.ts:16` `isListedQueryKey`: the query-key rule sits in a file named for free text.
+
+Done when each of these places sits where its name and file say, with imports still running one way
+(AGENTS.md → Working here), and every rule on credentials in a span still in one folder (decision
+"Every rule on credentials in a span sits in one folder"). Every redaction holds (README → Goals #7).
+Item 160 reworks the query rules in `credentials/query*.ts`; this item leaves their logic to it.
+
+Ranks ahead of the release's other items because docs/decisions.md → "The comprehension baseline"
+ships comprehension work ahead of them; Moves reflects that the overall score is under the 7.0 floor.
+
 ### 158. Let a test hand a `Log` the network it sends through, so no test swaps `globalThis.fetch` except to prove a default reads it.
 
 A `Log` takes `clock`, `randomBytes`, `stdout` and `stderr`, and `otlpTransport` and `Queue` take
@@ -136,55 +217,6 @@ What bounds the repair:
   scope.
 - The comprehension seats found `attachDefaultQueue` hard to follow, since the two ways a queue is
   built report to different sinks. A change there makes that easier to read, not harder.
-
-### 160. Let a reader check by reading why a query key is redacted or kept, with every redaction 2.x makes still made.
-
-The query-credential rules were the hardest place of the 2026-11-15 scoring run (PR #391, at
-4f96af8) for every seat, under Overall and Locality, the run's lowest dimension at 5.88:
-
-- `credentials/query.ts:47` `readNestedUrl`, `:78` `redactsKeyAndValue` and `:111`
-  `redactedSearch`: a cycle of three or four functions with a depth-keyed memo. The depth rises
-  only in `redactedSearch` while the cap is checked in two places, and a key is read alone and
-  joined. Seats could not predict an output, nor say which condition covers which README bullet.
-- `credentials/query-userinfo-runs.ts:34` `scanPair` and `:55` `pairsInUserinfoRuns`: a run is
-  tracked across pairs under three readings of the query, and one pair can close a run and open
-  another. Why a key that opens a run is checked against the whole pair stayed opaque, and a
-  comment admits a special case. The senior warned that a local-looking change can open a gap that
-  one reading would have caught.
-
-Make each of these places easier to read. This is security-critical (README → Goals #7): every
-redaction the suite and README → Credentials in a captured value promise still holds. A chunk
-that reworks redaction has let defects escape before (item 84 drew six later fixes), so the chunk
-adds a test for each shape the rework could drop before it changes the code.
-
-### 162. Make how a `Log` hands entries to its transports sit in folders and under names that say so.
-
-Seats of the 2026-11-15 scoring run (PR #391, at 4f96af8) found the transport code where its folder
-or comment says something else, under Navigation (7.38) and Shape (6.63):
-
-- `log/deprecated-options/default-transports.ts:9` `transportsOf`: live dispatch, which
-  `opentelemetry-adapter/recorded-span.ts` imports, sits in the folder 3.0.0 cuts down (AGENTS.md →
-  Working here). Two seats named it.
-- `tracing/transport.ts:24` `Transport`: the contract for entries sits in the tracing folder.
-- `log/console-output.ts:7` `writeConsoleEntry`: its comment calls it the one console writer, while
-  `consoleTransport` writes on its own.
-
-Done when each of these places sits where its name, folder and comment say, with imports still
-running one way (AGENTS.md → Working here; the decision log names each import that runs against it).
-What 3.0.0 deletes stays in `log/deprecated-options/`: item 97 removes the OTLP keys and
-`inTransportNames`, and this item leaves them alone. Behaviour doesn't change.
-
-### 163. Let a reader check from the code and its comments when the export scheduler's shell re-enters `dispatch`, and what each re-entry reads.
-
-Seats of the 2026-11-15 scoring run (PR #391, at 4f96af8) found the pure `transition` of
-`ExportScheduler` pleasant and its shell hard, under Overall (6.50) and Locality (5.88):
-
-- `otlp/queue/export-scheduler.ts:181` `dispatch`: it re-enters itself from `startRound` and from its
-  catch; `joined` is computed outside the state machine, read before the effects change `joiners`;
-  and `Queue.round` calls `backoff()`, which recomputes, after dispatching.
-
-Make this place easier to read. The 2.x behaviour, the order of rounds, retries and backoff, holds,
-and so do its tests.
 
 ### 156. Lower the reading cost of the files a chunk reads most before its first commit.
 
@@ -241,23 +273,6 @@ Item 77 makes the constructor reject it in 3.0.0, and this warning is that break
 `scripts/run-browser-tests.mjs` launches Chromium alone, though its Playwright image ships both.
 WebKit is the only engine on an iPhone, and `failureMessage` has a Firefox branch the suite only
 fakes. `~/.claude/principles/frontend.md` → broad device support.
-
-### 161. Make each function in `credentials/` sit in a file, and under a name, that says what it does.
-
-Seats of the 2026-11-15 scoring run (PR #391, at 4f96af8) found names and files in `credentials/`
-that mislead, under Shape (6.63) and Navigation (7.38):
-
-- `credentials/span-values.ts:45` `failureMessage`, `:85` `redactedAsUrl` and `:103`
-  `redactedRecordedValue`: a status-message redactor serves as the general redactor of recorded
-  values, called on a value that is no failure, behind a made-up base url put on and taken off twice.
-- `credentials/span-values.ts:25` `parseHttpUrl`: the filter for which urls `log.fetch` traces lives
-  in the credentials folder.
-- `credentials/text.ts:16` `isListedQueryKey`: the query-key rule sits in a file named for free text.
-
-Done when each of these places sits where its name and file say, with imports still running one way
-(AGENTS.md → Working here), and every rule on credentials in a span still in one folder (decision
-"Every rule on credentials in a span sits in one folder"). Every redaction holds (README → Goals #7).
-Item 160 reworks the query rules in `credentials/query*.ts`; this item leaves their logic to it.
 
 ### 157. Hand a custom transport's `span` method a span in a consumer's shape, and each transport its own copy of an entry and a span.
 
