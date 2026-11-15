@@ -23,7 +23,7 @@ export function redactHeaderCredential(name: string, value: string): string {
 }
 
 // `text` with each credential rule of 4 to 7 above applied, `url` being a known url that `text` may quote.
-export function redactedText(text: string, url?: URL): string {
+function redactedText(text: string, url?: URL): string {
 	// Precise rules first, coarse after, so each coarse rule sees only what the finer ones left. First,
 	// the known url, which the runtime quotes back: Firefox's `Window.fetch: <url> …` parses whole, its
 	// quoted userinfo in the path.
