@@ -1,16 +1,18 @@
-import type { LogLevel } from "../primitives/levels.js";
+import type { EntryFormatter, EntryFormatterConf } from "./types.js";
 import type { Metadata } from "../primitives/metadata.js";
-import type { ResolvedLogConf } from "./types.js";
-import { resolveFormatter } from "./conf.js";
 
-// The one writer of a console line: an entry, and each line this library writes of its own accord.
-export function writeConsoleEntry(conf: ResolvedLogConf, logLevel: LogLevel, msg: string, metadata: Metadata, msTimestamp: number): void {
-	const line = resolveFormatter(conf)({ colors: conf.colors, logLevel, metadata, msTimestamp, msg });
+// Where a console line goes, and whether it is coloured. A Log's conf is one.
+export type ConsoleSink = { colors: boolean, stderr: (msg: string) => void, stdout: (msg: string) => void };
 
-	if (logLevel === "error" || logLevel === "warn") {
-		conf.stderr(line);
+// The one writer of a console line: an entry, from consoleTransport or the deprecated console
+// options, and each line this library writes of its own accord. error and warn go to stderr.
+export function writeConsoleLine(sink: ConsoleSink, format: EntryFormatter, entry: Omit<EntryFormatterConf, "colors">): void {
+	const line = format({ colors: sink.colors, ...entry });
+
+	if (entry.logLevel === "error" || entry.logLevel === "warn") {
+		sink.stderr(line);
 	} else {
-		conf.stdout(line);
+		sink.stdout(line);
 	}
 }
 

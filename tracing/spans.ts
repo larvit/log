@@ -6,9 +6,8 @@ import { numberFieldAsString, stringField } from "../primitives/field-reads.js";
 import { parseTraceparent, spanIdFrom, traceIdFrom } from "./traceparent.js";
 import type { Transport } from "./transport.js";
 
-// A span just opened: it starts and ends now, and doesn't carry any attributes, events or links yet.
-function newSpan(fields: Pick<OtlpSpan, "kind" | "name" | "parentSpanId" | "spanId" | "traceId">, nowMs: number): OtlpSpan {
-	const startedAt = getNsTimestamp(nowMs);
+// A span just opened: it starts and ends at `startedAt`, in nanoseconds, and doesn't carry any attributes, events or links yet.
+export function newSpan(fields: Pick<OtlpSpan, "kind" | "name" | "parentSpanId" | "spanId" | "traceId">, startedAt: string): OtlpSpan {
 
 	return {
 		attributes: [],
@@ -47,7 +46,7 @@ export function openSpan(conf: SpanOrigin): { sampled: boolean, span: OtlpSpan }
 			parentSpanId: conf.parentLog?.span.spanId ?? incoming?.spanId,
 			spanId: spanIdFrom(conf.randomBytes),
 			traceId: conf.parentLog?.span.traceId || incoming?.traceId || traceIdFrom(conf.randomBytes),
-		}, conf.clock.now()),
+		}, getNsTimestamp(conf.clock.now())),
 	};
 }
 
@@ -58,7 +57,7 @@ export function childSpan(host: Pick<SpanHost, "clock" | "randomBytes" | "span">
 		parentSpanId: host.span.spanId,
 		spanId: spanIdFrom(host.randomBytes),
 		traceId: host.span.traceId,
-	}, host.clock.now());
+	}, getNsTimestamp(host.clock.now()));
 }
 
 // What a span failed with. `errorType`, the span's `error.type`, comes from one of the two functions

@@ -1,15 +1,16 @@
-import { buildLogPayload, type OtlpSpan } from "../otlp/payloads.js";
 import { DEFAULT_LOG_LEVEL, type LogLevel, LogLevels, SEVERITY_NUMBERS } from "../primitives/levels.js";
 import { endErrorType, exportSpan, openSpan, spanEnd, type SpanHost } from "../tracing/spans.js";
 import { type FetchTrace, traceFetch } from "../tracing/fetch.js";
 import { formatTraceparent } from "../tracing/traceparent.js";
 import type { LogInt, LogOptions, ResolvedLogConf } from "./types.js";
 import { type Metadata, type MetadataInput, withoutUndefined } from "../primitives/metadata.js";
+import type { OtlpSpan } from "../otlp/payloads.js";
 import { resolveConf } from "./conf.js";
-import type { Transport, TransportEntry } from "../tracing/transport.js";
+import { resolveFormatter } from "./entry-format.js";
+import type { Transport } from "../tracing/transport.js";
 import { transportsOf } from "./log-transports.js";
 import { warnOnceToStderr, writeStderr } from "./stderr-lines.js";
-import { withTraceInfo, writeConsoleEntry } from "./console-output.js";
+import { withTraceInfo, writeConsoleLine } from "./console-output.js";
 import { writeOnce } from "../primitives/once-per-sink.js";
 
 // A configured logLevel that is not a level, as the warning about it prints it.
@@ -183,18 +184,22 @@ export class Log implements LogInt {
 		}
 	}
 
-	// The deprecated options' entry side: prints the entry and queues it for OTLP.
-	private deprecatedEntry({ logLevel, metadata, msg, msTimestamp, spanId, traceId }: TransportEntry): void {
-		// 2.x prints the instance's own span, even where the entry is exported under its parent's.
-		// The formatter gets a copy, so one that changes it changes nothing that is exported.
-		const printed = this.conf.printTraceInfo ? withTraceInfo(metadata, { spanId: this.span.spanId, spanName: this.span.name, traceId: this.span.traceId }) : { ...metadata };
+	// The console the deprecated options make. Unlike consoleTransport it reads the conf at each
+	// entry, and its printTraceInfo prints the instance's own span, as 2.x does, even where the entry
+	// is exported under its parent's.
+	private deprecatedConsole(): Transport {
+		return {
+			entry: ({ logLevel, metadata, msg, msTimestamp }) => {
+				// The formatter gets a copy, so one that changes it changes nothing that is exported.
+				const printed = this.conf.printTraceInfo ? withTraceInfo(metadata, { spanId: this.span.spanId, spanName: this.span.name, traceId: this.span.traceId }) : { ...metadata };
 
-		writeConsoleEntry(this.conf, logLevel, msg, printed, msTimestamp);
-		this.conf.otlpQueue?.enqueue(buildLogPayload({ attributes: metadata, logLevel, msTimestamp, msg, span: { spanId, traceId } }));
+				writeConsoleLine(this.conf, resolveFormatter(this.conf), { logLevel, metadata: printed, msTimestamp, msg });
+			},
+		};
 	}
 
 	private transports(): readonly Transport[] {
-		return transportsOf(this.conf, entry => { this.deprecatedEntry(entry); });
+		return transportsOf(this.conf, this.deprecatedConsole());
 	}
 
 	private spanHost(): SpanHost {

@@ -1,6 +1,6 @@
 import type { Attributes, AttributeValue, Span, SpanContext, SpanOptions, SpanStatus, TimeInput } from "@opentelemetry/api";
 import { attributesOf, getNsTimestamp, type OtlpSpan, STATUS_CODE_ERROR, STATUS_CODE_OK, STATUS_CODE_UNSET } from "../otlp/payloads.js";
-import { exportSpan } from "../tracing/spans.js";
+import { exportSpan, newSpan } from "../tracing/spans.js";
 import type { Log } from "../log/log.js";
 import type { Metadata } from "../primitives/metadata.js";
 import { redactedRecordedAttribute, redactedRecordedValue } from "../credentials/span-values.js";
@@ -36,24 +36,18 @@ const OTLP_KINDS = [1, 2, 3, 4, 5] as const;
 export class RecordedSpan implements Span {
 	private readonly attributes: Metadata;
 	private ended = false;
-	private readonly span: Omit<OtlpSpan, "attributes" | "endTimeUnixNano">;
+	private readonly span: OtlpSpan;
 
 	constructor(private readonly log: Log, scope: Metadata, name: string, options: SpanOptions, parent: SpanContext | undefined) {
 		this.attributes = { ...scope };
-		this.span = {
-			droppedAttributesCount: 0,
-			droppedEventsCount: 0,
-			droppedLinksCount: options.links?.length ?? 0,
-			events: [],
+		this.span = newSpan({
 			kind: OTLP_KINDS[options.kind ?? 0] ?? 1,
-			links: [],
 			name,
 			parentSpanId: parent?.spanId,
 			spanId: spanIdFrom(log.conf.randomBytes),
-			startTimeUnixNano: nsTimestamp(options.startTime, log),
-			status: { code: STATUS_CODE_UNSET },
 			traceId: parent?.traceId ?? traceIdFrom(log.conf.randomBytes),
-		};
+		}, nsTimestamp(options.startTime, log));
+		this.span.droppedLinksCount = options.links?.length ?? 0;
 		this.setAttributes(options.attributes ?? {});
 	}
 
