@@ -229,9 +229,8 @@ The maintainer chose, on 2026-11-15: give `TransportSpan` a consumer's shape in 
 The latest run, at 4f96af8 on 2026-11-15 (PR #391), scored Navigation 7.38, Locality 5.88, Shape
 6.63, Self-sufficiency 6.63, overall 6.50. Locality is the lowest.
 
-Items 159 (what a child or clone inherits), 160 (the query-credential rules) and 163 (the export
-scheduler's shell) lift Locality and the overall. Items 161 (`credentials/` names) and 162 (where
-the transport code sits) lift Shape and Navigation. Places the seats named that no item takes:
+Item 160 (the query-credential rules) lifts Locality and the overall, and item 161
+(`credentials/` names) Shape and Navigation. Places the seats named that no item takes:
 `log/otlp-transport.ts:14` `inTransportNames` and `log/log.ts:187` `deprecatedEntry`, which 3.0.0
 deletes (item 97), and `credentials/path.ts:36` `redactedPath`.
 

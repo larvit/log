@@ -7,9 +7,7 @@ import type { EntryFormatter, LogConf, LogOptions, ResolvedLogConf } from "../ty
 // one accessor that every such conf shares:
 // - Read, it answers the function formatter, or else the built-in formatter that format names, so
 //   log.conf.entryFormatter is always a formatter, as 2.x types it.
-// - It keeps the function in functionFormatters, keyed by conf, rather than on the conf.
-// - It marks a conf this copy of the library built, since no other conf has this getter. A child or
-//   clone takes a source's function alone, through functionFormatterOf, never the built-in one.
+// - It marks a conf this copy of the library built, since no other conf has this getter.
 
 // The function formatter of each conf this copy of the library built with one.
 const functionFormatters = new WeakMap<object, EntryFormatter>();

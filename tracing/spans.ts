@@ -37,7 +37,8 @@ export type SpanOrigin = {
 export type TransportSpan = { attributes: Metadata, span: OtlpSpan };
 
 // What childSpan, spanEnd and exportSpan read of a Log: the Log's clock, randomness, transports, sampled flag and own span.
-// Of each transport, only its `span` method, out of the Transport contract in log/transport.ts.
+// Of each transport, only its `span` method: the Transport contract sits in log/transport.ts, and
+// imports point from log/ to tracing/.
 export type SpanHost = Pick<SpanOrigin, "clock" | "randomBytes"> & { sampled: boolean, span: OtlpSpan, transports: readonly { span?: (span: TransportSpan) => void }[] };
 
 export function openSpan(conf: SpanOrigin): { sampled: boolean, span: OtlpSpan } {

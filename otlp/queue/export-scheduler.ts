@@ -181,14 +181,15 @@ export class ExportScheduler {
 	// Runs one event through `transition`, then carries out its effects in order. Returns what a
 	// flush() caller waits for, where the event gave it something to wait for.
 	//
-	// Three places dispatch an event while a dispatch runs, and only the catch below starts it
-	// before this call returns:
-	// - The round startRound starts dispatches `loaded` and `roundDone`, each after an await.
+	// Only one dispatch runs inside another: when an effect throws, the catch below dispatches
+	// `effectFailed` at once. That inner call reads the state this call set, and the joiners as the
+	// effects before the throw left them. Every other dispatch starts after the one that led to it
+	// has returned:
+	// - A round, which startRound starts, dispatches `loaded` and `roundDone` after an await, and
+	//   `sendFailed` or `sendSucceeded` through backoff or resetBackoff after each send.
 	// - The timer dispatches `timerFired` when it fires.
-	// - An effect that throws dispatches `effectFailed` at once. That call reads the state this one
-	//   set and the joiners as the effects before the throw left them.
 	private dispatch(event: SchedulerEvent): Promise<void> | undefined {
-		// Read before the effects run, since joinNextRound and settleJoiners change it.
+		// Read before the effects run, since joinNextRound and settleJoiners change this.joiners.
 		const joined = this.joiners !== undefined;
 		const { effects, state } = transition(this.state, event, this.conf, joined);
 		let awaited: Promise<void> | undefined;
