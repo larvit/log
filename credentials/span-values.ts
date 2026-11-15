@@ -6,8 +6,8 @@ import { stringField } from "../primitives/field-reads.js";
 
 // Where README → Credentials in a captured value is enforced, bullet by bullet:
 // 1. A credential header name: isCredentialHeaderName in header-names.ts, applied by redactHeaderCredential.
-// 2. A listed query key: isListedQueryKey and redactTextQueryKeys in text.ts, applied by redactsKeyAndValue and redactsValueOnly in query.ts.
-// 3. A url in a kept query value or key: redactedSearch in query.ts, with redactQueryPair and readNestedUrl.
+// 2. A listed query key: isListedQueryKey and redactTextQueryKeys in text.ts, applied by NestedQueryReader.pair in query.ts.
+// 3. A url in a kept query value or key: NestedQueryReader in query.ts.
 // 4. A url that parses whole, in a header value or status message: redactedWholeUrl in query.ts.
 // 5. Userinfo after `//` or its backslash forms: redactTextUserinfo in text.ts, and in a query
 //    pairsInUserinfoRunsOfAnyReading in query-userinfo-runs.ts.

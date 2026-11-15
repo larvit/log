@@ -56,10 +56,9 @@ test("redactedQuery reads each pair as a key and a value", t => {
 	t.end();
 });
 
-// The query of a url nested `levels` deep, its innermost query holding a key that opens a url the
-// runtime cannot parse.
-function nestedUnparseableKey(levels: number): string {
-	let search = "https://[=1";
+// The query of a url nested `levels` deep, its innermost query being `innermost`.
+function nestedQuery(levels: number, innermost: string): string {
+	let search = innermost;
 
 	for (let level = 2; level <= levels; level++) {
 		search = `n=${encodeURIComponent(`https://h.test/?${search}`)}`;
@@ -68,9 +67,19 @@ function nestedUnparseableKey(levels: number): string {
 	return search;
 }
 
-test("redactedQuery keeps a url-opening key eight levels deep, and redacts one in the ninth", t => {
-	t.strictEqual(query(nestedUnparseableKey(8)), undefined, "the eighth level is read as written");
-	t.ok(query(nestedUnparseableKey(9))?.includes("REDACTED"), "past the nesting limit a url-opening key counts as holding a credential");
+test("redactedQuery keeps a url-opening key or value eight levels deep, and redacts one in the ninth", t => {
+	t.strictEqual(query(nestedQuery(8, "https://[=1")), undefined, "a key the runtime cannot parse, eighth level, is read as written");
+	t.ok(query(nestedQuery(9, "https://[=1"))?.includes("REDACTED"), "past the nesting limit a url-opening key counts as holding a credential");
+	t.strictEqual(query(nestedQuery(8, "v=https://[")), undefined, "a value the runtime cannot parse, eighth level, is read as written");
+	t.ok(query(nestedQuery(9, "v=https://["))?.includes("REDACTED"), "past the nesting limit a url-opening value counts as holding a credential, parsed or not");
+	t.end();
+});
+
+test("redactedQuery reads a run of userinfo across pairs as a parser does", t => {
+	t.strictEqual(query("\\\\u:p=w@h.test&m=1"), "REDACTED=REDACTED&m=1", "userinfo a backslash opens, across the =");
+	t.strictEqual(query("\\\\u:p&\\\\v&w@h.test&m=1"), "REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&m=1", "a key opening userinfo inside a run joins it");
+	t.strictEqual(query("\\\\u:p&\\\\v=x@a/b&w@h.test"), "REDACTED=REDACTED&REDACTED=REDACTED&w%40h.test=", "the value that closes a run ends it at its last @");
+	t.strictEqual(query("\\\\u&\\\\v=a/b&w@h.test"), undefined, "a delimiter before any @ closes the run, and the run it closes holds no pair");
 	t.end();
 });
 
