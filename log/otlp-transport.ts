@@ -1,6 +1,6 @@
-import { buildLogPayload, buildSpanPayload } from "../otlp/payloads.js";
 import { Queue } from "../otlp/queue/queue.js";
 import type { QueueConf } from "../otlp/queue/queue-types.js";
+import { queueTransport } from "./queue-transport.js";
 import type { Transport } from "../tracing/transport.js";
 
 export type OtlpTransportOptions = Omit<QueueConf, "otlpAdditionalHeaders" | "otlpHttpBaseURI" | "otlpProtocol"> & {
@@ -49,15 +49,5 @@ function queueOf(options: OtlpTransportOptions): Queue {
 
 // Exports each entry and span as an OTLP payload, through a Queue of its own.
 export function otlpTransport(options: OtlpTransportOptions): Transport {
-	const queue = queueOf(options);
-
-	return {
-		entry({ logLevel, metadata, msg, msTimestamp, spanId, traceId }) {
-			queue.enqueue(buildLogPayload({ attributes: metadata, logLevel, msTimestamp, msg, span: { spanId, traceId } }));
-		},
-		flush: () => queue.flush(),
-		span(span) {
-			queue.enqueue(buildSpanPayload(span));
-		},
-	};
+	return queueTransport(queueOf(options));
 }

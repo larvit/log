@@ -1,4 +1,4 @@
-import type { EntryFormatterConf } from "./types.js";
+import type { EntryFormatter, EntryFormatterConf, LogConf } from "./types.js";
 import type { LogLevel } from "../primitives/levels.js";
 import { processEnv } from "../primitives/process-env.js";
 
@@ -60,4 +60,19 @@ export function msgTextFormatter(conf: EntryFormatterConf) {
 // `colors` where the code set none: the process env's choice, or else on.
 export function defaultColors(): boolean {
 	return colorsFromEnv(processEnv()) ?? true;
+}
+
+// The formatter a `format` names: a function is its own, and anything but "json" writes text.
+export function formatterOf(format: unknown): EntryFormatter {
+	if (typeof format === "function") {
+		return format as EntryFormatter;
+	}
+
+	return format === "json" ? msgJsonFormatter : msgTextFormatter;
+}
+
+// The formatter a conf writes with. A Log's own conf always reads one from entryFormatter; the built-in
+// that format names serves a conf built by hand.
+export function resolveFormatter(conf: LogConf): EntryFormatter {
+	return conf.entryFormatter ?? formatterOf(conf.format);
 }

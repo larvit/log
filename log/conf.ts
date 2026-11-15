@@ -1,6 +1,6 @@
 import { attachDefaultQueue, OTLP_ENDPOINT_KEYS, rejectQueueBesideShorthand } from "./default-queue.js";
 import { DEFAULT_LOG_LEVEL, type LogLevel } from "../primitives/levels.js";
-import { defaultColors, msgJsonFormatter, msgTextFormatter } from "./entry-format.js";
+import { defaultColors, formatterOf } from "./entry-format.js";
 import type { EntryFormatter, LogConf, LogOptions, ResolvedLogConf } from "./types.js";
 import { type Metadata, withoutUndefined } from "../primitives/metadata.js";
 import { platformRandomBytes } from "../tracing/traceparent.js";
@@ -97,23 +97,13 @@ const LOG_CONF_KEYS = Object.keys(INHERITED_BY).filter(isLogConfKey);
 // The function formatter of each conf this copy of the library built with one.
 const functionFormatters = new WeakMap<object, EntryFormatter>();
 
-function builtInFormatter(format: LogConf["format"]): EntryFormatter {
-	return format === "json" ? msgJsonFormatter : msgTextFormatter;
-}
-
-// The formatter a conf writes with. A Log's own conf always reads one from entryFormatter; the built-in
-// that format names serves a conf built by hand.
-export function resolveFormatter(conf: LogConf): EntryFormatter {
-	return conf.entryFormatter ?? builtInFormatter(conf.format);
-}
-
 // One descriptor for every instance: README → Footprint's 1 KB budget.
 const ENTRY_FORMATTER_ALIAS: PropertyDescriptor = {
 	configurable: true,
 	// So a spread never hands the alias back as an option the caller wrote.
 	enumerable: false,
 	get(this: ResolvedLogConf): EntryFormatter {
-		return functionFormatters.get(this) ?? builtInFormatter(this.format);
+		return functionFormatters.get(this) ?? formatterOf(this.format);
 	},
 	set(this: ResolvedLogConf, formatter: EntryFormatter) {
 		functionFormatters.set(this, formatter);
