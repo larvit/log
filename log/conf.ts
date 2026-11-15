@@ -135,10 +135,10 @@ function functionFormatterOf(conf: LogConf): EntryFormatter | undefined {
 function formatterWarning(options: LogOptions): string | undefined {
 	if (options.entryFormatter !== undefined) {
 		if (typeof options.format === "string") {
-			return "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use transports: [consoleTransport({ format })] — entryFormatter wins and the format beside it is ignored";
+			return "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use transports: [consoleTransport({ format })], see README → Transports — entryFormatter wins and the format beside it is ignored";
 		}
 
-		return "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use transports: [consoleTransport({ format })]";
+		return "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use transports: [consoleTransport({ format })], see README → Transports";
 	}
 
 	if (typeof options.format === "string" && options.format !== "text" && options.format !== "json") {
@@ -158,7 +158,7 @@ function ownConf(options: LogOptions | LogLevel | "none" | undefined): { conf: L
 	const formatFunction = typeof format === "function" ? format : fromLogConf;
 
 	if (entryFormatter !== undefined && formatFunction !== undefined && formatFunction !== entryFormatter) {
-		throw new Error("entryFormatter and format are two spellings of one formatter: pass only format");
+		throw new Error("entryFormatter and format are two spellings of one formatter: pass it once, to consoleTransport({ format })");
 	}
 
 	const formatter = formatFunction ?? entryFormatter;

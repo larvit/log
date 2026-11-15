@@ -30,7 +30,7 @@ export type LogConf = {
 	colors?: boolean;
 	context?: Metadata;
 
-	/** @deprecated Removed in 3.0.0: pass `format`. On `log.conf`, read {@link resolveFormatter}`(log.conf)` instead; `log.conf.format` holds no function before 3.0.0. */
+	/** @deprecated Removed in 3.0.0: pass `transports` with `consoleTransport({ format })`. On `log.conf`, read {@link resolveFormatter}`(log.conf)` instead; `log.conf.format` holds no function before 3.0.0. */
 	entryFormatter?: EntryFormatter;
 
 	/** @deprecated Removed in 3.0.0: pass `transports` with `consoleTransport({ format })`. */

@@ -251,6 +251,11 @@ since 2.x has no other spelling to move to. Its `@deprecated` tag stays and name
 built by another copy of this module hands its child only a function, its built-in formatters
 included, so writing that child's `conf.format` changes nothing either.
 
+2026-11-15, the implementing agent, correcting the paragraph above: `transports` makes `format` on a
+`Log` a deprecated name too, removed in 3.0.0, so `conf.format` is not where a reader moves to.
+The `@deprecated` tag and the warning name `consoleTransport({ format })` instead; `conf.format`
+still never holds a function before 3.0.0.
+
 2026-10-03, the maintainer, superseding the reason above for reads: a read of `conf.entryFormatter`
 still does not warn, though 2.5.0's `resolveFormatter` replaces it. The reader is almost always a
 library handed a consumer's `Log`, so the warning would reach an app developer who cannot change
