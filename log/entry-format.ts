@@ -1,5 +1,6 @@
 import type { EntryFormatterConf } from "./types.js";
 import type { LogLevel } from "../primitives/levels.js";
+import { processEnv } from "../primitives/process-env.js";
 
 export function msgJsonFormatter(conf: EntryFormatterConf) {
 	// New object: never mutate the caller's metadata. Framework keys win over metadata.
@@ -54,4 +55,9 @@ export function msgTextFormatter(conf: EntryFormatterConf) {
 	}
 
 	return str;
+}
+
+// `colors` where the code set none: the process env's choice, or else on.
+export function defaultColors(): boolean {
+	return colorsFromEnv(processEnv()) ?? true;
 }

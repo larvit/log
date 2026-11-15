@@ -16,7 +16,11 @@ change in your code.
 - **Move `colors`, `format`, `printTraceInfo` and `stdout` to `consoleTransport`, and the `otlp*`
   options to `otlpTransport`, before 3.0.0 removes them.** They work as before on a `Log` with no
   `transports`, and write no warning. `otlpHttpBaseURI`, `otlpAdditionalHeaders` and `otlpProtocol`
-  become `baseUrl`, `headers` and `protocol`, and `otlpTransport` takes what `new Queue()` took.
+  become `baseUrl`, `headers` and `protocol`, and `otlpTransport` takes what `new Queue()` took. Two
+  things change when you move: pass your `stderr` to `consoleTransport` too, since the `Log`'s then
+  takes only this library's warnings, and expect export failure reports on `otlpTransport`'s
+  `report`, `console.error` by default, where the `otlp*` options sent them to the `Log`'s `stderr`.
+  README → Transports → Deprecated options lists each option.
 - **Get a warning, once per `stderr` sink, for a `format` string other than `"text"` or `"json"`.**
   `new Log({ format: process.env.LOG_FORMAT })` wrote text, without a word, for `"pretty"`. It still
   writes text, and now says why.

@@ -15,13 +15,15 @@ export type TransportEntry = {
 	traceId: string;
 };
 
-// An ended span of a sampled trace, with the context of the Log that ended it.
+// An ended span of a sampled trace. `attributes` holds what the span is exported with: the context of
+// the Log that ended it, with `error.type` and, on a log.fetch span, its HTTP attributes.
 export type TransportSpan = { attributes: Metadata, span: OtlpSpan };
 
-// A destination a Log hands entries and spans to. A transport takes a kind of record by having its
-// method, so a kind added later, as an optional method, reaches only the transports written for it.
+// A destination a Log hands entries and spans to. Each kind of record has its own optional method,
+// so a kind added later reaches only the transports that have its method.
 export type Transport = {
 	entry?: (entry: TransportEntry) => void;
-	flush?: () => Promise<void>;
+	// What it returns is awaited, whatever a promise resolves with.
+	flush?: () => unknown;
 	span?: (span: TransportSpan) => void;
 };

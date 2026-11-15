@@ -202,15 +202,14 @@ it. `~/.claude/principles/frontend.md` → Testability and broad device support.
 ### 81. Test export and `log.fetch` against a real server in a browser.
 
 The browser run stubs `globalThis.fetch`, so the 64 KiB `keepalive` cap and the CORS preflight are
-never exercised. `otlpTransport({ fetch })` removes the global swap, not this gap. `~/.claude/principles/frontend.md` →
+never exercised. A `fetch` passed to `otlpTransport` lets a test skip the global swap, but does not close this gap. `~/.claude/principles/frontend.md` →
 testability.
 
 ### 99. Honour a collector's `Retry-After` before retrying a batch.
 
 OTLP/HTTP asks a client to wait as long as a 429 or 503 response's `Retry-After` says. Today the
 queue retries on its own backoff, which can hit a throttling collector again too soon. It adds to
-what the queue does, so it ships in a minor. Retries belong to the OTLP
-transport.
+what the queue does, so it ships in a minor.
 
 ### 86. Set `telemetry.sdk.language` to a semconv value, `nodejs` or `webjs`.
 
@@ -423,7 +422,7 @@ The 3.0.0 half of `transports`, removing what 2.7.0 deprecates: no part of the s
 transport knows or depends on anything OTLP. This takes over item 74's aim, one OTLP representation
 in `conf`: today `log.conf.otlpHttpBaseURI` stays readable beside the `Queue` built from it, and
 `isQueueFor` exists to match the two. Items naming `otlpQueue` or the `OtlpQueue` type, such as 17,
-21, 56 and 77, are reworded to the transport shape.
+21, 56 and 77, still say so and are reworded to the transport shape when each is planned.
 
 ### 62. Remove `entryFormatter`, the option and the `conf` alias of `format` beside it.
 

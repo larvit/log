@@ -33,7 +33,7 @@ export type SpanOrigin = {
 	traceparent?: string,
 };
 
-// What childSpan, spanEnd and exportSpan read of a Log: the Log's clock, randomness, queue, sampled flag and own span.
+// What childSpan, spanEnd and exportSpan read of a Log: the Log's clock, randomness, transports, sampled flag and own span.
 export type SpanHost = Pick<SpanOrigin, "clock" | "randomBytes"> & { sampled: boolean, span: OtlpSpan, transports: readonly Transport[] };
 
 export function openSpan(conf: SpanOrigin): { sampled: boolean, span: OtlpSpan } {

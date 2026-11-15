@@ -24,31 +24,43 @@ Valid while `otlpTransport` exports through a `Queue`.
 
 ## A `Log` sends through a list of transports
 
-2026-11-15, the maintainer, on the spelling eight fresh readers seated from README → Audience
-benched: `transports` lists every destination, `consoleTransport` and `otlpTransport` are factory
-functions, and a transport is an object with optional `entry`, `span` and `flush`. A kind of record
-is a method, so a later kind ships in a minor as one more optional method. The list replaces the
-default one, a child or clone inherits it, and a library author adds to it by spreading
-`parentLog.conf.transports`. Every option the list replaces is deprecated until 3.0.0, the console
-ones included: an option on `Log` that assumes a console transport is implicit, and
-`transports: [consoleTransport({ format: "json" })]` is explicit. A replaced option beside a list,
-its own or an inherited one, throws. The library's own warnings stay on `stderr`, since no
-transport can be trusted to carry them. `otlpTransport` names its endpoint options `baseUrl`,
-`headers` and `protocol`, so the README holds two sets of names until 3.0.0, which the maintainer
-approved against README → Goals #2.
+2026-11-15, the maintainer, on a spelling that eight fresh readers, seated from README → Audience,
+benched:
+
+- `transports` lists every destination. `consoleTransport` and `otlpTransport` are factory
+  functions, and a transport is an object with optional `entry`, `span` and `flush`.
+- Each kind of record has its own method, so a later kind ships in a minor as one more optional
+  method.
+- A list replaces the default one, and a child or clone inherits it. A library author adds to a
+  parent's list by spreading `parentLog.conf.transports`.
+- Every option a list replaces is deprecated until 3.0.0, the console ones included. An option on
+  `Log` that assumes a console transport is implicit;
+  `transports: [consoleTransport({ format: "json" })]` is explicit.
+- A replaced option beside a list throws, whether the list is the `Log`'s own or inherited.
+- The library's own warnings stay on `stderr`, since no transport can be trusted to carry them.
+- `otlpTransport` names its endpoint options `baseUrl`, `headers` and `protocol`. The README so
+  holds two sets of names, against README → Goals #2, until `todo.md` item 97 removes the old set in
+  3.0.0. The maintainer approved that cost.
 
 The implementing agent, same day, on what that leaves open:
 
 - The deprecated options write no warning. Nearly every configured consumer sets one, so a line per
   `stderr` sink would change the output of code that did not change, in a minor. The `@deprecated`
-  tags, the README and the changelog carry it.
-- `log.conf.transports` is unset on a `Log` given no list. Its default list reads `log.conf` at each
-  record, because 2.x documents that a write to `log.conf.format` takes effect from the next line,
-  so the list belongs to that one `Log` and a child must not inherit it.
+  tags, the README and the changelog say it instead.
+- `log.conf.transports` is unset on a `Log` given no list. What such a `Log` sends to is read from
+  `log.conf` at each record, because 2.x documents that a write to `log.conf.format` takes effect
+  from the next line. It is one `Log`'s own, so a child cannot inherit it as a list, and it is built
+  per call so that a `Log` stays within README → Footprint's 1 KB per instance.
+- A clone writes as the `Log` it clones. `plain.clone({ parentLog: listed })` so keeps `plain`'s
+  console options and takes no list from `listed`, also where `plain` was given no option, since a
+  `Log` with no list writes text to the console.
 - Beside a list, `log.conf.colors` and `log.conf.stdout` are not enumerable. `ResolvedLogConf`
-  requires them until 3.0.0, and a spread of a conf passed back as options would otherwise be
-  rejected for holding them.
-- A transport that throws, throws from the call that logged, as a throwing `stdout` does.
+  requires both until 3.0.0, and `new Log({ ...log.conf })` would otherwise throw for holding them.
+- A transport that throws, throws from the call that logged, as a throwing `stdout` does. A `flush()`
+  that rejects, rejects `log.flush()` and `log.end()` once every transport has flushed, as a failed
+  `Queue` flush does in 2.x.
+- `otlpTransport` rewrites the option names in what its `Queue` throws and reports to `baseUrl` and
+  `headers`, the names its caller wrote. The rewrite goes when item 97 leaves one set of names.
 - The `Transport` types sit in `tracing/`, the lowest folder that hands a record over, and both
   shipped transports in `log/`, so every import follows AGENTS → "Working here".
 
