@@ -57,6 +57,14 @@ export function msgTextFormatter(conf: EntryFormatterConf) {
 	return str;
 }
 
+// 3.0.0 follows stdout's TTY flag where neither env var decides. This is the warning for a Log that would change, or
+// undefined where the env or a TTY keeps colour as it is.
+export function colorsDefaultWarning(env: unknown, isTTY: unknown): string | undefined {
+	if (colorsFromEnv(env) !== undefined || isTTY === true) return undefined;
+
+	return "@larvit/log: colors is unset and stdout is no TTY, so text entries carry colour codes, which 3.0.0 turns off here; set colors, or NO_COLOR or FORCE_COLOR, to decide now";
+}
+
 // `colors` where the code set none: the process env's choice, or else on.
 export function defaultColors(): boolean {
 	return colorsFromEnv(processEnv()) ?? true;

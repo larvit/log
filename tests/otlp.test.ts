@@ -1,4 +1,4 @@
-import { callHeader, exportedRecords, exportedSpans, fakeClock, fakeStorage, fetchRecorder, nanos, reportSink, response, storedRecords, stubFetch, thrown, waitFor, withGlobals } from "./test-doubles.js";
+import { callHeader, exportedRecords, exportedSpans, fakeClock, fakeStorage, fetchRecorder, nanos, reportSink, response, storedRecords, thrown, waitFor, withGlobals } from "./test-doubles.js";
 import { type Clock, Log, type Metadata, type OtlpPayload, type OtlpQueue, Queue, type QueueStorage, type TimerHandle } from "../index.js";
 import { encodeBatch } from "../otlp/send/batch.js";
 import { ExportScheduler, transition, unref } from "../otlp/queue/export-scheduler.js";
@@ -39,9 +39,9 @@ test("a transient export failure keeps the batch queued, reports one line and th
 });
 
 test("the Log-built queue reports through the instance's stderr and formatter", async t => {
-	stubFetch(() => response({ status: 400 }));
+	const { fetch } = fetchRecorder(() => response({ status: 400 }));
 	const stderr: string[] = [];
-	const log = new Log({ format: "json", otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: line => stderr.push(line) });
+	const log = new Log({ fetch, format: "json", otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: line => stderr.push(line) });
 
 	log.info("x");
 	await log.flush();
@@ -71,9 +71,9 @@ for (const status of [401, 403]) {
 }
 
 test("a rejected export (4xx) drops the batch, reports one line per batch and does not retry", async t => {
-	const { calls } = stubFetch(() => response({ status: 400 }));
+	const { calls, fetch } = fetchRecorder(() => response({ status: 400 }));
 	const stderr: string[] = [];
-	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: line => stderr.push(line) });
+	const log = new Log({ colors: false, fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: line => stderr.push(line) });
 
 	log.info("x");
 	log.info("y");
@@ -90,10 +90,10 @@ test("a rejected export (4xx) drops the batch, reports one line per batch and do
 });
 
 test("endpoint userinfo authenticates through an Authorization header, never through the url", async t => {
-	const { calls } = stubFetch(() => response({ status: 400 }));
+	const { calls, fetch } = fetchRecorder(() => response({ status: 400 }));
 	const stderr: string[] = [];
 	const endpoint = "http://collector:s3cr%40t%C3%A5@127.0.0.1:4318";
-	const log = new Log({ otlpHttpBaseURI: endpoint, stderr: line => stderr.push(line) });
+	const log = new Log({ colors: false, fetch, otlpHttpBaseURI: endpoint, stderr: line => stderr.push(line) });
 
 	log.info("x");
 	await log.flush();
@@ -103,19 +103,19 @@ test("endpoint userinfo authenticates through an Authorization header, never thr
 	t.strictEqual(stderr.length, 1, "the rejected batch is reported");
 	t.notOk(stderr.join("").includes("s3cr"), "no reported line carries the password");
 
-	const explicit = new Log({ otlpAdditionalHeaders: { authorization: "Bearer token" }, otlpHttpBaseURI: endpoint, stderr: () => {} });
+	const explicit = new Log({ fetch, otlpAdditionalHeaders: { authorization: "Bearer token" }, otlpHttpBaseURI: endpoint, stderr: () => {} });
 
 	explicit.info("y");
 	await explicit.flush();
 	t.strictEqual(callHeader(calls[1], "Authorization"), "Bearer token", "an explicit Authorization header wins over the userinfo, whatever its casing");
 
-	const passwordOnly = new Log({ otlpHttpBaseURI: "http://:t0ken@127.0.0.1:4318", stderr: () => {} });
+	const passwordOnly = new Log({ fetch, otlpHttpBaseURI: "http://:t0ken@127.0.0.1:4318", stderr: () => {} });
 
 	passwordOnly.info("z");
 	await passwordOnly.flush();
 	t.strictEqual(callHeader(calls[2], "Authorization"), "Basic OnQwa2Vu", "an empty user-id still authenticates, as RFC 7617 allows");
 
-	const plain = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+	const plain = new Log({ fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 
 	plain.info("w");
 	await plain.flush();
@@ -178,7 +178,6 @@ for (const conf of [
 
 test("an Authorization sent over plain http: to a non-loopback host warns once per report sink, and still goes", async t => {
 	const { calls, fetch } = fetchRecorder();
-	const viaGlobal = stubFetch();
 	const warning = (source: string, header = "authorization") => `@larvit/log: the ${header} header from ${source} goes over plain http: to collector.test:4318, readable by anything on the network path; use an https: endpoint, or on a network you trust set acceptPlainHttpCredentials: true on the Queue`;
 	const send = async (queue: Queue) => {
 		const log = new Log({ otlpQueue: queue, stderr: () => {} });
@@ -226,8 +225,8 @@ test("an Authorization sent over plain http: to a non-loopback host warns once p
 	const stderr: string[] = [];
 	const toStderr = (line: string) => { stderr.push(line); };
 
-	const first = new Log({ format: "json", otlpHttpBaseURI: "http://collector:s3cret@collector.test:4318", stderr: toStderr });
-	const second = new Log({ format: "json", otlpHttpBaseURI: "http://collector:s3cret@collector.test:4318", stderr: toStderr });
+	const first = new Log({ fetch, format: "json", otlpHttpBaseURI: "http://collector:s3cret@collector.test:4318", stderr: toStderr });
+	const second = new Log({ fetch, format: "json", otlpHttpBaseURI: "http://collector:s3cret@collector.test:4318", stderr: toStderr });
 
 	first.info("x");
 	await first.flush();
@@ -238,11 +237,11 @@ test("an Authorization sent over plain http: to a non-loopback host warns once p
 
 	t.deepEqual({ lines: stderr.length, logLevel, msg }, { lines: 1, logLevel: "warn", msg: warning("user:pass@ in otlpHttpBaseURI") }, "a Log-built queue warns once per stderr, at warn");
 
-	const broken = new Log({ otlpHttpBaseURI: "http://collector:s3cret@collector.test:4318", stderr: () => { throw new Error("stderr closed"); } });
+	const broken = new Log({ fetch, otlpHttpBaseURI: "http://collector:s3cret@collector.test:4318", stderr: () => { throw new Error("stderr closed"); } });
 
 	broken.info("z");
 	t.strictEqual(await broken.flush().then(() => "", err => String(err)), "", "a stderr that throws on the warning never rejects flush()");
-	t.deepEqual({ handed: calls.length, viaGlobal: viaGlobal.calls.length }, { handed: 7, viaGlobal: 3 }, "every request still goes, a hand-built queue's through the fetch it was handed");
+	t.strictEqual(calls.length, 10, "every request still goes, through the one fetch each queue and Log was handed");
 	t.end();
 });
 
@@ -278,9 +277,9 @@ test("every credential header over plain http: warns once, and acceptPlainHttpCr
 });
 
 test("otlpAdditionalHeaders is read per send, and an invalid one fails the export, not the Log", async t => {
-	const { calls } = stubFetch();
+	const { calls, fetch } = fetchRecorder();
 	const rotating = { Authorization: "Bearer first" };
-	const log = new Log({ otlpAdditionalHeaders: rotating, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+	const log = new Log({ fetch, otlpAdditionalHeaders: rotating, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 
 	log.info("x");
 	await log.flush();
@@ -1065,8 +1064,8 @@ test("a custom OtlpQueue receives every record and span, and end() flushes it", 
 		},
 	};
 
-	stubFetch();
-	const log = new Log({ otlpQueue, stderr: () => {} });
+	const { fetch } = fetchRecorder();
+	const log = new Log({ fetch, otlpQueue, stderr: () => {} });
 
 	log.info("hi");
 	await log.fetch("https://api.test/x");
@@ -1089,12 +1088,13 @@ test("OTLP preserves a base path from otlpHttpBaseURI", async t => {
 });
 
 test("OTLP/JSON batches the records into one POST and exports one span sharing trace/span ids", async t => {
-	const { calls } = stubFetch();
+	const { calls, fetch } = fetchRecorder();
 	const clock = fakeClock();
 	const startedAt = clock.now();
 	const log = new Log({
 		clock,
 		context: { region: undefined, "service.name": "eva-bosse" },
+		fetch,
 		otlpHttpBaseURI: "http://127.0.0.1:4318",
 		spanName: "lur-bert",
 		stderr: () => {},
@@ -1986,5 +1986,51 @@ test("a removeItem that throws once the queue empties is reported as a failed wr
 	await queue.flush();
 	await waitFor(() => sink.lines.length > 0);
 	t.deepEqual(sink.lines, [{ error: "removeItem broke", key: "@larvit/log:otlp-queue", msg: "OTLP queue storage write failed" }], "the failed removal is reported with its error");
+	t.end();
+});
+
+test("a Queue option that is NaN, zero or negative warns once per report sink and uses the default", t => {
+	const sink = reportSink();
+	const options = { batchDelayMs: 0, maxBatchBytes: NaN, maxItems: -1, otlpHttpBaseURI: "http://127.0.0.1:4318", report: sink.report, retryDelayMs: 0 };
+	const queue = new Queue(options);
+
+	new Queue(options);
+	t.deepEqual(
+		{ batchDelayMs: queue.conf.batchDelayMs, maxBatchBytes: queue.conf.maxBatchBytes, maxItems: queue.conf.maxItems, retryDelayMs: queue.conf.retryDelayMs },
+		{ batchDelayMs: 1000, maxBatchBytes: 65536, maxItems: 1000, retryDelayMs: 1000 },
+		"each falls to its default",
+	);
+	t.deepEqual(sink.lines.map(line => line.msg), [
+		"@larvit/log: batchDelayMs 0 is not above zero, using 1000",
+		"@larvit/log: maxBatchBytes NaN is not above zero, using 65536",
+		"@larvit/log: maxItems -1 is not above zero, using 1000",
+		"@larvit/log: retryDelayMs 0 is not above zero, using 1000",
+	], "one warning per option, and none again for a second queue on the same sink");
+
+	const valid = reportSink();
+	const kept = new Queue({ batchDelayMs: 5, maxBatchBytes: 10, maxItems: 3, otlpHttpBaseURI: "http://127.0.0.1:4318", report: valid.report, retryDelayMs: 7 });
+
+	t.deepEqual({ batchDelayMs: kept.conf.batchDelayMs, lines: valid.lines.length, maxBatchBytes: kept.conf.maxBatchBytes, maxItems: kept.conf.maxItems, retryDelayMs: kept.conf.retryDelayMs }, { batchDelayMs: 5, lines: 0, maxBatchBytes: 10, maxItems: 3, retryDelayMs: 7 }, "a number above zero is kept, with no warning");
+	t.end();
+});
+
+test("an instance with an otlpQueue and no spanName warns once per stderr sink", t => {
+	const notice = "@larvit/log: spanName is unset on an instance with an otlpQueue, so its span is named \"unnamed-span\"; 3.0.0 throws there, so set spanName";
+	const { fetch } = fetchRecorder();
+	const otlpQueue = new Queue({ fetch, otlpHttpBaseURI: "http://127.0.0.1:4318" });
+	const lines: string[] = [];
+	const stderr = (line: string) => { lines.push(line); };
+	const named = new Log({ colors: false, otlpQueue, spanName: "app", stderr });
+
+	new Log({ colors: false, stderr });
+	named.clone({ spanName: "request" });
+	new Log({ parentLog: named });
+	t.deepEqual(lines, [], "no warning where there is no queue, or where the span is named, set or inherited");
+
+	named.clone();
+	named.clone();
+	new Log({ colors: false, otlpQueue, stderr });
+	t.strictEqual(lines.length, 1, "a clone that leaves spanName unset, and a Log that sets a queue and no name, warn once for the sink");
+	t.ok(lines[0].includes(notice), "and say what 3.0.0 does");
 	t.end();
 });

@@ -1,4 +1,4 @@
-import { callHeader, exportedRecords, exportedSpans, fakeClock, fetchRecorder, stubFetch } from "./test-doubles.js";
+import { callHeader, exportedRecords, exportedSpans, fakeClock, fetchRecorder } from "./test-doubles.js";
 import { formatTraceparent, generateSpanId, generateTraceId, Log, type LogInt, type Metadata, type OtlpSpan, parseTraceparent, Queue } from "../index.js";
 import { pbDecode, pbMsg } from "./protobuf-decode.js";
 import test from "./tap.js";
@@ -158,10 +158,10 @@ test("log.traceparent() emits the current span context", t => {
 });
 
 test("an unsampled traceparent exports records but no spans, passes 00 on and still prints", async t => {
-	const { calls } = stubFetch();
+	const { calls, fetch } = fetchRecorder();
 	const stdout: string[] = [];
 	const traceparent = formatTraceparent(generateTraceId(), generateSpanId(), false);
-	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {}, stdout: line => { stdout.push(line); }, traceparent });
+	const log = new Log({ fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {}, stdout: line => { stdout.push(line); }, traceparent });
 	const child = new Log({ parentLog: log, spanName: "child" });
 	const clone = log.clone({ spanName: "clone" });
 

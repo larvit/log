@@ -52,6 +52,11 @@ Nothing here needs a change in your code.
 - **A query value opening a url nested past eight levels records `REDACTED` even where the runtime
   cannot parse it.** A key there, and a value the runtime parses, already did, so the change only
   redacts more: `https://[` nested nine urls deep was exported as written.
+- **A `Log` warns once when its text output will lose colour in 3.0.0.** It fires when `colors` is unset, stdout is no TTY and neither `NO_COLOR` nor `FORCE_COLOR` is set. Set one of them to decide now.
+- **A `Queue` option that is negative, zero or `NaN` now warns once and uses the default.** `batchDelayMs`, `maxBatchBytes`, `maxItems` and `retryDelayMs` are checked, and the warning goes to the queue's `report` sink.
+- **`log.fetch` leaves a `Request` object untraced and passes it to the platform whole.** Before, it read the `Request`'s url and could drop its method, headers and body. Pass a `string` or a `URL` to have the call traced.
+- **Hand a `Log` the `fetch` it sends through, with the new `fetch` option.** `log.fetch` and the queue built from `otlpHttpBaseURI` send with it, and a child and a clone inherit it. A `Log` handed none still sends through the global `fetch`, read at each call, so a polyfill installed later still wins. See README → Options.
+- **A `Log` warns once when it has an `otlpQueue` and no `spanName`.** 3.0.0 throws there, so name the span now.
 
 ## v2.6.1
 

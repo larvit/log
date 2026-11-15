@@ -33,6 +33,9 @@ export type LogConf = {
 	/** @deprecated Removed in 3.0.0: pass `transports` with `consoleTransport({ format })`. On `log.conf`, read {@link resolveFormatter}`(log.conf)` instead; `log.conf.format` holds no function before 3.0.0. */
 	entryFormatter?: EntryFormatter;
 
+	// What `log.fetch`, and the queue the otlp* shorthand builds, send with. Unset, the global fetch, read at each send.
+	fetch?: typeof fetch;
+
 	/** @deprecated Removed in 3.0.0: pass `transports` with `consoleTransport({ format })`. */
 	format?: "json" | "text";
 	logLevel?: LogLevel | "none";

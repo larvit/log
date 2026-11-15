@@ -49,6 +49,9 @@ class ItemBuffer {
 	}
 }
 
+// The numeric options, with the default each falls to when it is NaN, zero or negative.
+const NUMERIC_DEFAULTS = { batchDelayMs: 1000, maxBatchBytes: KEEPALIVE_MAX_BYTES, maxItems: 1000, retryDelayMs: 1000 } as const;
+
 export class Queue implements OtlpQueue {
 	readonly conf: ResolvedQueueConf;
 
@@ -71,18 +74,28 @@ export class Queue implements OtlpQueue {
 		this.conf = {
 			...conf,
 			acceptPlainHttpCredentials: conf.acceptPlainHttpCredentials === true,
-			batchDelayMs: conf.batchDelayMs ?? 1000,
+			batchDelayMs: conf.batchDelayMs ?? NUMERIC_DEFAULTS.batchDelayMs,
 			clock: conf.clock ?? systemClock,
 			key: conf.key ?? "@larvit/log:otlp-queue",
-			maxBatchBytes: conf.maxBatchBytes ?? KEEPALIVE_MAX_BYTES,
-			maxItems: conf.maxItems ?? 1000,
+			maxBatchBytes: conf.maxBatchBytes ?? NUMERIC_DEFAULTS.maxBatchBytes,
+			maxItems: conf.maxItems ?? NUMERIC_DEFAULTS.maxItems,
 			otlpProtocol: conf.otlpProtocol ?? DEFAULT_OTLP_PROTOCOL,
 			report: conf.report ?? console.error,
-			retryDelayMs: conf.retryDelayMs ?? 1000,
+			retryDelayMs: conf.retryDelayMs ?? NUMERIC_DEFAULTS.retryDelayMs,
 		};
 
 		// A browser's localStorage holds the origin's session tokens, so no stringify or spread may carry it.
 		Object.defineProperty(this.conf, "storage", { configurable: true, enumerable: false, value: conf.storage, writable: true });
+
+		// Such a number would retry at once, drop everything or never flush on size.
+		for (const key of Object.keys(NUMERIC_DEFAULTS) as (keyof typeof NUMERIC_DEFAULTS)[]) {
+			const given = this.conf[key];
+
+			if (typeof given === "number" && !(given > 0)) {
+				this.warnOnceToSink(`@larvit/log: ${key} ${given} is not above zero, using ${NUMERIC_DEFAULTS[key]}`);
+				this.conf[key] = NUMERIC_DEFAULTS[key];
+			}
+		}
 
 		// Validate eagerly: a malformed endpoint or clock fails here, not as an unhandled rejection mid-log.
 		const { clock } = this.conf;

@@ -148,6 +148,8 @@ export function capture(conf?: ConstructorParameters<typeof Log>[0]) {
 	const stdout: string[] = [];
 	const opts: LogOptions = typeof conf === "object" ? { ...conf } : { logLevel: conf };
 
+	// Colour is not what a test of capture's callers is about, and an unset `colors` makes a Log warn on stderr off a TTY.
+	if (opts.colors === undefined) opts.colors = false;
 	opts.stderr = line => { stderr.push(line); };
 	opts.stdout = line => { stdout.push(line); };
 
@@ -188,8 +190,9 @@ export function fetchRecorder(responder?: Responder) {
 	return { calls, fetch: recordingFetch(calls, responder) };
 }
 
-// Replaces the global fetch with a recording one, for a test of code that reads the global: the
-// default a Log-built queue or log.fetch falls back to. The harness restores it after each test.
+// Replaces the global fetch with a recording one, for the test that proves a Log handed no `fetch` reads the
+// global one. Any other test hands its Log or Queue a fetchRecorder's `fetch`. The harness restores the global
+// after each test.
 export function stubFetch(responder?: Responder) {
 	const { calls, fetch } = fetchRecorder(responder);
 

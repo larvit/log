@@ -60,7 +60,11 @@ export class Log implements LogInt {
 		this.context = withoutUndefined(conf.context);
 
 		for (const msg of warnings) {
-			warnOnceToStderr(conf, this.context, msg);
+			try {
+				warnOnceToStderr(conf, this.context, msg);
+			} catch {
+				// A stderr that throws must not stop a Log from being made over a warning.
+			}
 		}
 
 		const { sampled, span } = openSpan(conf);
@@ -199,8 +203,9 @@ export class Log implements LogInt {
 			captureRequestHeaders,
 			captureResponseHeaders,
 			context: this.context,
-			// Read at the call, so a fetch polyfill installed after this Log was made still wins.
-			fetch: (...args) => globalThis.fetch(...args),
+			// Read at the call, so a `conf.fetch` set later, or a polyfill installed after this Log was made, still wins.
+			// The global is called as a method of globalThis, since a browser's fetch throws when detached.
+			fetch: (...args) => this.conf.fetch ? this.conf.fetch(...args) : globalThis.fetch(...args),
 			warn: msg => warnOnceToStderr(this.conf, this.context, msg),
 		};
 	}

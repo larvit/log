@@ -477,7 +477,7 @@ you pass one. A `Log` using the deprecated `otlpHttpBaseURI` moves its `otlp*` o
 | Option | Type | Default | |
 |---|---|---|---|
 | `acceptPlainHttpCredentials` | `boolean` | `false` | Silences the line a credential header over plain `http:` writes, for a collector on a network you trust. |
-| `batchDelayMs` | `number` | `1000` | How long a queued item waits for company before a send. |
+| `batchDelayMs` | `number` | `1000` | How long a queued item waits for company before a send. This and every other number here must be above zero: a negative, zero or `NaN` one warns once per `report` sink and is replaced by the default. |
 | `clock` | `Clock` | system clock | `{ now, setTimeout, clearTimeout }` behind the batch, retry and send-timeout timers. Supply one to control time: a deterministic test, or a corrected `now()`. |
 | `fetch` | `typeof fetch` | the global `fetch` | What the queue sends with. Unset, the global `fetch` is read at each send. |
 | `key` | `string` | `"@larvit/log:otlp-queue"` | The `storage` key. |
@@ -557,9 +557,10 @@ instead.
 | `captureRequestHeaders` | `string[]` | none | `log.fetch` only: request header names to record as `http.request.header.*`. Not every secret in one is redacted — see [Credentials in a captured value](#credentials-in-a-captured-value). An invalid name is skipped, with one `stderr` warning. |
 | `captureResponseHeaders` | `string[]` | none | `log.fetch` only: response header names to record as `http.response.header.*`. Same redaction and invalid-name handling as `captureRequestHeaders`. |
 | `clock` | `Clock` | system clock | `{ now, setTimeout, clearTimeout }` behind every span and entry timestamp. Passed on to the default `Queue`; a `Queue` you build takes its own. |
-| `colors` | `boolean` | `true` | Deprecated, removed in 3.0.0: pass [`transports`](#transports) with `consoleTransport({ colors })`. ANSI colour codes in text output. Unset in code, the env decides: `NO_COLOR` (non-empty) turns it off; otherwise `FORCE_COLOR` turns it on, except `0` or `false` which turn it off. |
+| `colors` | `boolean` | `true` | Deprecated, removed in 3.0.0: pass [`transports`](#transports) with `consoleTransport({ colors })`. ANSI colour codes in text output. Unset in code, the env decides: `NO_COLOR` (non-empty) turns it off; otherwise `FORCE_COLOR` turns it on, except `0` or `false` which turn it off. With none of these set and stdout no TTY, colour is on until 3.0.0 turns it off there, and the `Log` warns of that once per `stderr` sink; set `colors`, `NO_COLOR` or `FORCE_COLOR` to decide now. |
 | `context` | `MetadataInput` | `{}` | Added to every entry. Wins over a per-call key of the same name. An `undefined` key is dropped, so `log.conf.context` reads back as `Metadata`. |
 | `entryFormatter` | `EntryFormatter` | none | Deprecated, removed in 3.0.0: pass [`transports`](#transports) with `consoleTransport({ format })`. Warns once per `stderr` sink. Wins over a `"text"`/`"json"` `format`; two different formatters, one per spelling, throw. On `log.conf` it reads the formatter in use, and writing it swaps it. |
+| `fetch` | `typeof fetch` | the global `fetch` | What `log.fetch` sends with, and the queue built from `otlpHttpBaseURI`. Unset, the global `fetch` is read at each call. A child and a clone inherit it. It is not the method `log.fetch`, which adds the span. |
 | `format` | `"json" \| "text" \| EntryFormatter` | `"text"` | Deprecated, removed in 3.0.0: pass [`transports`](#transports) with `consoleTransport({ format })`. Console output format, or a formatter of your own. Any other string writes text and warns once per `stderr` sink. Use the entry's `msTimestamp` rather than `new Date()` so console and OTLP timestamps of one entry match. `log.conf.format` never holds a function before 3.0.0; `resolveFormatter(log.conf)` reads the formatter in use, as `log.conf.entryFormatter` does until 3.0.0. Writing `"text"` or `"json"` to `log.conf.format` takes effect from the next line, unless a function formatter is set, which wins. |
 | `logLevel` | `LogLevel \| "none"` | `"info"` | Minimum level to output. Any other value is kept as written, logs at `"info"` and warns once per `stderr` sink and value. |
 | `otlpAdditionalHeaders` | `Record<string, string>` | none | Deprecated, removed in 3.0.0: pass [`transports`](#transports) with `otlpTransport({ headers })`. Shorthand: the same option on the default `Queue`, see [Queue exports](#queue-exports). Not inherited by a child or clone whose `otlpHttpBaseURI` has another origin (scheme, host and port) than its source's. |
@@ -569,7 +570,7 @@ instead.
 | `parentLog` | `LogInt` | none | Nest under this instance's span and inherit its options except `traceparent`. Log entries attach to the parent's span. |
 | `printTraceInfo` | `boolean` | `false` | Deprecated, removed in 3.0.0: pass [`transports`](#transports) with `consoleTransport({ printTraceInfo })`. Append `spanId`, `traceId` and `spanName` to console output. |
 | `randomBytes` | `(size: number) => Uint8Array` | Web Crypto, else `Math.random` | Returns `size` random bytes for each trace and span id the `Log` makes. Supply one for deterministic ids in a test. Return exactly `size` bytes, and never all zeros: W3C Trace Context makes an all-zero id invalid, so a receiver drops it. Children and clones inherit it. |
-| `spanName` | `string` | `"unnamed-span"` | The instance's span name. Inherited from `parentLog` when set there. |
+| `spanName` | `string` | `"unnamed-span"` | The instance's span name. Inherited from `parentLog` when set there. An instance with an `otlpQueue` that leaves it unset warns once per `stderr` sink, since 3.0.0 throws there. |
 | `stderr` | `(msg: string) => void` | `console.error` | Sink for this library's own warnings. Without `transports`, also for `error` and `warn`. |
 | `stdout` | `(msg: string) => void` | `console.log` | Deprecated, removed in 3.0.0: pass [`transports`](#transports) with `consoleTransport({ stdout })`. Sink for the other levels. |
 | `traceparent` | `string` | none | Incoming W3C `traceparent` to nest under; an unsampled one (`00`) drops spans, not log entries. Ignored when malformed or when `parentLog` is set. |
@@ -613,7 +614,7 @@ server to list it in `Access-Control-Allow-Headers`.
 Only a URL that resolves to `http:` or `https:` is traced — a relative one resolves against the
 page, so it is untraced where there is no page, as on a server, and where the page is not
 `http:`/`https:`, as under a `file:` or app-scheme origin. Anything else passes straight through to
-an untraced `fetch`: no span, and no `traceparent` sent.
+an untraced `fetch`: no span, and no `traceparent` sent. A `Request` object passes through the same way, whole and untouched: pass a `string` or a `URL` to have the call traced.
 
 Span attributes follow the OpenTelemetry HTTP semantic conventions:
 
