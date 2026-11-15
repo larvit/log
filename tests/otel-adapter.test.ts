@@ -1,5 +1,5 @@
 import { type Context, context, type ContextManager, ROOT_CONTEXT, SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
-import { fakeClock, nanos, thrown } from "./test-doubles.js";
+import { fakeClock, nanos, thrown, withGlobals } from "./test-doubles.js";
 import { Log, type LogOptions, type OtlpPayload, type TransportSpan } from "../index.js";
 import { logTracerProvider, runWithLog } from "../otel.js";
 import test from "./tap.js";
@@ -57,7 +57,7 @@ function requestLog(options: LogOptions = {}) {
 }
 
 test("a span recorded inside runWithLog is handed to the Log's transports, under the Log's span", async t => {
-	const { clock, log, spans } = requestLog();
+	const { clock, log, spans, stderr } = requestLog();
 
 	await runWithLog(log, async () => {
 		const span = pgTracer.startSpan("SELECT orders", { attributes: { "db.rows": 3, "db.system.name": "postgresql" }, kind: SpanKind.CLIENT });
@@ -101,6 +101,27 @@ test("a span recorded inside runWithLog is handed to the Log's transports, under
 	}]);
 	t.ok(/^[0-9a-f]{16}$/.test(spans[0]?.span.spanId ?? ""));
 	t.notStrictEqual(spans[0]?.span.spanId, log.span.spanId);
+	t.deepEqual(stderr, []);
+});
+
+test("startActiveSpan takes options, and a context in place of the active one", t => {
+	const active = requestLog();
+	const handed = requestLog();
+	const handedContext = runWithLog(handed.log, () => context.active());
+
+	runWithLog(active.log, () => {
+		pgTracer.startActiveSpan("with options", { kind: SpanKind.CLIENT }, span => span.end());
+		t.strictEqual(pgTracer.startActiveSpan("with a context", { kind: SpanKind.SERVER }, handedContext, span => {
+			pgTracer.startSpan("nested").end();
+			span.end();
+
+			return "returned";
+		}), "returned");
+	});
+
+	t.deepEqual(active.spans.map(({ span }) => [span.name, span.kind]), [["with options", 3]]);
+	t.deepEqual(handed.spans.map(({ span }) => [span.name, span.kind, span.parentSpanId === handed.log.span.spanId]), [["nested", 1, false], ["with a context", 2, true]]);
+	t.strictEqual(handed.spans[0]?.span.parentSpanId, handed.spans[1]?.span.spanId);
 });
 
 test("a span started while another is active nests under it, as does a later sibling under the Log", t => {
@@ -246,6 +267,27 @@ test("a number below the process's start is read as performance.now()", t => {
 	t.ok(Math.abs(endMs - startMs - 0.25) < 0.01, `lasted ${endMs - startMs}`);
 });
 
+test("a number equal to the process's start is an epoch", t => {
+	const { log, spans } = requestLog();
+	const epochMs = Math.ceil(performance.timeOrigin);
+
+	withGlobals({ performance: { timeOrigin: epochMs } }, () => {
+		runWithLog(log, () => pgTracer.startSpan("at the start", { startTime: epochMs }).end(epochMs));
+	});
+
+	t.strictEqual(spans[0]?.span.startTimeUnixNano, `${epochMs}000000`);
+});
+
+test("on a runtime with no performance global, every number is an epoch", t => {
+	const { log, spans } = requestLog();
+
+	withGlobals({ performance: undefined }, () => {
+		runWithLog(log, () => pgTracer.startSpan("early", { startTime: 1500 }).end(1501));
+	});
+
+	t.deepEqual([spans[0]?.span.startTimeUnixNano, spans[0]?.span.endTimeUnixNano], ["1500000000", "1501000000"]);
+});
+
 test("events, links and attribute values OTLP's stringValue cannot hold are left out and counted", t => {
 	const { log, spans } = requestLog();
 	const link = { context: { spanId: "b7ad6b7169203331", traceFlags: 1, traceId: "0af7651916cd43dd8448eb211c80319c" } };
@@ -257,6 +299,8 @@ test("events, links and attribute values OTLP's stringValue cannot hold are left
 		span.recordException(new Error("boom"));
 		span.addLink(link).addLinks([link, link]);
 		span.setAttributes({ alsoKept: 1, list: ["a"], missing: undefined });
+		// OpenTelemetry's API ignores a null, which its types leave out.
+		span.setAttribute("absent", null as unknown as string);
 		span.end();
 	});
 
