@@ -77,10 +77,10 @@ test("consoleTransport takes the console options: format, colors, printTraceInfo
 	t.strictEqual(JSON.parse(stderr[0]).msg, "err", "warn goes to stderr");
 
 	const plain: string[] = [];
-	const text = new Log({ transports: [consoleTransport({ colors: false, format: entry => `${entry.colors}|${entry.msg}`, stdout: line => { plain.push(line); } })] });
+	const text = new Log({ transports: [consoleTransport({ colors: false, format: entry => `${entry.colors}|${entry.msg}|${JSON.stringify(entry.metadata)}`, stdout: line => { plain.push(line); } })] });
 
-	text.info("x");
-	t.deepEqual(plain, ["false|x"], "a function format is handed the entry and the transport's colors");
+	text.info("x", { orderId: "o1" });
+	t.deepEqual(plain, ["false|x|{\"orderId\":\"o1\"}"], "a function format is handed the entry, its metadata and the transport's colors");
 	t.end();
 });
 
@@ -289,6 +289,7 @@ test("transports that is not a list of transport objects throws, saying what it 
 
 	t.strictEqual(thrown(() => new Log({ transports: Object(consoleTransport()) as [] })), expected, "a bare transport");
 	t.strictEqual(thrown(() => new Log({ transports: [Object(consoleTransport) as object] })), expected, "a factory that was not called");
+	t.strictEqual(thrown(() => new Log({ transports: [Object(null) as object, JSON.parse("null") as object] })), expected, "a null in the list");
 	t.end();
 });
 
@@ -300,7 +301,7 @@ test("an option beside an inherited list throws, saying the list is inherited", 
 	t.end();
 });
 
-test("otlpTransport names its own options in what it throws and reports", t => {
+test("otlpTransport names its own options in what it throws and reports", async t => {
 	const reports: string[] = [];
 
 	t.strictEqual(thrown(() => otlpTransport({ baseUrl: "collector.example.com" })), "Error: baseUrl is not a valid URI; it needs an http:// or https:// prefix, and any / ? # \\ in a password percent-encoded", "a baseUrl without a scheme");
@@ -308,5 +309,12 @@ test("otlpTransport names its own options in what it throws and reports", t => {
 	t.strictEqual(reports.length, 1, "both credential spellings warn once");
 	t.ok(reports[0].startsWith("@larvit/log: baseUrl carries user:pass@ and headers sets Authorization, so the headers one is sent"), `in the transport's names, got ${reports[0]}`);
 	t.strictEqual(reports[0].includes("otlp"), false, "and none of the queue's");
+
+	const plain: string[] = [];
+	const transport = otlpTransport({ baseUrl: "http://collector.example.com", fetch: () => Promise.resolve(new Response(null, { status: 200 })), headers: { Authorization: "Bearer t" }, report: line => { plain.push(line); } });
+
+	transport.entry?.({ logLevel: "info", metadata: {}, msTimestamp: 0, msg: "x", spanId: "", spanName: "", traceId: "" });
+	await transport.flush?.();
+	t.ok(plain.some(line => line.endsWith("set acceptPlainHttpCredentials: true on otlpTransport")), `the plain-http warning says where to accept it, got ${plain.join(" | ")}`);
 	t.end();
 });
