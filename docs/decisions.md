@@ -554,7 +554,7 @@ and the `Log` handed over explicitly at the request's edge. What that left open:
   `timeInputToHrTime` in `@opentelemetry/core` reads it, since instrumentation is written against
   that SDK.
 - **The adapter reads the `Log`'s transports from its documented fields.** `RecordedSpan.end`
-  calls `log/deprecated-options/default-transports.ts` → `transportsOf(log.conf)` and hands the
+  calls `log/transport.ts` → `transportsOf(log.conf)` and hands the
   list, with `log.sampled`, to `tracing/spans.ts` → `exportSpan`. `Log` builds its own list with
   the same function, so the rule "`transports`, or else what the deprecated options make" has one
   home. A method on `Log` for the hand-off would add a public member, and README → Goals #2 counts

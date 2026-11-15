@@ -28,7 +28,7 @@ export function rejectQueueBesideShorthand(conf: LogConf): void {
 	}
 }
 
-// The one write to a conf after its defaults are set. The queue warns through the conf, and can warn
+// The last write to a conf as it is built. The queue warns through the conf, and can warn
 // while the queue is being built, so the conf has to exist first.
 export function attachDefaultQueue(conf: ResolvedLogConf): void {
 	if (!conf.otlpQueue && conf.otlpHttpBaseURI) {

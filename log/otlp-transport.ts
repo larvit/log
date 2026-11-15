@@ -1,7 +1,7 @@
 import { Queue } from "../otlp/queue/queue.js";
 import type { QueueConf } from "../otlp/queue/queue-types.js";
 import { queueTransport } from "./queue-transport.js";
-import type { Transport } from "../tracing/transport.js";
+import type { Transport } from "./transport.js";
 
 export type OtlpTransportOptions = Omit<QueueConf, "otlpAdditionalHeaders" | "otlpHttpBaseURI" | "otlpProtocol"> & {
 	// Entries are POSTed to /v1/logs under it, and spans to /v1/traces.

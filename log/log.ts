@@ -7,8 +7,7 @@ import type { LogInt, LogOptions, ResolvedLogConf } from "./types.js";
 import { type Metadata, type MetadataInput, withoutUndefined } from "../primitives/metadata.js";
 import type { OtlpSpan } from "../otlp/payloads.js";
 import { resolveConf } from "./conf.js";
-import type { Transport } from "../tracing/transport.js";
-import { transportsOf } from "./deprecated-options/default-transports.js";
+import { type Transport, transportsOf } from "./transport.js";
 import { warnOnceToStderr, writeStderr } from "./stderr-lines.js";
 import { writeOnce } from "../primitives/once-per-sink.js";
 

@@ -15,15 +15,19 @@ type Source = { conf: LogConf, context?: Metadata };
 
 const CHILD_AND_CLONE: readonly Derivation[] = ["child", "clone"];
 
-// Which derivations take a key from their source when the caller leaves it unset.
+// What a child or clone inherits, stated from here down to `inherited`: each key the caller leaves
+// unset, taken from its source where INHERITED_BY lists the derivation, unless keptOut keeps it out.
+// A clone's source is the Log it clones, and a child's is its parentLog. A clone given a parentLog
+// takes from the Log it clones first, then from the parent what both leave unset.
 const INHERITED_BY: { [K in keyof LogConf]-?: readonly Derivation[] } = {
 	captureQuery: CHILD_AND_CLONE,
 	captureRequestHeaders: CHILD_AND_CLONE,
 	captureResponseHeaders: CHILD_AND_CLONE,
 	clock: CHILD_AND_CLONE,
 	colors: CHILD_AND_CLONE,
-	// A clone merges its source's live `context` per key instead.
+	// A clone merges its source's live `context` with the caller's, key by key, instead.
 	context: ["child"],
+	// handedDown says which formatter a source hands down here.
 	entryFormatter: CHILD_AND_CLONE,
 	format: CHILD_AND_CLONE,
 	logLevel: CHILD_AND_CLONE,
@@ -42,9 +46,25 @@ const INHERITED_BY: { [K in keyof LogConf]-?: readonly Derivation[] } = {
 	transports: CHILD_AND_CLONE,
 };
 
-// What a conf, the caller's or a clone's, keeps a source from handing down, so the two never mix:
-// a list keeps out every option it replaces, and such an option keeps out the list.
-function keysTransportsKeepOut(conf: LogConf): (keyof LogConf)[] {
+function isLogConfKey(key: string): key is keyof LogConf {
+	return Object.prototype.hasOwnProperty.call(INHERITED_BY, key);
+}
+
+const LOG_CONF_KEYS = Object.keys(INHERITED_BY).filter(isLogConfKey);
+
+// The keys `conf` doesn't inherit, though it leaves them unset. Each rule keeps a setting the caller
+// gave from mixing with the source's spelling of it, and no rule depends on another.
+function keptOut(conf: LogConf, sourceConf: LogConf): Set<keyof LogConf> {
+	return new Set([...keptOutByFormatter(conf), ...keptOutByTransports(conf), ...keptOutByEndpoint(conf, sourceConf)]);
+}
+
+// A formatter, in either key, replaces the source's in both.
+function keptOutByFormatter(conf: LogConf): (keyof LogConf)[] {
+	return conf.format !== undefined || conf.entryFormatter !== undefined ? ["format", "entryFormatter"] : [];
+}
+
+// A list keeps out every option it replaces, and such an option keeps out the list.
+function keptOutByTransports(conf: LogConf): (keyof LogConf)[] {
 	const replaced = REPLACED_BY_TRANSPORTS.map(([key]) => key);
 
 	if (conf.transports) {
@@ -54,12 +74,63 @@ function keysTransportsKeepOut(conf: LogConf): (keyof LogConf)[] {
 	return replaced.some(key => conf[key] !== undefined) ? ["transports"] : [];
 }
 
-function isLogConfKey(key: string): key is keyof LogConf {
-	return Object.prototype.hasOwnProperty.call(INHERITED_BY, key);
+// A queue stays only beside the endpoint it was built from; headers only beside their endpoint's origin.
+function keptOutByEndpoint(conf: LogConf, sourceConf: LogConf): (keyof LogConf)[] {
+	if (conf.otlpQueue) {
+		return [...OTLP_ENDPOINT_KEYS];
+	}
+
+	if (!OTLP_ENDPOINT_KEYS.some(key => conf[key] !== undefined)) {
+		return [];
+	}
+
+	if (conf.otlpHttpBaseURI === undefined || sourceConf.otlpHttpBaseURI === undefined || sameOrigin(conf.otlpHttpBaseURI, sourceConf.otlpHttpBaseURI)) {
+		return ["otlpQueue"];
+	}
+
+	return ["otlpAdditionalHeaders", "otlpQueue"];
 }
 
-const LOG_CONF_KEYS = Object.keys(INHERITED_BY).filter(isLogConfKey);
+function sameOrigin(uri: string, other: string): boolean {
+	try {
+		return new URL(uri).origin === new URL(other).origin;
+	} catch {
+		return false;
+	}
+}
 
+// The conf to read `key` off. It is the source's own conf, not a spread of it, since a hand-written
+// LogInt's conf may hold a key behind a getter, which a spread drops. Only entryFormatter differs: a
+// conf built here reads back a built-in formatter there, which functionFormatterOf leaves out, so a
+// child or clone follows its own format.
+function handedDown(sourceConf: LogConf, key: keyof LogConf): LogConf {
+	return key === "entryFormatter" ? { entryFormatter: functionFormatterOf(sourceConf) } : sourceConf;
+}
+
+// Generic over the key, so the compiler sees one value type on both sides.
+function copyKey<K extends keyof LogConf>(target: LogConf, source: LogConf, key: K): void {
+	target[key] = source[key];
+}
+
+function inherited(conf: LogConf, source: Source, derivation: Derivation): LogConf {
+	const skip = keptOut(conf, source.conf);
+	const taken: LogConf = {};
+
+	for (const key of LOG_CONF_KEYS) {
+		const from = handedDown(source.conf, key);
+
+		if (INHERITED_BY[key].includes(derivation) && !skip.has(key) && conf[key] === undefined && from[key] !== undefined) {
+			copyKey(taken, from, key);
+		}
+	}
+
+	return {
+		...conf,
+		...taken,
+		// The source's `context` is live, so a caller may have written an undefined into it.
+		...derivation === "clone" ? { context: withoutUndefined({ ...source.context, ...conf.context }) } : {},
+	};
+}
 
 // The caller's options as a conf. A Log's own conf passed as options hands on its function formatter
 // only unspread: a spread drops the non-enumerable entryFormatter accessor.
@@ -88,72 +159,14 @@ function ownConf(options: LogOptions | LogLevel | "none" | undefined): { conf: L
 	return { conf, warning: formatterWarning(copy) };
 }
 
-function sameOrigin(uri: string, other: string): boolean {
-	try {
-		return new URL(uri).origin === new URL(other).origin;
-	} catch {
-		return false;
-	}
-}
-
-// A queue stays only beside the endpoint it was built from; headers only beside their endpoint's origin.
-function otlpKeysNotToInherit(conf: LogConf, sourceConf: LogConf): (keyof LogConf)[] {
-	if (conf.otlpQueue) {
-		return [...OTLP_ENDPOINT_KEYS];
-	}
-
-	if (!OTLP_ENDPOINT_KEYS.some(key => conf[key] !== undefined)) {
-		return [];
-	}
-
-	if (conf.otlpHttpBaseURI === undefined || sourceConf.otlpHttpBaseURI === undefined || sameOrigin(conf.otlpHttpBaseURI, sourceConf.otlpHttpBaseURI)) {
-		return ["otlpQueue"];
-	}
-
-	return ["otlpAdditionalHeaders", "otlpQueue"];
-}
-
-// Generic over the key, so the compiler sees one value type on both sides.
-function copyKey<K extends keyof LogConf>(target: LogConf, source: LogConf, key: K): void {
-	target[key] = source[key];
-}
-
-function inherited(conf: LogConf, source: Source, derivation: Derivation): LogConf {
-	const skip = new Set([...otlpKeysNotToInherit(conf, source.conf), ...keysTransportsKeepOut(conf)]);
-
-	// The caller's formatter, in either key, replaces the source's in both.
-	if (conf.format !== undefined || conf.entryFormatter !== undefined) {
-		skip.add("format");
-		skip.add("entryFormatter");
-	}
-
-	const taken: LogConf = {};
-
-	for (const key of LOG_CONF_KEYS) {
-		// Read each key off source.conf, not a spread of it: a hand-written LogInt's conf may hold a key
-		// behind a getter, which a spread drops. entryFormatter goes through functionFormatterOf, which
-		// leaves out the built-in formatter a conf built here reads back.
-		const from = key === "entryFormatter" ? { entryFormatter: functionFormatterOf(source.conf) } : source.conf;
-
-		if (INHERITED_BY[key].includes(derivation) && !skip.has(key) && conf[key] === undefined && from[key] !== undefined) {
-			copyKey(taken, from, key);
-		}
-	}
-
-	return {
-		...conf,
-		...taken,
-		// The source's `context` is live, so a caller may have written an undefined into it.
-		...derivation === "clone" ? { context: withoutUndefined({ ...source.context, ...conf.context }) } : {},
-	};
-}
-
 // Only undefined is unset: a null is kept, so the check for a bad value still sees it.
 function orDefault<T>(value: T | undefined, fallback: T): T {
 	return value === undefined ? fallback : value;
 }
 
-
+// The conf with its defaults, built in one object literal. What a literal can't spell follows it:
+// two keys made non-enumerable, and the entryFormatter accessor, which attachFormatter explains. The
+// conf stays writable: a write to `log.conf` takes effect, as 2.x documents.
 function withDefaults(given: LogConf): ResolvedLogConf {
 	const { entryFormatter, ...rest } = given;
 	const conf = {
@@ -179,7 +192,9 @@ function withDefaults(given: LogConf): ResolvedLogConf {
 	return conf;
 }
 
-// A clone passes the Log it clones as cloneOf.
+// A Log's conf, in four steps: the caller's options; what they leave unset, inherited from the Log a
+// clone clones and then from parentLog; the defaults; and last the queue the otlp* shorthand builds,
+// since it warns through the finished conf. A clone passes the Log it clones as cloneOf.
 export function resolveConf(options: LogOptions | LogLevel | "none" | undefined, cloneOf?: Source): { conf: ResolvedLogConf, warnings: string[] } {
 	const { conf: own, warning } = ownConf(options);
 

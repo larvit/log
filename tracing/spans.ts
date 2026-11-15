@@ -4,7 +4,6 @@ import { failureMessage } from "../credentials/span-values.js";
 import type { Metadata } from "../primitives/metadata.js";
 import { numberFieldAsString, stringField } from "../primitives/field-reads.js";
 import { parseTraceparent, spanIdFrom, traceIdFrom } from "./traceparent.js";
-import type { Transport } from "./transport.js";
 
 // A span just opened: it starts and ends at `startedAt`, in nanoseconds, and doesn't carry any attributes, events or links yet.
 export function newSpan(fields: Pick<OtlpSpan, "kind" | "name" | "parentSpanId" | "spanId" | "traceId">, startedAt: string): OtlpSpan {
@@ -32,8 +31,14 @@ export type SpanOrigin = {
 	traceparent?: string,
 };
 
+// An ended span of a sampled trace, as a transport is handed it. `attributes` holds what the span is
+// exported with: the context of the Log that ended it, with `error.type` and, on a log.fetch span,
+// its HTTP attributes.
+export type TransportSpan = { attributes: Metadata, span: OtlpSpan };
+
 // What childSpan, spanEnd and exportSpan read of a Log: the Log's clock, randomness, transports, sampled flag and own span.
-export type SpanHost = Pick<SpanOrigin, "clock" | "randomBytes"> & { sampled: boolean, span: OtlpSpan, transports: readonly Transport[] };
+// Of each transport, only its `span` method, out of the Transport contract in log/transport.ts.
+export type SpanHost = Pick<SpanOrigin, "clock" | "randomBytes"> & { sampled: boolean, span: OtlpSpan, transports: readonly { span?: (span: TransportSpan) => void }[] };
 
 export function openSpan(conf: SpanOrigin): { sampled: boolean, span: OtlpSpan } {
 	const incoming = !conf.parentLog && conf.traceparent ? parseTraceparent(conf.traceparent) : null;

@@ -12,4 +12,4 @@ export type { OtlpAttribute, OtlpLogPayload, OtlpPayload, OtlpScope, OtlpSpan, O
 export type { OtlpQueue, QueueConf, QueueStorage, ResolvedQueueConf } from "./otlp/queue/queue-types.js";
 export { otlpTransport, type OtlpTransportOptions } from "./log/otlp-transport.js";
 export { Queue } from "./otlp/queue/queue.js";
-export type { Transport, TransportEntry, TransportSpan } from "./tracing/transport.js";
+export type { Transport, TransportEntry, TransportSpan } from "./log/transport.js";
