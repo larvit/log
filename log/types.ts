@@ -3,12 +3,15 @@ import type { LogLevel } from "../primitives/levels.js";
 import type { Metadata, MetadataInput } from "../primitives/metadata.js";
 import type { OtlpQueue } from "../otlp/queue/queue-types.js";
 import type { OtlpSpan } from "../otlp/payloads.js";
+import type { Transport } from "../tracing/transport.js";
 
 export type EntryFormatter = (entry: EntryFormatterConf) => string;
 
 /** @deprecated Renamed in 3.0.0: use {@link LogEntry}. */
 export type EntryFormatterConf = {
 	// The instance's resolved `colors`. Unset means on.
+
+	/** @deprecated Removed in 3.0.0: pass `transports` with `consoleTransport({ colors })`. */
 	colors?: boolean;
 	logLevel: LogLevel;
 	metadata?: Metadata;
@@ -29,21 +32,38 @@ export type LogConf = {
 
 	/** @deprecated Removed in 3.0.0: pass `format`. On `log.conf`, read {@link resolveFormatter}`(log.conf)` instead; `log.conf.format` holds no function before 3.0.0. */
 	entryFormatter?: EntryFormatter;
+
+	/** @deprecated Removed in 3.0.0: pass `transports` with `consoleTransport({ format })`. */
 	format?: "json" | "text";
 	logLevel?: LogLevel | "none";
+
+	/** @deprecated Removed in 3.0.0: pass `transports` with `otlpTransport({ headers })`. */
 	otlpAdditionalHeaders?: Record<string, string>;
+
+	/** @deprecated Removed in 3.0.0: pass `transports` with `otlpTransport({ baseUrl })`. */
 	otlpHttpBaseURI?: string;
+
+	/** @deprecated Removed in 3.0.0: pass `transports` with `otlpTransport({ protocol })`. */
 	otlpProtocol?: "http/json" | "http/protobuf";
+
+	/** @deprecated Removed in 3.0.0: pass `transports` with `otlpTransport()`. */
 	otlpQueue?: OtlpQueue;
 	parentLog?: LogInt;
+
+	/** @deprecated Removed in 3.0.0: pass `transports` with `consoleTransport({ printTraceInfo })`. */
 	printTraceInfo?: boolean;
 
 	// Returns `size` random bytes for a trace or span id. Unset, Web Crypto, else `Math.random`.
 	randomBytes?: (size: number) => Uint8Array;
 	spanName?: string;
 	stderr?: (msg: string) => void;
+
+	/** @deprecated Removed in 3.0.0: pass `transports` with `consoleTransport({ stdout })`. */
 	stdout?: (msg: string) => void;
 	traceparent?: string;
+
+	// Every destination entries and spans go to. Unset, the default list: the console, and OTLP where an otlp* option is set.
+	transports?: readonly Transport[];
 };
 
 export type ResolvedLogConf = LogConf & Required<Pick<LogConf, "clock" | "colors" | "entryFormatter" | "logLevel" | "randomBytes" | "stderr" | "stdout">>;

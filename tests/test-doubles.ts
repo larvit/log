@@ -1,3 +1,4 @@
+import { buildSpanPayload } from "../otlp/payloads.js";
 import { type FetchTrace, traceFetch } from "../tracing/fetch.js";
 import { Log, type LogOptions, type Metadata, type OtlpQueue, type QueueStorage, type TimerHandle } from "../index.js";
 import { openSpan } from "../tracing/spans.js";
@@ -167,7 +168,7 @@ type Responder = (path: string, body: unknown) => StubResponse | Promise<StubRes
 type RecordedCall = { body: any, contentType: string | null, headers: any, keepalive: unknown, method?: string, path: string, rawBody: any, url: string };
 
 // A fetch that records each call in `calls` and answers with `responder`'s response, else a 200.
-function recordingFetch(calls: RecordedCall[], responder?: Responder): typeof fetch {
+export function recordingFetch(calls: RecordedCall[], responder?: Responder): typeof fetch {
 	return (async (url: string, init: { body?: any, headers?: HeadersInit, keepalive?: boolean, method?: string } = {}) => {
 		const contentType = new Headers(init.headers ?? {}).get("Content-Type");
 		const path = new URL(String(url)).pathname;
@@ -213,10 +214,10 @@ export function testFetchTrace(over: Partial<FetchTrace> = {}, responder?: Respo
 		clock,
 		context: { "service.name": "svc" },
 		fetch: recordingFetch(calls, responder),
-		otlpQueue,
 		randomBytes,
 		sampled,
 		span,
+		transports: [{ span: ended => { otlpQueue.enqueue(buildSpanPayload(ended)); } }],
 		warn: msg => { warnings.push(msg); },
 		...over,
 	};

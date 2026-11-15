@@ -129,7 +129,7 @@ export function buildLogPayload(opts: {
 	logLevel: LogLevel,
 	msg: string,
 	msTimestamp: number,
-	span: OtlpSpan,
+	span: Pick<OtlpSpan, "spanId" | "traceId">,
 }): OtlpLogPayload {
 	const { attributes, logLevel, msTimestamp, msg, span } = opts;
 

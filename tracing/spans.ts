@@ -1,10 +1,10 @@
-import { attributesOf, buildSpanPayload, getNsTimestamp, type OtlpSpan, SPAN_KIND_INTERNAL, STATUS_CODE_ERROR, STATUS_CODE_UNSET } from "../otlp/payloads.js";
+import { attributesOf, getNsTimestamp, type OtlpSpan, SPAN_KIND_INTERNAL, STATUS_CODE_ERROR, STATUS_CODE_UNSET } from "../otlp/payloads.js";
 import type { Clock } from "../primitives/clock.js";
 import { failureMessage } from "../credentials/span-values.js";
 import type { Metadata } from "../primitives/metadata.js";
 import { numberFieldAsString, stringField } from "../primitives/field-reads.js";
-import type { OtlpQueue } from "../otlp/queue/queue-types.js";
 import { parseTraceparent, spanIdFrom, traceIdFrom } from "./traceparent.js";
+import type { Transport } from "./transport.js";
 
 // A span just opened: it starts and ends now, and doesn't carry any attributes, events or links yet.
 function newSpan(fields: Pick<OtlpSpan, "kind" | "name" | "parentSpanId" | "spanId" | "traceId">, nowMs: number): OtlpSpan {
@@ -34,7 +34,7 @@ export type SpanOrigin = {
 };
 
 // What childSpan, spanEnd and exportSpan read of a Log: the Log's clock, randomness, queue, sampled flag and own span.
-export type SpanHost = Pick<SpanOrigin, "clock" | "randomBytes"> & { otlpQueue?: OtlpQueue, sampled: boolean, span: OtlpSpan };
+export type SpanHost = Pick<SpanOrigin, "clock" | "randomBytes"> & { sampled: boolean, span: OtlpSpan, transports: readonly Transport[] };
 
 export function openSpan(conf: SpanOrigin): { sampled: boolean, span: OtlpSpan } {
 	const incoming = !conf.parentLog && conf.traceparent ? parseTraceparent(conf.traceparent) : null;
@@ -92,9 +92,11 @@ export function spanEnd(host: Pick<SpanHost, "clock" | "sampled">, attributes: M
 	return { attributes: ended, fields: { endTimeUnixNano, ...status, ...spanAttributes.length ? { attributes: spanAttributes } : {} } };
 }
 
-// Queues an ended span, where its trace is sampled.
-export function exportSpan(host: Pick<SpanHost, "otlpQueue" | "sampled">, span: OtlpSpan, attributes: Metadata): void {
+// Hands an ended span to each transport that takes spans, where its trace is sampled.
+export function exportSpan(host: Pick<SpanHost, "sampled" | "transports">, span: OtlpSpan, attributes: Metadata): void {
 	if (host.sampled) {
-		host.otlpQueue?.enqueue(buildSpanPayload({ attributes, span }));
+		for (const transport of host.transports) {
+			transport.span?.({ attributes, span });
+		}
 	}
 }

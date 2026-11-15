@@ -12,7 +12,7 @@ browsers and React Native. No OpenTelemetry SDK, no dependencies.
 - **Exports survive a restart.** Entries and spans are batched and retried with backoff; give the
   queue a storage and an offline phone holds them until the network is back.
 - **Just log.** `log.info("msg", { key: "value" })` to stdout/stderr, text or JSON.
-- **Traces without an SDK.** Set `otlpHttpBaseURI` and every instance is a span, its logs exported
+- **Traces without an SDK.** Add `otlpTransport` and every instance is a span, its logs exported
   with it. OTLP (OpenTelemetry's export protocol) over HTTP, JSON or protobuf.
 - **HTTP client tracing.** `log.fetch()` is a drop-in `fetch` that records a client span and
   propagates the trace downstream.
@@ -22,7 +22,8 @@ browsers and React Native. No OpenTelemetry SDK, no dependencies.
 [Goals](#goals) · [Audience](#audience) · [Install](#install) · [Log something](#log-something) ·
 [Group logs into a trace](#group-logs-into-a-trace) ·
 [Trace outgoing HTTP](#trace-outgoing-http) · [Join an incoming trace](#join-an-incoming-trace) ·
-[Queue exports](#queue-exports) · [Accept a logger in your library](#accept-a-logger-in-your-library) ·
+[Transports](#transports) · [Queue exports](#queue-exports) ·
+[Accept a logger in your library](#accept-a-logger-in-your-library) ·
 [Options](#options) · [Output formats](#output-formats) · [`log.fetch` in depth](#logfetch-in-depth) ·
 [Footprint](#footprint) · [Exports](#exports) ·
 [Development](#development) · [Changelog](CHANGELOG.md)
@@ -155,7 +156,7 @@ log.silly("Open the flood gates!"); // stdout
 
 Levels, most to least severe: `error`, `warn`, `info`, `verbose`, `debug`, `silly`. `"none"` outputs
 nothing but this library's own lines, which no `logLevel` silences: its `@larvit/log:` warnings and,
-with `otlpHttpBaseURI`, the export queue's failure reports. To drop them too, pass a no-op `stderr`,
+with an OTLP transport, the export queue's failure reports. To drop them too, pass a no-op `stderr`,
 and a no-op `report` to a `Queue` you build.
 
 Keep the message a static string and put every value in the metadata object, so entries with the
@@ -173,16 +174,16 @@ entry and win over a per-call key of the same name.
 ## Group logs into a trace
 
 Every `Log` instance is a span. Give it a parent and its span nests under the parent's, joining the
-same trace; give it an `otlpHttpBaseURI` and its logs and span are exported there. A span (a timed
+same trace; give it an [`otlpTransport`](#transports) and its entries and span are exported there. A span (a timed
 unit of work) and its trace (the tree of spans one request produces) are what a tracing backend such
 as Grafana Tempo or Jaeger shows.
 
 ```javascript
-import { Log } from "@larvit/log";
+import { consoleTransport, Log, otlpTransport } from "@larvit/log";
 
 const appLog = new Log({
 	context: { "service.name": "foobar" },
-	otlpHttpBaseURI: "http://127.0.0.1:4318",
+	transports: [consoleTransport(), otlpTransport({ baseUrl: "http://127.0.0.1:4318" })],
 });
 
 async function myRequestHandler(req, res) {
@@ -245,7 +246,7 @@ await reqLog.end(); // delivers the span; the fetch itself never waits on the ex
 ```
 
 Responses, errors and the returned promise behave exactly like plain `fetch`: a failed request
-rejects, so await it (or attach `.catch`) whenever the call can fail. Without `otlpHttpBaseURI` it
+rejects, so await it (or attach `.catch`) whenever the call can fail. Without an OTLP transport it
 still injects `traceparent`. Attributes, privacy defaults and edge cases:
 [`log.fetch` in depth](#logfetch-in-depth).
 
@@ -268,33 +269,110 @@ An unsampled header (flags `00`) is honoured: the instance and its children expo
 `log.traceparent()` and `log.fetch` pass `00` on; `log.sampled` is `false`. Log entries still
 export.
 
+## Transports
+
+A transport is a destination a `Log` hands entries and spans to. `transports` lists every one:
+
+```javascript
+import { consoleTransport, Log, otlpTransport } from "@larvit/log";
+
+const log = new Log({
+	transports: [
+		consoleTransport({ format: "json" }),
+		otlpTransport({ baseUrl: "https://collector.example.com", headers: { Authorization: "Bearer …" } }),
+	],
+});
+```
+
+The list is the whole set: with `transports: [otlpTransport({ … })]` nothing is written to the
+console, and with `transports: []` nothing goes anywhere. Unset, a `Log` writes text to the console.
+A child and a clone use their source's list, and a list of their own replaces it. To add to a
+parent's list, spread it: `transports: [...parentLog.conf.transports ?? [consoleTransport()], mine]`.
+`log.conf.transports` is unset on a `Log` that was given no list.
+
+`consoleTransport(options)` writes `error` and `warn` to `stderr` and the other levels to `stdout`:
+
+| Option | Type | Default | |
+|---|---|---|---|
+| `colors` | `boolean` | `true` | ANSI colour codes in text output. Unset in code, the env decides: `NO_COLOR` (non-empty) turns it off; otherwise `FORCE_COLOR` turns it on, except `0` or `false` which turn it off. |
+| `format` | `"json" \| "text" \| EntryFormatter` | `"text"` | See [Output formats](#output-formats). |
+| `printTraceInfo` | `boolean` | `false` | Append `spanId`, `traceId` and `spanName` to each line. |
+| `stderr` | `(msg: string) => void` | `console.error` | Sink for this library's own warnings, and for `error` and `warn` on a `Log` with no `transports`. |
+| `stdout` | `(msg: string) => void` | `console.log` | Sink for the other levels. |
+
+`otlpTransport(options)` exports over OTLP/HTTP through an [export queue](#queue-exports) of its
+own, and takes every option of that queue. Three have shorter names here, and one is new:
+
+| Option | Type | Default | |
+|---|---|---|---|
+| `baseUrl` | `string` | required | The queue's `otlpHttpBaseURI`: entries are POSTed to `/v1/logs` under it and spans to `/v1/traces`. |
+| `fetch` | `typeof fetch` | the global `fetch` | What the transport sends with, such as `expo/fetch` or one that pins TLS. |
+| `headers` | `Record<string, string>` | none | The queue's `otlpAdditionalHeaders`. |
+| `protocol` | `"http/json" \| "http/protobuf"` | `"http/json"` | The queue's `otlpProtocol`. |
+
+Create one `otlpTransport` per collector and share it through the list, since each has a queue of
+its own.
+
+### Write your own
+
+A transport is an object with any of three methods:
+
+```javascript
+const sentry = {
+	entry({ logLevel, msg, metadata, msTimestamp, traceId, spanId, spanName }) {
+		if (logLevel === "error") Sentry.captureMessage(msg, { extra: metadata });
+	},
+	flush() { return Sentry.flush(); },
+};
+
+const log = new Log({ transports: [consoleTransport(), sentry] });
+```
+
+| Method | |
+|---|---|
+| `entry(entry)` | Called for each entry at or above `logLevel`. `metadata` holds the call's metadata under the instance's context, and `traceId`, `spanId` and `spanName` name the span the entry belongs to: the parent's where the `Log` has a `parentLog`. Every transport is handed the same object, so copy it before changing it. |
+| `span({ span, attributes })` | Called for each ended span of a sampled trace: `span` is the `OtlpSpan`, and `attributes` the context of the `Log` that ended it. |
+| `flush()` | Awaited by `log.flush()` and `log.end()`. Return a promise that resolves once everything handed over is delivered. |
+
+A transport takes a kind of record by having its method, so leave out what you don't handle. A
+later minor may add a method for a new kind. The methods are called in list order, and what one
+throws is thrown from the call that logged, before the transports after it are reached.
+
+`transports` replaces these options, which are deprecated and removed in 3.0.0: `colors`, `format`,
+`printTraceInfo` and `stdout`, which go to `consoleTransport`, and `otlpHttpBaseURI`,
+`otlpAdditionalHeaders`, `otlpProtocol` and `otlpQueue`, which `otlpTransport` replaces. Until then
+they work as before on a `Log` with no list, and one of them beside a list, its own or an inherited
+one, throws and names where it goes. This library's own warnings are written to the `stderr` option
+whatever the list holds.
+
 ## Queue exports
 
-Every entry and span goes through an export queue. `otlpHttpBaseURI` builds one, shared by every
-child and clone that sets no `otlp*` option of its own, so one process sends few POSTs and retries a
-batch the collector did not accept with backoff. Configure it yourself to persist the queue or to
-tune it:
+Every entry and span an `otlpTransport` takes goes through an export queue, shared by every child
+and clone that uses the list, so one process sends few POSTs and retries a batch the collector did
+not accept with backoff. Configure it to persist the queue or to tune it:
 
 ```javascript
 import "react-native-url-polyfill/auto"; // React Native only, see Runtimes
-import { Log, Queue } from "@larvit/log";
+import { consoleTransport, Log, otlpTransport } from "@larvit/log";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const appLog = new Log({
 	context: { "service.name": "mobile-app" },
-	otlpQueue: new Queue({ otlpHttpBaseURI: "https://collector.example.com", storage: AsyncStorage }),
+	transports: [consoleTransport(), otlpTransport({ baseUrl: "https://collector.example.com", storage: AsyncStorage })],
 });
 ```
 
 With `storage`, undelivered items are written after every change and loaded, ahead of new ones, by
-the next `Queue` created with the same `storage` and `key`. `AsyncStorage` and `localStorage` fit
+the next queue created with the same `storage` and `key`. `AsyncStorage` and `localStorage` fit
 `storage` as they are; anything with `getItem`, `setItem` and `removeItem`, sync or async, does.
-Create one `Queue` per `key` per process, two would overwrite each other. If `getItem` throws, the
+Create one queue per `key` per process, two would overwrite each other. If `getItem` throws, the
 stored queue is left as it is and nothing is written to it until the next start. Without `storage`
 the queue is in memory only.
 
-`new Queue(options)`. The endpoint belongs to the queue: a `Log` given `otlpQueue` rejects
-`otlpHttpBaseURI`, `otlpProtocol` and `otlpAdditionalHeaders` beside it.
+The options below are the queue's own names, which the deprecated `new Queue(options)` takes;
+`otlpTransport` takes the same ones, with `baseUrl`, `headers` and `protocol` for the three `otlp*`
+names. A `Log` given the deprecated `otlpQueue` rejects `otlpHttpBaseURI`, `otlpProtocol` and
+`otlpAdditionalHeaders` beside it.
 
 Credentials go either in the endpoint as `user:pass@`, which is sent as an `Authorization: Basic`
 header, or in `otlpAdditionalHeaders` as a token of your own. Set one: with both, the
@@ -306,15 +384,16 @@ or `api-key`. Each one sent over `http:` to a host other than `localhost`, `127.
 writes one `@larvit/log:` line naming the host and the header, and still sends. A line is written
 once per host, header and credential source to each `report` function, or to each `stderr` for a
 queue a `Log` built. On a network you trust, pass `acceptPlainHttpCredentials: true`
-to the `Queue`; a `Log` using `otlpHttpBaseURI` moves its `otlp*` options to `otlpQueue: new Queue({
-acceptPlainHttpCredentials: true, otlpHttpBaseURI })`, whose report lines then go to that queue's
-`report`, `console.error` unless you pass one.
+to `otlpTransport` or to the `Queue`, whose report lines go to its `report`, `console.error` unless
+you pass one. A `Log` using the deprecated `otlpHttpBaseURI` moves its `otlp*` options to
+`otlpTransport({ acceptPlainHttpCredentials: true, baseUrl })`.
 
 | Option | Type | Default | |
 |---|---|---|---|
 | `acceptPlainHttpCredentials` | `boolean` | `false` | Silences the line a credential header over plain `http:` writes, for a collector on a network you trust. |
 | `batchDelayMs` | `number` | `1000` | How long a queued item waits for company before a send. |
 | `clock` | `Clock` | system clock | `{ now, setTimeout, clearTimeout }` behind the batch, retry and send-timeout timers. Supply one to control time: a deterministic test, or a corrected `now()`. |
+| `fetch` | `typeof fetch` | the global `fetch` | What the queue sends with. Unset, the global `fetch` is read at each send. |
 | `key` | `string` | `"@larvit/log:otlp-queue"` | The `storage` key. |
 | `maxBatchBytes` | `number` | `65536` | Items per POST are cut here, measured as their JSON size. The default is the browser `keepalive` limit; a batch over 64 KiB is sent without `keepalive`. |
 | `maxItems` | `number` | `1000` | Queue bound. The oldest items are dropped when exceeded, reported in one stderr line with the count. |
@@ -338,7 +417,7 @@ In a browser, the collector must answer a CORS preflight, unless it is on the pa
 Every cross-origin POST sets `Content-Type` to a value CORS doesn't safelist, so the browser first
 sends an `OPTIONS` request. The collector's answer must allow `Content-Type` and every other header
 the queue sends: `Authorization` when the endpoint carries `user:pass@`, and each header in
-`otlpAdditionalHeaders`. Without that, every batch fails as a network error, such as Chrome's
+`headers`. Without that, every batch fails as a network error, such as Chrome's
 `Failed to fetch`, and is retried, never dropped, while newer items queue behind it and the oldest
 of those are dropped past `maxItems`. In the OpenTelemetry Collector, set the OTLP/HTTP receiver's
 `cors`: your page's origin in `allowed_origins`, and each header you send in `allowed_headers`.
@@ -390,22 +469,23 @@ instead. `entryFormatter` is deprecated the same way: pass the function as `form
 | `captureRequestHeaders` | `string[]` | none | `log.fetch` only: request header names to record as `http.request.header.*`. Not every secret in one is redacted — see [Credentials in a captured value](#credentials-in-a-captured-value). An invalid name is skipped, with one `stderr` warning. |
 | `captureResponseHeaders` | `string[]` | none | `log.fetch` only: response header names to record as `http.response.header.*`. Same redaction and invalid-name handling as `captureRequestHeaders`. |
 | `clock` | `Clock` | system clock | `{ now, setTimeout, clearTimeout }` behind every span and entry timestamp. Passed on to the default `Queue`; a `Queue` you build takes its own. |
-| `colors` | `boolean` | `true` | ANSI colour codes in text output. Unset in code, the env decides: `NO_COLOR` (non-empty) turns it off; otherwise `FORCE_COLOR` turns it on, except `0` or `false` which turn it off. |
+| `colors` | `boolean` | `true` | Deprecated, removed in 3.0.0: pass [`transports`](#transports) with `consoleTransport({ colors })`. ANSI colour codes in text output. Unset in code, the env decides: `NO_COLOR` (non-empty) turns it off; otherwise `FORCE_COLOR` turns it on, except `0` or `false` which turn it off. |
 | `context` | `MetadataInput` | `{}` | Added to every entry. Wins over a per-call key of the same name. An `undefined` key is dropped, so `log.conf.context` reads back as `Metadata`. |
 | `entryFormatter` | `EntryFormatter` | none | Deprecated, removed in 3.0.0: pass the function as `format`. Wins over a `"text"`/`"json"` `format`; two different formatters, one per spelling, throw. On `log.conf` it reads the formatter in use, and writing it swaps it. |
-| `format` | `"json" \| "text" \| EntryFormatter` | `"text"` | Console output format, or a formatter of your own. Any other string writes text and warns once per `stderr` sink. Use the entry's `msTimestamp` rather than `new Date()` so console and OTLP timestamps of one entry match. `log.conf.format` never holds a function before 3.0.0; `resolveFormatter(log.conf)` reads the formatter in use, as `log.conf.entryFormatter` does until 3.0.0. Writing `"text"` or `"json"` to `log.conf.format` takes effect from the next line, unless a function formatter is set, which wins. |
+| `format` | `"json" \| "text" \| EntryFormatter` | `"text"` | Deprecated, removed in 3.0.0: pass [`transports`](#transports) with `consoleTransport({ format })`. Console output format, or a formatter of your own. Any other string writes text and warns once per `stderr` sink. Use the entry's `msTimestamp` rather than `new Date()` so console and OTLP timestamps of one entry match. `log.conf.format` never holds a function before 3.0.0; `resolveFormatter(log.conf)` reads the formatter in use, as `log.conf.entryFormatter` does until 3.0.0. Writing `"text"` or `"json"` to `log.conf.format` takes effect from the next line, unless a function formatter is set, which wins. |
 | `logLevel` | `LogLevel \| "none"` | `"info"` | Minimum level to output. Any other value is kept as written, logs at `"info"` and warns once per `stderr` sink and value. |
-| `otlpAdditionalHeaders` | `Record<string, string>` | none | Shorthand: the same option on the default `Queue`, see [Queue exports](#queue-exports). Not inherited by a child or clone whose `otlpHttpBaseURI` has another origin (scheme, host and port) than its source's. |
-| `otlpHttpBaseURI` | `string` | none | Shorthand for `otlpQueue: new Queue({ otlpHttpBaseURI, otlpProtocol, otlpAdditionalHeaders })`. `user:pass@` in it authenticates, see [Queue exports](#queue-exports). |
-| `otlpProtocol` | `"http/json" \| "http/protobuf"` | `"http/json"` | Shorthand: the same option on the default `Queue`. |
-| `otlpQueue` | `OtlpQueue` | none | The [export queue](#queue-exports). Cannot be combined with the three shorthands above; on an instance given them, `log.conf.otlpQueue` reads back the queue they built. Inherited by children and clones; one that sets a shorthand instead gets a queue of its own. |
+| `otlpAdditionalHeaders` | `Record<string, string>` | none | Deprecated, removed in 3.0.0: pass [`transports`](#transports) with `otlpTransport({ headers })`. Shorthand: the same option on the default `Queue`, see [Queue exports](#queue-exports). Not inherited by a child or clone whose `otlpHttpBaseURI` has another origin (scheme, host and port) than its source's. |
+| `otlpHttpBaseURI` | `string` | none | Deprecated, removed in 3.0.0: pass [`transports`](#transports) with `otlpTransport({ baseUrl })`. Shorthand for `otlpQueue: new Queue({ otlpHttpBaseURI, otlpProtocol, otlpAdditionalHeaders })`. `user:pass@` in it authenticates, see [Queue exports](#queue-exports). |
+| `otlpProtocol` | `"http/json" \| "http/protobuf"` | `"http/json"` | Deprecated, removed in 3.0.0: pass [`transports`](#transports) with `otlpTransport({ protocol })`. Shorthand: the same option on the default `Queue`. |
+| `otlpQueue` | `OtlpQueue` | none | Deprecated, removed in 3.0.0: pass [`transports`](#transports) with `otlpTransport()`. The [export queue](#queue-exports). Cannot be combined with the three shorthands above; on an instance given them, `log.conf.otlpQueue` reads back the queue they built. Inherited by children and clones; one that sets a shorthand instead gets a queue of its own. |
 | `parentLog` | `LogInt` | none | Nest under this instance's span and inherit its options except `traceparent`. Log entries attach to the parent's span. |
-| `printTraceInfo` | `boolean` | `false` | Append `spanId`, `traceId` and `spanName` to console output. |
+| `printTraceInfo` | `boolean` | `false` | Deprecated, removed in 3.0.0: pass [`transports`](#transports) with `consoleTransport({ printTraceInfo })`. Append `spanId`, `traceId` and `spanName` to console output. |
 | `randomBytes` | `(size: number) => Uint8Array` | Web Crypto, else `Math.random` | Returns `size` random bytes for each trace and span id the `Log` makes. Supply one for deterministic ids in a test. Return exactly `size` bytes, and never all zeros: W3C Trace Context makes an all-zero id invalid, so a receiver drops it. Children and clones inherit it. |
 | `spanName` | `string` | `"unnamed-span"` | The instance's span name. Inherited from `parentLog` when set there. |
 | `stderr` | `(msg: string) => void` | `console.error` | Sink for `error` and `warn`. |
-| `stdout` | `(msg: string) => void` | `console.log` | Sink for the other levels. |
+| `stdout` | `(msg: string) => void` | `console.log` | Deprecated, removed in 3.0.0: pass [`transports`](#transports) with `consoleTransport({ stdout })`. Sink for the other levels. |
 | `traceparent` | `string` | none | Incoming W3C `traceparent` to nest under; an unsampled one (`00`) drops spans, not log entries. Ignored when malformed or when `parentLog` is set. |
+| `transports` | `Transport[]` | the console | Every destination entries and spans go to, see [Transports](#transports). Inherited by children and clones. |
 
 ## Output formats
 
@@ -427,7 +507,7 @@ A formatter of your own takes the entry and returns the line, and is inherited b
 clones; either can switch back with `format: "text"`:
 
 ```javascript
-new Log({ format: entry => `${entry.logLevel} ${entry.msg}` });
+new Log({ transports: [consoleTransport({ format: entry => `${entry.logLevel} ${entry.msg}` })] });
 ```
 
 OTLP receives every metadata value as a string (`{ total: 199 }` → `"199"`); the JSON formatter
@@ -557,7 +637,10 @@ a call below `logLevel`, ≤2 µs for a console call, ≤10 µs with OTLP config
 | Export | |
 |---|---|
 | `Log` | The logger class. |
-| `Queue` | The export queue; `new Queue(options)`, see [Queue exports](#queue-exports). |
+| `consoleTransport(options?)`, `otlpTransport(options)` | The two transports this library ships, see [Transports](#transports). |
+| `Transport`, `TransportEntry`, `TransportSpan` | A transport, `{ entry?, span?, flush? }`, and what `entry` and `span` are handed. |
+| `ConsoleTransportOptions`, `OtlpTransportOptions` | What the two shipped transports take. |
+| `Queue` | Deprecated with `otlpQueue`, removed in 3.0.0: the export queue, `new Queue(options)`, see [Queue exports](#queue-exports). |
 | `LogLevels` | Level → OTLP `severityNumber`/`severityText`, most to least severe. |
 | `msgTextFormatter`, `msgJsonFormatter` | The built-in formatters; wrap one to extend it. |
 | `resolveFormatter(conf)` | The `EntryFormatter` a `LogConf` writes with, e.g. a `LogInt.conf` you were handed. |

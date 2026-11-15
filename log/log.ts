@@ -1,4 +1,4 @@
-import { buildLogPayload, type OtlpSpan } from "../otlp/payloads.js";
+import { buildLogPayload, buildSpanPayload, type OtlpSpan } from "../otlp/payloads.js";
 import { DEFAULT_LOG_LEVEL, type LogLevel, LogLevels, SEVERITY_NUMBERS } from "../primitives/levels.js";
 import { endErrorType, exportSpan, openSpan, spanEnd, type SpanHost } from "../tracing/spans.js";
 import { type FetchTrace, traceFetch } from "../tracing/fetch.js";
@@ -6,8 +6,9 @@ import { formatTraceparent } from "../tracing/traceparent.js";
 import type { LogInt, LogOptions, ResolvedLogConf } from "./types.js";
 import { type Metadata, type MetadataInput, withoutUndefined } from "../primitives/metadata.js";
 import { resolveConf } from "./conf.js";
+import type { Transport } from "../tracing/transport.js";
 import { warnOnceToStderr, writeStderr } from "./stderr-lines.js";
-import { writeConsoleEntry } from "./console-output.js";
+import { withTraceInfo, writeConsoleEntry } from "./console-output.js";
 import { writeOnce } from "../primitives/once-per-sink.js";
 
 // A configured logLevel that is not a level, as the warning about it prints it.
@@ -34,6 +35,9 @@ export class Log implements LogInt {
 	ended: boolean = false;
 
 	readonly conf: ResolvedLogConf;
+
+	// The default list, built at first use: what the conf's own console and otlp* options make.
+	private defaultTransports?: readonly Transport[];
 
 	// Un-awaited log.fetch calls, awaited by flush() so their spans are queued before the queue flushes.
 	private pendingFetches = new Set<Promise<unknown>>();
@@ -100,7 +104,7 @@ export class Log implements LogInt {
 
 	public async flush(): Promise<void> {
 		await Promise.all([...this.pendingFetches]);
-		await this.conf.otlpQueue?.flush();
+		await Promise.all(this.transports().map(transport => transport.flush?.()));
 	}
 
 	public traceparent(): string {
@@ -157,28 +161,48 @@ export class Log implements LogInt {
 
 		if (!this.enabled(logLevel)) return;
 
-		const msTimestamp = this.conf.clock.now();
-		const attributes = Object.assign(withoutUndefined(metadata), this.context);
-
-		const consoleMetadata: Metadata = { ...attributes };
-		if (this.conf.printTraceInfo) {
-			consoleMetadata.spanId = this.span.spanId;
-			consoleMetadata.traceId = this.span.traceId;
-			consoleMetadata.spanName = this.span.name;
-		}
-		writeConsoleEntry(this.conf, logLevel, msg, consoleMetadata, msTimestamp);
-
-		if (!this.conf.otlpQueue) {
-			return;
-		}
-
+		// An entry belongs to the parent's span where there is one.
 		const span = this.conf.parentLog?.span.spanId ? this.conf.parentLog.span : this.span;
+		const entry = {
+			logLevel,
+			metadata: Object.assign(withoutUndefined(metadata), this.context),
+			msTimestamp: this.conf.clock.now(),
+			msg,
+			spanId: span.spanId,
+			spanName: span.name,
+			traceId: span.traceId,
+		};
 
-		this.conf.otlpQueue.enqueue(buildLogPayload({ attributes, logLevel, msTimestamp, msg, span }));
+		for (const transport of this.transports()) {
+			transport.entry?.(entry);
+		}
+	}
+
+	// The list this Log hands entries and spans to: `transports`, or else the default list. The default
+	// list reads the conf at each record, so a write to `log.conf.format` or `log.conf.otlpQueue` takes
+	// effect from the next one, as 2.x documents.
+	private transports(): readonly Transport[] {
+		return this.conf.transports ?? (this.defaultTransports ??= [
+			{
+				entry: ({ logLevel, metadata, msg, msTimestamp }) => {
+					// 2.x prints the instance's own span, also where the entry is exported under its parent's.
+					const { name, spanId, traceId } = this.span;
+
+					writeConsoleEntry(this.conf, logLevel, msg, this.conf.printTraceInfo ? withTraceInfo(metadata, { spanId, spanName: name, traceId }) : metadata, msTimestamp);
+				},
+			},
+			{
+				entry: ({ logLevel, metadata, msg, msTimestamp, spanId, traceId }) => {
+					this.conf.otlpQueue?.enqueue(buildLogPayload({ attributes: metadata, logLevel, msTimestamp, msg, span: { spanId, traceId } }));
+				},
+				flush: async () => { await this.conf.otlpQueue?.flush(); },
+				span: span => { this.conf.otlpQueue?.enqueue(buildSpanPayload(span)); },
+			},
+		]);
 	}
 
 	private spanHost(): SpanHost {
-		return { clock: this.conf.clock, otlpQueue: this.conf.otlpQueue, randomBytes: this.conf.randomBytes, sampled: this.sampled, span: this.span };
+		return { clock: this.conf.clock, randomBytes: this.conf.randomBytes, sampled: this.sampled, span: this.span, transports: this.transports() };
 	}
 
 	private fetchTrace(): FetchTrace {

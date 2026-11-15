@@ -8,7 +8,7 @@ import { stringField } from "../../primitives/field-reads.js";
 const OTLP_EXPORT_TIMEOUT_MS = 3000;
 
 // Read live, so a rotated otlpAdditionalHeaders reaches the next send.
-type SenderConf = EndpointConf & { clock: Clock, otlpProtocol: "http/json" | "http/protobuf" };
+type SenderConf = EndpointConf & { clock: Clock, fetch?: typeof fetch, otlpProtocol: "http/json" | "http/protobuf" };
 
 type Report = (msg: string, metadata: Metadata) => void;
 
@@ -65,8 +65,11 @@ export class OtlpSender {
 		const controller = new AbortController();
 		const abortTimer = this.conf.clock.setTimeout(() => controller.abort(), OTLP_EXPORT_TIMEOUT_MS);
 
+		// Called bare: a browser's fetch throws when its `this` is the conf.
+		const send = this.conf.fetch ?? fetch;
+
 		try {
-			const res = await fetch(this.url + otlpPath(batch[0].payload), {
+			const res = await send(this.url + otlpPath(batch[0].payload), {
 				body,
 				headers,
 				keepalive: bytes <= KEEPALIVE_MAX_BYTES,

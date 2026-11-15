@@ -14,7 +14,8 @@ In [docs/decisions.md](docs/decisions.md):
 
 - The OTLP types and `ResolvedLogConf` stay exported
 - No level-string shorthand from 3.0.0
-- The OTLP endpoint belongs to the queue
+- The OTLP endpoint belongs to the OTLP transport
+- A `Log` sends through a list of transports
 - `colors` precedence, and colour on by default through 2.x
 - `Log` and `Queue` each own a `clock`
 - `Clock` hands back the platform's timer handle

@@ -12,28 +12,27 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 96 | 2.7.0 |  | owner | **Add a list of transports, each handed plain log entries it encodes itself, with console and OTLP as the two this library ships and uses by default.** | 4 | 2 | 3 | 7 | 8 | 2 by 7, 4 by 8 | 1.4 |
-| 153 | 2.7.0 | 96 | owner | **Let an app export the spans OpenTelemetry's instrumentation packages record, such as pg or Prisma queries, through a `Log`, nested under the request they ran in.** | 4 | 2 | 2 | 6 | 6 | 2 by 8, 4 by 6 | 1.7 |
+| 153 | 2.7.0 |  | owner | **Let an app export the spans OpenTelemetry's instrumentation packages record, such as pg or Prisma queries, through a `Log`, nested under the request they ran in.** | 4 | 2 | 2 | 6 | 6 | 2 by 8, 4 by 6 | 1.7 |
 | 146 | 2.8.0 |  |  | **Let a reader see from `redactedPath` alone which segments of a request path it keeps.** | 2 | 2 | 4 | 6 | 2 | code health by 3 | 2.3 |
 | 149 | 2.8.0 |  |  | **Keep a queue's storage read from rejecting when `restore` throws.** | 1 | 1 | 2 | 2 | 6 | code health by 3 | 2.3 |
 | 114 | 2.8.0 |  |  | **Move `package.json`'s build and test one-liners into named scripts, and let the OTLP test read its collector's port, image and container name from the environment, today's values as defaults.** | 1 | 1 | 1 | 1 | 2 | code health by 1 | 2.1 |
 | 139 | 2.8.0 |  | principle | **Cite "Sane defaults" as applied in the clock and randomness decision, once the principle carries its exception for a library.** | 1 | 2 | 1 | 2 | 1 | code health by 1 | 2.1 |
 | 19 | 2.8.0 |  | defect | **Leave a `Request` untraced in `log.fetch`.** | 1 | 1 | 2 | 2 | 2 | 3.1 by 6 | 2.1 |
 | 80 | 2.8.0 |  | principle | **Run the browser suite in WebKit and Firefox as well as Chromium.** | 2 | 1 | 1 | 2 | 3 | 3 by 7 | 2.0 |
-| 28 | 2.8.0 | 96 |  | **Export resource attributes beyond `service.name`.** | 2 | 1 | 2 | 3 | 3 | 2 by 7 | 1.7 |
+| 28 | 2.8.0 |  |  | **Export resource attributes beyond `service.name`.** | 2 | 1 | 2 | 3 | 3 | 2 by 7 | 1.7 |
 | 117 | 2.8.0 |  |  | **Bring the built `index.js` within README → Footprint's 10 KB gzipped budget.** | 2 | 1 | 2 | 3 | 3 | 5 by 7 | 1.5 |
 | 26 | 2.8.0 |  |  | **Check the footprint budget in CI, so the numbers in README → Footprint fail a build instead of going stale.** | 2 | 1 | 1 | 2 | 5 | 5 by 8 | 1.5 |
 | 88 | 2.8.0 |  |  | **Parse `traceparent` as W3C Trace Context does: ignore uppercase hex, and read a higher version by its first four fields.** | 1 | 1 | 1 | 1 | 2 | 2 by 3 | 1.5 |
-| 31 | 2.8.0 | 96 |  | **Set a log record's `flags` to the W3C trace flags.** | 1 | 1 | 2 | 2 | 2 | 2 by 4 | 1.5 |
+| 31 | 2.8.0 |  |  | **Set a log record's `flags` to the W3C trace flags.** | 1 | 1 | 2 | 2 | 2 | 2 by 4 | 1.5 |
 | 112 | 2.8.0 |  |  | **Run the suite on Deno and Bun in CI.** | 2 | 1 | 1 | 2 | 3 | 3 by 5 | 1.4 |
 | 27 | 2.8.0 |  |  | **Name a `log.fetch` span and its errors as HTTP semconv does.** | 2 | 1 | 3 | 4 | 3 | 2 by 6 | 1.3 |
 | 30 | 2.8.0 |  |  | **Let a consumer sample by ratio.** | 3 | 2 | 2 | 5 | 5 | 2 by 5, 5 by 4 | 1.3 |
 | 107 | 2.8.0 |  | principle | **Run the suite on React Native's Hermes in CI.** | 3 | 1 | 1 | 3 | 5 | 3 by 7 | 1.2 |
 | 81 | 2.8.0 |  | principle | **Test export and `log.fetch` against a real server in a browser.** | 2 | 1 | 1 | 2 | 5 | 3.1 by 6 | 1.2 |
-| 99 | 2.8.0 | 96 |  | **Honour a collector's `Retry-After` before retrying a batch.** | 2 | 1 | 2 | 3 | 2 | 2 by 4 | 1.2 |
-| 86 | 2.8.0 | 96 |  | **Set `telemetry.sdk.language` to a semconv value, `nodejs` or `webjs`.** | 1 | 1 | 2 | 2 | 2 | 2 by 3 | 1.1 |
-| 29 | 2.8.0 | 96 |  | **Export span events.** | 3 | 1 | 2 | 4 | 5 | 2 by 6 | 1.0 |
-| 87 | 2.8.0 | 96 |  | **Report a protobuf export's `partialSuccess` as the JSON transport does.** | 2 | 1 | 2 | 3 | 4 | 2 by 4 | 0.8 |
+| 99 | 2.8.0 |  |  | **Honour a collector's `Retry-After` before retrying a batch.** | 2 | 1 | 2 | 3 | 2 | 2 by 4 | 1.2 |
+| 86 | 2.8.0 |  |  | **Set `telemetry.sdk.language` to a semconv value, `nodejs` or `webjs`.** | 1 | 1 | 2 | 2 | 2 | 2 by 3 | 1.1 |
+| 29 | 2.8.0 |  |  | **Export span events.** | 3 | 1 | 2 | 4 | 5 | 2 by 6 | 1.0 |
+| 87 | 2.8.0 |  |  | **Report a protobuf export's `partialSuccess` as the JSON transport does.** | 2 | 1 | 2 | 3 | 4 | 2 by 4 | 0.8 |
 | 148 | 2.9.0 | 146 | owner | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
 | 41 | 2.9.0 |  | principle | **Warn once about a negative, zero or `NaN` numeric `QueueConf` option, and use the default.** | 1 | 1 | 1 | 1 | 2 | 1 by 5 | 2.5 |
 | 20 | 2.9.0 |  |  | **Announce in the README and CHANGELOG that 3.0.0 gives a `log.fetch` span `end({ error })`'s `error.type`, so a query on `"20"` for an abort or `"fetch_error"` moves first.** | 1 | 1 | 1 | 1 | 1 | 1 by 3 | 2.3 |
@@ -74,7 +73,7 @@
 | 72 | 3.0.0 |  |  | **Make nothing throw after `end()`.** | 2 | 1 | 2 | 3 | 4 | 1 by 6 | 1.3 |
 | 58 | 3.0.0 |  |  | **Give the redaction sentinel its own name — `REDACTED by @larvit/log` or similar.** | 1 | 1 | 2 | 2 | 2 | 1 by 3 | 1.1 |
 | 68 | 3.0.0 |  |  | **Merge a child's `context` per key with the parent's, as `clone()` does.** | 2 | 1 | 2 | 3 | 3 | 4 by 5 | 1.1 |
-| 97 | 3.0.0 | 96 | decision | **Keep every OTLP option, type and encoding inside the OTLP transport, so no other code knows OTLP.** | 4 | 2 | 3 | 7 | 8 | 2 by 5, 4 by 6 | 1.0 |
+| 97 | 3.0.0 |  | decision | **Keep every OTLP option, type and encoding inside the OTLP transport, so no other code knows OTLP.** | 4 | 2 | 3 | 7 | 8 | 2 by 5, 4 by 6 | 1.0 |
 | 62 | 3.0.0 |  | decision | **Remove `entryFormatter`, the option and the `conf` alias of `format` beside it.** | 2 | 1 | 2 | 3 | 3 | 1 by 4 | 1.0 |
 | 56 | 3.0.0 | 21 | decision | **Export OTLP metrics from instruments that aggregate for the caller.** | 3 | 2 | 2 | 5 | 8 | 2 by 7 | 0.8 |
 | 75 | 3.0.0 | 22 | decision | **Keep credentials off `log.conf` and `queue.conf`.** | 2 | 1 | 2 | 3 | 3 | 1 by 3 | 0.8 |
@@ -82,53 +81,6 @@
 | 108 | 3.0.0 |  | principle | **Keep two tabs of one web app sharing a `storage` key from sending a record twice or deleting each other's backlog.** | 3 | 2 | 2 | 5 | 5 | 3 by 5 | 0.7 |
 
 ## Details
-
-### 96. Add a list of transports, each handed plain log entries it encodes itself, with console and OTLP as the two this library ships and uses by default.
-
-Today a `Log` writes console output through `stdout` and `stderr`, and exports through one seam,
-`otlpQueue`, that takes OTLP payloads. Serving README → Goals #2 and #4 means a consumer sends to
-any set of destinations without a second library. Settled by the maintainer on 2026-10-26:
-
-- Console output is a transport like any other.
-- A transport is handed plain log entries, and encodes them itself, so writing a new one is easy and
-  intuitive.
-- The OTLP options, injecting the `fetch` the OTLP transport sends with among them, belong to the
-  OTLP transport. That `fetch` was item 12: the queue reaches for the global `fetch`, so a React
-  Native app that pins TLS or uses `expo/fetch` cannot route the exporter through it, and the suite
-  swaps `globalThis.fetch`.
-
-It ships in a 2.x minor only if it can be done cleanly under README → Goals #8: the existing options
-keep working exactly as today, building the default list, and the ones it replaces are deprecated.
-Otherwise it moves to 3.0.0, with the maintainer's approval. The decisions resting on "a queue owns
-the transport" and "The OTLP endpoint belongs to the queue" are revised in the same change.
-
-**Done only once the maintainer approves both** the transport configuration a consumer writes, and
-examples of building a transport, each shown to them before the item is marked complete. The
-spelling is benched with the README's audience before it is shown.
-
-Let a transport skip a record kind it does not handle, so a new kind, such as item 56's metrics,
-ships in a minor instead of waiting for a major.
-
-Every seat of the 2026-10-03 comprehension run named `formatFunctions` and `defaultQueues`, two
-module-level tables a reader must trace to know a `Log`'s formatter and queue. Where the console
-and OTLP transports take those over, the formatter and the queue are read where they are used.
-
-Benched on 2026-11-15 with eight fresh readers seated from README → Audience, in two rounds, and
-awaiting the maintainer's approval:
-
-- `transports: [consoleTransport({ format }), otlpTransport({ baseUrl, headers, protocol, fetch, storage })]`:
-  factory functions, picked by 3 of 4 over classes. `Queue` as the OTLP transport read as a buffer,
-  and `Console` as the global.
-- `baseUrl`, `headers` and `protocol` inside `otlpTransport`, picked by 3 of 4. `url` and `endpoint`
-  read as the full `/v1/logs` url, and the `otlp` prefix as noise there.
-- A transport is an object with optional `entry(entry)`, `span(span)` and `flush()`, picked by 3 of
-  4. `onEntry` read as a fire-and-forget event, and one `write(record)` breaks on a new kind.
-- `transports` replaces the default list, and a child inherits its parent's list: every reader
-  predicted both.
-- `transports` beside an option it replaces throws, naming where the option goes: picked by 4 of 4
-  over a warning or a merge.
-- Deprecate only the four `otlp*` options, and keep the console options as the short way to set up
-  the default console transport: picked by 3 of 4.
 
 ### 153. Let an app export the spans OpenTelemetry's instrumentation packages record, such as pg or Prisma queries, through a `Log`, nested under the request they ran in.
 
@@ -148,7 +100,7 @@ Settled by the maintainer on 2026-11-14:
 - The spans must join the trace and the span of the `Log` the app handles the request with, which
   the app hands to the adapter explicitly at the request's edge.
 
-Blocked by item 96, since these spans will flow through whatever transports it creates. README's
+These spans flow through the `Log`'s `transports`. README's
 "One file, every runtime" claim changes with a second entry point; say what holds instead.
 
 ### 146. Let a reader see from `redactedPath` alone which segments of a request path it keeps.
@@ -250,14 +202,14 @@ it. `~/.claude/principles/frontend.md` → Testability and broad device support.
 ### 81. Test export and `log.fetch` against a real server in a browser.
 
 The browser run stubs `globalThis.fetch`, so the 64 KiB `keepalive` cap and the CORS preflight are
-never exercised. Item 96 removes the global swap, not this gap. `~/.claude/principles/frontend.md` →
+never exercised. `otlpTransport({ fetch })` removes the global swap, not this gap. `~/.claude/principles/frontend.md` →
 testability.
 
 ### 99. Honour a collector's `Retry-After` before retrying a batch.
 
 OTLP/HTTP asks a client to wait as long as a 429 or 503 response's `Retry-After` says. Today the
 queue retries on its own backoff, which can hit a throttling collector again too soon. It adds to
-what the queue does, so it ships in a minor; it waits on item 96 because retries belong to the OTLP
+what the queue does, so it ships in a minor. Retries belong to the OTLP
 transport.
 
 ### 86. Set `telemetry.sdk.language` to a semconv value, `nodejs` or `webjs`.
@@ -467,11 +419,11 @@ clone takes the live `log.context`, a child today reads `conf.context`, so they 
 
 ### 97. Keep every OTLP option, type and encoding inside the OTLP transport, so no other code knows OTLP.
 
-The 3.0.0 half of item 96, removing what it deprecates: no part of the source outside the OTLP
+The 3.0.0 half of `transports`, removing what 2.7.0 deprecates: no part of the source outside the OTLP
 transport knows or depends on anything OTLP. This takes over item 74's aim, one OTLP representation
 in `conf`: today `log.conf.otlpHttpBaseURI` stays readable beside the `Queue` built from it, and
 `isQueueFor` exists to match the two. Items naming `otlpQueue` or the `OtlpQueue` type, such as 17,
-21, 56 and 77, are reworded to the transport shape once item 96 is approved.
+21, 56 and 77, are reworded to the transport shape.
 
 ### 62. Remove `entryFormatter`, the option and the `conf` alias of `format` beside it.
 

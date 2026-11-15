@@ -19,6 +19,9 @@ export type QueueConf = {
 	acceptPlainHttpCredentials?: boolean;
 	batchDelayMs?: number;
 	clock?: Clock;
+
+	// What the queue sends with. Unset, the global fetch, read at each send.
+	fetch?: typeof fetch;
 	key?: string;
 	maxBatchBytes?: number;
 	maxItems?: number;
