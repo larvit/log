@@ -1,4 +1,4 @@
-import { changesInAnyDecoding, withoutDropped } from "./decodings.js";
+import { changesInAnyDecoding, decodings, inAnyDecoding, withoutDropped } from "./decodings.js";
 
 // Userinfo after `//`, and the same after `\\`, `/\` or `\/`: the patterns match a url among other text, or one
 // the runtime cannot parse. After an opener holding a `\`, userinfo may not hold a `\`, so matching a
@@ -10,7 +10,7 @@ import { changesInAnyDecoding, withoutDropped } from "./decodings.js";
 const SLASHED_USERINFO = /(:?\/\/)[^/?# ]*@/g;
 const BACKSLASH_OPENED_USERINFO = /(:?(?:\\[/\\]|\/\\))[^/\\?# ]*@/g;
 
-export const OPENS_USERINFO = /\/\/[^/?# ]*$|(?:\\[/\\]|\/\\)[^/\\?# ]*$/;
+const OPENS_USERINFO = /\/\/[^/?# ]*$|(?:\\[/\\]|\/\\)[^/\\?# ]*$/;
 export const redactTextUserinfo = (text: string) => text.replace(SLASHED_USERINFO, "$1REDACTED@").replace(BACKSLASH_OPENED_USERINFO, "$1REDACTED@");
 
 const SENSITIVE_QUERY_KEY = /(auth|authentication|authorization|consumerid|credential|key|keyid|pass|passphrase|p(ass)?w(or)?d[12]?|secret|sig|sign|signature|signed|token)$|^(code|googleaccessid|idtokenhint)$/;
@@ -53,6 +53,8 @@ export function redactTextQueryKeys(text: string): string {
 }
 
 export const holdsUserinfoInAnyDecoding = (text: string) => changesInAnyDecoding(text, redactTextUserinfo);
+// Whether a `//`, `\\`, `/\` or `\/` at the text's end, in any decoding, opens userinfo.
+export const opensUserinfoInAnyDecoding = (text: string) => inAnyDecoding(decodings(text), decoding => OPENS_USERINFO.test(decoding));
 export const holdsListedKey = (text: string) => redactTextQueryKeys(text) !== text;
 export const holdsListedKeyInAnyDecoding = (text: string) => changesInAnyDecoding(text, redactTextQueryKeys);
 
