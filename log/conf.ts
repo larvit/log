@@ -52,12 +52,6 @@ function isLogConfKey(key: string): key is keyof LogConf {
 
 const LOG_CONF_KEYS = Object.keys(INHERITED_BY).filter(isLogConfKey);
 
-// The keys `conf` doesn't inherit, though it leaves them unset. Each rule keeps a setting the caller
-// gave from mixing with the source's spelling of it, and no rule depends on another.
-function keptOut(conf: LogConf, sourceConf: LogConf): Set<keyof LogConf> {
-	return new Set([...keptOutByFormatter(conf), ...keptOutByTransports(conf), ...keptOutByEndpoint(conf, sourceConf)]);
-}
-
 // A formatter, in either key, replaces the source's in both.
 function keptOutByFormatter(conf: LogConf): (keyof LogConf)[] {
 	return conf.format !== undefined || conf.entryFormatter !== undefined ? ["format", "entryFormatter"] : [];
@@ -72,6 +66,14 @@ function keptOutByTransports(conf: LogConf): (keyof LogConf)[] {
 	}
 
 	return replaced.some(key => conf[key] !== undefined) ? ["transports"] : [];
+}
+
+function sameOrigin(uri: string, other: string): boolean {
+	try {
+		return new URL(uri).origin === new URL(other).origin;
+	} catch {
+		return false;
+	}
 }
 
 // A queue stays only beside the endpoint it was built from; headers only beside their endpoint's origin.
@@ -91,12 +93,10 @@ function keptOutByEndpoint(conf: LogConf, sourceConf: LogConf): (keyof LogConf)[
 	return ["otlpAdditionalHeaders", "otlpQueue"];
 }
 
-function sameOrigin(uri: string, other: string): boolean {
-	try {
-		return new URL(uri).origin === new URL(other).origin;
-	} catch {
-		return false;
-	}
+// The keys `conf` doesn't inherit, though it leaves them unset. Each rule keeps a setting the caller
+// gave from mixing with the source's spelling of it, and no rule depends on another.
+function keptOut(conf: LogConf, sourceConf: LogConf): Set<keyof LogConf> {
+	return new Set([...keptOutByFormatter(conf), ...keptOutByTransports(conf), ...keptOutByEndpoint(conf, sourceConf)]);
 }
 
 // The conf to read `key` off. It is the source's own conf, not a spread of it, since a hand-written
