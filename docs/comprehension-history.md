@@ -587,3 +587,31 @@ Inherited architect, would restructure first:
 - Navigation: `log/console-output.ts:7` `writeConsoleEntry`: the comment says it is the one console writer, while `consoleTransport` writes on its own
 - Navigation: `tracing/transport.ts:24` `Transport`: holds the contract for entries too, under a tracing folder
 - Navigation: `credentials/span-values.ts:25` `parseHttpUrl`: the fetch filter lives in the credentials folder
+
+## 2026-11-15T20:49:13Z, PR #388 at 5e92228, against f613041
+
+Ruling: better
+
+| Seat | Navigation | Locality | Shape | Self-sufficiency | Overall |
+|---|---|---|---|---|---|
+| Mid A | better | better | better | better | better |
+| Inherited architect | better | better | better | same | better |
+
+Mid A, decided by:
+
+- Navigation, Locality, Shape: `log/log.ts:186` `transports`: `Log` only puts the list together; `deprecatedConsole` prints and `queueTransport` enqueues, where the base's `deprecatedEntry` did both inside the class
+- Navigation, Shape, Self-sufficiency: `log/console-output.ts:9` `writeConsoleLine`: `consoleTransport`, the deprecated console and `writeStderr` all go through it, so "the one writer" is now true
+- Locality, Shape: `log/console-output.ts:1` imports: the cycle through `conf.ts` for `resolveFormatter` is gone
+- Navigation, Shape: `log/conf.ts:1` module: 297 lines to 197, inheritance and defaults only; what 3.0.0 deletes sits in `log/deprecated-options/`
+- Locality: `tracing/fetch.ts:91` `sendTraced`: returns the outcome as a value where the base mutated four locals across a `try` and read them in a `finally`
+- Shape: `opentelemetry-adapter/recorded-span.ts:43` `RecordedSpan` constructor: builds through the shared `newSpan`
+- Self-sufficiency: `credentials/query-userinfo-runs.ts:19` `Scan`: the comments about surviving mutants are gone, and the rest describe behaviour
+
+Inherited architect, decided by:
+
+- Locality, Shape: `log/queue-transport.ts:7` `queueTransport`: one place turns an entry or a span into an OTLP payload, where the base had three
+- Locality, Navigation: `log/console-output.ts:9` `writeConsoleLine`: one line writer taking a sink and a formatter; the base's `consoleTransport` repeated the routing
+- Navigation, Shape: `log/deprecated-options/formatter-alias.ts:14` `ENTRY_FORMATTER_ALIAS`: everything 3.0.0 deletes sits in one folder that says so, though `inherited` in `log/conf.ts:136` still sends the reader there
+- Shape: `log/deprecated-options/default-transports.ts:9` `transportsOf`: reads worse, since every `Log` and the adapter resolve transports through a folder named for deprecated options
+- Navigation: `log/entry-format.ts:78` `resolveFormatter`: lives beside the formatters it picks from
+- Shape: `opentelemetry-adapter/recorded-span.ts:43` `RecordedSpan` constructor: uses the shared `newSpan`
