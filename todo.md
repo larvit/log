@@ -164,7 +164,7 @@ Item 77 makes the constructor reject it in 3.0.0, and this warning is that break
 ### 80. Run the browser suite in WebKit and Firefox as well as Chromium.
 
 `scripts/run-browser-tests.mjs` launches Chromium alone, though its Playwright image ships both.
-WebKit is the only engine on an iPhone, and `failureMessage` has a Firefox branch the suite only
+WebKit is the only engine on an iPhone, and `redactedText` has a Firefox branch the suite only
 fakes. `~/.claude/principles/frontend.md` → broad device support.
 
 ### 157. Hand a custom transport's `span` method a span in a consumer's shape, and each transport its own copy of an entry and a span.
@@ -184,7 +184,7 @@ The maintainer chose, on 2026-11-15: give `TransportSpan` a consumer's shape in 
 The latest run, at 4f96af8 on 2026-11-15 (PR #391), scored Navigation 7.38, Locality 5.88, Shape
 6.63, Self-sufficiency 6.63, overall 6.50. Locality is the lowest.
 
-Item 161 (`credentials/` names) lifts Shape and Navigation. Places the seats named that no item takes:
+The chunk that renamed `credentials/` places (item 161, shipped) should lift Shape and Navigation. Places the seats named that no item takes:
 `log/otlp-transport.ts:14` `inTransportNames` and `log/log.ts:187` `deprecatedEntry`, which 3.0.0
 deletes (item 97), and `credentials/path.ts:36` `redactedPath`.
 
