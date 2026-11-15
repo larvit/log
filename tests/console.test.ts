@@ -567,7 +567,7 @@ test("entryFormatter still formats and warns once per stderr sink", t => {
 	t.strictEqual(stdout[0], "custom hi", "the deprecated formatter still formats output, and still wins over format: \"json\"");
 	t.strictEqual(log.conf.format, "json", "and format reads back as written, as in v2.3.0");
 	t.strictEqual(stderr.length, 1, "one warning per sink");
-	t.strictEqual(stderr[0], "custom @larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format — entryFormatter wins and the format beside it is ignored", "the warning goes through the instance's formatter, names the spelling to use instead and says which of the two wins");
+	t.strictEqual(stderr[0], "custom @larvit/log: entryFormatter is deprecated and removed in 3.0.0, use transports: [consoleTransport({ format })] — entryFormatter wins and the format beside it is ignored", "the warning goes through the instance's formatter, names the transport to use instead and says which of the two wins");
 	log.info("again");
 	t.strictEqual(stderr.length, 1, "a second entry on the same sink stays quiet");
 
@@ -583,7 +583,7 @@ test("entryFormatter still formats and warns once per stderr sink", t => {
 
 	builtIn.log.info("x");
 	t.strictEqual(builtIn.stderr.length, 1, "a built-in formatter warns too; the warning does not depend on which function it is");
-	t.ok(builtIn.stderr[0].endsWith("@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format"), "with no format beside it, the warning stops at the spelling to use");
+	t.ok(builtIn.stderr[0].endsWith("@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use transports: [consoleTransport({ format })]"), "with no format beside it, the warning stops at the transport to use");
 	t.end();
 });
 
@@ -602,7 +602,7 @@ test("format and entryFormatter are one setting, and a resolved conf carries nei
 	const pairStderr: string[] = [];
 
 	parent.log.clone({ entryFormatter: own, format: "json", stderr: line => { pairStderr.push(line); } });
-	t.ok(pairStderr[0]?.endsWith("@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format — entryFormatter wins and the format beside it is ignored"), "a clone holding both spellings hears the same warning the constructor gives");
+	t.ok(pairStderr[0]?.endsWith("@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use transports: [consoleTransport({ format })] — entryFormatter wins and the format beside it is ignored"), "a clone holding both spellings hears the same warning the constructor gives");
 
 	const spread = capture({ ...parent.log.conf, format: (entry: EntryFormatterConf) => `spread ${entry.msg}` });
 

@@ -135,10 +135,10 @@ function functionFormatterOf(conf: LogConf): EntryFormatter | undefined {
 function formatterWarning(options: LogOptions): string | undefined {
 	if (options.entryFormatter !== undefined) {
 		if (typeof options.format === "string") {
-			return "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format — entryFormatter wins and the format beside it is ignored";
+			return "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use transports: [consoleTransport({ format })] — entryFormatter wins and the format beside it is ignored";
 		}
 
-		return "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use format";
+		return "@larvit/log: entryFormatter is deprecated and removed in 3.0.0, use transports: [consoleTransport({ format })]";
 	}
 
 	if (typeof options.format === "string" && options.format !== "text" && options.format !== "json") {

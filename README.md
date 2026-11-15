@@ -546,7 +546,7 @@ instance you were handed; it is single-use and the consumer owns it.
 `new Log(options)` or `new Log()`, `options` a `LogOptions`. Every option is optional. A level string in place of the object,
 `new Log("debug")` or `log.clone("debug")`, is deprecated: it still sets the level, warns once per
 `stderr` sink for each distinct warning text and is removed in 3.0.0, so pass `{ logLevel }`
-instead. `entryFormatter` is deprecated the same way: pass the function as `format`.
+instead. `entryFormatter` is deprecated the same way: pass the function as `format` of a `consoleTransport` in `transports`.
 
 | Option | Type | Default | |
 |---|---|---|---|
@@ -556,7 +556,7 @@ instead. `entryFormatter` is deprecated the same way: pass the function as `form
 | `clock` | `Clock` | system clock | `{ now, setTimeout, clearTimeout }` behind every span and entry timestamp. Passed on to the default `Queue`; a `Queue` you build takes its own. |
 | `colors` | `boolean` | `true` | Deprecated, removed in 3.0.0: pass [`transports`](#transports) with `consoleTransport({ colors })`. ANSI colour codes in text output. Unset in code, the env decides: `NO_COLOR` (non-empty) turns it off; otherwise `FORCE_COLOR` turns it on, except `0` or `false` which turn it off. |
 | `context` | `MetadataInput` | `{}` | Added to every entry. Wins over a per-call key of the same name. An `undefined` key is dropped, so `log.conf.context` reads back as `Metadata`. |
-| `entryFormatter` | `EntryFormatter` | none | Deprecated, removed in 3.0.0: pass the function as `format`. Wins over a `"text"`/`"json"` `format`; two different formatters, one per spelling, throw. On `log.conf` it reads the formatter in use, and writing it swaps it. |
+| `entryFormatter` | `EntryFormatter` | none | Deprecated, removed in 3.0.0: pass [`transports`](#transports) with `consoleTransport({ format })`. Wins over a `"text"`/`"json"` `format`; two different formatters, one per spelling, throw. On `log.conf` it reads the formatter in use, and writing it swaps it. |
 | `format` | `"json" \| "text" \| EntryFormatter` | `"text"` | Deprecated, removed in 3.0.0: pass [`transports`](#transports) with `consoleTransport({ format })`. Console output format, or a formatter of your own. Any other string writes text and warns once per `stderr` sink. Use the entry's `msTimestamp` rather than `new Date()` so console and OTLP timestamps of one entry match. `log.conf.format` never holds a function before 3.0.0; `resolveFormatter(log.conf)` reads the formatter in use, as `log.conf.entryFormatter` does until 3.0.0. Writing `"text"` or `"json"` to `log.conf.format` takes effect from the next line, unless a function formatter is set, which wins. |
 | `logLevel` | `LogLevel \| "none"` | `"info"` | Minimum level to output. Any other value is kept as written, logs at `"info"` and warns once per `stderr` sink and value. |
 | `otlpAdditionalHeaders` | `Record<string, string>` | none | Deprecated, removed in 3.0.0: pass [`transports`](#transports) with `otlpTransport({ headers })`. Shorthand: the same option on the default `Queue`, see [Queue exports](#queue-exports). Not inherited by a child or clone whose `otlpHttpBaseURI` has another origin (scheme, host and port) than its source's. |
