@@ -3,12 +3,14 @@ import { systemClock, type TimerHandle } from "../../primitives/clock.js";
 
 const RETRY_DELAY_MAX_MS = 30000;
 
+const isUnrefTimer = (value: unknown): value is (id: number) => void => typeof value === "function";
+
 // Deno's unref for a numeric timer id, or undefined elsewhere.
 function denoUnrefTimer(): ((id: number) => void) | undefined {
 	const deno: unknown = Reflect.get(globalThis, "Deno");
 	const unrefTimer: unknown = typeof deno === "object" && deno !== null ? Reflect.get(deno, "unrefTimer") : undefined;
 
-	return typeof unrefTimer === "function" ? unrefTimer as (id: number) => void : undefined;
+	return isUnrefTimer(unrefTimer) ? unrefTimer : undefined;
 }
 
 // A pending batch or retry must not keep a finished Node or Deno process alive.
