@@ -54,7 +54,6 @@ export function requestAttributes(trace: FetchTrace, url: URL, method: string): 
 		"server.address": url.hostname,
 		...url.port ? { "server.port": Number(url.port) } : {},
 		"url.full": buildUrlFull(url, trace.captureQuery === true),
-		// A protocol holds one `:`, its last character.
 		"url.scheme": url.protocol.replace(/:$/, ""),
 	};
 }
@@ -83,7 +82,7 @@ function outgoing(url: URL, init: RequestInit | undefined, traceparent: string):
 	return { headers, request };
 }
 
-// What the span says of a request, beside the platform's response or the error it threw.
+// What the span says of a request so far, and at the end beside the response or the error thrown.
 type SpanSoFar = { attributes: Metadata, name: string, statusCode: number };
 type FetchOutcome = SpanSoFar & ({ failure: SpanFailure, res?: undefined } | { failure?: undefined, res: Response });
 

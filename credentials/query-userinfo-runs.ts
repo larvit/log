@@ -16,7 +16,6 @@ const holdsAtSignInAnyDecoding = (text: string) => inAnyDecoding(decodings(text)
 interface Run { lastAtSign?: number, start: number }
 
 // What one pair does to the scan: the runs a delimiter closes in it, and the run still going after it.
-// A stray entry in `closed` selects no pair, and a run with no `lastAtSign` has none to select.
 interface Scan { closed: Run[], going?: Run }
 
 // `run` extended through the pair at `index`, whose text is `part`: an `@` before the part's first
