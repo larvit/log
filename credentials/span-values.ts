@@ -14,7 +14,7 @@ import { stringField } from "../primitives/field-reads.js";
 // 6. A listed key after `?`, `&`, `#` or `;` in text: redactTextQueryKeys in text.ts.
 // 7. A url nested in the path: redactedPath in path.ts.
 // buildUrlFull assembles url.full from 3 and 7, failureMessage a span's status from 4 to 7, and
-// redactedRecordedValue what an OpenTelemetry instrumentation recorded from 3 to 7.
+// redactedRecordedAttribute what an OpenTelemetry instrumentation recorded from 1 to 7.
 
 export function redactHeaderCredential(name: string, value: string): string {
 	return isCredentialHeaderName(name) || redactedWholeUrl(value) !== undefined || holdsUserinfoInAnyDecoding(value) || holdsListedKeyInAnyDecoding(value) ? "REDACTED" : value;
@@ -72,29 +72,57 @@ export function failureMessage(error: unknown, url?: URL): string {
 	return holdsListedKeyInAnyDecoding(keyed) ? "REDACTED" : keyed;
 }
 
-// The origin a recorded path or query, as in `url.path` or `http.target`, is read after.
+// A recorded path, query or fragment is read as a url on this made-up origin.
 const RELATIVE_BASE = "http://relative.invalid";
 
-// A string attribute value, span name or status message an OpenTelemetry instrumentation recorded, read
-// as failureMessage reads log.fetch's status, and as its url where it parses as one, alone or after
-// RELATIVE_BASE. A value with nothing to redact stays as recorded, unnormalised. `url.query`, which
-// OpenTelemetry's semantic conventions write without its `?`, is read as a query.
-export function redactedRecordedValue(value: string, key?: string): string {
-	if (key === "url.query") {
-		return redactedQuery(new URL(`${RELATIVE_BASE}?${value}`)) ?? value;
+// OpenTelemetry's semantic conventions write these attributes without the `?` or `#` that opens them,
+// where the text rules find a pair only after one.
+const OPENER_LEFT_OUT = new Map([["url.fragment", "#"], ["url.query", "?"]]);
+const HEADER_ATTRIBUTE = /http\.(?:request|response)\.header\.(.+)/;
+
+// `text` read as a url after `base`, with `base` taken off again; `undefined` where it is no http: or
+// https: url, or holds nothing to redact.
+function redactedAsUrl(text: string, base: string): string | undefined {
+	const url = parseHttpUrl(base + text, undefined);
+
+	if (url === undefined) {
+		return undefined;
 	}
 
+	const redacted = failureMessage(url.href, url);
+
+	if (redacted === url.href) {
+		return undefined;
+	}
+
+	return redacted.startsWith(base) ? redacted.slice(base.length) : redacted;
+}
+
+// A span name, status message or attribute value an OpenTelemetry instrumentation recorded. A value
+// with nothing to redact stays as recorded, unnormalised.
+export function redactedRecordedValue(value: string): string {
 	// Appended, not resolved, so a path opening with `//` stays a path rather than naming a host.
-	const url = parseHttpUrl(/^[/?]/.test(value) ? RELATIVE_BASE + value : value, undefined);
+	const base = value.startsWith("/") ? RELATIVE_BASE : /^[?#]/.test(value) ? `${RELATIVE_BASE}/` : "";
 
-	if (url !== undefined) {
-		const redacted = failureMessage(url.href, url);
+	// Where the url reading finds nothing, the text is read as written: parsing drops a `..` segment,
+	// and a credential before it.
+	return redactedAsUrl(value, base) ?? failureMessage(value);
+}
 
-		if (redacted !== url.href) {
-			return redacted.startsWith(RELATIVE_BASE) ? redacted.slice(RELATIVE_BASE.length) : redacted;
-		}
+export function redactedRecordedAttribute(key: string, value: string): string {
+	const header = HEADER_ATTRIBUTE.exec(key);
+
+	if (header !== null) {
+		return redactHeaderCredential(header[1], value);
 	}
 
-	// The value as written too: parsing drops a `..` segment, and a credential before it.
-	return failureMessage(value);
+	const opener = OPENER_LEFT_OUT.get(key);
+
+	if (opener === undefined) {
+		return redactedRecordedValue(value);
+	}
+
+	const redacted = redactedRecordedValue(opener + value);
+
+	return redacted.startsWith(opener) ? redacted.slice(opener.length) : redacted;
 }

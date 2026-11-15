@@ -3,7 +3,7 @@ import { attributesOf, getNsTimestamp, type OtlpSpan, STATUS_CODE_ERROR, STATUS_
 import { exportSpan } from "../tracing/spans.js";
 import type { Log } from "../log/log.js";
 import type { Metadata } from "../primitives/metadata.js";
-import { redactedRecordedValue } from "../credentials/span-values.js";
+import { redactedRecordedAttribute, redactedRecordedValue } from "../credentials/span-values.js";
 import { spanIdFrom, traceIdFrom } from "../tracing/traceparent.js";
 import { transportsOf } from "../log/log-transports.js";
 
@@ -78,12 +78,11 @@ export class RecordedSpan implements Span {
 
 		this.ended = true;
 
-		// The span's own attribute wins over the Log's context, as a log.fetch span's does. Only what the
-		// instrumentation recorded is redacted: the context is the app's own, as on a log.fetch span.
+		// The span's own attribute wins over the Log's context, as a log.fetch span's does.
 		const attributes: Metadata = { ...this.log.context };
 
 		for (const [key, value] of Object.entries(this.attributes)) {
-			attributes[key] = typeof value === "string" ? redactedRecordedValue(value, key) : value;
+			attributes[key] = typeof value === "string" ? redactedRecordedAttribute(key, value) : value;
 		}
 
 		const status = this.span.status.message === undefined ? this.span.status : { ...this.span.status, message: redactedRecordedValue(this.span.status.message) };

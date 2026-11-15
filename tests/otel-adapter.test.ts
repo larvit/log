@@ -438,7 +438,10 @@ test("a credential in an instrumentation span's attributes, name or status messa
 	runWithLog(log, () => {
 		undiciTracer.startSpan("GET https://api.test/x?token=abc", { attributes: {
 			"db.query.text": "SELECT dblink('postgres://app:pw@db.test/x')",
+			"http.request.header.accept": "text/html",
+			"http.request.header.authorization": "Bearer abc",
 			"http.request.method": "GET",
+			"http.response.status_code": 200,
 			"http.target": "/orders?token=abc",
 			"path.dot-segment": "/fetch/https://u:pw@s3.test/../k",
 			"path.dot-segment-matrix": "/m/img;sig=abc/../x.png",
@@ -447,7 +450,8 @@ test("a credential in an instrumentation span's attributes, name or status messa
 			"url.full": "https://api.test/orders?access_token=s3cret&page=2",
 			"url.nested": "https://img.test/fetch/https:%2F%2Fu:pw@s3.test%2Fk",
 			"url.path": "/fetch/https:%2F%2Fu:pw@s3.test%2Fk",
-			"url.query": "access_token=s3cret&page=2",
+			"url.query": "access_token=s3cret&next=https%3A%2F%2Fu%3Apw%40h.test%2F&page=2",
+			"url.query-led": "?token=abc",
 			"url.unchanged": "HTTPS://API.test/x?page=2",
 			"url.userinfo": "https://u:pw@api.test/x",
 		} }).setStatus({ code: SpanStatusCode.ERROR, message: "request to https://u:pw@h.test/x failed" }).end();
@@ -455,7 +459,10 @@ test("a credential in an instrumentation span's attributes, name or status messa
 
 	t.deepEqual(spans[0]?.attributes, {
 		"db.query.text": "SELECT dblink('postgres://REDACTED@db.test/x')",
+		"http.request.header.accept": "text/html",
+		"http.request.header.authorization": "REDACTED",
 		"http.request.method": "GET",
+		"http.response.status_code": 200,
 		"http.target": "/orders?token=REDACTED",
 		"otel.scope.name": "@opentelemetry/instrumentation-undici",
 		"path.dot-segment": "/fetch/https://REDACTED@s3.test/../k",
@@ -465,11 +472,24 @@ test("a credential in an instrumentation span's attributes, name or status messa
 		"url.full": "https://api.test/orders?access_token=REDACTED&page=2",
 		"url.nested": "https://img.test/fetch/REDACTED",
 		"url.path": "/fetch/REDACTED",
-		"url.query": "access_token=REDACTED&page=2",
+		"url.query": "access_token=REDACTED&next=REDACTED&page=2",
+		"url.query-led": "?token=REDACTED",
 		"url.unchanged": "HTTPS://API.test/x?page=2",
 		"url.userinfo": "https://REDACTED@api.test/x",
 	});
 	t.ok(spans[0]?.span.attributes.some(({ key, value }) => key === "url.full" && value.stringValue === "https://api.test/orders?access_token=REDACTED&page=2"));
 	t.strictEqual(spans[0]?.span.name, "GET https://api.test/x?token=REDACTED");
 	t.deepEqual(spans[0]?.span.status, { code: 2, message: "request to https://REDACTED@h.test/x failed" });
+});
+
+test("url.fragment, written without its #, is read as a fragment", t => {
+	const { log, spans } = requestLog({ context: {} });
+
+	runWithLog(log, () => {
+		pgTracer.startSpan("implicit flow", { attributes: { "url.fragment": "access_token=abc&token_type=bearer" } }).end();
+		pgTracer.startSpan("encoded", { attributes: { "url.fragment": "%26token%3Dabc" } }).end();
+		pgTracer.startSpan("unchanged", { attributes: { "url.fragment": "section-2" } }).end();
+	});
+
+	t.deepEqual(spans.map(({ attributes }) => attributes["url.fragment"]), ["access_token=REDACTED&token_type=bearer", "REDACTED", "section-2"]);
 });
