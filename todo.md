@@ -12,8 +12,7 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 146 | 2.7.0 |  |  | **Let a reader see from `redactedPath` alone which segments of a request path it keeps.** | 2 | 2 | 4 | 6 | 2 | code health by 3 | 2.3 |
-| 148 | 2.7.0 | 146 | owner | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
+| 148 | 2.7.0 |  | owner | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
 | 158 | 2.7.0 |  | principle | **Let a test hand a `Log` the network it sends through, so no test swaps `globalThis.fetch` except to prove a default reads it.** | 2 | 1 | 2 | 3 | 3 | code health by 3, 1 by 3 | 3.9 |
 | 156 | 2.7.0 |  |  | **Lower the reading cost of the files a chunk reads most before its first commit.** | 2 | 2 | 1 | 3 | 4 | code health by 3 | 2.7 |
 | 41 | 2.7.0 |  | principle | **Warn once about a negative, zero or `NaN` numeric `QueueConf` option, and use the default.** | 1 | 1 | 1 | 1 | 2 | 1 by 5 | 2.5 |
@@ -83,18 +82,6 @@
 | 108 | 3.0.0 |  | principle | **Keep two tabs of one web app sharing a `storage` key from sending a record twice or deleting each other's backlog.** | 3 | 2 | 2 | 5 | 5 | 3 by 5 | 0.7 |
 
 ## Details
-
-### 146. Let a reader see from `redactedPath` alone which segments of a request path it keeps.
-
-The comprehension run of 2026-11-14, at 78682e7, scored Shape 6.63, and three of four seats named
-`credentials/path.ts` → `redactedPath`: it picks between two candidate cuts, one at a listed key and
-one at a url nested in the path whose search is bounded by the key's position, skips segment 0, and
-ends in a whole-path fallback that can override either cut. A reader has to hold all three
-together to say what a given path keeps.
-
-What is redacted stays as README → "Credentials in a captured value" sets it, and a defect here
-exposes a credential in an exported span's `url.full`, README → Goals #7. Against the technical
-principle "Keep It Simple, Stupid", and code health.
 
 ### 148. Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.
 
