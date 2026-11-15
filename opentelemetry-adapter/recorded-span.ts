@@ -6,43 +6,48 @@ import { spanIdFrom, traceIdFrom } from "../tracing/traceparent.js";
 
 // A number below the process's start counts from it, as performance.now() does: the rule of
 // `timeInputToHrTime` in @opentelemetry/core, which instrumentation written against the SDK relies on.
-function nsTimestamp(time: TimeInput | undefined, log: Log): string {
-	if (time === undefined) return getNsTimestamp(log.conf.clock.now());
-	if (Array.isArray(time)) return String((BigInt(time[0]) * BigInt(1000000000)) + BigInt(time[1]));
-	if (time instanceof Date) return getNsTimestamp(time.getTime());
+function epochMs(time: Date | number): number {
+	if (time instanceof Date) return time.getTime();
 
 	const processStart = globalThis.performance?.timeOrigin;
 
-	return getNsTimestamp(processStart !== undefined && time < processStart ? processStart + time : time);
+	return processStart !== undefined && time < processStart ? processStart + time : time;
 }
 
-// A span an OpenTelemetry tracer started under a Log, exported through that Log when it ends:
-// once, as a copy, so whatever is set on it later is never exported. It leaves out what an
-// OtlpSpan cannot hold and counts each in the span's dropped counts: an event, a link, and an
-// attribute value that is a list.
+// A time that is no time, such as NaN or an HrTime with a fraction, reads as now: a throw here
+// would surface inside the instrumented library's own call.
+function nsTimestamp(time: TimeInput | undefined, log: Log): string {
+	if (Array.isArray(time)) {
+		if (time.every(Number.isInteger)) return String((BigInt(time[0]) * BigInt(1000000000)) + BigInt(time[1]));
+	} else if (time !== undefined && Number.isFinite(epochMs(time))) {
+		return getNsTimestamp(epochMs(time));
+	}
+
+	return getNsTimestamp(log.conf.clock.now());
+}
+
+// OTLP numbers the kinds one above OpenTelemetry's API, whose 0 is INTERNAL.
+const OTLP_KINDS = [1, 2, 3, 4, 5] as const;
+
+// Exported once, as a copy, when it ends: whatever is set on it later is never exported.
 export class RecordedSpan implements Span {
 	private readonly attributes: Metadata;
 	private ended = false;
-	private readonly span: OtlpSpan;
+	private readonly span: Omit<OtlpSpan, "attributes" | "endTimeUnixNano">;
 
 	constructor(private readonly log: Log, scope: Metadata, name: string, options: SpanOptions, parent: SpanContext | undefined) {
-		const startedAt = nsTimestamp(options.startTime, log);
-
 		this.attributes = { ...scope };
 		this.span = {
-			attributes: [],
 			droppedAttributesCount: 0,
 			droppedEventsCount: 0,
 			droppedLinksCount: options.links?.length ?? 0,
-			endTimeUnixNano: startedAt,
 			events: [],
-			// OTLP numbers the kinds one above OpenTelemetry's API, whose 0 is INTERNAL.
-			kind: (options.kind ?? 0) + 1 as OtlpSpan["kind"],
+			kind: OTLP_KINDS[options.kind ?? 0] ?? 1,
 			links: [],
 			name,
 			parentSpanId: parent?.spanId,
 			spanId: spanIdFrom(log.conf.randomBytes),
-			startTimeUnixNano: startedAt,
+			startTimeUnixNano: nsTimestamp(options.startTime, log),
 			status: { code: STATUS_CODE_UNSET },
 			traceId: parent?.traceId ?? traceIdFrom(log.conf.randomBytes),
 		};
