@@ -296,7 +296,7 @@ trace.setGlobalTracerProvider(logTracerProvider());
 app.use((req, res, next) => {
 	const reqLog = appLog.clone({ spanName: `${req.method} ${req.path}`, traceparent: req.headers.traceparent });
 
-	res.on("finish", () => reqLog.end());
+	res.on("close", () => reqLog.end());
 	runWithLog(reqLog, next);
 });
 ```
@@ -307,20 +307,21 @@ provider, which is now this library's.
 `runWithLog(log, callback)` runs `callback` and returns what it returns. A span that a tracer starts
 while `callback` runs, or in anything it awaits, joins the trace of `log`. It nests under the span
 of `log`, or under the instrumentation span that was active when it started, and goes to the
-[transports](#transports) of `log` when it ends. The span carries the context of `log`, under its
-own attributes where both have a key, and `otel.scope.name` and `otel.scope.version` name the
+[transports](#transports) of `log` when it ends. The span carries the context of `log`; where both
+hold a key, the span's own attribute wins. `otel.scope.name` and `otel.scope.version` name the
 tracer that recorded it. Call `runWithLog` where the request enters your code, as in a middleware:
 that call is the only way a span finds its `Log`.
 
+- **Attributes are exported unredacted.** Nothing under
+  [Credentials in a captured value](#credentials-in-a-captured-value) applies to them, so a
+  password in a `url.full` or a `db.query.text` reaches your collector. Redact it with the
+  instrumentation's own options. Each value is exported as a string, as every attribute this
+  library sends is.
 - **A span started outside `runWithLog` is not exported,** and neither is one under a `Log` whose
   trace is unsampled.
 - **OpenTelemetry's context manager does the nesting,** so install one before the first request.
   Without one, `runWithLog` still runs `callback`, no span is exported, and the `stderr` of `log`
   gets one warning. This library keeps no context of its own.
-- **Attributes are exported as the instrumentation recorded them.** Nothing under
-  [Credentials in a captured value](#credentials-in-a-captured-value) applies to them, so a
-  password in a `url.full` or a `db.query.text` reaches your collector. Redact it with the
-  instrumentation's own options.
 - **Span events, span links and attributes holding a list are left out,** and counted in the span's
   `droppedEventsCount`, `droppedLinksCount` and `droppedAttributesCount`. An exception recorded on a
   span is an event, so set the span's status to keep its message.
@@ -328,10 +329,10 @@ that call is the only way a span finds its `Log`.
   OpenTelemetry's HTTP client instrumentation does. Set one with `propagation.setGlobalPropagator()`,
   such as `W3CTraceContextPropagator` from `@opentelemetry/core`. `log.fetch` needs none.
 - **`@opentelemetry/api` 1.3.0 or later, below 2,** is an optional peer dependency. An app that
-  never imports `@larvit/log/otel` installs nothing more and loads only `index.js`.
+  never imports `@larvit/log/otel` doesn't install anything more and loads only `index.js`.
 
-CI proves the adapter on Node 18 to 26. It reads nothing Node-specific, so it runs wherever
-OpenTelemetry's context manager for that runtime does.
+CI proves the adapter on Node 18 to 26. The adapter doesn't read anything Node-specific, so it
+runs wherever OpenTelemetry's context manager for that runtime does.
 
 ## Transports
 
@@ -738,8 +739,8 @@ a call below `logLevel`, ≤2 µs for a console call, ≤10 µs with OTLP config
 
 Instance fields: `log.conf`, `log.context`, `log.span`, `log.sampled`, `log.ended`.
 
-`@larvit/log/otel` exports `logTracerProvider()`, an OpenTelemetry `TracerProvider`, and
-`runWithLog(log, callback)`, see
+`@larvit/log/otel` exports `logTracerProvider()`, which returns an OpenTelemetry
+`TracerProvider`, and `runWithLog(log, callback)`; see
 [Export what OpenTelemetry instrumentation records](#export-what-opentelemetry-instrumentation-records).
 
 ## Development
@@ -752,7 +753,7 @@ needs Node 18+ on the host.
 |---|---|
 | `npm test` | Node and browser suites. |
 | `npm run test-docker` | Node suite, on the image the `Dockerfile` pins. `NODE_IMAGE=node:18.20.8-bookworm-slim npm run test-docker` picks another; CI runs 18 to 26. |
-| `npm run test-browser` | The same suite in Chromium. |
+| `npm run test-browser` | The same suite in Chromium, less the OpenTelemetry adapter's tests. |
 | `npm run test-otlp` | Export to a real OpenTelemetry Collector, JSON and protobuf. `OTLP_DEBUG=1` prints what it received. |
 | `npm run test-mutation` | Stryker mutation tests of the library, against the Node suite. `npm run test-mutation -- --mutate credentials/path.ts:30-50` mutates only those lines. |
 | `npm run lint` | eslint. |

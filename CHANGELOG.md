@@ -13,11 +13,11 @@ Nothing here needs a change in your code.
   lists every destination, and an object with `entry(entry)`, `span(span)` or `flush()` is a
   transport of your own, such as one for Sentry or a test spy. See README → Transports.
 - **Export the spans OpenTelemetry's instrumentation packages record, such as pg or Prisma queries,
-  through a `Log`.** `trace.setGlobalTracerProvider(logTracerProvider())` and
-  `runWithLog(reqLog, next)`, both from the new entry point `@larvit/log/otel`, nest each span under
-  the request's `Log` and send it to that `Log`'s transports, with no OpenTelemetry SDK. It needs
-  `@opentelemetry/api` and a context manager, and an app that doesn't import it loads nothing new.
-  Attributes are exported as the instrumentation recorded them, unredacted. See README → Export
+  through a `Log`.** `logTracerProvider()` and `runWithLog(reqLog, next)`, both from the new entry
+  point `@larvit/log/otel`, nest each span under the request's `Log` and send it to that `Log`'s
+  transports, with no OpenTelemetry SDK. It needs `@opentelemetry/api` and a context manager, and
+  an app that doesn't import it doesn't load anything new. Attributes are exported unredacted, each
+  value as a string like every attribute this library sends. See README → Export
   what OpenTelemetry instrumentation records.
 - **Send OTLP with a `fetch` of your own.** `otlpTransport({ baseUrl, fetch })` exports through the
   `fetch` you pass, such as `expo/fetch` or one that pins TLS, and no longer needs the global one.
