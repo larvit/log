@@ -54,7 +54,7 @@ export function requestAttributes(trace: FetchTrace, url: URL, method: string): 
 		"server.address": url.hostname,
 		...url.port ? { "server.port": Number(url.port) } : {},
 		"url.full": buildUrlFull(url, trace.captureQuery === true),
-		// A protocol holds one `:`, its last character, so no test can tell `/:$/` from `/:/`.
+		// A protocol holds one `:`, its last character.
 		"url.scheme": url.protocol.replace(/:$/, ""),
 	};
 }
@@ -137,8 +137,7 @@ export function pageHref(scope: object = globalThis): string | undefined {
 	try {
 		const location: unknown = Reflect.get(scope, "location");
 
-		// The guard only satisfies the type: `Reflect.get` throws on a non-object, and the catch turns that into undefined
-		// too, so removing the guard doesn't fail any test.
+		// The guard only satisfies the type: `Reflect.get` throws on a non-object, and the catch turns that into undefined too.
 		href = typeof location === "object" && location !== null ? Reflect.get(location, "href") : undefined;
 	} catch {
 		// The address stays undefined.

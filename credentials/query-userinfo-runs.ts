@@ -16,8 +16,7 @@ const holdsAtSignInAnyDecoding = (text: string) => inAnyDecoding(decodings(text)
 interface Run { lastAtSign?: number, start: number }
 
 // What one pair does to the scan: the runs a delimiter closes in it, and the run still going after it.
-// Two spots hold a value no test can tell from a missing one, so no test kills a mutant there: a stray
-// entry in `closed`, which selects no pair, and a run with no `lastAtSign`, which has none to select.
+// A stray entry in `closed` selects no pair, and a run with no `lastAtSign` has none to select.
 interface Scan { closed: Run[], going?: Run }
 
 // `run` extended through the pair at `index`, whose text is `part`: an `@` before the part's first
@@ -72,8 +71,8 @@ function pairsInUserinfoRuns(pairs: QueryPairs, holdsAtSign: (text: string) => b
 }
 
 // The indexes of the pairs inside a run of userinfo in any of three readings of the query, each as a
-// consumer may read it, given the query's pairs raw and form-decoded. Dropping a reading that no test
-// finds a difference in can only let a credential through. Raw, only a literal delimiter ends a run and only a literal `@` counts: a
+// consumer may read it, given the query's pairs raw and form-decoded. Dropping a reading
+// can only let a credential through. Raw, only a literal delimiter ends a run and only a literal `@` counts: a
 // `%2F` or `%40` there is no `/` or `@`. Percent-decoded, an escaped delimiter ends a run and an escaped
 // `@` counts, for a consumer that decodes first; its `+` stays, since a parser takes it as part of the
 // userinfo. Form-decoded, as `searchParams` reads it, a `+` is a space and ends a run.
