@@ -114,8 +114,8 @@ A `Log` takes `clock`, `randomBytes`, `stdout` and `stderr`, and `otlpTransport`
 `fetch`. The network is the one effect a `Log` can't be handed, in two places: `log/log.ts` →
 `fetchTrace` sends every `log.fetch` request through `globalThis.fetch`, read at the call so a
 polyfill installed later still wins, and `log/deprecated-options/default-queue.ts` →
-`attachDefaultQueue` builds the queue for `otlpHttpBaseURI` with no `fetch`. So 22 tests swap the
-global through `tests/test-doubles.ts` → `stubFetch`: 12 in `tests/fetch.test.ts`, 7 in
+`attachDefaultQueue` builds the queue for `otlpHttpBaseURI` with no `fetch`. So tests swap the
+global through `tests/test-doubles.ts` → `stubFetch`, in 22 calls: 12 in `tests/fetch.test.ts`, 7 in
 `tests/otlp.test.ts`, 2 in `tests/console.test.ts` and 1 in `tests/trace-context.test.ts`. They
 share one mutable global, a `log.fetch` test that forgets the swap sends a real request, and a
 consumer testing their own code that calls `log.fetch` has to swap the global too.
@@ -123,16 +123,17 @@ consumer testing their own code that calls `log.fetch` has to swap the global to
 Principle: "Functional core, imperative shell", which bans a test swapping `globalThis.fetch` by
 name. Found by the principles pass of the 2.7.0 release review, round 2.
 
-Done when the suite swaps `globalThis.fetch` only in the tests that prove a default reads it, as it
-swaps `process` for the colour default, and `docs/decisions.md` → "A platform read stays a default"
-lists it so. A `Log` that is handed nothing still sends through the global, polyfill included.
+Done when the suite swaps `globalThis.fetch` only in a test that proves a default reads it, or
+that code handed a `fetch` leaves the global alone, and the decision "A platform read stays a
+default, and a consumer injects through `colors` and `clock`" lists `fetch` among those swaps. A `Log` that is handed nothing still sends through the global, polyfill included.
 
 What bounds the repair:
 
 - An option a consumer writes is a new spelling, so a panel seated as README → Audience picks it
   before it ships, and README → Goals #2 counts it against the documented surface.
 - `Log`'s second constructor parameter carries only what this library passes
-  (`docs/decisions.md`), so a test may not hand a `Log` its network through it.
+  (decision "A constructor parameter marked 'Not part of the API' carries what only this library
+  passes"), so a test may not hand a `Log` its network through it.
 - Item 97 removes the queue a `Log` builds, in 3.0.0. Until then that queue is in this item's
   scope.
 - The comprehension seats found `attachDefaultQueue` hard to follow, since the two ways a queue is
