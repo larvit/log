@@ -10,6 +10,9 @@ new name, `LogEntry`, which 3.0.0 gives the old one. Nothing here needs a change
   writes text, and now says why.
 - **Import `LogEntry`, and stop using `EntryFormatterConf`, which 3.0.0 removes.** Both name the same
   type, so switching now changes nothing at runtime and leaves nothing to do in 3.0.0.
+- **Tell a browser consumer that the collector must answer a CORS preflight.** README → Queue
+  exports now says every cross-origin OTLP POST is preflighted for its `Content-Type`, and that
+  without CORS on the collector each batch fails as `Failed to fetch` and is retried.
 
 ## v2.6.1
 

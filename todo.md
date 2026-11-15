@@ -12,7 +12,6 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 82 | 2.7.0 |  |  | **Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.** | 1 | 2 | 1 | 2 | 1 | 1 by 5 | 2.5 |
 | 138 | 2.7.0 |  | principle | **Sort each module's imports on their first binding, with a lint rule that keeps them so.** | 2 | 1 | 1 | 2 | 3 | code health by 2 | 2.5 |
 | 96 | 2.7.0 |  | owner | **Add a list of transports, each handed plain log entries it encodes itself, with console and OTLP as the two this library ships and uses by default.** | 4 | 2 | 3 | 7 | 8 | 2 by 7, 4 by 8 | 1.4 |
 | 153 | 2.7.0 | 96 | owner | **Let an app export the spans OpenTelemetry's instrumentation packages record, such as pg or Prisma queries, through a `Log`, nested under the request they ran in.** | 4 | 2 | 2 | 6 | 6 | 2 by 8, 4 by 6 | 1.7 |
@@ -84,11 +83,6 @@
 | 108 | 3.0.0 |  | principle | **Keep two tabs of one web app sharing a `storage` key from sending a record twice or deleting each other's backlog.** | 3 | 2 | 2 | 5 | 5 | 3 by 5 | 0.7 |
 
 ## Details
-
-### 82. Tell a browser consumer in README → Queue exports that the collector must answer a CORS preflight.
-
-Every cross-origin OTLP POST is preflighted for its `Content-Type`; without CORS on the collector
-each batch fails as `Failed to fetch` and retries forever.
 
 ### 138. Sort each module's imports on their first binding, with a lint rule that keeps them so.
 

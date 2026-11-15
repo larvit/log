@@ -535,3 +535,20 @@ Read most (opens and searches):
 - `.github/workflows/push.yaml` 1
 - `.gitignore` 1
 - `eslint.config.js` 1
+
+## Reading cost, chunk f197ef1e3d97, finished 2026-11-15T00:02:20Z
+
+59661 new input tokens before the first commit.
+
+Read most (opens and searches):
+
+- `tests/credentials.test.ts` 4
+- `README.md` 3
+- `credentials/query.ts` 2
+- `package.json` 2
+- `.dockerignore` 1
+- `.gitignore` 1
+- `credentials/decodings.ts` 1
+- `credentials/query-userinfo-runs.ts` 1
+- `credentials/span-values.ts` 1
+- `credentials/text.ts` 1
