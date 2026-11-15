@@ -52,11 +52,13 @@ In [docs/decisions.md](docs/decisions.md):
 
 ## Working here
 
-- `index.ts` and `otel.ts` hold only the public exports of their entry points. New code joins the module whose file name stays true
-  of it, or gets its own. A rule set answering one question — what a reader has to check as a
-  whole — lives in one module, or in one folder once it outgrows a module.
-- Imports point one way: `opentelemetry-adapter/` → `log/` → `tracing/` → `otlp/` → `credentials/` → `primitives/`, and
-  inside `otlp/`, `queue/` → `send/`. The decision log names each import that runs against it.
+- `index.ts` and `otel.ts` hold only the public exports of their entry points. New code joins the
+  module whose file name stays true of it, or gets its own. A rule set answering one question —
+  what a reader has to check as a whole — lives in one module, or in one folder once it outgrows a
+  module.
+- Imports point one way: `opentelemetry-adapter/` → `log/` → `tracing/` → `otlp/` →
+  `credentials/` → `primitives/`, and inside `otlp/`, `queue/` → `send/`. The decision log names
+  each import that runs against it.
 - A `// --- name ---` banner divides a source module only where a technical limit stops a split.
 - A done `todo.md` item leaves the file: a change a consumer can observe is reworded for them
   under `CHANGELOG.md` → `## Unreleased`; anything else is deleted outright.
@@ -68,8 +70,9 @@ In [docs/decisions.md](docs/decisions.md):
   open — puts `### Security` holding it right after that intro, ahead of `### Everything else`;
   one with none omits both headings. Thirty flat bullets is where a rotation notice goes unread.
 - Tests-first. Tests sit in one file per part of the library, as `tests/otlp.test.ts`, beside the
-  doubles they share in `tests/test-doubles.ts`. Import a new test file in `tests/test.ts`, the one
-  entry the Node and browser runs load. The suite injects `stdout`/`stderr` and stubs the global
+  doubles they share in `tests/test-doubles.ts`. Import a new test file in `tests/test.ts`, the
+  entry the Node and browser runs both load. A test of `@larvit/log/otel` goes in
+  `tests/otel-adapter.test.ts`, which only `npm run test-node` runs. The suite injects `stdout`/`stderr` and stubs the global
   `fetch`, so the same tests cover console + OTLP in both runtimes.
 - See [README](README.md) for build/test/release commands.
 - Don't wait on CodeRabbit: under 10 stars it reviews only when triggered by hand.
