@@ -48,7 +48,7 @@ In [docs/decisions.md](docs/decisions.md):
 - A platform read stays a default, and a consumer injects through `colors` and `clock`
 - A constructor parameter marked "Not part of the API" carries what only this library passes
 - The package publishes one bundled file per entry point, built from a module per part
-- The OpenTelemetry adapter exports a span through the `Log` handed to `runWithLog`, as its instrumentation recorded it
+- The OpenTelemetry adapter exports a span through the `Log` handed to `runWithLog`, redacted as a `log.fetch` span is
 
 ## Working here
 

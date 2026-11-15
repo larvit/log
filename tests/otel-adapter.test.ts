@@ -430,3 +430,38 @@ test("with no context manager installed, runWithLog still runs the callback and 
 	t.strictEqual(stderr.length, 1);
 	t.ok(/@larvit\/log: runWithLog found no OpenTelemetry context manager, so no span joins this Log; install one with context\.setGlobalContextManager\(\)/.test(stderr[0] ?? ""));
 });
+
+test("a credential in an instrumentation span's attributes, name or status message records REDACTED, as in a log.fetch span", t => {
+	const { log, spans } = requestLog({ context: {} });
+	const undiciTracer = trace.getTracer("@opentelemetry/instrumentation-undici");
+
+	runWithLog(log, () => {
+		undiciTracer.startSpan("GET https://api.test/x?token=abc", { attributes: {
+			"db.query.text": "SELECT dblink('postgres://app:pw@db.test/x')",
+			"http.request.method": "GET",
+			"http.target": "/orders?token=abc",
+			"url.full": "https://api.test/orders?access_token=s3cret&page=2",
+			"url.path": "/fetch/https:%2F%2Fu:pw@s3.test%2Fk",
+			"url.query": "access_token=s3cret&page=2",
+			"url.userinfo": "https://u:pw@api.test/x",
+			"url.nested": "https://img.test/fetch/https:%2F%2Fu:pw@s3.test%2Fk",
+			"url.unchanged": "HTTPS://API.test/x?page=2",
+		} }).setStatus({ code: SpanStatusCode.ERROR, message: "request to https://u:pw@h.test/x failed" }).end();
+	});
+
+	t.deepEqual(spans[0]?.attributes, {
+		"db.query.text": "SELECT dblink('postgres://REDACTED@db.test/x')",
+		"http.request.method": "GET",
+		"http.target": "/orders?token=REDACTED",
+		"otel.scope.name": "@opentelemetry/instrumentation-undici",
+		"url.full": "https://api.test/orders?access_token=REDACTED&page=2",
+		"url.nested": "https://img.test/fetch/REDACTED",
+		"url.path": "/fetch/REDACTED",
+		"url.query": "access_token=REDACTED&page=2",
+		"url.unchanged": "HTTPS://API.test/x?page=2",
+		"url.userinfo": "https://REDACTED@api.test/x",
+	});
+	t.ok(spans[0]?.span.attributes.some(({ key, value }) => key === "url.full" && value.stringValue === "https://api.test/orders?access_token=REDACTED&page=2"));
+	t.strictEqual(spans[0]?.span.name, "GET https://api.test/x?token=REDACTED");
+	t.deepEqual(spans[0]?.span.status, { code: 2, message: "request to https://REDACTED@h.test/x failed" });
+});

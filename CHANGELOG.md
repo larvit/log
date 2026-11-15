@@ -16,8 +16,9 @@ Nothing here needs a change in your code.
   through a `Log`.** `logTracerProvider()` and `runWithLog(reqLog, next)`, both from the new entry
   point `@larvit/log/otel`, nest each span under the request's `Log` and send it to that `Log`'s
   transports, with no OpenTelemetry SDK. It needs `@opentelemetry/api` and a context manager, and
-  an app that doesn't import it doesn't load anything new. Attributes are exported unredacted, each
-  value as a string like every attribute this library sends. See README → Export
+  an app that doesn't import it doesn't load anything new. A credential in an attribute, the span's
+  name or its status message records `REDACTED`, as in a `log.fetch` span, and each value is
+  exported as a string like every attribute this library sends. See README → Export
   what OpenTelemetry instrumentation records.
 - **Send OTLP with a `fetch` of your own.** `otlpTransport({ baseUrl, fetch })` exports through the
   `fetch` you pass, such as `expo/fetch` or one that pins TLS, and no longer needs the global one.
