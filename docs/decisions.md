@@ -456,10 +456,18 @@ for these reads: a consumer already injects through `colors`, which beats the en
 whose timers `unref` handles, and through an absolute url, which needs no page address. A further
 option would grow the documented surface for what only a default reads. Applies the technical
 principle "Functional core, imperative shell". The suite tests `colorsFromEnv` and `unref` with
-the value passed in, and `pageHref` with a stand-in for the global object. It swaps a global by
-name only in the tests of the default that reads it: `process` to prove the colour default reads
-the env, and, through `withGlobals`, `Deno` and `setTimeout` to prove that only the system clock's
-timer ids reach `Deno.unrefTimer`. Serves README → Goals #2 and #5. Valid while no
+the value passed in, and `pageHref` with a stand-in for the global object. A test hands a `Queue`
+or `otlpTransport` its `fetch`. The suite swaps a global by name only in the tests of the default
+that reads it:
+- `process`, to prove the colour default reads the env.
+- `Deno` and `setTimeout`, to prove that only the system clock's timer ids reach `Deno.unrefTimer`.
+- `fetch`, for the queue a Log builds from `otlpHttpBaseURI` and for `log.fetch`, which both send
+  through the global.
+- `Request`, to prove `log.fetch` traces a call on a runtime without one.
+- `performance`, to prove the OpenTelemetry adapter reads `performance.timeOrigin`.
+
+One test swaps `URL` to count the parses `redactedQuery` makes, since that function takes no
+parser. Serves README → Goals #2 and #5. Valid while no
 consumer needs the page address or the env injected apart from these.
 
 ## A constructor parameter marked "Not part of the API" carries what only this library passes

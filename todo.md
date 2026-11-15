@@ -95,6 +95,8 @@ Today `TransportSpan` is `{ attributes: Metadata, span: OtlpSpan }`, and README 
 
 `Log.end` also hands every transport the `Log`'s own `this.span` object, so a transport that writes to it changes what the next one gets. Whatever the answer, hand each transport a copy.
 
+Entries share the same way: `log/log.ts` → `Log`'s entry hand-off gives every transport one `entry` object, and README → Transports only asks a transport to copy it before changing it. The 2.7.0 principles pass raised it under "One owner per value". Settle both with one rule: copy per transport, or freeze.
+
 Options:
 
 - A. Give `TransportSpan` a consumer shape, such as `{ name, traceId, spanId, parentSpanId?, kind, startMs, endMs, status, attributes, serviceName? }`, built in `tracing/spans.ts`, and convert to `OtlpSpan` inside `log/queue-transport.ts`. It must still carry what the OpenTelemetry adapter records: nanosecond times from an `HrTime`, and the dropped attribute, event and link counts. A panel benches the spelling first. This does item 97's span half early, and grows `index.js`, which item 117 already holds over budget.

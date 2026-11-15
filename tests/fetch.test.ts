@@ -1,7 +1,7 @@
 import { buildUrlFull } from "../credentials/span-values.js";
-import { callHeader, capture, clientSpan, exportedRecords, exportedSpans, nextTurn, response, stubFetch, testFetchTrace, waitFor } from "./test-doubles.js";
+import { callHeader, capture, clientSpan, exportedRecords, exportedSpans, fetchRecorder, nextTurn, response, stubFetch, testFetchTrace, waitFor } from "./test-doubles.js";
 import { capturedHeaders, fetchFailure, pageHref, requestAttributes, responseAttributes, spanStatusCode } from "../tracing/fetch.js";
-import { formatTraceparent, generateSpanId, generateTraceId, Log, parseTraceparent, type TimerHandle } from "../index.js";
+import { formatTraceparent, generateSpanId, generateTraceId, Log, parseTraceparent, Queue, type TimerHandle } from "../index.js";
 import { isCredentialHeaderName } from "../credentials/header-names.js";
 import { STATUS_CODE_ERROR, STATUS_CODE_UNSET } from "../otlp/payloads.js";
 import test from "./tap.js";
@@ -396,9 +396,9 @@ test("log.fetch redacts userinfo holding a tab the parser drops, in a captured h
 // A url parser keeps these in userinfo, so a status message redacts it; only a plain space ends it in text.
 for (const character of ["\v", "\f", "\u00a0", "\u1680", "\u2000", "\u200a", "\u2028", "\u2029", "\u202f", "\u205f", "\u3000", "\ufeff"]) {
 	test(`userinfo holding U+${character.charCodeAt(0).toString(16).padStart(4, "0")} is redacted in a status message`, async t => {
-		const { calls } = stubFetch();
+		const { calls, fetch } = fetchRecorder();
 
-		await new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} }).end({ error: new Error(`retry https://us${character}er:pw${character}hunter2@db.test/x and \\\\us${character}er:pw${character}hunter2@h and https:\\/pw${character}hunter2@h`) });
+		await new Log({ otlpQueue: new Queue({ fetch, otlpHttpBaseURI: "http://127.0.0.1:4318" }), stderr: () => {} }).end({ error: new Error(`retry https://us${character}er:pw${character}hunter2@db.test/x and \\\\us${character}er:pw${character}hunter2@h and https:\\/pw${character}hunter2@h`) });
 
 		t.deepEqual(exportedSpans(calls)[0].status, { code: 2, message: "retry https://REDACTED@db.test/x and \\\\REDACTED@h and https:\\/REDACTED@h" }, "after //, \\\\ and \\/");
 		t.end();
@@ -408,9 +408,9 @@ for (const character of ["\v", "\f", "\u00a0", "\u1680", "\u2000", "\u200a", "\u
 // A url parser keeps these in a query value.
 for (const character of ["\v", "\f", "\u00a0", "\u1680", "\u2000", "\u200a", "\u2028", "\u2029", "\u202f", "\u205f", "\u3000", "\ufeff"]) {
 	test(`a listed key's value holding U+${character.charCodeAt(0).toString(16).padStart(4, "0")} is redacted whole in a status message`, async t => {
-		const { calls } = stubFetch();
+		const { calls, fetch } = fetchRecorder();
 
-		await new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} }).end({ error: new Error(`request to https://h.test/x?token=ab${character}cd&page=2 failed`) });
+		await new Log({ otlpQueue: new Queue({ fetch, otlpHttpBaseURI: "http://127.0.0.1:4318" }), stderr: () => {} }).end({ error: new Error(`request to https://h.test/x?token=ab${character}cd&page=2 failed`) });
 
 		t.deepEqual(exportedSpans(calls)[0].status, { code: 2, message: "request to https://h.test/x?token=REDACTED&page=2 failed" });
 		t.end();
@@ -418,9 +418,9 @@ for (const character of ["\v", "\f", "\u00a0", "\u1680", "\u2000", "\u200a", "\u
 }
 
 test("a plain space still ends userinfo in a status message", async t => {
-	const { calls } = stubFetch();
+	const { calls, fetch } = fetchRecorder();
 
-	await new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} }).end({ error: new Error("see //host and mail a@b, see \\\\host and mail a@b") });
+	await new Log({ otlpQueue: new Queue({ fetch, otlpHttpBaseURI: "http://127.0.0.1:4318" }), stderr: () => {} }).end({ error: new Error("see //host and mail a@b, see \\\\host and mail a@b") });
 
 	t.deepEqual(exportedSpans(calls)[0].status, { code: 2, message: "see //host and mail a@b, see \\\\host and mail a@b" });
 	t.end();
