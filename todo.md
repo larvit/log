@@ -6,12 +6,13 @@
 
 `Bar = 0.5`
 
-`Next ID = 157`
+`Next ID = 158`
 
 ## Items
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
+| 157 | 2.7.0 |  | question | **Settle the shape a custom transport's `span` method is handed before 2.7.0 publishes it.** | 3 | 2 | 3 | 6 | 5 | 1 by 4, 4 by 4 | 1.0 |
 | 156 | 2.8.0 |  |  | **Lower the reading cost of the files a chunk reads most before its first commit.** | 2 | 2 | 1 | 3 | 4 | code health by 3 | 2.7 |
 | 146 | 2.8.0 |  |  | **Let a reader see from `redactedPath` alone which segments of a request path it keeps.** | 2 | 2 | 4 | 6 | 2 | code health by 3 | 2.3 |
 | 149 | 2.8.0 |  |  | **Keep a queue's storage read from rejecting when `restore` throws.** | 1 | 1 | 2 | 2 | 6 | code health by 3 | 2.3 |
@@ -81,6 +82,28 @@
 | 108 | 3.0.0 |  | principle | **Keep two tabs of one web app sharing a `storage` key from sending a record twice or deleting each other's backlog.** | 3 | 2 | 2 | 5 | 5 | 3 by 5 | 0.7 |
 
 ## Details
+
+### 157. Settle the shape a custom transport's `span` method is handed before 2.7.0 publishes it.
+
+The 2.7.0 release review's architect raised this as a 🔴 (`tracing/transport.ts` → `TransportSpan`). The maintainer chooses, since each option changes what 2.7.0 holds or the decision "A `Log` sends through a list of transports".
+
+Today `TransportSpan` is `{ attributes: Metadata, span: OtlpSpan }`, and README → Transports documents it. Three problems:
+
+- A custom transport gets the OTLP wire form: nanosecond strings, numeric kind and status codes.
+- The attributes travel twice. `span.attributes` is the wire list without `service.name`; `attributes` is the `Metadata`, which `buildSpanPayload` reads only to find `service.name`.
+- Item 97 (3.0.0) lets no code outside the OTLP transport know OTLP, so the shape breaks one major after it ships. README → Audience says a feature whose right shape breaks waits for that major. Nothing is published yet, so 2.7.0 can still change it freely.
+
+`Log.end` also hands every transport the `Log`'s own `this.span` object, so a transport that writes to it changes what the next one gets. Whatever the answer, hand each transport a copy.
+
+Options:
+
+- A. Give `TransportSpan` a consumer shape, such as `{ name, traceId, spanId, parentSpanId?, kind, startMs, endMs, status, attributes, serviceName? }`, built in `tracing/spans.ts`, and convert to `OtlpSpan` inside `log/queue-transport.ts`. It must still carry what the OpenTelemetry adapter records: nanosecond times from an `HrTime`, and the dropped attribute, event and link counts. A panel benches the spelling first. This does item 97's span half early, and grows `index.js`, which item 117 already holds over budget.
+- B. Document only `entry` and `flush` for a custom transport in 2.7.0, and file A for a later release. A custom transport then gets no spans in 2.7.0; `otlpTransport` and `otlpQueue` export them as before. It rewords the decision's first bullet.
+- C. Keep `OtlpSpan`, hand it once as `{ span, serviceName? }`, record that choice in `docs/decisions.md`, and announce in README → Transports that 3.0.0 changes the shape.
+
+Recommended: B now, with A filed for the release that can bench its shape. It is the one option that follows README → Audience as written, and a later minor can add `span` without a break. C is the cheapest, and needs the maintainer to accept a known break, as they did for the two sets of endpoint names.
+
+Once settled, `Transport` and its types can move out of `tracing/transport.ts` to a file named for what they hold, where the answer drops its `OtlpSpan` import.
 
 ### 156. Lower the reading cost of the files a chunk reads most before its first commit.
 
