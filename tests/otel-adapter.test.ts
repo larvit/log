@@ -291,7 +291,7 @@ test("on a runtime with no performance global, every number is an epoch", t => {
 test("a time that is no time reads as now", t => {
 	const { clock, log, spans } = requestLog();
 	const now = `${clock.now()}000000`;
-	const noTimes: TimeInput[] = [Number.NaN, Number.POSITIVE_INFINITY, new Date("no date"), [1758150000, 1234.5], [1758150000.5, 0]];
+	const noTimes: TimeInput[] = [Number.NaN, Number.POSITIVE_INFINITY, new Date("no date"), [1758150000, 1234.5], [1758150000.5, 0], [5] as unknown as TimeInput];
 
 	runWithLog(log, () => {
 		for (const noTime of noTimes) {
