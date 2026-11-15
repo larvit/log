@@ -656,3 +656,15 @@ Read most (opens and searches):
 - `credentials/text.ts` 1
 - `package.json` 1
 - `release-tooling/test-in-docker.py` 1
+
+## Reading cost, chunk 5c45496dc393, finished 2026-11-15T22:16:43Z
+
+62346 new input tokens before the first commit.
+
+Read most (opens and searches):
+
+- `README.md` 7
+- `CHANGELOG.md` 5
+- `todo.md` 4
+- `AGENTS.md` 1
+- `docs/decisions.md` 1
