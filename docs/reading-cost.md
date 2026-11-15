@@ -696,3 +696,20 @@ Read most (opens and searches):
 - `credentials/span-values.ts` 1
 - `eslint.config.js` 1
 - `package.json` 1
+
+## Reading cost, chunk fdf902cfb2be, finished 2026-11-15T23:39:46Z
+
+56161 new input tokens before the first commit.
+
+Read most (opens and searches):
+
+- `README.md` 2
+- `docs/decisions.md` 2
+- `package.json` 2
+- `credentials/query-key.ts` 1
+- `credentials/query.ts` 1
+- `credentials/span-values.ts` 1
+- `credentials/text.ts` 1
+- `credentials/url-full.ts` 1
+- `release-tooling/test-in-docker.py` 1
+- `tests/credentials.test.ts` 1
