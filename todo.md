@@ -91,7 +91,9 @@ Security: `@larvit/log/otel` exports each attribute as the instrumentation recor
 `?access_token=…` reaches every transport of the `Log` and the collector behind it, where the same
 request through `log.fetch` records `REDACTED` (README → Goals #7, → Credentials in a captured
 value). A database instrumentation's `db.query.text` can hold a literal the same way. README and
-the changelog state that these attributes are unredacted. The path: `RecordedSpan.end` in
+the changelog state that these attributes are unredacted. The span's name and its error status
+message are exported as recorded too, and an instrumentation can put a credentialed url in either,
+where `log.fetch` redacts its own span's status. The path: `RecordedSpan.end` in
 `opentelemetry-adapter/recorded-span.ts` → `Log.exportSpan` → each transport's `span`.
 
 ### 153. Let an app export the spans OpenTelemetry's instrumentation packages record, such as pg or Prisma queries, through a `Log`, nested under the request they ran in.
