@@ -592,6 +592,7 @@ needs Node 18+ on the host.
 | `npm run test-otlp` | Export to a real OpenTelemetry Collector, JSON and protobuf. `OTLP_DEBUG=1` prints what it received. |
 | `npm run test-mutation` | Stryker mutation tests of the library, against the Node suite. `npm run test-mutation -- --mutate credentials/path.ts:30-50` mutates only those lines. |
 | `npm run lint` | eslint. |
+| `npm run lint-fix` | eslint, fixing what it can, such as import order. |
 
 ### Releasing
 

@@ -2,10 +2,10 @@
 // Intended to run inside the official Playwright Docker image (browsers preinstalled), so it
 // never depends on the local OS or a locally installed Chromium. See package.json "test-browser".
 
-import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readFile } from "node:fs/promises";
 
 import { chromium } from "playwright";
 

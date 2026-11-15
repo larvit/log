@@ -55,8 +55,6 @@ In [docs/decisions.md](docs/decisions.md):
   whole — lives in one module, or in one folder once it outgrows a module.
 - Imports point one way: `log/` → `tracing/` → `otlp/` → `credentials/` → `primitives/`, and
   inside `otlp/`, `queue/` → `send/`. The decision log names each import that runs against it.
-- Imports sort on their first binding, not their path, so moving a module reorders nothing; `npm run
-  lint` keeps them so, and `npm run lint-fix` sorts them.
 - A `// --- name ---` banner divides a source module only where a technical limit stops a split.
 - A done `todo.md` item leaves the file: a change a consumer can observe is reworded for them
   under `CHANGELOG.md` → `## Unreleased`; anything else is deleted outright.
