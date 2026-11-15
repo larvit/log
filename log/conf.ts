@@ -15,10 +15,10 @@ type Source = { conf: LogConf, context?: Metadata };
 
 const CHILD_AND_CLONE: readonly Derivation[] = ["child", "clone"];
 
-// What a child or clone inherits, stated from here down to `inherited`: each key the caller leaves
-// unset, taken from its source where INHERITED_BY lists the derivation, unless keptOut keeps it out.
-// A clone's source is the Log it clones, and a child's is its parentLog. A clone given a parentLog
-// takes from the Log it clones first, then from the parent what both leave unset.
+// What a child or clone inherits is stated from here down to `inherited`. It takes each key the
+// caller leaves unset from its source, where INHERITED_BY lists the derivation and keptOut doesn't
+// keep the key out. A clone's source is the Log it clones, and a child's is its parentLog. A clone
+// given a parentLog takes from the Log it clones first, then from the parent what both leave unset.
 const INHERITED_BY: { [K in keyof LogConf]-?: readonly Derivation[] } = {
 	captureQuery: CHILD_AND_CLONE,
 	captureRequestHeaders: CHILD_AND_CLONE,
@@ -57,7 +57,7 @@ function keptOutByFormatter(conf: LogConf): (keyof LogConf)[] {
 	return conf.format !== undefined || conf.entryFormatter !== undefined ? ["format", "entryFormatter"] : [];
 }
 
-// A list keeps out every option it replaces, and such an option keeps out the list.
+// A `transports` list keeps out every option it replaces, and such an option keeps out the list.
 function keptOutByTransports(conf: LogConf): (keyof LogConf)[] {
 	const replaced = REPLACED_BY_TRANSPORTS.map(([key]) => key);
 
@@ -93,16 +93,15 @@ function keptOutByEndpoint(conf: LogConf, sourceConf: LogConf): (keyof LogConf)[
 	return ["otlpAdditionalHeaders", "otlpQueue"];
 }
 
-// The keys `conf` doesn't inherit, though it leaves them unset. Each rule keeps a setting the caller
-// gave from mixing with the source's spelling of it, and no rule depends on another.
+// The keys `conf` doesn't take from this source, though it leaves them unset: each would clash with
+// a key `conf` holds. No rule depends on another.
 function keptOut(conf: LogConf, sourceConf: LogConf): Set<keyof LogConf> {
 	return new Set([...keptOutByFormatter(conf), ...keptOutByTransports(conf), ...keptOutByEndpoint(conf, sourceConf)]);
 }
 
 // The conf to read `key` off. It is the source's own conf, not a spread of it, since a hand-written
-// LogInt's conf may hold a key behind a getter, which a spread drops. Only entryFormatter differs: a
-// conf built here reads back a built-in formatter there, which functionFormatterOf leaves out, so a
-// child or clone follows its own format.
+// LogInt's conf may hold a key behind a class getter or a non-enumerable one, which a spread drops.
+// Only entryFormatter is read through functionFormatterOf instead.
 function handedDown(sourceConf: LogConf, key: keyof LogConf): LogConf {
 	return key === "entryFormatter" ? { entryFormatter: functionFormatterOf(sourceConf) } : sourceConf;
 }
@@ -164,9 +163,8 @@ function orDefault<T>(value: T | undefined, fallback: T): T {
 	return value === undefined ? fallback : value;
 }
 
-// The conf with its defaults, built in one object literal. What a literal can't spell follows it:
-// two keys made non-enumerable, and the entryFormatter accessor, which attachFormatter explains. The
-// conf stays writable: a write to `log.conf` takes effect, as 2.x documents.
+// The conf with its defaults. The conf stays writable: a write to `log.conf` takes effect, as 2.x
+// documents.
 function withDefaults(given: LogConf): ResolvedLogConf {
 	const { entryFormatter, ...rest } = given;
 	const conf = {
@@ -192,9 +190,8 @@ function withDefaults(given: LogConf): ResolvedLogConf {
 	return conf;
 }
 
-// A Log's conf, in four steps: the caller's options; what they leave unset, inherited from the Log a
-// clone clones and then from parentLog; the defaults; and last the queue the otlp* shorthand builds,
-// since it warns through the finished conf. A clone passes the Log it clones as cloneOf.
+// A Log's conf, in four steps: the caller's options, what they inherit, the defaults, and last the
+// queue the otlp* shorthand builds. A clone passes the Log it clones as cloneOf.
 export function resolveConf(options: LogOptions | LogLevel | "none" | undefined, cloneOf?: Source): { conf: ResolvedLogConf, warnings: string[] } {
 	const { conf: own, warning } = ownConf(options);
 
