@@ -213,3 +213,12 @@ test("a clone's console options win over the list of the parentLog it is given",
 	t.strictEqual(clone.conf.transports, undefined, "its conf holds none");
 	t.end();
 });
+
+test("consoleTransport defaults its colors as a Log does", t => {
+	const lines: string[] = [];
+	const log = new Log({ transports: [consoleTransport({ format: entry => String(entry.colors), stdout: line => { lines.push(line); } })] });
+
+	log.info("x");
+	t.deepEqual(lines, [String(new Log().conf.colors)], "the environment's choice, or else on");
+	t.end();
+});
