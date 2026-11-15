@@ -1,8 +1,8 @@
-import type { OtlpSpan } from "../otlp/payloads.js";
-import type { OtlpQueue } from "../otlp/queue/queue-types.js";
 import type { Clock } from "../primitives/clock.js";
 import type { LogLevel } from "../primitives/levels.js";
 import type { Metadata, MetadataInput } from "../primitives/metadata.js";
+import type { OtlpQueue } from "../otlp/queue/queue-types.js";
+import type { OtlpSpan } from "../otlp/payloads.js";
 
 export type EntryFormatter = (entry: EntryFormatterConf) => string;
 

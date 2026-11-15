@@ -1,9 +1,9 @@
-import { failureMessage } from "../credentials/span-values.js";
 import { attributesOf, buildSpanPayload, getNsTimestamp, type OtlpSpan, SPAN_KIND_INTERNAL, STATUS_CODE_ERROR, STATUS_CODE_UNSET } from "../otlp/payloads.js";
-import type { OtlpQueue } from "../otlp/queue/queue-types.js";
 import type { Clock } from "../primitives/clock.js";
-import { numberFieldAsString, stringField } from "../primitives/field-reads.js";
+import { failureMessage } from "../credentials/span-values.js";
 import type { Metadata } from "../primitives/metadata.js";
+import { numberFieldAsString, stringField } from "../primitives/field-reads.js";
+import type { OtlpQueue } from "../otlp/queue/queue-types.js";
 import { parseTraceparent, spanIdFrom, traceIdFrom } from "./traceparent.js";
 
 // A span just opened: it starts and ends now, and doesn't carry any attributes, events or links yet.

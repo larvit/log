@@ -1,5 +1,5 @@
-import type { LogLevel } from "../primitives/levels.js";
 import type { EntryFormatterConf } from "./types.js";
+import type { LogLevel } from "../primitives/levels.js";
 
 export function msgJsonFormatter(conf: EntryFormatterConf) {
 	// New object: never mutate the caller's metadata. Framework keys win over metadata.

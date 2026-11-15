@@ -1,7 +1,7 @@
 import type { Decodings } from "./decodings.js";
 import { decodings, inAnyDecoding, UNREADABLE } from "./decodings.js";
-import { redactedWholeUrl } from "./query.js";
 import { holdsListedKey, holdsUserinfoInAnyDecoding, redactTextUserinfo, SCHEME_LED } from "./text.js";
+import { redactedWholeUrl } from "./query.js";
 
 // Path segments opening a url, each read with the rest of the path. Past this limit a segment counts as
 // holding a credential, as decodings.ts says of every reading limit.

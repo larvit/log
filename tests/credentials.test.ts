@@ -1,8 +1,8 @@
-import { percentDecoded } from "../credentials/decodings.js";
 import { isCredentialHeaderName } from "../credentials/header-names.js";
-import { redactedQuery, redactedWholeUrl } from "../credentials/query.js";
-import { parseHttpUrl } from "../credentials/span-values.js";
 import { isListedQueryKey } from "../credentials/text.js";
+import { parseHttpUrl } from "../credentials/span-values.js";
+import { percentDecoded } from "../credentials/decodings.js";
+import { redactedQuery, redactedWholeUrl } from "../credentials/query.js";
 import test from "./tap.js";
 import { withGlobals } from "./test-doubles.js";
 

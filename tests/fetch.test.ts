@@ -1,10 +1,10 @@
-import { isCredentialHeaderName } from "../credentials/header-names.js";
 import { buildUrlFull } from "../credentials/span-values.js";
-import { formatTraceparent, generateSpanId, generateTraceId, Log, parseTraceparent, type TimerHandle } from "../index.js";
-import { STATUS_CODE_ERROR, STATUS_CODE_UNSET } from "../otlp/payloads.js";
-import { capturedHeaders, fetchFailure, pageHref, requestAttributes, responseAttributes, spanStatusCode } from "../tracing/fetch.js";
-import test from "./tap.js";
 import { callHeader, capture, clientSpan, exportedRecords, exportedSpans, nextTurn, response, stubFetch, testFetchTrace, waitFor } from "./test-doubles.js";
+import { capturedHeaders, fetchFailure, pageHref, requestAttributes, responseAttributes, spanStatusCode } from "../tracing/fetch.js";
+import { formatTraceparent, generateSpanId, generateTraceId, Log, parseTraceparent, type TimerHandle } from "../index.js";
+import { isCredentialHeaderName } from "../credentials/header-names.js";
+import { STATUS_CODE_ERROR, STATUS_CODE_UNSET } from "../otlp/payloads.js";
+import test from "./tap.js";
 
 test("log.fetch traces a successful call and drops the query by default", async t => {
 	const { calls, logFetch, trace } = testFetchTrace({ context: { "service.name": "svc", tenant: "acme" } });

@@ -1,14 +1,14 @@
 import { buildLogPayload, type OtlpSpan } from "../otlp/payloads.js";
 import { DEFAULT_LOG_LEVEL, type LogLevel, LogLevels, SEVERITY_NUMBERS } from "../primitives/levels.js";
-import { type Metadata, type MetadataInput, withoutUndefined } from "../primitives/metadata.js";
-import { writeOnce } from "../primitives/once-per-sink.js";
-import { type FetchTrace, traceFetch } from "../tracing/fetch.js";
 import { endErrorType, exportSpan, openSpan, spanEnd, type SpanHost } from "../tracing/spans.js";
+import { type FetchTrace, traceFetch } from "../tracing/fetch.js";
 import { formatTraceparent } from "../tracing/traceparent.js";
-import { resolveConf } from "./conf.js";
-import { writeConsoleEntry } from "./console-output.js";
-import { warnOnceToStderr, writeStderr } from "./stderr-lines.js";
 import type { LogInt, LogOptions, ResolvedLogConf } from "./types.js";
+import { type Metadata, type MetadataInput, withoutUndefined } from "../primitives/metadata.js";
+import { resolveConf } from "./conf.js";
+import { warnOnceToStderr, writeStderr } from "./stderr-lines.js";
+import { writeConsoleEntry } from "./console-output.js";
+import { writeOnce } from "../primitives/once-per-sink.js";
 
 // A configured logLevel that is not a level, as the warning about it prints it.
 function describeLogLevel(value: unknown): string {
