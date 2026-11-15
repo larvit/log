@@ -114,9 +114,8 @@ A `Log` takes `clock`, `randomBytes`, `stdout` and `stderr`, and `otlpTransport`
 `fetch`. The network is the one effect a `Log` can't be handed, in two places: `log/log.ts` →
 `fetchTrace` sends every `log.fetch` request through `globalThis.fetch`, read at the call so a
 polyfill installed later still wins, and `log/deprecated-options/default-queue.ts` →
-`attachDefaultQueue` builds the queue for `otlpHttpBaseURI` with no `fetch`. So tests swap the
-global through `tests/test-doubles.ts` → `stubFetch`, in 22 calls: 12 in `tests/fetch.test.ts`, 7 in
-`tests/otlp.test.ts`, 2 in `tests/console.test.ts` and 1 in `tests/trace-context.test.ts`. They
+`attachDefaultQueue` builds the queue for `otlpHttpBaseURI` with no `fetch`. So each test of those
+two swaps the global through `tests/test-doubles.ts` → `stubFetch`. They
 share one mutable global, a `log.fetch` test that forgets the swap sends a real request, and a
 consumer testing their own code that calls `log.fetch` has to swap the global too.
 
