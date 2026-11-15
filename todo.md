@@ -207,17 +207,32 @@ Under `http/protobuf` a partially rejected batch counts as delivered.
 
 ### 148. Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.
 
-The latest run, at 39d7c0a on 2026-11-14 during release 2.6.1, scored Navigation 7.75, Locality
-6.38, Shape 7.00, Self-sufficiency 7.00, overall 6.88. Locality is the lowest. Its seats named the
-query rules in `credentials/query.ts` → `redactedSearch` and `PAIR_RULES`, with
-`credentials/query-userinfo-runs.ts` → `step`, which release 2.7.0 reworked; the formatter in
-`log/formatter-setting.ts` → `inheritedFormatter`, held under five names and told apart by getter
-identity, with what a child inherits in `log/settings.ts` → `inherited`; and the default queue's
-recognition in `log/default-queue.ts` → `isDefaultQueueFor`. Release 2.7.0 reworked both into
-`log/conf.ts` and `log/default-queue.ts`. Shape's seats also named `credentials/path.ts` → `redactedPath`, item 146. No item yet
-takes `credentials/span-values.ts` → `failureMessage` and `traceableUrl`, now `parseHttpUrl`,
-or `credentials/text.ts` → `redactTextQueryKeys`; the 2.6.1 release review reworked
-`otlp/queue/export-scheduler.ts` → `transitionRound` and `tracing/fetch.ts` → `fetchFailure`. This item's tagline names
+The latest run, at 998478e on 2026-11-15 (PR #386, rerun), scored Navigation 7.50, Locality 6.00,
+Shape 6.50, Self-sufficiency 6.38, overall 6.50. Locality is the lowest. Its seats named:
+
+- What a child inherits: `log/conf.ts` → `inherited`, named by every seat in both runs at this
+  commit. The formatter alias (`ENTRY_FORMATTER_ALIAS`, `functionFormatterOf` and a module WeakMap)
+  and two skip sets, `otlpKeysNotToInherit` and `keysTransportsKeepOut`, decide the result
+  together, and a reader could not predict it. Item 62 removes the alias and item 97 the OTLP keys,
+  both in 3.0.0; no item takes the rest before then.
+- The query rules: `credentials/query.ts` → `readNestedUrl`, `redactsKeyAndValue` and
+  `redactedSearch`, a cycle carrying a depth and a memo, and `credentials/query-userinfo-runs.ts` →
+  `scanPair` and `pairsInUserinfoRuns`, a scan across pairs under three readings. No item takes them.
+- The transports: `log/otlp-transport.ts` → `inTransportNames` rewrites queue messages whose
+  wording lives in `otlp/send/endpoint.ts`; `log/console-output.ts` → `writeConsoleEntry` calls
+  itself the one console writer while `consoleTransport` writes on its own; `log/log.ts` →
+  `deprecatedEntry` and `log/log-transports.ts` → `transportsOf`. Item 97 removes the OTLP half in
+  3.0.0; no item takes the console half.
+- Folders: `credentials/span-values.ts` → `failureMessage` also redacts recorded attributes,
+  `parseHttpUrl`, the fetch filter, sits in `credentials/`, and `tracing/transport.ts` holds the
+  `Transport` contract for entries. No item takes them.
+- `credentials/path.ts` → `redactedPath`, item 146, and `otlp/queue/export-scheduler.ts` →
+  `dispatch`, which no item takes.
+
+Several seats also found the 2.x compatibility layer interleaved with the core `Log`, in no folder
+3.0.0 can delete. They found that the comments recording what no test can kill, such as
+`tracing/fetch.ts:57`, `otlp/queue/export-scheduler.ts:81` and `log/conf.ts:172`, cost a read and
+say nothing about the code. No item takes either. This item's tagline names
 the floor, so its chunk runs the four-seat scoring run. Where a dimension or the overall stays under
 7.0, file items for the places the seats name, lowest dimension first, and a copy of this item
 blocked by them. Where every score reaches 7.0, it doesn't file anything, and the run replaces the
