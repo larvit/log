@@ -165,6 +165,7 @@ split the credential, settings and queue modules. With `uglifyjs --toplevel` the
 shortens every top-level name, keeping only the names consumers import. So `Log.name` and
 `Queue.name`, which a debugger prints, are shortened too unless the build reserves them.
 On 2026-11-15 `transports`, with `consoleTransport` and `otlpTransport`, took the build to 13638 bytes.
+The maintainer approved merging that over the budget the same day, with this item to bring it back.
 
 ### 26. Check the footprint budget in CI, so the numbers in README → Footprint fail a build instead of going stale.
 
