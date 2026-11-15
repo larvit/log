@@ -831,3 +831,31 @@ test("fetchFailure names the error by its code, else its name, else fetch_error"
 	t.strictEqual(fetchFailure("boom", url).errorType, "fetch_error", "then the fallback");
 	t.end();
 });
+
+test("log.fetch: a pending request's span goes to the queue the Log had when the request started", async t => {
+	const first = fetchRecorder();
+	const second = fetchRecorder();
+	let release = () => {};
+	const held = new Promise<void>(resolve => { release = resolve; });
+
+	stubFetch(async () => {
+		await held;
+
+		return response();
+	});
+
+	const firstQueue = new Queue({ fetch: first.fetch, otlpHttpBaseURI: "http://127.0.0.1:4318" });
+	const secondQueue = new Queue({ fetch: second.fetch, otlpHttpBaseURI: "http://127.0.0.1:4319" });
+	const log = new Log({ otlpQueue: firstQueue, stderr: () => {}, stdout: () => {} });
+	const pending = log.fetch("https://api.test/x");
+
+	log.conf.otlpQueue = secondQueue;
+	release();
+	await pending;
+	await firstQueue.flush();
+	await secondQueue.flush();
+
+	t.deepEqual(exportedSpans(first.calls).map(span => span.name), ["GET api.test"], "the queue set at the call takes the span, as in 2.6.1");
+	t.deepEqual(exportedSpans(second.calls), [], "and a queue written to log.conf.otlpQueue while it was pending takes none");
+	t.end();
+});
