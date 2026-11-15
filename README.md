@@ -298,7 +298,7 @@ a list, and a child that passes a list of its own takes none of it.
 | `colors` | `boolean` | `true` | ANSI colour codes in text output. Unset in code, the env decides: `NO_COLOR` (non-empty) turns it off; otherwise `FORCE_COLOR` turns it on, except `0` or `false` which turn it off. |
 | `format` | `"json" \| "text" \| EntryFormatter` | `"text"` | See [Output formats](#output-formats). |
 | `printTraceInfo` | `boolean` | `false` | Append `spanId`, `traceId` and `spanName` to each line: those of the span the entry is exported under, which for a child is its parent's. |
-| `stderr` | `(msg: string) => void` | `console.error` | Sink for this library's own warnings. Without `transports`, also for `error` and `warn`. |
+| `stderr` | `(msg: string) => void` | `console.error` | Sink for `error` and `warn`. |
 | `stdout` | `(msg: string) => void` | `console.log` | Sink for the other levels. |
 
 `otlpTransport(options)` exports over OTLP/HTTP through an [export queue](#queue-exports) of its
@@ -495,7 +495,7 @@ instead. `entryFormatter` is deprecated the same way: pass the function as `form
 | `printTraceInfo` | `boolean` | `false` | Deprecated, removed in 3.0.0: pass [`transports`](#transports) with `consoleTransport({ printTraceInfo })`. Append `spanId`, `traceId` and `spanName` to console output. |
 | `randomBytes` | `(size: number) => Uint8Array` | Web Crypto, else `Math.random` | Returns `size` random bytes for each trace and span id the `Log` makes. Supply one for deterministic ids in a test. Return exactly `size` bytes, and never all zeros: W3C Trace Context makes an all-zero id invalid, so a receiver drops it. Children and clones inherit it. |
 | `spanName` | `string` | `"unnamed-span"` | The instance's span name. Inherited from `parentLog` when set there. |
-| `stderr` | `(msg: string) => void` | `console.error` | Sink for `error` and `warn`. |
+| `stderr` | `(msg: string) => void` | `console.error` | Sink for this library's own warnings. Without `transports`, also for `error` and `warn`. |
 | `stdout` | `(msg: string) => void` | `console.log` | Deprecated, removed in 3.0.0: pass [`transports`](#transports) with `consoleTransport({ stdout })`. Sink for the other levels. |
 | `traceparent` | `string` | none | Incoming W3C `traceparent` to nest under; an unsampled one (`00`) drops spans, not log entries. Ignored when malformed or when `parentLog` is set. |
 | `transports` | `Transport[]` | the console | Every destination entries and spans go to, see [Transports](#transports). Inherited by children and clones. |

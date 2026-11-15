@@ -318,3 +318,19 @@ test("otlpTransport names its own options in what it throws and reports", async 
 	t.ok(plain.some(line => line.endsWith("set acceptPlainHttpCredentials: true on otlpTransport")), `the plain-http warning says where to accept it, got ${plain.join(" | ")}`);
 	t.end();
 });
+
+test("two otlpTransports sharing a report write the plain-http credential warning once", async t => {
+	const reports: string[] = [];
+	const report = (line: string): void => { reports.push(line); };
+
+	for (let i = 0; i < 2; i++) {
+		const transport = otlpTransport({ baseUrl: "http://shared-report.example.com", fetch: () => Promise.resolve(new Response(null, { status: 200 })), headers: { Authorization: "Bearer t" }, report });
+
+		transport.entry?.({ logLevel: "info", metadata: {}, msTimestamp: 0, msg: "x", spanId: "", spanName: "", traceId: "" });
+		await transport.flush?.();
+	}
+
+	t.strictEqual(reports.length, 1, `one line for both transports, got ${reports.join(" | ")}`);
+	t.ok(reports[0]?.endsWith("set acceptPlainHttpCredentials: true on otlpTransport"), "in the transport's names");
+	t.end();
+});

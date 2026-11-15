@@ -15,6 +15,22 @@ function inTransportNames(msg: string): string {
 	return msg.replace(/otlpHttpBaseURI/g, "baseUrl").replace(/otlpAdditionalHeaders/g, "headers").replace("on the Queue", "on otlpTransport");
 }
 
+type Report = NonNullable<QueueConf["report"]>;
+
+const renamingReports = new WeakMap<Report, Report>();
+
+// One wrapper per report function: the Queue writes a warning once per function it is handed.
+function inTransportNamesTo(report: Report): Report {
+	let renaming = renamingReports.get(report);
+
+	if (renaming === undefined) {
+		renaming = (msg, metadata) => { report(inTransportNames(msg), metadata); };
+		renamingReports.set(report, renaming);
+	}
+
+	return renaming;
+}
+
 function queueOf(options: OtlpTransportOptions): Queue {
 	const { baseUrl, headers, protocol, report = console.error, ...queueOptions } = options;
 
@@ -22,7 +38,7 @@ function queueOf(options: OtlpTransportOptions): Queue {
 		return new Queue({
 			...queueOptions,
 			otlpHttpBaseURI: baseUrl,
-			report: (msg, metadata) => { report(inTransportNames(msg), metadata); },
+			report: inTransportNamesTo(report),
 			...headers === undefined ? {} : { otlpAdditionalHeaders: headers },
 			...protocol === undefined ? {} : { otlpProtocol: protocol },
 		});
