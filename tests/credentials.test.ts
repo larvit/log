@@ -80,6 +80,12 @@ test("redactedQuery reads a run of userinfo across pairs as a parser does", t =>
 	t.strictEqual(query("\\\\u:p&\\\\v&w@h.test&m=1"), "REDACTED=REDACTED&REDACTED=REDACTED&REDACTED=REDACTED&m=1", "a key opening userinfo inside a run joins it");
 	t.strictEqual(query("\\\\u:p&\\\\v=x@a/b&w@h.test"), "REDACTED=REDACTED&REDACTED=REDACTED&w%40h.test=", "the value that closes a run ends it at its last @");
 	t.strictEqual(query("\\\\u&\\\\v=a/b&w@h.test"), undefined, "a delimiter before any @ closes the run, and the run it closes holds no pair");
+	t.strictEqual(query(`//u:p=a/%${"25".repeat(10)}40`), "REDACTED=REDACTED", "a key opening userinfo beside a value encoded past the reading limit, which may hide the @");
+	t.end();
+});
+
+test("redactedQuery redacts a url in a value whose userinfo only the runtime's parser finds", t => {
+	t.strictEqual(query("next=https:/u:pw@h.test"), "next=REDACTED", "one slash after a special scheme still opens userinfo");
 	t.end();
 });
 
