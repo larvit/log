@@ -13,7 +13,6 @@
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 155 | 2.7.0 |  | security | **Keep a credential in an instrumentation span's attributes, such as `url.full`, from reaching the collector through `@larvit/log/otel`.** | 3 | 2 | 4 | 7 | 5 | 7 by 5 | 2.1 |
-| 153 | 2.7.0 |  | owner | **Let an app export the spans OpenTelemetry's instrumentation packages record, such as pg or Prisma queries, through a `Log`, nested under the request they ran in.** | 4 | 2 | 2 | 6 | 6 | 2 by 8, 4 by 6 | 1.7 |
 | 154 | 2.7.0 |  |  | **Point the `entryFormatter` deprecation warning at a name that is not itself deprecated.** | 1 | 1 | 2 | 2 | 2 | code health by 1 | 1.6 |
 | 146 | 2.8.0 |  |  | **Let a reader see from `redactedPath` alone which segments of a request path it keeps.** | 2 | 2 | 4 | 6 | 2 | code health by 3 | 2.3 |
 | 149 | 2.8.0 |  |  | **Keep a queue's storage read from rejecting when `restore` throws.** | 1 | 1 | 2 | 2 | 6 | code health by 3 | 2.3 |
@@ -96,27 +95,6 @@ message are exported as recorded too, and an instrumentation can put a credentia
 where `log.fetch` redacts its own span's status. The path: `RecordedSpan.end` in
 `opentelemetry-adapter/recorded-span.ts` → `exportSpan` in `tracing/spans.ts`, over
 `transportsOf(log.conf)` from `log/log-transports.ts` → each transport's `span`.
-
-### 153. Let an app export the spans OpenTelemetry's instrumentation packages record, such as pg or Prisma queries, through a `Log`, nested under the request they ran in.
-
-Database, queue and RPC calls appear in a trace today only where the app wraps each one in a span by
-hand. OpenTelemetry's instrumentation packages, and libraries that call `@opentelemetry/api`
-themselves, record those spans automatically, but only an app running the OpenTelemetry SDK exports
-them. That data is very hard to get any other way, and it sends users to the SDK (README → Goals
-#2).
-
-Settled by the maintainer on 2026-11-14:
-
-- It ships from this package, as a second entry point such as `@larvit/log/otel`, not as a package
-  of its own: OpenTelemetry already makes an app install many packages. An app that doesn't import
-  it doesn't load it, and the core's bundle and dependencies stay as they are.
-- Nesting the spans uses OpenTelemetry's own context manager, which the app installs. This library
-  keeps no ambient context of its own (README → Goals #10, which carves out this adapter).
-- The spans must join the trace and the span of the `Log` the app handles the request with, which
-  the app hands to the adapter explicitly at the request's edge.
-
-These spans flow through the `Log`'s `transports`. README's
-"One file, every runtime" claim changes with a second entry point; say what holds instead.
 
 ### 154. Point the `entryFormatter` deprecation warning at a name that is not itself deprecated.
 
