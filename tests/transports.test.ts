@@ -1,5 +1,5 @@
 import { consoleTransport, Log, otlpTransport, Queue, type Transport, type TransportEntry, type TransportSpan } from "../index.js";
-import { recordingFetch, thrown } from "./test-doubles.js";
+import { fetchRecorder, thrown } from "./test-doubles.js";
 import test from "./tap.js";
 
 function spy() {
@@ -17,12 +17,6 @@ function spy() {
 	};
 
 	return { entries, flushes: () => flushes, spans, transport };
-}
-
-function recorder() {
-	const calls: Parameters<typeof recordingFetch>[0] = [];
-
-	return { calls, fetch: recordingFetch(calls) };
 }
 
 test("a transport is handed each entry as a plain object", t => {
@@ -85,7 +79,7 @@ test("consoleTransport takes the console options: format, colors, printTraceInfo
 });
 
 test("otlpTransport sends entries and spans under baseUrl with its own fetch, headers and protocol", async t => {
-	const { calls, fetch } = recorder();
+	const { calls, fetch } = fetchRecorder();
 	const globalFetch = globalThis.fetch;
 	let globalCalls = 0;
 
@@ -105,7 +99,7 @@ test("otlpTransport sends entries and spans under baseUrl with its own fetch, he
 	t.strictEqual(calls.find(call => call.path.endsWith("/v1/logs"))?.body.resourceLogs[0].scopeLogs[0].logRecords[0].traceId, log.span.traceId, "the record carries the entry's trace id");
 	t.strictEqual(globalCalls, 0, "the global fetch is never called");
 
-	const proto = recorder();
+	const proto = fetchRecorder();
 	const protoLog = new Log({ transports: [otlpTransport({ baseUrl: "https://collector.example.com", fetch: proto.fetch, protocol: "http/protobuf" })] });
 
 	protoLog.info("hello");
@@ -115,7 +109,7 @@ test("otlpTransport sends entries and spans under baseUrl with its own fetch, he
 });
 
 test("a Queue sends with the fetch it is given", async t => {
-	const { calls, fetch } = recorder();
+	const { calls, fetch } = fetchRecorder();
 	const log = new Log({ otlpQueue: new Queue({ fetch, otlpHttpBaseURI: "https://collector.example.com" }), stdout: () => {} });
 
 	log.info("hello");
@@ -172,7 +166,7 @@ test("a child and a clone inherit the list, their own list replaces it, and stde
 });
 
 test("a child with its own list takes no console or otlp option from a parent without a list", async t => {
-	const { calls, fetch } = recorder();
+	const { calls, fetch } = fetchRecorder();
 	const stdout: string[] = [];
 	const parent = new Log({ format: "json", otlpQueue: new Queue({ fetch, otlpHttpBaseURI: "https://collector.example.com" }), stdout: line => { stdout.push(line); } });
 	const own = spy();

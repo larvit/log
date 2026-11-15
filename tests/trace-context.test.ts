@@ -1,11 +1,11 @@
-import { callHeader, exportedRecords, exportedSpans, fakeClock, stubFetch } from "./test-doubles.js";
+import { callHeader, exportedRecords, exportedSpans, fakeClock, fetchRecorder, stubFetch } from "./test-doubles.js";
 import { formatTraceparent, generateSpanId, generateTraceId, Log, type LogInt, type Metadata, type OtlpSpan, parseTraceparent, Queue } from "../index.js";
 import { pbDecode, pbMsg } from "./protobuf-decode.js";
 import test from "./tap.js";
 
 test("spans of different names share one scopeSpans entry in a POST", async t => {
-	const { calls } = stubFetch();
-	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", spanName: "parent", stderr: () => {} });
+	const { calls, fetch } = fetchRecorder();
+	const log = new Log({ otlpQueue: new Queue({ fetch, otlpHttpBaseURI: "http://127.0.0.1:4318" }), spanName: "parent", stderr: () => {} });
 
 	void new Log({ parentLog: log, spanName: "child" }).end();
 	await log.end();
@@ -17,8 +17,8 @@ test("spans of different names share one scopeSpans entry in a POST", async t =>
 });
 
 test("a batch merges per scope, keeping a v2.4.0 stored payload's apart", async t => {
-	const { calls } = stubFetch();
-	const queue = new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318" });
+	const { calls, fetch } = fetchRecorder();
+	const queue = new Queue({ fetch, otlpHttpBaseURI: "http://127.0.0.1:4318" });
 	const resource = { attributes: [{ key: "service.name", value: { stringValue: "svc" } }] };
 	const record = (msg: string) => ({ body: { stringValue: msg }, severityNumber: 9, severityText: "INFO", timeUnixNano: "1" });
 	const span = (name: string): OtlpSpan => ({ attributes: [], droppedAttributesCount: 0, droppedEventsCount: 0, droppedLinksCount: 0, endTimeUnixNano: "2", events: [], kind: 1, links: [], name, spanId: generateSpanId(), startTimeUnixNano: "1", status: { code: 0 }, traceId: generateTraceId() });
@@ -43,7 +43,7 @@ test("a batch merges per scope, keeping a v2.4.0 stored payload's apart", async 
 	t.deepEqual(logs.map((entry: any) => entry.scopeLogs.map((scopeLog: any) => [scopeLog.scope?.name, scopeLog.logRecords.map((rec: any) => rec.body.stringValue)])), [[["@larvit/log", ["new", "new too"]], [undefined, ["stored"]]]], "records group under one resource, per scope");
 	t.deepEqual(traces.map((entry: any) => entry.scopeSpans.map((scopeSpan: any) => [scopeSpan.scope.name, scopeSpan.spans.map((item: any) => item.name)])), [[["@larvit/log", ["new", "new too"]], ["stored", ["stored"]]]], "and so do spans");
 
-	const protobuf = new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", otlpProtocol: "http/protobuf" });
+	const protobuf = new Queue({ fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", otlpProtocol: "http/protobuf" });
 
 	calls.length = 0;
 	protobuf.enqueue({ resourceLogs: [{ resource, scopeLogs: [{ logRecords: [record("stored")] }] }] });

@@ -36,6 +36,8 @@ function tracer(scope: Metadata): Tracer {
 	// A span that is not recorded passes its parent's ids on, so what is propagated downstream
 	// still names the caller.
 	function startSpan(name: string, options: SpanOptions = {}, active: Context = context.active()): Span {
+		// Only runWithLog writes LOG_KEY. `instanceof Log` would reject every caller's Log: otel.js
+		// bundles its own copy of the class, and the caller's comes from index.js.
 		const log = active.getValue(LOG_KEY) as Log | undefined;
 		const parent = options.root ? undefined : trace.getSpanContext(active);
 

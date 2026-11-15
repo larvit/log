@@ -168,7 +168,7 @@ type Responder = (path: string, body: unknown) => StubResponse | Promise<StubRes
 type RecordedCall = { body: any, contentType: string | null, headers: any, keepalive: unknown, method?: string, path: string, rawBody: any, url: string };
 
 // A fetch that records each call in `calls` and answers with `responder`'s response, else a 200.
-export function recordingFetch(calls: RecordedCall[], responder?: Responder): typeof fetch {
+function recordingFetch(calls: RecordedCall[], responder?: Responder): typeof fetch {
 	return (async (url: string, init: { body?: any, headers?: HeadersInit, keepalive?: boolean, method?: string } = {}) => {
 		const contentType = new Headers(init.headers ?? {}).get("Content-Type");
 		const path = new URL(String(url)).pathname;
@@ -181,12 +181,19 @@ export function recordingFetch(calls: RecordedCall[], responder?: Responder): ty
 	}) as unknown as typeof fetch;
 }
 
-// Replace global fetch with a recording stub (Node + browser), so the OTLP transport is asserted
-// without a real server. The harness restores globalThis.fetch after each test.
-export function stubFetch(responder?: Responder) {
+// A recording fetch to hand a Queue or a transport as its `fetch`, with the calls it records.
+export function fetchRecorder(responder?: Responder) {
 	const calls: RecordedCall[] = [];
 
-	globalThis.fetch = recordingFetch(calls, responder);
+	return { calls, fetch: recordingFetch(calls, responder) };
+}
+
+// Replaces the global fetch with a recording one, for a test of code that reads the global: the
+// default a Log-built queue or log.fetch falls back to. The harness restores it after each test.
+export function stubFetch(responder?: Responder) {
+	const { calls, fetch } = fetchRecorder(responder);
+
+	globalThis.fetch = fetch;
 
 	return { calls };
 }

@@ -1,4 +1,4 @@
-import { callHeader, exportedRecords, exportedSpans, fakeClock, fakeStorage, nanos, reportSink, response, storedRecords, stubFetch, thrown, waitFor, withGlobals } from "./test-doubles.js";
+import { callHeader, exportedRecords, exportedSpans, fakeClock, fakeStorage, fetchRecorder, nanos, reportSink, response, storedRecords, stubFetch, thrown, waitFor, withGlobals } from "./test-doubles.js";
 import { type Clock, Log, type Metadata, type OtlpPayload, type OtlpQueue, Queue, type QueueStorage, type TimerHandle } from "../index.js";
 import { encodeBatch } from "../otlp/send/batch.js";
 import { ExportScheduler, transition, unref } from "../otlp/queue/export-scheduler.js";
@@ -10,10 +10,12 @@ import { systemClock } from "../primitives/clock.js";
 import test from "./tap.js";
 
 test("a transient export failure keeps the batch queued, reports one line and the retry delivers it", async t => {
-	stubFetch(() => { throw new Error("connection refused"); });
+	const refused = fetchRecorder(() => { throw new Error("connection refused"); });
+	const delivering = fetchRecorder();
+	let send = refused.fetch;
 	const clock = fakeClock();
 	const stderr: string[] = [];
-	const log = new Log({ otlpQueue: new Queue({ clock, otlpHttpBaseURI: "http://127.0.0.1:1", report: (msg, metadata) => stderr.push(`${msg} ${JSON.stringify(metadata)}`), retryDelayMs: 20 }), stderr: () => {} });
+	const log = new Log({ otlpQueue: new Queue({ clock, fetch: (...args) => send(...args), otlpHttpBaseURI: "http://127.0.0.1:1", report: (msg, metadata) => stderr.push(`${msg} ${JSON.stringify(metadata)}`), retryDelayMs: 20 }), stderr: () => {} });
 
 	log.info("will fail to export");
 	log.info("so will this");
@@ -25,8 +27,9 @@ test("a transient export failure keeps the batch queued, reports one line and th
 	t.ok(stderr[0].includes("127.0.0.1:1"), "the line names the endpoint url");
 	t.ok(stderr[0].includes("connection refused"), "the line carries the error message");
 
-	const { calls } = stubFetch();
+	const { calls } = delivering;
 
+	send = delivering.fetch;
 	await log.flush();
 	t.strictEqual(calls.length, 0, "flush() while a retry is pending attempts nothing; the backoff holds");
 	await clock.advance(20);
@@ -54,9 +57,9 @@ test("the Log-built queue reports through the instance's stderr and formatter", 
 
 for (const status of [401, 403]) {
 	test(`a ${status} export reports unauthorized once and drops the batch without a retry`, async t => {
-		const { calls } = stubFetch(() => response({ status }));
+		const { calls, fetch } = fetchRecorder(() => response({ status }));
 		const sink = reportSink();
-		const log = new Log({ otlpQueue: new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", report: sink.report }), stderr: () => {} });
+		const log = new Log({ otlpQueue: new Queue({ fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", report: sink.report }), stderr: () => {} });
 
 		log.info("x");
 		await log.flush();
@@ -121,10 +124,10 @@ test("endpoint userinfo authenticates through an Authorization header, never thr
 });
 
 test("user:pass@ in otlpHttpBaseURI beside an Authorization in otlpAdditionalHeaders warns once per report sink, and the header goes", async t => {
-	const { calls } = stubFetch();
+	const { calls, fetch } = fetchRecorder();
 	const warning = "@larvit/log: otlpHttpBaseURI carries user:pass@ and otlpAdditionalHeaders sets Authorization, so the otlpAdditionalHeaders one is sent and the userinfo is not; set one of them, as 3.0.0 throws on both";
 	const sink = reportSink();
-	const both = { otlpAdditionalHeaders: { authorization: "Bearer t0ken" }, otlpHttpBaseURI: "https://collector:s3cret@collector.test", report: sink.report };
+	const both = { fetch, otlpAdditionalHeaders: { authorization: "Bearer t0ken" }, otlpHttpBaseURI: "https://collector:s3cret@collector.test", report: sink.report };
 
 	new Queue(both);
 
@@ -162,9 +165,9 @@ for (const conf of [
 	{ acceptPlainHttpCredentials: true, otlpHttpBaseURI: "http://u:p@collector.test:4318" },
 ]) {
 	test(`credentials sent to ${JSON.stringify(conf)} raise no plain-http warning`, async t => {
-		stubFetch();
+		const { fetch } = fetchRecorder();
 		const quiet = reportSink();
-		const log = new Log({ otlpQueue: new Queue({ ...conf, report: quiet.report }), stderr: () => {} });
+		const log = new Log({ otlpQueue: new Queue({ ...conf, fetch, report: quiet.report }), stderr: () => {} });
 
 		log.info("x");
 		await log.flush();
@@ -243,7 +246,7 @@ test("an Authorization sent over plain http: to a non-loopback host warns once p
 });
 
 test("every credential header over plain http: warns once, and acceptPlainHttpCredentials silences them all", async t => {
-	const { calls } = stubFetch();
+	const { calls, fetch } = fetchRecorder();
 	const warning = (header: string) => `@larvit/log: the ${header} header from otlpAdditionalHeaders goes over plain http: to collector.test:4318, readable by anything on the network path; use an https: endpoint, or on a network you trust set acceptPlainHttpCredentials: true on the Queue`;
 	const send = async (queue: Queue) => {
 		const log = new Log({ otlpQueue: queue, stderr: () => {} });
@@ -255,18 +258,18 @@ test("every credential header over plain http: warns once, and acceptPlainHttpCr
 	const otlpHttpBaseURI = "http://collector.test:4318";
 	const loud = reportSink();
 
-	await send(new Queue({ otlpAdditionalHeaders: { "Api-Key": "k", "X-Auth-Token": "t", "X-Trace": "harmless" }, otlpHttpBaseURI, report: loud.report }));
+	await send(new Queue({ fetch, otlpAdditionalHeaders: { "Api-Key": "k", "X-Auth-Token": "t", "X-Trace": "harmless" }, otlpHttpBaseURI, report: loud.report }));
 	t.deepEqual(loud.lines.map(line => line.msg).sort(), [warning("api-key"), warning("x-auth-token")], "one line per credential header, by its name and never its value, none for a plain one");
 
 	const quiet = reportSink();
 
-	await send(new Queue({ acceptPlainHttpCredentials: true, otlpAdditionalHeaders: { "api-key": "k" }, otlpHttpBaseURI, report: quiet.report }));
+	await send(new Queue({ acceptPlainHttpCredentials: true, fetch, otlpAdditionalHeaders: { "api-key": "k" }, otlpHttpBaseURI, report: quiet.report }));
 	t.deepEqual(quiet.lines, [], "acceptPlainHttpCredentials silences a header other than Authorization");
 
 	const loopback = reportSink();
 
-	await send(new Queue({ otlpAdditionalHeaders: { "api-key": "k" }, otlpHttpBaseURI: "http://localhost:4318", report: loopback.report }));
-	await send(new Queue({ otlpAdditionalHeaders: { "api-key": "k" }, otlpHttpBaseURI: "https://collector.test", report: loopback.report }));
+	await send(new Queue({ fetch, otlpAdditionalHeaders: { "api-key": "k" }, otlpHttpBaseURI: "http://localhost:4318", report: loopback.report }));
+	await send(new Queue({ fetch, otlpAdditionalHeaders: { "api-key": "k" }, otlpHttpBaseURI: "https://collector.test", report: loopback.report }));
 	t.deepEqual(loopback.lines, [], "a loopback host and https: stay silent");
 
 	t.strictEqual(calls.length, 4, "every request still goes");
@@ -307,14 +310,14 @@ test("otlpAdditionalHeaders is read per send, and an invalid one fails the expor
 
 test("any 2xx is JSON export success; a partialSuccess rejected count is reported once and never retried", async t => {
 	let second = false;
-	const { calls } = stubFetch(path => {
+	const { calls, fetch } = fetchRecorder(path => {
 		if (second) return response({ json: { partialSuccess: path === "/v1/logs" ? { rejectedLogRecords: 2 } : { rejectedSpans: "1" } } });
 		if (path === "/v1/logs") return response({ json: { partialSuccess: { errorMessage: "too old", rejectedLogRecords: "1" } } });
 
 		return { ...response({ status: 202 }), json: () => Promise.reject(new SyntaxError("Unexpected end of JSON input")) };
 	});
 	const reports = reportSink();
-	const queue = new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report });
+	const queue = new Queue({ fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report });
 	const log = new Log({ otlpQueue: queue, stderr: () => {} });
 
 	log.info("x");
@@ -344,13 +347,13 @@ test("Queue retries a failed batch with doubling backoff, capped at 30 s, until 
 	const clock = fakeClock();
 	const delays = [1000, 2000, 4000, 8000, 16000, 30000, 30000];
 	let attempts = 0;
-	const { calls } = stubFetch(() => {
+	const { calls, fetch } = fetchRecorder(() => {
 		attempts++;
 
 		return attempts <= delays.length ? response({ status: 503 }) : undefined;
 	});
 	const reports = reportSink();
-	const log = new Log({ clock, otlpQueue: new Queue({ clock, otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report }), stderr: () => {} });
+	const log = new Log({ clock, otlpQueue: new Queue({ clock, fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report }), stderr: () => {} });
 
 	log.warn("keep me");
 	await log.flush();
@@ -363,7 +366,7 @@ test("Queue retries a failed batch with doubling backoff, capped at 30 s, until 
 	}
 
 	t.strictEqual(attempts, delays.length + 1, "the accepted attempt is the last one");
-	t.deepEqual(exportedRecords(calls), Array(attempts).fill("keep me"), "the same batch is retried until accepted");
+	t.deepEqual(exportedRecords(calls), Array(delays.length + 1).fill("keep me"), "the same batch is retried until accepted");
 	t.deepEqual(reports.lines.map(line => line.msg), Array(delays.length).fill("OTLP export failed, will retry"), "one line per failed attempt");
 	t.deepEqual(reports.lines.map(line => line.retryInMs), delays, "the delay doubles from retryDelayMs and stops at the 30 s cap");
 	t.strictEqual(reports.lines[0].status, 503, "the status is in the metadata");
@@ -373,9 +376,9 @@ test("Queue retries a failed batch with doubling backoff, capped at 30 s, until 
 });
 
 test("Queue batches by time and by size, with keepalive under the browser cap", async t => {
-	const { calls } = stubFetch();
+	const { calls, fetch } = fetchRecorder();
 	const clock = fakeClock();
-	const log = new Log({ clock, otlpQueue: new Queue({ clock, otlpHttpBaseURI: "http://127.0.0.1:4318" }), stderr: () => {} });
+	const log = new Log({ clock, otlpQueue: new Queue({ clock, fetch, otlpHttpBaseURI: "http://127.0.0.1:4318" }), stderr: () => {} });
 
 	log.info("one");
 	log.info("two");
@@ -388,7 +391,7 @@ test("Queue batches by time and by size, with keepalive under the browser cap", 
 	t.strictEqual(calls[0].keepalive, true, "a batch under 64 KiB is sent with keepalive");
 
 	calls.length = 0;
-	const sized = new Log({ clock, otlpQueue: new Queue({ batchDelayMs: 10000, clock, maxBatchBytes: 3000, otlpHttpBaseURI: "http://127.0.0.1:4318" }), stderr: () => {} });
+	const sized = new Log({ clock, otlpQueue: new Queue({ batchDelayMs: 10000, clock, fetch, maxBatchBytes: 3000, otlpHttpBaseURI: "http://127.0.0.1:4318" }), stderr: () => {} });
 
 	sized.info("a".repeat(700));
 	sized.info("b".repeat(700));
@@ -415,10 +418,10 @@ function recordPayload(text: string): { bytes: number, payload: OtlpPayload } {
 }
 
 test("Queue sends at once when its bytes reach maxBatchBytes, whatever batches and loads came before", async t => {
-	const { calls } = stubFetch();
+	const { calls, fetch } = fetchRecorder();
 	const clock = fakeClock();
 	const { bytes, payload } = recordPayload("abc");
-	const queueFor = (storage?: QueueStorage) => new Queue({ batchDelayMs: 10000, clock, maxBatchBytes: 2 * bytes, otlpHttpBaseURI: "http://127.0.0.1:4318", storage });
+	const queueFor = (storage?: QueueStorage) => new Queue({ batchDelayMs: 10000, clock, fetch, maxBatchBytes: 2 * bytes, otlpHttpBaseURI: "http://127.0.0.1:4318", storage });
 	const logTo = (queue: Queue) => new Log({ clock, otlpQueue: queue, stderr: () => {} });
 
 	const exact = logTo(queueFor());
@@ -461,11 +464,11 @@ test("Queue sends at once when its bytes reach maxBatchBytes, whatever batches a
 });
 
 test("Queue hands its warnings to the warn function it is given, once per message", async t => {
-	stubFetch();
+	const { fetch } = fetchRecorder();
 
 	const reports = reportSink();
 	const warned: string[] = [];
-	const queue = new Queue({ otlpHttpBaseURI: "http://u:p@collector.test:4318", report: reports.report }, msg => { warned.push(msg); });
+	const queue = new Queue({ fetch, otlpHttpBaseURI: "http://u:p@collector.test:4318", report: reports.report }, msg => { warned.push(msg); });
 	const log = new Log({ otlpQueue: queue, stderr: () => {} });
 
 	log.info("x");
@@ -479,13 +482,13 @@ test("Queue hands its warnings to the warn function it is given, once per messag
 });
 
 test("Queue is bounded: drops the oldest when full and reports the count once", async t => {
-	const { calls } = stubFetch();
+	const { calls, fetch } = fetchRecorder();
 	const reports = reportSink();
 	const throwingReport = (msg: string, metadata: Metadata) => {
 		reports.report(msg, metadata);
 		throw new Error("sink broke");
 	};
-	const log = new Log({ otlpQueue: new Queue({ batchDelayMs: 10000, maxItems: 2, otlpHttpBaseURI: "http://127.0.0.1:4318", report: throwingReport }), stderr: () => {} });
+	const log = new Log({ otlpQueue: new Queue({ batchDelayMs: 10000, fetch, maxItems: 2, otlpHttpBaseURI: "http://127.0.0.1:4318", report: throwingReport }), stderr: () => {} });
 
 	log.info("1");
 	log.info("2");
@@ -504,7 +507,7 @@ test("Queue keeps a batch it reported a retry for through the maxItems trim", as
 	let attempts = 0;
 	let released = false;
 	let retryReleased = false;
-	const { calls } = stubFetch(async () => {
+	const { calls, fetch } = fetchRecorder(async () => {
 		attempts++;
 
 		if (attempts === 1) {
@@ -519,7 +522,7 @@ test("Queue keeps a batch it reported a retry for through the maxItems trim", as
 
 		return undefined;
 	});
-	const log = new Log({ clock, otlpQueue: new Queue({ batchDelayMs: 600000, clock, maxItems: 3, otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report, retryDelayMs: 1000 }), stderr: () => {} });
+	const log = new Log({ clock, otlpQueue: new Queue({ batchDelayMs: 600000, clock, fetch, maxItems: 3, otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report, retryDelayMs: 1000 }), stderr: () => {} });
 
 	log.info("a");
 	log.info("b");
@@ -560,12 +563,12 @@ test("Queue keeps a batch in storage when a round takes it before the first save
 		return getItem(key);
 	};
 
-	const { calls } = stubFetch(async () => {
+	const { calls, fetch } = fetchRecorder(async () => {
 		await waitFor(() => released);
 
 		return undefined;
 	});
-	const queue = new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, storage });
+	const queue = new Queue({ fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, storage });
 	const log = new Log({ otlpQueue: queue, stderr: () => {} });
 	const flushed = queue.flush();
 
@@ -584,8 +587,8 @@ test("Queue drops the oldest leftovers over maxItems when it loads them", async 
 	const storage = fakeStorage(false);
 	const reports = reportSink();
 
-	stubFetch(() => { throw new Error("offline"); });
-	const before = new Log({ otlpQueue: new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, retryDelayMs: 3600000, storage }), stderr: () => {} });
+	const offline = fetchRecorder(() => { throw new Error("offline"); });
+	const before = new Log({ otlpQueue: new Queue({ fetch: offline.fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, retryDelayMs: 3600000, storage }), stderr: () => {} });
 
 	before.info("old");
 	before.info("middle");
@@ -593,8 +596,8 @@ test("Queue drops the oldest leftovers over maxItems when it loads them", async 
 	await before.flush();
 	await waitFor(() => storedRecords(storage).length === 3);
 
-	const { calls } = stubFetch();
-	const after = new Log({ otlpQueue: new Queue({ maxItems: 2, otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report, storage }), stderr: () => {} });
+	const { calls, fetch } = fetchRecorder();
+	const after = new Log({ otlpQueue: new Queue({ fetch, maxItems: 2, otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report, storage }), stderr: () => {} });
 
 	await after.flush();
 	t.deepEqual(exportedRecords(calls), ["middle", "new"], "the oldest leftover is dropped");
@@ -605,12 +608,12 @@ test("Queue drops the oldest leftovers over maxItems when it loads them", async 
 test("Queue keeps a batch in storage while it is sent, so a record logged meanwhile is saved behind it", async t => {
 	const storage = fakeStorage(false);
 	let released = false;
-	const { calls } = stubFetch(async () => {
+	const { calls, fetch } = fetchRecorder(async () => {
 		await waitFor(() => released);
 
 		return undefined;
 	});
-	const log = new Log({ otlpQueue: new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, storage }), stderr: () => {} });
+	const log = new Log({ otlpQueue: new Queue({ fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, storage }), stderr: () => {} });
 
 	log.info("sending");
 	const flushed = log.flush();
@@ -641,8 +644,8 @@ for (const async of [false, true]) {
 			throw new Error("flaky");
 		};
 
-		const { calls } = stubFetch();
-		const log = new Log({ otlpQueue: new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report, storage }), stderr: () => {} });
+		const { calls, fetch } = fetchRecorder();
+		const log = new Log({ otlpQueue: new Queue({ fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report, storage }), stderr: () => {} });
 
 		log.info("new");
 		await log.flush();
@@ -658,12 +661,12 @@ test("Queue's byte count follows its items, so a delivered or dropped record sto
 	const clock = fakeClock();
 	const big = "a".repeat(5000);
 	let attempts = 0;
-	const { calls } = stubFetch(() => {
+	const { calls, fetch } = fetchRecorder(() => {
 		attempts++;
 
 		return attempts === 1 ? response({ status: 503 }) : undefined;
 	});
-	const log = new Log({ clock, otlpQueue: new Queue({ batchDelayMs: 600000, clock, maxBatchBytes: 8000, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, retryDelayMs: 1000 }), stderr: () => {}, stdout: () => {} });
+	const log = new Log({ clock, otlpQueue: new Queue({ batchDelayMs: 600000, clock, fetch, maxBatchBytes: 8000, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, retryDelayMs: 1000 }), stderr: () => {}, stdout: () => {} });
 
 	log.info(big);
 	log.info(big);
@@ -678,7 +681,7 @@ test("Queue's byte count follows its items, so a delivered or dropped record sto
 	await clock.advance(600000);
 	t.deepEqual(calls.map(call => call.body.resourceLogs[0].scopeLogs[0].logRecords.length), [1, 1, 1, 1], "one record per POST throughout");
 
-	const bounded = new Log({ clock, otlpQueue: new Queue({ batchDelayMs: 600000, clock, maxBatchBytes: 8000, maxItems: 1, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {} }), stderr: () => {}, stdout: () => {} });
+	const bounded = new Log({ clock, otlpQueue: new Queue({ batchDelayMs: 600000, clock, fetch, maxBatchBytes: 8000, maxItems: 1, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {} }), stderr: () => {}, stdout: () => {} });
 
 	calls.length = 0;
 	bounded.info(big);
@@ -691,12 +694,12 @@ test("Queue's byte count follows its items, so a delivered or dropped record sto
 test("Queue runs one round at a time, and a flush() arriving mid-round waits for a round of its own", async t => {
 	const clock = fakeClock();
 	let released = false;
-	const { calls } = stubFetch(async () => {
+	const { calls, fetch } = fetchRecorder(async () => {
 		await waitFor(() => released);
 
 		return response();
 	});
-	const log = new Log({ clock, otlpQueue: new Queue({ clock, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {} }), stderr: () => {} });
+	const log = new Log({ clock, otlpQueue: new Queue({ clock, fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {} }), stderr: () => {} });
 
 	log.info("first");
 	const first = log.flush();
@@ -721,12 +724,12 @@ test("Queue runs one round at a time, and a flush() arriving mid-round waits for
 test("Queue keeps one timer: a record arriving during a retry backoff never jumps it", async t => {
 	const clock = fakeClock();
 	let attempts = 0;
-	const { calls } = stubFetch(() => {
+	const { calls, fetch } = fetchRecorder(() => {
 		attempts++;
 
 		return attempts === 1 ? response({ status: 503 }) : undefined;
 	});
-	const log = new Log({ clock, otlpQueue: new Queue({ batchDelayMs: 100, clock, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, retryDelayMs: 5000 }), stderr: () => {} });
+	const log = new Log({ clock, otlpQueue: new Queue({ batchDelayMs: 100, clock, fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, retryDelayMs: 5000 }), stderr: () => {} });
 
 	log.info("first");
 	t.strictEqual(clock.pending.size, 1, "one timer waits for the batch to fill");
@@ -749,7 +752,7 @@ test("Queue keeps one timer: a retry takes over the batch timer a mid-round reco
 	const clock = fakeClock();
 	let released = false;
 	let attempts = 0;
-	const { calls } = stubFetch(async () => {
+	const { calls, fetch } = fetchRecorder(async () => {
 		attempts++;
 
 		if (attempts > 1) {
@@ -760,7 +763,7 @@ test("Queue keeps one timer: a retry takes over the batch timer a mid-round reco
 
 		return response({ status: 503 });
 	});
-	const log = new Log({ clock, otlpQueue: new Queue({ batchDelayMs: 100, clock, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, retryDelayMs: 5000 }), stderr: () => {} });
+	const log = new Log({ clock, otlpQueue: new Queue({ batchDelayMs: 100, clock, fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, retryDelayMs: 5000 }), stderr: () => {} });
 
 	log.info("first");
 	const flushed = log.flush();
@@ -797,8 +800,8 @@ test("Queue with storage writes through one writer, so changes made during a wri
 		await setItem(key, value);
 		inFlight--;
 	};
-	stubFetch();
-	const log = new Log({ clock, otlpQueue: new Queue({ batchDelayMs: 600000, clock, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, storage }), stderr: () => {} });
+	const { fetch } = fetchRecorder();
+	const log = new Log({ clock, otlpQueue: new Queue({ batchDelayMs: 600000, clock, fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, storage }), stderr: () => {} });
 
 	log.info("1");
 	await waitFor(() => writes === 1);
@@ -819,9 +822,9 @@ test("Queue schedules the leftovers it loads, with nothing new enqueued", async 
 
 	storage.data.set("@larvit/log:otlp-queue", JSON.stringify([{ resourceLogs: [{ resource: { attributes: [] }, scopeLogs: [{ logRecords: [{ body: { stringValue: "leftover" }, severityNumber: 9, severityText: "INFO", timeUnixNano: nanos(clock.now()) }] }] }] }]));
 
-	const { calls } = stubFetch();
+	const { calls, fetch } = fetchRecorder();
 
-	new Queue({ clock, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, storage });
+	new Queue({ clock, fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, storage });
 	await waitFor(() => clock.pending.size === 1);
 	await clock.advance(60000);
 	t.deepEqual(exportedRecords(calls), ["leftover"], "the batch timer the load set sends them");
@@ -841,8 +844,8 @@ test("Queue flushed while storage loads sends the leftovers and leaves no batch 
 		return getItem(key);
 	};
 
-	const { calls } = stubFetch();
-	const queue = new Queue({ clock, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, storage });
+	const { calls, fetch } = fetchRecorder();
+	const queue = new Queue({ clock, fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, storage });
 	const flushed = queue.flush();
 
 	released = true;
@@ -857,17 +860,17 @@ for (const async of [false, true]) {
 		const storage = fakeStorage(async);
 		const otlpHttpBaseURI = "http://127.0.0.1:4318";
 
-		stubFetch(() => { throw new Error("offline"); });
-		const before = new Log({ otlpQueue: new Queue({ otlpHttpBaseURI, report: () => {}, retryDelayMs: 3600000, storage }), stderr: () => {} });
+		const offline = fetchRecorder(() => { throw new Error("offline"); });
+		const before = new Log({ otlpQueue: new Queue({ fetch: offline.fetch, otlpHttpBaseURI, report: () => {}, retryDelayMs: 3600000, storage }), stderr: () => {} });
 
 		before.info("before restart");
 		await before.end();
 		await waitFor(() => (storage.data.get("@larvit/log:otlp-queue") ?? "").includes("before restart"));
 		t.strictEqual(storage.data.size, 1, "the undelivered records and span are persisted under the default key");
 
-		const { calls } = stubFetch();
+		const { calls, fetch } = fetchRecorder();
 		const afterReports = reportSink();
-		const after = new Log({ otlpQueue: new Queue({ otlpHttpBaseURI, report: afterReports.report, storage }), stderr: () => {} });
+		const after = new Log({ otlpQueue: new Queue({ fetch, otlpHttpBaseURI, report: afterReports.report, storage }), stderr: () => {} });
 
 		after.info("after restart");
 		await after.flush();
@@ -885,8 +888,8 @@ test("Queue reports corrupt stored data once, discards it from its custom key an
 	const reports = reportSink();
 
 	corrupt.data.set("custom-key", "not json");
-	const { calls } = stubFetch();
-	const queue = new Queue({ key: "custom-key", otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report, storage: corrupt });
+	const { calls, fetch } = fetchRecorder();
+	const queue = new Queue({ fetch, key: "custom-key", otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report, storage: corrupt });
 	const log = new Log({ otlpQueue: queue, stderr: () => {} });
 
 	log.info("still works");
@@ -900,9 +903,9 @@ test("Queue reports corrupt stored data once, discards it from its custom key an
 });
 
 test("Queue never sends an enqueued payload of unknown kind, and reports it by the rule stored data meets", async t => {
-	const { calls } = stubFetch();
+	const { calls, fetch } = fetchRecorder();
 	const reports = reportSink();
-	const queue = new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report, storage: fakeStorage(false) });
+	const queue = new Queue({ fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report, storage: fakeStorage(false) });
 
 	Reflect.apply(queue.enqueue, queue, [{ resourceMetrics: [] }]);
 	await queue.flush();
@@ -928,24 +931,24 @@ for (const [stored, name] of [
 }
 
 test("Queue loads a stored list too long to pass as call arguments without a report", async t => {
-	stubFetch();
+	const { fetch } = fetchRecorder();
 
 	const long = fakeStorage(false);
 	const longReports = reportSink();
 
 	long.data.set("@larvit/log:otlp-queue", JSON.stringify(Array.from({ length: 150000 }, () => ({ resourceLogs: [] }))));
-	await new Queue({ maxItems: 150000, otlpHttpBaseURI: "http://127.0.0.1:4318", report: longReports.report, storage: long }).flush();
+	await new Queue({ fetch, maxItems: 150000, otlpHttpBaseURI: "http://127.0.0.1:4318", report: longReports.report, storage: long }).flush();
 	t.deepEqual(longReports.lines, [], "a stored list too long to pass as call arguments loads without a report");
 	t.end();
 });
 
 test("Queue still exports to a storage that cannot be written, and reports the write failure", async t => {
-	const { calls } = stubFetch();
+	const { calls, fetch } = fetchRecorder();
 	const broken = fakeStorage(false);
 	const brokenReports = reportSink();
 
 	broken.setItem = () => { throw new Error("quota exceeded"); };
-	const unsaved = new Log({ otlpQueue: new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", report: brokenReports.report, storage: broken }), stderr: () => {} });
+	const unsaved = new Log({ otlpQueue: new Queue({ fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", report: brokenReports.report, storage: broken }), stderr: () => {} });
 
 	unsaved.info("delivered anyway");
 	await unsaved.flush();
@@ -956,8 +959,8 @@ test("Queue still exports to a storage that cannot be written, and reports the w
 });
 
 test("log.flush() delivers pending records without ending the span", async t => {
-	const { calls } = stubFetch();
-	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+	const { calls, fetch } = fetchRecorder();
+	const log = new Log({ otlpQueue: new Queue({ fetch, otlpHttpBaseURI: "http://127.0.0.1:4318" }), stderr: () => {} });
 
 	log.info("early");
 	await log.flush();
@@ -1025,9 +1028,8 @@ test("otlpQueue and the otlp* options are two spellings of one endpoint; inherit
 });
 
 test("JSON.stringify of a conf holding a Queue carries the queue's conf, even with a batch pending", async t => {
-	stubFetch();
-
-	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {}, stdout: () => {} });
+	const { fetch } = fetchRecorder();
+	const log = new Log({ otlpQueue: new Queue({ fetch, otlpHttpBaseURI: "http://127.0.0.1:4318" }), stderr: () => {}, stdout: () => {} });
 
 	log.info("pending");
 
@@ -1037,7 +1039,7 @@ test("JSON.stringify of a conf holding a Queue carries the queue's conf, even wi
 	await log.end();
 
 	const storage = Object.assign(fakeStorage(false), { sessionToken: "s3cr3t" });
-	const stored = new Log({ otlpQueue: new Queue({ otlpHttpBaseURI: "http://127.0.0.1:4318", storage }), stderr: () => {}, stdout: () => {} });
+	const stored = new Log({ otlpQueue: new Queue({ fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", storage }), stderr: () => {}, stdout: () => {} });
 
 	Object.assign(storage, { self: storage });
 	t.notOk(JSON.stringify(stored.conf).includes("s3cr3t"), "what a storage holds stays out, and a circular one no longer throws");
@@ -1073,8 +1075,8 @@ test("a custom OtlpQueue receives every record and span, and end() flushes it", 
 });
 
 test("OTLP preserves a base path from otlpHttpBaseURI", async t => {
-	const { calls } = stubFetch();
-	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318/otel", stderr: () => {} });
+	const { calls, fetch } = fetchRecorder();
+	const log = new Log({ otlpQueue: new Queue({ fetch, otlpHttpBaseURI: "http://127.0.0.1:4318/otel" }), stderr: () => {} });
 
 	log.error("with base path");
 	await log.end();
@@ -1171,10 +1173,10 @@ test("OTLP/JSON batches the records into one POST and exports one span sharing t
 const encodeURIComponentTimes = (text: string, times: number): string => times === 0 ? text : encodeURIComponentTimes(encodeURIComponent(text), times - 1);
 
 test("end({ error }) marks the span failed", async t => {
-	const { calls } = stubFetch();
+	const { calls, fetch } = fetchRecorder();
 	const exportedSpan = (index: number) => exportedSpans(calls)[index];
 	const attr = (span: any, key: string) => span.attributes.find((attribute: any) => attribute.key === key)?.value.stringValue;
-	const conf = { context: { region: "eu" }, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} };
+	const conf = { context: { region: "eu" }, otlpQueue: new Queue({ fetch, otlpHttpBaseURI: "http://127.0.0.1:4318" }), stderr: () => {} };
 
 	await new Log(conf).end({ error: Object.assign(new TypeError("refused"), { code: "ECONNREFUSED" }) });
 	await new Log(conf).end({ error: new RangeError("too big") });
@@ -1257,14 +1259,13 @@ test("end({ error }) marks the span failed", async t => {
 });
 
 test("OTLP protobuf encodes logs and spans on the wire", async t => {
-	const { calls } = stubFetch();
+	const { calls, fetch } = fetchRecorder();
 	const clock = fakeClock();
 	const startedAt = clock.now();
 	const log = new Log({
 		clock,
 		context: { "service.name": "proto-svc" },
-		otlpHttpBaseURI: "http://127.0.0.1:4318",
-		otlpProtocol: "http/protobuf",
+		otlpQueue: new Queue({ clock, fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", otlpProtocol: "http/protobuf" }),
 		spanName: "proto-span",
 		stderr: () => {},
 	});
@@ -1317,8 +1318,8 @@ test("OTLP protobuf encodes logs and spans on the wire", async t => {
 });
 
 test("OTLP instances export independently, each with its own service.name", async t => {
-	const { calls } = stubFetch();
-	const otlp = { otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} };
+	const { calls, fetch } = fetchRecorder();
+	const otlp = { otlpQueue: new Queue({ fetch, otlpHttpBaseURI: "http://127.0.0.1:4318" }), stderr: () => {} };
 
 	const log1 = new Log({ context: { "service.name": "log1" }, ...otlp });
 
@@ -1355,12 +1356,12 @@ test("Queue under a clock whose setTimeout throws still runs the round a mid-rou
 			return setTimeout(callback, delayMs);
 		},
 	};
-	const { calls } = stubFetch(async () => {
+	const { calls, fetch } = fetchRecorder(async () => {
 		await waitFor(() => released);
 
 		return response();
 	});
-	const log = new Log({ otlpQueue: new Queue({ batchDelayMs: 600000, clock, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {} }), stderr: () => {}, stdout: () => {} });
+	const log = new Log({ otlpQueue: new Queue({ batchDelayMs: 600000, clock, fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {} }), stderr: () => {}, stdout: () => {} });
 
 	log.info("lost");
 	broken = true;
@@ -1401,12 +1402,12 @@ test("a pending batch timer never holds the process, including one set by a reco
 			return timer as unknown as TimerHandle;
 		},
 	};
-	const { calls } = stubFetch(async () => {
+	const { calls, fetch } = fetchRecorder(async () => {
 		await waitFor(() => released);
 
 		return response();
 	});
-	const log = new Log({ otlpQueue: new Queue({ batchDelayMs: 600000, clock, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {} }), stderr: () => {}, stdout: () => {} });
+	const log = new Log({ otlpQueue: new Queue({ batchDelayMs: 600000, clock, fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {} }), stderr: () => {}, stdout: () => {} });
 
 	log.info("first");
 	t.strictEqual(timers.length, 1, "a record logged sets one batch timer");
@@ -1756,9 +1757,9 @@ test("user:pass@ in otlpHttpBaseURI beside a non-credential otlpAdditionalHeader
 
 for (const otlpHttpBaseURI of ["http://u:p@mylocalhost:4318", "http://u:p@localhost.evil.test"]) {
 	test(`credentials sent to ${otlpHttpBaseURI}, a name that only contains localhost, raise the plain-http warning`, async t => {
-		stubFetch();
+		const { fetch } = fetchRecorder();
 		const sink = reportSink();
-		const queue = new Queue({ otlpHttpBaseURI, report: sink.report });
+		const queue = new Queue({ fetch, otlpHttpBaseURI, report: sink.report });
 
 		queue.enqueue(resourceLogsOf("a"));
 		await queue.flush();
@@ -1776,8 +1777,8 @@ for (const [payload, keepalive, name] of [
 	[() => payloadOfBytes(80000, "é"), false, "a body under 64 Ki characters but over 64 KiB in UTF-8"],
 ] as const) {
 	test(`keepalive is ${keepalive} for ${name}`, async t => {
-		const { calls } = stubFetch();
-		const queue = new Queue({ clock: fakeClock(), otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {} });
+		const { calls, fetch } = fetchRecorder();
+		const queue = new Queue({ clock: fakeClock(), fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {} });
 
 		queue.enqueue(payload());
 		await queue.flush();
@@ -1787,8 +1788,8 @@ for (const [payload, keepalive, name] of [
 }
 
 test("keepalive is true for a protobuf body under 64 KiB", async t => {
-	const { calls } = stubFetch();
-	const queue = new Queue({ clock: fakeClock(), otlpHttpBaseURI: "http://127.0.0.1:4318", otlpProtocol: "http/protobuf", report: () => {} });
+	const { calls, fetch } = fetchRecorder();
+	const queue = new Queue({ clock: fakeClock(), fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", otlpProtocol: "http/protobuf", report: () => {} });
 
 	queue.enqueue(recordPayload("a".repeat(30000)).payload);
 	await queue.flush();
@@ -1797,8 +1798,8 @@ test("keepalive is true for a protobuf body under 64 KiB", async t => {
 });
 
 test("Queue posts each batch", async t => {
-	const { calls } = stubFetch();
-	const queue = new Queue({ clock: fakeClock(), otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {} });
+	const { calls, fetch } = fetchRecorder();
+	const queue = new Queue({ clock: fakeClock(), fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {} });
 
 	queue.enqueue(resourceLogsOf("a"));
 	await queue.flush();
@@ -1807,9 +1808,9 @@ test("Queue posts each batch", async t => {
 });
 
 test("a protobuf Queue doesn't read a partialSuccess from the response", async t => {
-	stubFetch(() => response({ json: { partialSuccess: { errorMessage: "bad record", rejectedLogRecords: 1 } } }));
+	const { fetch } = fetchRecorder(() => response({ json: { partialSuccess: { errorMessage: "bad record", rejectedLogRecords: 1 } } }));
 	const sink = reportSink();
-	const queue = new Queue({ clock: fakeClock(), otlpHttpBaseURI: "http://127.0.0.1:4318", otlpProtocol: "http/protobuf", report: sink.report });
+	const queue = new Queue({ clock: fakeClock(), fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", otlpProtocol: "http/protobuf", report: sink.report });
 
 	queue.enqueue(resourceLogsOf("a"));
 	await queue.flush();
@@ -1818,9 +1819,9 @@ test("a protobuf Queue doesn't read a partialSuccess from the response", async t
 });
 
 test("a send that fails with something other than an Error reports an unknown error", async t => {
-	stubFetch(() => { throw Object.freeze({ reason: "offline" }); });
+	const { fetch } = fetchRecorder(() => { throw Object.freeze({ reason: "offline" }); });
 	const sink = reportSink();
-	const queue = new Queue({ clock: fakeClock(), otlpHttpBaseURI: "http://127.0.0.1:4318", report: sink.report });
+	const queue = new Queue({ clock: fakeClock(), fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", report: sink.report });
 
 	queue.enqueue(resourceLogsOf("a"));
 	await queue.flush();
@@ -1829,13 +1830,13 @@ test("a send that fails with something other than an Error reports an unknown er
 });
 
 test("Queue drops and reports a stored payload that cannot be encoded, and doesn't send anything", async t => {
-	const { calls } = stubFetch();
+	const { calls, fetch } = fetchRecorder();
 	const storage = fakeStorage(false);
 	const sink = reportSink();
 
 	storage.data.set("@larvit/log:otlp-queue", JSON.stringify([{ resourceLogs: [{}] }]));
 
-	const queue = new Queue({ clock: fakeClock(), otlpHttpBaseURI: "http://127.0.0.1:4318", report: sink.report, storage });
+	const queue = new Queue({ clock: fakeClock(), fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", report: sink.report, storage });
 
 	await queue.flush();
 	t.deepEqual(sink.lines.map(line => line.msg), ["OTLP export rejected, batch dropped"], "reported as dropped");
@@ -1857,14 +1858,14 @@ test("queue.conf.storage is hidden from stringify and spread, and otherwise a pl
 
 test("a retried batch put back over maxItems leaves the oldest other item out of storage too", async t => {
 	let released = false;
-	const { calls } = stubFetch(async () => {
+	const { calls, fetch } = fetchRecorder(async () => {
 		await waitFor(() => released);
 
 		throw new Error("connection refused");
 	});
 	const clock = fakeClock();
 	const storage = fakeStorage(false);
-	const queue = new Queue({ clock, maxItems: 2, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, storage });
+	const queue = new Queue({ clock, fetch, maxItems: 2, otlpHttpBaseURI: "http://127.0.0.1:4318", report: () => {}, storage });
 	const log = new Log({ clock, otlpQueue: queue, stderr: () => {} });
 
 	log.info("a");
@@ -1884,14 +1885,16 @@ test("a retried batch put back over maxItems leaves the oldest other item out of
 test("a delivered batch resets the retry delay", async t => {
 	const clock = fakeClock();
 	const sink = reportSink();
-	const queue = new Queue({ clock, otlpHttpBaseURI: "http://127.0.0.1:4318", report: sink.report, retryDelayMs: 20 });
+	const refused = fetchRecorder(() => { throw new Error("connection refused"); });
+	const delivering = fetchRecorder();
+	let send = refused.fetch;
+	const queue = new Queue({ clock, fetch: (...args) => send(...args), otlpHttpBaseURI: "http://127.0.0.1:4318", report: sink.report, retryDelayMs: 20 });
 
-	stubFetch(() => { throw new Error("connection refused"); });
 	queue.enqueue(resourceLogsOf("first"));
 	await queue.flush();
-	stubFetch();
+	send = delivering.fetch;
 	await clock.advance(20);
-	stubFetch(() => { throw new Error("connection refused"); });
+	send = refused.fetch;
 	queue.enqueue(resourceLogsOf("second"));
 	await queue.flush();
 	t.deepEqual(sink.lines.map(line => line.retryInMs), [20, 20], "the failure after a delivery waits retryDelayMs again");
@@ -1912,14 +1915,13 @@ test("Queue loading an empty stored list arms no batch timer", async t => {
 test("an export the collector doesn't answer is aborted after 3 s and retried", async t => {
 	const clock = fakeClock();
 	const sink = reportSink();
-	const queue = new Queue({ clock, otlpHttpBaseURI: "http://127.0.0.1:4318", report: sink.report });
-
 	let sent = false;
-
-	globalThis.fetch = ((_url: string, init: { signal: AbortSignal }) => new Promise((_resolve, reject) => {
+	const unanswered = ((_url: string, init: { signal: AbortSignal }) => new Promise((_resolve, reject) => {
 		sent = true;
 		init.signal.addEventListener("abort", () => { reject(new Error("aborted")); });
 	})) as unknown as typeof fetch;
+	const queue = new Queue({ clock, fetch: unanswered, otlpHttpBaseURI: "http://127.0.0.1:4318", report: sink.report });
+
 	new Log({ otlpQueue: queue, stderr: () => {} }).info("x");
 	void queue.flush();
 	await waitFor(() => sent);
@@ -1942,8 +1944,8 @@ for (const [clock, missing] of [
 }
 
 test("a malformed percent escape in the endpoint's password is sent as written in the Basic credential", async t => {
-	const { calls } = stubFetch();
-	const queue = new Queue({ clock: fakeClock(), otlpHttpBaseURI: "http://user:p%zz@127.0.0.1:4318", report: () => {} });
+	const { calls, fetch } = fetchRecorder();
+	const queue = new Queue({ clock: fakeClock(), fetch, otlpHttpBaseURI: "http://user:p%zz@127.0.0.1:4318", report: () => {} });
 
 	new Log({ otlpQueue: queue, stderr: () => {} }).info("x");
 	await queue.flush();
@@ -1952,14 +1954,14 @@ test("a malformed percent escape in the endpoint's password is sent as written i
 });
 
 test("a removeItem that throws while discarding an unreadable stored queue is not reported, and the next save overwrites it", async t => {
-	stubFetch(() => response({ status: 503 }));
+	const { fetch } = fetchRecorder(() => response({ status: 503 }));
 	const storage = fakeStorage(false);
 	const sink = reportSink();
 
 	storage.data.set("@larvit/log:otlp-queue", "{ not json");
 	storage.removeItem = () => { throw new Error("removeItem broke"); };
 
-	const queue = new Queue({ clock: fakeClock(), otlpHttpBaseURI: "http://127.0.0.1:4318", report: sink.report, retryDelayMs: 600000, storage });
+	const queue = new Queue({ clock: fakeClock(), fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", report: sink.report, retryDelayMs: 600000, storage });
 
 	new Log({ otlpQueue: queue, stderr: () => {} }).info("kept");
 	await queue.flush();
@@ -1969,13 +1971,13 @@ test("a removeItem that throws while discarding an unreadable stored queue is no
 });
 
 test("a removeItem that throws once the queue empties is reported as a failed write", async t => {
-	stubFetch();
+	const { fetch } = fetchRecorder();
 	const storage = fakeStorage(false);
 	const sink = reportSink();
 
 	storage.removeItem = () => { throw new Error("removeItem broke"); };
 
-	const queue = new Queue({ clock: fakeClock(), otlpHttpBaseURI: "http://127.0.0.1:4318", report: sink.report, storage });
+	const queue = new Queue({ clock: fakeClock(), fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", report: sink.report, storage });
 
 	new Log({ otlpQueue: queue, stderr: () => {} }).info("x");
 	await queue.flush();
