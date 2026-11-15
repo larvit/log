@@ -668,3 +668,14 @@ Read most (opens and searches):
 - `todo.md` 4
 - `AGENTS.md` 1
 - `docs/decisions.md` 1
+
+## Reading cost, chunk ddb2f040e822, finished 2026-11-15T22:34:24Z
+
+45450 new input tokens before the first commit.
+
+Read most (opens and searches):
+
+- `log/conf.ts` 4
+- `log/deprecated-options/default-queue.ts` 1
+- `log/deprecated-options/formatter-alias.ts` 1
+- `log/deprecated-options/replaced-by-transports.ts` 1
