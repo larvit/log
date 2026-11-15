@@ -6,13 +6,14 @@
 
 `Bar = 0.5`
 
-`Next ID = 154`
+`Next ID = 155`
 
 ## Items
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 153 | 2.7.0 |  | owner | **Let an app export the spans OpenTelemetry's instrumentation packages record, such as pg or Prisma queries, through a `Log`, nested under the request they ran in.** | 4 | 2 | 2 | 6 | 6 | 2 by 8, 4 by 6 | 1.7 |
+| 154 | 2.7.0 |  |  | **Point the `entryFormatter` deprecation warning at a name that is not itself deprecated.** | 1 | 1 | 2 | 2 | 2 | code health by 1 | 1.6 |
 | 146 | 2.8.0 |  |  | **Let a reader see from `redactedPath` alone which segments of a request path it keeps.** | 2 | 2 | 4 | 6 | 2 | code health by 3 | 2.3 |
 | 149 | 2.8.0 |  |  | **Keep a queue's storage read from rejecting when `restore` throws.** | 1 | 1 | 2 | 2 | 6 | code health by 3 | 2.3 |
 | 114 | 2.8.0 |  |  | **Move `package.json`'s build and test one-liners into named scripts, and let the OTLP test read its collector's port, image and container name from the environment, today's values as defaults.** | 1 | 1 | 1 | 1 | 2 | code health by 1 | 2.1 |
@@ -103,6 +104,13 @@ Settled by the maintainer on 2026-11-14:
 These spans flow through the `Log`'s `transports`. README's
 "One file, every runtime" claim changes with a second entry point; say what holds instead.
 
+### 154. Point the `entryFormatter` deprecation warning at a name that is not itself deprecated.
+
+`log/conf.ts`'s warning reads "entryFormatter is deprecated and removed in 3.0.0, use format", and
+`format` on a `Log` is deprecated too since `transports`: it belongs to `consoleTransport({ format })`.
+A consumer who follows the warning moves to a name 3.0.0 also removes. Found by the prose review of
+the change that recorded the no-warning approval.
+
 ### 146. Let a reader see from `redactedPath` alone which segments of a request path it keeps.
 
 The comprehension run of 2026-11-14, at 78682e7, scored Shape 6.63, and three of four seats named
@@ -165,7 +173,8 @@ split the credential, settings and queue modules. With `uglifyjs --toplevel` the
 shortens every top-level name, keeping only the names consumers import. So `Log.name` and
 `Queue.name`, which a debugger prints, are shortened too unless the build reserves them.
 On 2026-11-15 `transports`, with `consoleTransport` and `otlpTransport`, took the build to 13638 bytes.
-The maintainer approved merging that over the budget the same day, with this item to bring it back.
+The maintainer approved merging `transports` over the budget the same day; this item brings the build
+back under it.
 
 ### 26. Check the footprint budget in CI, so the numbers in README → Footprint fail a build instead of going stale.
 
