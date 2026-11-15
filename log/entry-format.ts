@@ -62,17 +62,19 @@ export function defaultColors(): boolean {
 	return colorsFromEnv(processEnv()) ?? true;
 }
 
-// The formatter a `format` names: a function is its own, and anything but "json" writes text.
-export function formatterOf(format: unknown): EntryFormatter {
-	if (typeof format === "function") {
-		return format as EntryFormatter;
-	}
-
+// The built-in formatter a format word names: anything but "json" writes text. A conf's `format`
+// holds only a word before 3.0.0, so a function there writes text as well.
+export function builtInFormatter(format: unknown): EntryFormatter {
 	return format === "json" ? msgJsonFormatter : msgTextFormatter;
+}
+
+// The formatter consoleTransport's `format` names: a function is its own.
+export function formatterOf(format: "json" | "text" | EntryFormatter | undefined): EntryFormatter {
+	return typeof format === "function" ? format : builtInFormatter(format);
 }
 
 // The formatter a conf writes with. A Log's own conf always reads one from entryFormatter; the built-in
 // that format names serves a conf built by hand.
 export function resolveFormatter(conf: LogConf): EntryFormatter {
-	return conf.entryFormatter ?? formatterOf(conf.format);
+	return conf.entryFormatter ?? builtInFormatter(conf.format);
 }
