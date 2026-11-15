@@ -1,9 +1,9 @@
 import { redactedPath } from "./path.js";
 import { redactedQuery } from "./query.js";
 
-// The url log.fetch traces, and the only kind buildUrlFull below can rebuild without a credential: a
-// scheme written without "//" parses to an opaque path, where userinfo, or a data: payload, sits in
-// pathname and would ride into url.full.
+// The url log.fetch traces: an `http:` or `https:` one, the only kind buildUrlFull below can rebuild
+// without a credential. A scheme written without "//" parses to an opaque path, where userinfo, or a
+// data: payload, sits in pathname and would ride into url.full.
 export function parseHttpUrl(input: string | URL, baseHref: string | undefined): URL | undefined {
 	let url: URL;
 

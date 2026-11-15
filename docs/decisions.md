@@ -225,11 +225,11 @@ userinfo-free-by-construction choices at the `log.fetch` call site are not rules
 to spans because the remaining credential rules are the queue's. 2026-11-13, the release review of 2.6.0: one module outgrew one read, so the place is
 the folder `credentials/`, a module per kind of value, which `credentials/span-values.ts` maps in
 its opening comment. The folder sits below `otlp/`, since the queue's plain-`http:` warning reads
-the header-name rule `isCredentialHeaderName` too. 2026-11-16, the implementing agent, on the
-comprehension seats' finding that `parseHttpUrl` is fetch's filter: it stays here, in
-`credentials/url-full.ts` beside `buildUrlFull`, because it is the precondition that makes
-`buildUrlFull` leak nothing, and `redactedAsUrl` in `span-values.ts` reads it too, which a move to
-`tracing/` would turn against the import order. Serves README → Goals #7 and code health. Valid
+the header-name rule `isCredentialHeaderName` too. 2026-11-16, the implementing agent: the comprehension
+seats read `parseHttpUrl` as `log.fetch`'s filter, but it stays in `credentials/url-full.ts`, beside
+`buildUrlFull`. For a url it rejects, `buildUrlFull` would put userinfo or a `data:` payload in
+`url.full`. `redactedAsUrl` calls it too, so a move to `tracing/` would run the imports against
+their order. Serves README → Goals #7 and code health. Valid
 while a rule on a span's credentials has no reason to sit beside its caller.
 
 ## `format` is the formatter's one name, `entryFormatter` its alias until 3.0.0
