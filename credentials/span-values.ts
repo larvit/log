@@ -72,26 +72,29 @@ export function failureMessage(error: unknown, url?: URL): string {
 	return holdsListedKeyInAnyDecoding(keyed) ? "REDACTED" : keyed;
 }
 
-// Where a recorded value that is a url's path or query is read, as in `url.path` or `http.target`.
+// The origin a recorded path or query, as in `url.path` or `http.target`, is read after.
 const RELATIVE_BASE = "http://relative.invalid";
 
 // A string attribute value, span name or status message an OpenTelemetry instrumentation recorded, read
 // as failureMessage reads log.fetch's status, and as its url where it parses as one, alone or after
 // RELATIVE_BASE. A value with nothing to redact stays as recorded, unnormalised. `url.query`, which
 // OpenTelemetry's semantic conventions write without its `?`, is read as a query.
-export function redactedRecordedValue(key: string, value: string): string {
+export function redactedRecordedValue(value: string, key?: string): string {
 	if (key === "url.query") {
-		return redactedQuery(new URL(`?${value}`, RELATIVE_BASE)) ?? value;
+		return redactedQuery(new URL(`${RELATIVE_BASE}?${value}`)) ?? value;
 	}
 
-	const relative = /^(?:\/(?![/\\])|\?)/.test(value);
-	const url = parseHttpUrl(value, relative ? RELATIVE_BASE : undefined);
-	const read = url === undefined ? value : url.href;
-	const redacted = failureMessage(read, url);
+	// Appended, not resolved, so a path opening with `//` stays a path rather than naming a host.
+	const url = parseHttpUrl(/^[/?]/.test(value) ? RELATIVE_BASE + value : value, undefined);
 
-	if (redacted === read) {
-		return value;
+	if (url !== undefined) {
+		const redacted = failureMessage(url.href, url);
+
+		if (redacted !== url.href) {
+			return redacted.startsWith(RELATIVE_BASE) ? redacted.slice(RELATIVE_BASE.length) : redacted;
+		}
 	}
 
-	return relative && redacted.startsWith(RELATIVE_BASE) ? redacted.slice(RELATIVE_BASE.length) : redacted;
+	// The value as written too: parsing drops a `..` segment, and a credential before it.
+	return failureMessage(value);
 }

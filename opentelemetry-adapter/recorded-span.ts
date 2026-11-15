@@ -83,11 +83,11 @@ export class RecordedSpan implements Span {
 		const attributes: Metadata = { ...this.log.context };
 
 		for (const [key, value] of Object.entries(this.attributes)) {
-			attributes[key] = typeof value === "string" ? redactedRecordedValue(key, value) : value;
+			attributes[key] = typeof value === "string" ? redactedRecordedValue(value, key) : value;
 		}
 
-		const status = this.span.status.message === undefined ? this.span.status : { ...this.span.status, message: redactedRecordedValue("", this.span.status.message) };
-		const span = { ...this.span, attributes: attributesOf(attributes), endTimeUnixNano: nsTimestamp(endTime, this.log), name: redactedRecordedValue("", this.span.name), status };
+		const status = this.span.status.message === undefined ? this.span.status : { ...this.span.status, message: redactedRecordedValue(this.span.status.message) };
+		const span = { ...this.span, attributes: attributesOf(attributes), endTimeUnixNano: nsTimestamp(endTime, this.log), name: redactedRecordedValue(this.span.name), status };
 
 		// Over the Log's documented fields, so the hand-off adds no member to Log.
 		exportSpan({ sampled: this.log.sampled, transports: transportsOf(this.log.conf) }, span, attributes);
