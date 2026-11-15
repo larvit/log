@@ -243,28 +243,27 @@ The latest run, at 998478e on 2026-11-15 (PR #386, rerun), scored Navigation 7.5
 Shape 6.50, Self-sufficiency 6.38, overall 6.50. Locality is the lowest. Its seats named:
 
 - What a child inherits: `log/conf.ts` → `inherited`, named by every seat in both runs at this
-  commit. The formatter alias (`ENTRY_FORMATTER_ALIAS`, `functionFormatterOf` and a module WeakMap)
-  and two skip sets, `otlpKeysNotToInherit` and `keysTransportsKeepOut`, decide the result
-  together, and a reader could not predict it. Item 62 removes the alias and item 97 the OTLP keys,
+  commit. The formatter alias (`ENTRY_FORMATTER_ALIAS`, `functionFormatterOf` and a module WeakMap,
+  since moved to `log/deprecated-options/formatter-alias.ts`) and two skip sets,
+  `otlpKeysNotToInherit` and `keysTransportsKeepOut`, decide the result together, and a reader
+  could not predict it. Item 62 removes the alias and item 97 the OTLP keys,
   both in 3.0.0; no item takes the rest before then.
 - The query rules: `credentials/query.ts` → `readNestedUrl`, `redactsKeyAndValue` and
   `redactedSearch`, a cycle carrying a depth and a memo, and `credentials/query-userinfo-runs.ts` →
   `scanPair` and `pairsInUserinfoRuns`, a scan across pairs under three readings. No item takes them.
 - The transports: `log/otlp-transport.ts` → `inTransportNames` rewrites queue messages whose
-  wording lives in `otlp/send/endpoint.ts`; `log/console-output.ts` → `writeConsoleEntry` calls
-  itself the one console writer while `consoleTransport` writes on its own; `log/log.ts` →
-  `deprecatedEntry` and `log/log-transports.ts` → `transportsOf`. Item 97 removes the OTLP half in
-  3.0.0; no item takes the console half.
+  wording lives in `otlp/send/endpoint.ts`, which item 97 removes in 3.0.0. The 2.7.0 release
+  review took the console half: one console writer, and the default list in
+  `log/deprecated-options/`.
 - Folders: `credentials/span-values.ts` → `failureMessage` also redacts recorded attributes,
   `parseHttpUrl`, the fetch filter, sits in `credentials/`, and `tracing/transport.ts` holds the
   `Transport` contract for entries. No item takes them.
 - `credentials/path.ts` → `redactedPath`, item 146, and `otlp/queue/export-scheduler.ts` →
   `dispatch`, which no item takes.
 
-Several seats also found the 2.x compatibility layer interleaved with the core `Log`, in no folder
-3.0.0 can delete. They found that the comments recording what no test can kill, such as
-`tracing/fetch.ts:57`, `otlp/queue/export-scheduler.ts:81` and `log/conf.ts:172`, cost a read and
-say nothing about the code. No item takes either. This item's tagline names
+Several seats also found the 2.x compatibility layer interleaved with the core `Log`, and comments
+recording what no test can kill. The 2.7.0 release review answered both: `log/deprecated-options/`
+holds that layer, and each such comment now says what the code guarantees. This item's tagline names
 the floor, so its chunk runs the four-seat scoring run. Where a dimension or the overall stays under
 7.0, file items for the places the seats name, lowest dimension first, and a copy of this item
 blocked by them. Where every score reaches 7.0, it doesn't file anything, and the run replaces the

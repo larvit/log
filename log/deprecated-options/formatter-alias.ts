@@ -1,5 +1,5 @@
+import { builtInFormatter } from "../entry-format.js";
 import type { EntryFormatter, LogConf, LogOptions, ResolvedLogConf } from "../types.js";
-import { formatterOf } from "../entry-format.js";
 
 // A conf holds the formatter in two keys, as 2.x documents: `format`, "json" or "text", and
 // `entryFormatter`, a function formatter, which takes precedence over format. A function passed as
@@ -16,7 +16,7 @@ const ENTRY_FORMATTER_ALIAS: PropertyDescriptor = {
 	// So a spread never hands the alias back as an option the caller wrote.
 	enumerable: false,
 	get(this: ResolvedLogConf): EntryFormatter {
-		return functionFormatters.get(this) ?? formatterOf(this.format);
+		return functionFormatters.get(this) ?? builtInFormatter(this.format);
 	},
 	set(this: ResolvedLogConf, formatter: EntryFormatter) {
 		functionFormatters.set(this, formatter);

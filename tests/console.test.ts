@@ -637,6 +637,15 @@ test("resolveFormatter hands back the formatter a conf writes with", t => {
 	t.strictEqual(resolveFormatter(new Log().conf), msgTextFormatter, "text by default");
 	t.strictEqual(resolveFormatter(new Log(null as never).conf), msgTextFormatter, "and with null for options, as untyped code may pass");
 	t.strictEqual(resolveFormatter({ entryFormatter: own, format: "json" }), own, "a hand-built conf's entryFormatter, which wins over its format as on a Log");
+	t.strictEqual(resolveFormatter({ format: own as never }), msgTextFormatter, "a function in a hand-built conf's format, which holds a word before 3.0.0, writes text");
+
+	const written: string[] = [];
+	const log = new Log({ colors: false, stdout: line => written.push(line) });
+
+	(log.conf as { format: unknown }).format = own;
+	log.info("hello");
+	t.strictEqual(written.length, 1, "and a function written to log.conf.format");
+	t.strictEqual(written[0]?.endsWith("[inf] hello"), true, "writes text too");
 	t.end();
 });
 
