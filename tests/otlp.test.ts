@@ -1,13 +1,13 @@
-import { type Clock, Log, type Metadata, type OtlpPayload, type OtlpQueue, Queue, type QueueStorage, type TimerHandle } from "../index.js";
-import { ExportScheduler, transition, unref } from "../otlp/queue/export-scheduler.js";
-import { saveTransition } from "../otlp/queue/queue-storage.js";
-import { encodeBatch } from "../otlp/send/batch.js";
-import { plainHttpWarnings } from "../otlp/send/endpoint.js";
-import { partialRejection, statusFailure } from "../otlp/send/response.js";
-import { systemClock } from "../primitives/clock.js";
-import { pbDecode, pbDecodeLogs, pbDecodeSpans, pbMsg } from "./protobuf-decode.js";
-import test from "./tap.js";
 import { callHeader, exportedRecords, exportedSpans, fakeClock, fakeStorage, nanos, reportSink, response, storedRecords, stubFetch, thrown, waitFor, withGlobals } from "./test-doubles.js";
+import { type Clock, Log, type Metadata, type OtlpPayload, type OtlpQueue, Queue, type QueueStorage, type TimerHandle } from "../index.js";
+import { encodeBatch } from "../otlp/send/batch.js";
+import { ExportScheduler, transition, unref } from "../otlp/queue/export-scheduler.js";
+import { partialRejection, statusFailure } from "../otlp/send/response.js";
+import { pbDecode, pbDecodeLogs, pbDecodeSpans, pbMsg } from "./protobuf-decode.js";
+import { plainHttpWarnings } from "../otlp/send/endpoint.js";
+import { saveTransition } from "../otlp/queue/queue-storage.js";
+import { systemClock } from "../primitives/clock.js";
+import test from "./tap.js";
 
 test("a transient export failure keeps the batch queued, reports one line and the retry delivers it", async t => {
 	stubFetch(() => { throw new Error("connection refused"); });

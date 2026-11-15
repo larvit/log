@@ -1,5 +1,5 @@
-import { Log, type LogOptions, type Metadata, type OtlpQueue, type QueueStorage, type TimerHandle } from "../index.js";
 import { type FetchTrace, traceFetch } from "../tracing/fetch.js";
+import { Log, type LogOptions, type Metadata, type OtlpQueue, type QueueStorage, type TimerHandle } from "../index.js";
 import { openSpan } from "../tracing/spans.js";
 
 // Resolves after one macrotask, so every callback of an already settled promise runs first. It uses

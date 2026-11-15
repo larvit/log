@@ -1,8 +1,8 @@
-import { stringField } from "../primitives/field-reads.js";
+import { holdsListedKeyInAnyDecoding, holdsUserinfoInAnyDecoding, redactTextQueryKeys, redactTextUserinfo } from "./text.js";
 import { isCredentialHeaderName } from "./header-names.js";
 import { redactedPath } from "./path.js";
 import { redactedQuery, redactedWholeUrl } from "./query.js";
-import { holdsListedKeyInAnyDecoding, holdsUserinfoInAnyDecoding, redactTextQueryKeys, redactTextUserinfo } from "./text.js";
+import { stringField } from "../primitives/field-reads.js";
 
 // Where README → Credentials in a captured value is enforced, bullet by bullet:
 // 1. A credential header name: isCredentialHeaderName in header-names.ts, applied by redactHeaderCredential.

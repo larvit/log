@@ -1,9 +1,9 @@
 import type { Clock } from "../../primitives/clock.js";
-import { stringField } from "../../primitives/field-reads.js";
-import { type Metadata, withoutUndefined } from "../../primitives/metadata.js";
 import { encodeBatch, KEEPALIVE_MAX_BYTES, type QueuedItem, utf8Length } from "./batch.js";
 import { type EndpointConf, otlpPath, plainHttpWarnings, requestHeaders, resolveEndpoint } from "./endpoint.js";
+import { type Metadata, withoutUndefined } from "../../primitives/metadata.js";
 import { partialRejection, type SendFailure, statusFailure } from "./response.js";
+import { stringField } from "../../primitives/field-reads.js";
 
 const OTLP_EXPORT_TIMEOUT_MS = 3000;
 

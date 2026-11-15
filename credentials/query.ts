@@ -1,6 +1,6 @@
 import { formDecoded, withoutDropped } from "./decodings.js";
-import { pairsInUserinfoRunsOfAnyReading } from "./query-userinfo-runs.js";
 import { holdsListedKeyInAnyDecoding, holdsUserinfoInAnyDecoding, isListedQueryKey, SCHEME_LED } from "./text.js";
+import { pairsInUserinfoRunsOfAnyReading } from "./query-userinfo-runs.js";
 
 // Query parts parsed as a url, one inside the next; it also keeps the stack from running out. Past
 // this limit a part counts as holding a credential, as decodings.ts says of every reading limit.

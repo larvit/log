@@ -1,8 +1,8 @@
-import { Queue } from "../otlp/queue/queue.js";
 import { DEFAULT_OTLP_PROTOCOL, type OtlpQueue } from "../otlp/queue/queue-types.js";
-import type { Metadata } from "../primitives/metadata.js";
-import { warnOnceToStderr, writeStderr } from "./stderr-lines.js";
 import type { LogConf, ResolvedLogConf } from "./types.js";
+import type { Metadata } from "../primitives/metadata.js";
+import { Queue } from "../otlp/queue/queue.js";
+import { warnOnceToStderr, writeStderr } from "./stderr-lines.js";
 
 // The default queue: the Queue a Log builds from its otlp* shorthand. attachDefaultQueue builds it into
 // conf.otlpQueue, beside that shorthand, so a child, a clone or a spread of the conf carries the pair.

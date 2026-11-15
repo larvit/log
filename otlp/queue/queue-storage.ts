@@ -1,8 +1,8 @@
-import { stringField } from "../../primitives/field-reads.js";
-import { type Metadata, withoutUndefined } from "../../primitives/metadata.js";
 import { isOtlpPayload, type OtlpPayload } from "../payloads.js";
+import { type Metadata, withoutUndefined } from "../../primitives/metadata.js";
 import type { QueuedItem } from "../send/batch.js";
 import type { QueueStorage, ResolvedQueueConf } from "./queue-types.js";
+import { stringField } from "../../primitives/field-reads.js";
 
 // What a queue's storage holds: the payloads it saved, or why they can't be read.
 function parseStoredPayloads(raw: string): { error: string | undefined } | { payloads: OtlpPayload[] } {

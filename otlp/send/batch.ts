@@ -1,7 +1,7 @@
-import { stringField } from "../../primitives/field-reads.js";
 import { byKind, type OtlpLogPayload, type OtlpPayload, type OtlpScope, type OtlpSpanPayload } from "../payloads.js";
 import { encodeOtlpProtobuf } from "../protobuf.js";
 import type { SendFailure } from "./response.js";
+import { stringField } from "../../primitives/field-reads.js";
 
 // Browsers reject a keepalive request whose body is over 64 KiB.
 export const KEEPALIVE_MAX_BYTES = 65536;

@@ -1,5 +1,5 @@
-import { isCredentialHeaderName } from "../../credentials/header-names.js";
 import { byKind, type OtlpPayload } from "../payloads.js";
+import { isCredentialHeaderName } from "../../credentials/header-names.js";
 
 export type EndpointConf = { acceptPlainHttpCredentials: boolean, otlpAdditionalHeaders?: Record<string, string>, otlpHttpBaseURI: string };
 

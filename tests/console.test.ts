@@ -1,7 +1,7 @@
-import { type EntryFormatter, type EntryFormatterConf, generateSpanId, generateTraceId, Log, type LogConf, type LogEntry, type Logger, type LogInt, type LogLevel, LogLevels, type LogOptions, type Metadata, msgJsonFormatter, msgTextFormatter, Queue, type ResolvedLogConf, resolveFormatter } from "../index.js";
-import { colorsFromEnv } from "../log/entry-format.js";
-import test from "./tap.js";
 import { capture, clientSpan, fakeClock, stubFetch, thrown } from "./test-doubles.js";
+import { colorsFromEnv } from "../log/entry-format.js";
+import { type EntryFormatter, type EntryFormatterConf, generateSpanId, generateTraceId, Log, type LogConf, type LogEntry, type Logger, type LogInt, type LogLevel, LogLevels, type LogOptions, type Metadata, msgJsonFormatter, msgTextFormatter, Queue, type ResolvedLogConf, resolveFormatter } from "../index.js";
+import test from "./tap.js";
 
 for (const { level, stream, token } of [
 	{ level: "error", stream: "stderr", token: "\x1b[1;31merr\x1b[0m" },

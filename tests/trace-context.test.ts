@@ -1,7 +1,7 @@
+import { callHeader, exportedRecords, exportedSpans, fakeClock, stubFetch } from "./test-doubles.js";
 import { formatTraceparent, generateSpanId, generateTraceId, Log, type LogInt, type Metadata, type OtlpSpan, parseTraceparent, Queue } from "../index.js";
 import { pbDecode, pbMsg } from "./protobuf-decode.js";
 import test from "./tap.js";
-import { callHeader, exportedRecords, exportedSpans, fakeClock, stubFetch } from "./test-doubles.js";
 
 test("spans of different names share one scopeSpans entry in a POST", async t => {
 	const { calls } = stubFetch();

@@ -12,7 +12,6 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 138 | 2.7.0 |  | principle | **Sort each module's imports on their first binding, with a lint rule that keeps them so.** | 2 | 1 | 1 | 2 | 3 | code health by 2 | 2.5 |
 | 96 | 2.7.0 |  | owner | **Add a list of transports, each handed plain log entries it encodes itself, with console and OTLP as the two this library ships and uses by default.** | 4 | 2 | 3 | 7 | 8 | 2 by 7, 4 by 8 | 1.4 |
 | 153 | 2.7.0 | 96 | owner | **Let an app export the spans OpenTelemetry's instrumentation packages record, such as pg or Prisma queries, through a `Log`, nested under the request they ran in.** | 4 | 2 | 2 | 6 | 6 | 2 by 8, 4 by 6 | 1.7 |
 | 146 | 2.8.0 |  |  | **Let a reader see from `redactedPath` alone which segments of a request path it keeps.** | 2 | 2 | 4 | 6 | 2 | code health by 3 | 2.3 |
@@ -83,13 +82,6 @@
 | 108 | 3.0.0 |  | principle | **Keep two tabs of one web app sharing a `storage` key from sending a record twice or deleting each other's backlog.** | 3 | 2 | 2 | 5 | 5 | 3 by 5 | 0.7 |
 
 ## Details
-
-### 138. Sort each module's imports on their first binding, with a lint rule that keeps them so.
-
-Every module's imports sort on the module path, as the shared eslint config's `simple-import-sort`
-orders them. So moving or renaming a module reorders the imports of each module that reads it, as
-the `credentials/` split did. The technical principle "Deterministic order" sorts an import on its
-first binding. Found by the principles pass of 2.6.0's release review.
 
 ### 96. Add a list of transports, each handed plain log entries it encodes itself, with console and OTLP as the two this library ships and uses by default.
 

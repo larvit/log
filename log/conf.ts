@@ -1,10 +1,10 @@
-import { systemClock } from "../primitives/clock.js";
-import { DEFAULT_LOG_LEVEL, type LogLevel } from "../primitives/levels.js";
-import { type Metadata, withoutUndefined } from "../primitives/metadata.js";
-import { platformRandomBytes } from "../tracing/traceparent.js";
 import { attachDefaultQueue, OTLP_ENDPOINT_KEYS, rejectQueueBesideShorthand } from "./default-queue.js";
 import { colorsFromEnv, msgJsonFormatter, msgTextFormatter } from "./entry-format.js";
+import { DEFAULT_LOG_LEVEL, type LogLevel } from "../primitives/levels.js";
 import type { EntryFormatter, LogConf, LogOptions, ResolvedLogConf } from "./types.js";
+import { type Metadata, withoutUndefined } from "../primitives/metadata.js";
+import { platformRandomBytes } from "../tracing/traceparent.js";
+import { systemClock } from "../primitives/clock.js";
 
 // A conf holds the formatter in two keys, as 2.x documents: `format`, "json" or "text", and
 // `entryFormatter`, a function formatter, which takes precedence over format. A function passed as
