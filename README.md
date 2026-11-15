@@ -319,9 +319,10 @@ that call is the only way a span finds its `Log`.
   url, or a path or query starting with `/` or `?` as in `url.path`, is also read by the rules for
   the request path and query: `?access_token=…` in `url.full` records `?access_token=REDACTED`.
   `url.query` and `url.fragment` are written without their `?` and `#`, and are read as a query and
-  a fragment. A literal in a `db.query.text`, such as a password in an `UPDATE`, is none of these
-  shapes and reaches your collector: pass it as a query parameter, so the query text holds only its
-  placeholder. The context of `log` is exported as written.
+  a fragment. A value that still holds userinfo once percent-decoded, as in a nested url these
+  rules don't parse, records `REDACTED` whole. A literal in a `db.query.text`, such as a password in
+  an `UPDATE`, is none of these shapes and reaches your collector: pass it as a query parameter, so
+  the query text holds only its placeholder. The context of `log` is exported as written.
 - **A span started outside `runWithLog` is not exported,** and neither is one under a `Log` whose
   trace is unsampled.
 - **OpenTelemetry's context manager does the nesting,** so install one before the first request.

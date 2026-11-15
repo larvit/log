@@ -105,15 +105,19 @@ export function redactedRecordedValue(value: string): string {
 	const base = value.startsWith("/") ? RELATIVE_BASE : /^[?#]/.test(value) ? `${RELATIVE_BASE}/` : "";
 
 	// Where the url reading finds nothing, the text is read as written: parsing drops a `..` segment,
-	// and a credential before it.
-	return redactedAsUrl(value, base) ?? failureMessage(value);
+	// and a credential before it. Text rules see userinfo only raw, so one a decoding still holds, as
+	// in a nested url they don't parse, takes the whole value, as in a header value.
+	const redacted = redactedAsUrl(value, base) ?? failureMessage(value);
+
+	return holdsUserinfoInAnyDecoding(redacted) ? "REDACTED" : redacted;
 }
 
 export function redactedRecordedAttribute(key: string, value: string): string {
 	const header = HEADER_ATTRIBUTE.exec(key);
 
 	if (header !== null) {
-		return redactHeaderCredential(header[1], value);
+		// OpenTelemetry's older conventions write a header name with `_` for `-`, as `set_cookie`.
+		return redactHeaderCredential(header[1].replace(/_/g, "-"), value);
 	}
 
 	const opener = OPENER_LEFT_OUT.get(key);

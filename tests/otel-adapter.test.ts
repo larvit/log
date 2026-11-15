@@ -441,11 +441,13 @@ test("a credential in an instrumentation span's attributes, name or status messa
 			"http.request.header.accept": "text/html",
 			"http.request.header.authorization": "Bearer abc",
 			"http.request.method": "GET",
+			"http.response.header.set_cookie": "sid=abc",
 			"http.response.status_code": 200,
 			"http.target": "/orders?token=abc",
 			"path.dot-segment": "/fetch/https://u:pw@s3.test/../k",
 			"path.dot-segment-matrix": "/m/img;sig=abc/../x.png",
 			"path.double-slash": "//fetch/https:%2F%2Fu:pw@s3.test%2Fk",
+			"path.encoded-dot-segment": "/fetch/https:%2F%2Fu:pw@s3.test%2Fk/../x",
 			"path.encoded-key-in-fragment": "/x#%26token%3Dabc",
 			"url.full": "https://api.test/orders?access_token=s3cret&page=2",
 			"url.nested": "https://img.test/fetch/https:%2F%2Fu:pw@s3.test%2Fk",
@@ -454,6 +456,7 @@ test("a credential in an instrumentation span's attributes, name or status messa
 			"url.query-led": "?token=abc",
 			"url.unchanged": "HTTPS://API.test/x?page=2",
 			"url.userinfo": "https://u:pw@api.test/x",
+			"url.wss": "wss://proxy.test/fetch/https:%2F%2Fu:pw@s3.test%2Fk",
 		} }).setStatus({ code: SpanStatusCode.ERROR, message: "request to https://u:pw@h.test/x failed" }).end();
 	});
 
@@ -462,12 +465,14 @@ test("a credential in an instrumentation span's attributes, name or status messa
 		"http.request.header.accept": "text/html",
 		"http.request.header.authorization": "REDACTED",
 		"http.request.method": "GET",
+		"http.response.header.set_cookie": "REDACTED",
 		"http.response.status_code": 200,
 		"http.target": "/orders?token=REDACTED",
 		"otel.scope.name": "@opentelemetry/instrumentation-undici",
 		"path.dot-segment": "/fetch/https://REDACTED@s3.test/../k",
 		"path.dot-segment-matrix": "/m/img;sig=REDACTED",
 		"path.double-slash": "//fetch/REDACTED",
+		"path.encoded-dot-segment": "REDACTED",
 		"path.encoded-key-in-fragment": "REDACTED",
 		"url.full": "https://api.test/orders?access_token=REDACTED&page=2",
 		"url.nested": "https://img.test/fetch/REDACTED",
@@ -476,6 +481,7 @@ test("a credential in an instrumentation span's attributes, name or status messa
 		"url.query-led": "?token=REDACTED",
 		"url.unchanged": "HTTPS://API.test/x?page=2",
 		"url.userinfo": "https://REDACTED@api.test/x",
+		"url.wss": "REDACTED",
 	});
 	t.ok(spans[0]?.span.attributes.some(({ key, value }) => key === "url.full" && value.stringValue === "https://api.test/orders?access_token=REDACTED&page=2"));
 	t.strictEqual(spans[0]?.span.name, "GET https://api.test/x?token=REDACTED");
