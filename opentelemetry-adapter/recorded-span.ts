@@ -20,7 +20,7 @@ function epochMs(time: Date | number): number {
 // would surface inside the instrumented library's own call.
 function nsTimestamp(time: TimeInput | undefined, log: Log): string {
 	if (Array.isArray(time)) {
-		if (time.every(Number.isInteger)) return String((BigInt(time[0]) * BigInt(1000000000)) + BigInt(time[1]));
+		if (time.length === 2 && time.every(Number.isInteger)) return String((BigInt(time[0]) * BigInt(1000000000)) + BigInt(time[1]));
 	} else if (time !== undefined && Number.isFinite(epochMs(time))) {
 		return getNsTimestamp(epochMs(time));
 	}
