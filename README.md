@@ -334,13 +334,14 @@ retry never keeps a Node, Bun or Deno process alive, so a script that awaits nei
 `flush()` exits without exporting what it queued, and one whose first attempt fails loses the batch
 at exit, `await end()` or not; give the queue a `storage` to carry it into the next run.
 
-In a browser, the collector must answer a CORS preflight. Every cross-origin POST carries a
-`Content-Type` that CORS doesn't safelist, so the browser sends an `OPTIONS` request first, and the
-collector's answer must allow `Content-Type`, and `Authorization` or any other header you set in
+In a browser, the collector must answer a CORS preflight, unless it is on the page's own origin.
+Every cross-origin POST sets `Content-Type` to a value CORS doesn't safelist, so the browser first
+sends an `OPTIONS` request. The collector's answer must allow `Content-Type` and every other header
+the queue sends: `Authorization` when the endpoint carries `user:pass@`, and each header in
 `otlpAdditionalHeaders`. Without that, every batch fails as a network error, such as Chrome's
-`Failed to fetch`, and is retried until it is dropped past `maxItems`. In the OpenTelemetry
-Collector, that is the OTLP/HTTP receiver's `cors` setting, with your page's origin in
-`allowed_origins` and any header you send in `allowed_headers`.
+`Failed to fetch`, and is retried, never dropped, while newer items queue behind it and the oldest
+of those are dropped past `maxItems`. In the OpenTelemetry Collector, set the OTLP/HTTP receiver's
+`cors`: your page's origin in `allowed_origins`, and each header you send in `allowed_headers`.
 
 `flush()` on `Log` or `Queue` sends everything queued, one attempt per batch, and resolves when that
 round is done. A failed batch stays queued for the retry, and until that fires `flush()` attempts
