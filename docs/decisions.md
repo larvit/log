@@ -468,13 +468,14 @@ One test swaps `URL` to count the parses `redactedQuery` makes, since that funct
 parser. Serves README → Goals #2 and #5. Valid while no
 consumer needs the page address or the env injected apart from these.
 
-2026-11-15, the implementing agent, in the release review of 2.7.0: `fetch` is the one global the
-suite swaps outside such a test, which that principle bans by name. A `Log` can't be handed its
-network: `log.fetch`, and the queue a `Log` builds from `otlpHttpBaseURI`, both send through
-`globalThis.fetch`. So 22 tests of those two swap it, through `stubFetch`. Nothing above covers
+2026-11-15, the implementing agent, in the release review of 2.7.0: the suite also swaps `fetch`,
+which "Functional core, imperative shell" bans by name. A `Log` can't be handed its network:
+`log.fetch`, and the queue a `Log` builds from `otlpHttpBaseURI`, both send through
+`globalThis.fetch`. So the tests of those two swap it, through `stubFetch`. Nothing above covers
 this: `colors`, `clock` and an absolute url don't replace the `fetch` a `Log` calls. It stands only
-until `todo.md` item 158 lets a test hand a `Log` its network. A new test of either swaps the
-global until then, and a test of anything else never does.
+until `todo.md` item 158 lets a test hand a `Log` its network. Until then a new test of either
+swaps the global. So does a test proving that code handed a `fetch` leaves the global alone, as
+one in `tests/transports.test.ts` does. No other test swaps it.
 
 ## A constructor parameter marked "Not part of the API" carries what only this library passes
 
