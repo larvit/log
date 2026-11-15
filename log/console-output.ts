@@ -13,3 +13,14 @@ export function writeConsoleEntry(conf: ResolvedLogConf, logLevel: LogLevel, msg
 		conf.stdout(line);
 	}
 }
+
+// `metadata` with the trace info printTraceInfo appends, in the order 2.x prints it.
+export function withTraceInfo(metadata: Metadata, span: { spanId: string, spanName: string, traceId: string }): Metadata {
+	const printed = { ...metadata };
+
+	printed.spanId = span.spanId;
+	printed.traceId = span.traceId;
+	printed.spanName = span.spanName;
+
+	return printed;
+}

@@ -12,13 +12,48 @@ README → Goals #8 and #4.
 2026-09-16, the maintainer: no level-string shorthand; `{ logLevel }` is the one spelling from
 3.0.0 (`todo.md` item 61). Serves README → Goals #1.
 
-## The OTLP endpoint belongs to the queue
+## The OTLP endpoint belongs to the OTLP transport
 
-2026-09-16, the maintainer: the OTLP endpoint belongs to the queue. `otlpHttpBaseURI`,
-`otlpProtocol` and `otlpAdditionalHeaders` on `Log` are shorthand for a default `Queue` and are
+2026-11-15, the maintainer, revising 2026-09-16's "the OTLP endpoint belongs to the queue": the
+endpoint, its headers, its protocol and the `fetch` it is sent with are options of `otlpTransport`,
+which owns one `Queue`. Through 2.x the `otlp*` options on `Log` and `otlpQueue` keep working as
+before on a `Log` with no `transports`: the three shorthands build a default `Queue`, and are
 rejected beside an `otlpQueue` they did not build. One `Queue` class, in memory or persisted through
 `storage`; a second implementation needs a reason a `storage` cannot give. Serves README → Goals #4.
-Valid while a queue owns the transport.
+Valid while `otlpTransport` exports through a `Queue`.
+
+## A `Log` sends through a list of transports
+
+2026-11-15, the maintainer, on the spelling eight fresh readers seated from README → Audience
+benched: `transports` lists every destination, `consoleTransport` and `otlpTransport` are factory
+functions, and a transport is an object with optional `entry`, `span` and `flush`. A kind of record
+is a method, so a later kind ships in a minor as one more optional method. The list replaces the
+default one, a child or clone inherits it, and a library author adds to it by spreading
+`parentLog.conf.transports`. Every option the list replaces is deprecated until 3.0.0, the console
+ones included: an option on `Log` that assumes a console transport is implicit, and
+`transports: [consoleTransport({ format: "json" })]` is explicit. A replaced option beside a list,
+its own or an inherited one, throws. The library's own warnings stay on `stderr`, since no
+transport can be trusted to carry them. `otlpTransport` names its endpoint options `baseUrl`,
+`headers` and `protocol`, so the README holds two sets of names until 3.0.0, which the maintainer
+approved against README → Goals #2.
+
+The implementing agent, same day, on what that leaves open:
+
+- The deprecated options write no warning. Nearly every configured consumer sets one, so a line per
+  `stderr` sink would change the output of code that did not change, in a minor. The `@deprecated`
+  tags, the README and the changelog carry it.
+- `log.conf.transports` is unset on a `Log` given no list. Its default list reads `log.conf` at each
+  record, because 2.x documents that a write to `log.conf.format` takes effect from the next line,
+  so the list belongs to that one `Log` and a child must not inherit it.
+- Beside a list, `log.conf.colors` and `log.conf.stdout` are not enumerable. `ResolvedLogConf`
+  requires them until 3.0.0, and a spread of a conf passed back as options would otherwise be
+  rejected for holding them.
+- A transport that throws, throws from the call that logged, as a throwing `stdout` does.
+- The `Transport` types sit in `tracing/`, the lowest folder that hands a record over, and both
+  shipped transports in `log/`, so every import follows AGENTS → "Working here".
+
+Serves README → Goals #1, #2, #4 and #8. Valid while 2.x is maintained; 3.0.0 removes the replaced
+options and what they keep alive, the formatter alias and the default queue.
 
 ## `colors` precedence, and colour on by default through 2.x
 
@@ -104,7 +139,7 @@ credential-free url cannot be built from its parts. `btoa` is assumed present be
 on the same floor as "`ProtoWriter.string` uses `TextEncoder` with no fallback": Hermes added both
 (facebook/hermes#1178) and React Native has shipped them since 0.74. Both spellings stand per "Both
 credential spellings stay, and their combination warns". Serves README → Goals #3 and #7. Valid
-while a queue owns the transport.
+while `otlpTransport` exports through a `Queue`.
 
 ## `log.fetch` traces only `http:` and `https:` urls
 

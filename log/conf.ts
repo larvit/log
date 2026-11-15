@@ -4,6 +4,7 @@ import { DEFAULT_LOG_LEVEL, type LogLevel } from "../primitives/levels.js";
 import type { EntryFormatter, LogConf, LogOptions, ResolvedLogConf } from "./types.js";
 import { type Metadata, withoutUndefined } from "../primitives/metadata.js";
 import { platformRandomBytes } from "../tracing/traceparent.js";
+import { processEnv } from "../primitives/process-env.js";
 import { systemClock } from "../primitives/clock.js";
 
 // A conf holds the formatter in two keys, as 2.x documents: `format`, "json" or "text", and
@@ -42,7 +43,35 @@ const INHERITED_BY: { [K in keyof LogConf]-?: readonly Derivation[] } = {
 	stderr: CHILD_AND_CLONE,
 	stdout: CHILD_AND_CLONE,
 	traceparent: [],
+	transports: CHILD_AND_CLONE,
 };
+
+// Each option `transports` replaces, with where its value goes instead.
+const REPLACED_BY_TRANSPORTS: readonly (readonly [keyof LogConf, string])[] = [
+	["colors", "belongs to consoleTransport({ colors })"],
+	["entryFormatter", "belongs to consoleTransport({ format })"],
+	["format", "belongs to consoleTransport({ format })"],
+	["otlpAdditionalHeaders", "belongs to otlpTransport({ headers })"],
+	["otlpHttpBaseURI", "belongs to otlpTransport({ baseUrl })"],
+	["otlpProtocol", "belongs to otlpTransport({ protocol })"],
+	["otlpQueue", "is replaced by otlpTransport()"],
+	["printTraceInfo", "belongs to consoleTransport({ printTraceInfo })"],
+	["stdout", "belongs to consoleTransport({ stdout })"],
+];
+
+// `own` is what the caller wrote, before it inherits: a list, its own or the one it will inherit,
+// would leave a replaced option beside it without effect.
+function rejectBesideTransports(own: LogConf, sources: (LogConf | undefined)[]): void {
+	if (!own.transports && !sources.some(source => source?.transports)) {
+		return;
+	}
+
+	for (const [key, goesTo] of REPLACED_BY_TRANSPORTS) {
+		if (own[key] !== undefined) {
+			throw new Error(`${key} ${goesTo} once transports is set`);
+		}
+	}
+}
 
 function isLogConfKey(key: string): key is keyof LogConf {
 	return Object.prototype.hasOwnProperty.call(INHERITED_BY, key);
@@ -164,6 +193,14 @@ function copyKey<K extends keyof LogConf>(target: LogConf, source: LogConf, key:
 
 function inherited(conf: LogConf, source: Source, derivation: Derivation): LogConf {
 	const skip = new Set(otlpKeysNotToInherit(conf, source.conf));
+	const replaced = REPLACED_BY_TRANSPORTS.map(([key]) => key);
+
+	// A list and the options it replaces never mix: whichever the conf holds already keeps the other out.
+	if (conf.transports) {
+		replaced.forEach(key => skip.add(key));
+	} else if (replaced.some(key => conf[key] !== undefined)) {
+		skip.add("transports");
+	}
 
 	// The caller's formatter, in either key, replaces the source's in both.
 	if (conf.format !== undefined || conf.entryFormatter !== undefined) {
@@ -197,17 +234,6 @@ function orDefault<T>(value: T | undefined, fallback: T): T {
 	return value === undefined ? fallback : value;
 }
 
-// The process global's env, or undefined where there is none (browsers) or a permission-gated one throws.
-function processEnv(): unknown {
-	try {
-		const processGlobal: unknown = Reflect.get(globalThis, "process");
-
-		return typeof processGlobal === "object" && processGlobal !== null ? Reflect.get(processGlobal, "env") : undefined;
-	} catch {
-		return undefined;
-	}
-}
-
 // attachFormatter runs after the conf is built: writing entryFormatter into it first and redefining it turns a data
 // property into an accessor, which drops every conf into V8's slow dictionary mode and past README →
 // Footprint.
@@ -231,8 +257,15 @@ function withDefaults(given: LogConf): ResolvedLogConf {
 		randomBytes: orDefault(rest.randomBytes, platformRandomBytes),
 		stderr: orDefault(rest.stderr, console.error),
 		stdout: orDefault(rest.stdout, console.log),
-		...rest.format === undefined && !entryFormatter ? { format: "text" as const } : {},
+		...rest.format === undefined && !entryFormatter && !rest.transports ? { format: "text" as const } : {},
 	};
+
+	// ResolvedLogConf requires these two until 3.0.0, yet beside a list they don't configure anything.
+	// Hidden from a spread, they don't get a Log's conf rejected when it is passed back as options.
+	if (rest.transports) {
+		Object.defineProperty(conf, "colors", { enumerable: false });
+		Object.defineProperty(conf, "stdout", { enumerable: false });
+	}
 
 	attachFormatter(conf, entryFormatter);
 
@@ -242,6 +275,8 @@ function withDefaults(given: LogConf): ResolvedLogConf {
 // A clone passes the Log it clones as cloneOf.
 export function resolveConf(options: LogOptions | LogLevel | "none" | undefined, cloneOf?: Source): { conf: ResolvedLogConf, warnings: string[] } {
 	const { conf: own, warning } = ownConf(options);
+
+	rejectBesideTransports(own, [cloneOf?.conf, typeof own.parentLog === "object" ? own.parentLog.conf : undefined]);
 	const cloned = cloneOf ? inherited(own, cloneOf, "clone") : own;
 	const derived = typeof cloned.parentLog === "object" ? inherited(cloned, cloned.parentLog, "child") : cloned;
 

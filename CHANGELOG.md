@@ -2,9 +2,21 @@
 
 ## Unreleased
 
-A string `format` other than `"text"` or `"json"` now warns, and the entry a formatter takes has a
-new name, `LogEntry`, which 3.0.0 gives the old one. Nothing here needs a change in your code.
+A `Log` now sends to a list of transports you choose, and you can write your own. The options the
+list replaces are deprecated and keep working until 3.0.0. A string `format` other than `"text"` or
+`"json"` now warns, and the entry a formatter takes has a new name, `LogEntry`. Nothing here needs a
+change in your code.
 
+- **Send to any set of destinations with `transports`.**
+  `new Log({ transports: [consoleTransport({ format: "json" }), otlpTransport({ baseUrl })] })`
+  lists every destination, and an object with `entry(entry)`, `span(span)` or `flush()` is a
+  transport of your own, such as one for Sentry or a test spy. See README → Transports.
+- **Send OTLP with a `fetch` of your own.** `otlpTransport({ baseUrl, fetch })` exports through the
+  `fetch` you pass, such as `expo/fetch` or one that pins TLS, and no longer needs the global one.
+- **Move `colors`, `format`, `printTraceInfo` and `stdout` to `consoleTransport`, and the `otlp*`
+  options to `otlpTransport`, before 3.0.0 removes them.** They work as before on a `Log` with no
+  `transports`, and write no warning. `otlpHttpBaseURI`, `otlpAdditionalHeaders` and `otlpProtocol`
+  become `baseUrl`, `headers` and `protocol`, and `otlpTransport` takes what `new Queue()` took.
 - **Get a warning, once per `stderr` sink, for a `format` string other than `"text"` or `"json"`.**
   `new Log({ format: process.env.LOG_FORMAT })` wrote text, without a word, for `"pretty"`. It still
   writes text, and now says why.
