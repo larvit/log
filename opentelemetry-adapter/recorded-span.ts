@@ -5,7 +5,7 @@ import type { Log } from "../log/log.js";
 import type { Metadata } from "../primitives/metadata.js";
 import { redactedRecordedAttribute, redactedRecordedValue } from "../credentials/span-values.js";
 import { spanIdFrom, traceIdFrom } from "../tracing/traceparent.js";
-import { transportsOf } from "../log/deprecated-options/default-transports.js";
+import { transportsOf } from "../log/transport.js";
 
 // A number below the process's start counts from it, as performance.now() does: the rule of
 // `timeInputToHrTime` in @opentelemetry/core, which instrumentation written against the SDK relies on.

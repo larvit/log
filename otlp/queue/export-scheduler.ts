@@ -170,16 +170,27 @@ export class ExportScheduler {
 		void this.dispatch({ type: "sendSucceeded" });
 	}
 
-	// Called by the round whose send failed. Returns the delay of the retry that follows that round.
+	// Called by the round whose send failed. Returns the delay of the retry that follows that round:
+	// the one sendFailed stored for the retry timer, since both apply retryDelay to the new failure count.
 	backoff(): number {
 		void this.dispatch({ type: "sendFailed" });
 
 		return retryDelay(this.state.failures, this.conf);
 	}
 
-	// Returns what a flush() caller waits for, where the event gave it something to wait for.
+	// Runs one event through `transition`, then carries out its effects in order. Returns what a
+	// flush() caller waits for, where the event gave it something to wait for.
+	//
+	// Three places dispatch an event while a dispatch runs, and only the catch below starts it
+	// before this call returns:
+	// - The round startRound starts dispatches `loaded` and `roundDone`, each after an await.
+	// - The timer dispatches `timerFired` when it fires.
+	// - An effect that throws dispatches `effectFailed` at once. That call reads the state this one
+	//   set and the joiners as the effects before the throw left them.
 	private dispatch(event: SchedulerEvent): Promise<void> | undefined {
-		const { effects, state } = transition(this.state, event, this.conf, this.joiners !== undefined);
+		// Read before the effects run, since joinNextRound and settleJoiners change it.
+		const joined = this.joiners !== undefined;
+		const { effects, state } = transition(this.state, event, this.conf, joined);
 		let awaited: Promise<void> | undefined;
 
 		this.state = state;

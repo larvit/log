@@ -1,11 +1,15 @@
 import { builtInFormatter } from "../entry-format.js";
 import type { EntryFormatter, LogConf, LogOptions, ResolvedLogConf } from "../types.js";
 
-// A conf holds the formatter in two keys, as 2.x documents: `format`, "json" or "text", and
-// `entryFormatter`, a function formatter, which takes precedence over format. A function passed as
-// `format` moves to entryFormatter, so that conf.format keeps its 2.x read type. On a Log's own conf,
-// entryFormatter is an accessor: it keeps the function in functionFormatters, and reads the built-in
-// formatter that format names where there is no function.
+// 2.x documents the formatter under two keys: `format`, "json" or "text", and `entryFormatter`, a
+// function, which wins over format. A function passed as `format` moves to entryFormatter, so that
+// conf.format keeps its 2.x read type. On a Log's own conf, entryFormatter is ENTRY_FORMATTER_ALIAS,
+// one accessor that every such conf shares:
+// - Read, it answers the function formatter, or else the built-in formatter that format names, so
+//   log.conf.entryFormatter is always a formatter, as 2.x types it.
+// - It keeps the function in functionFormatters, keyed by conf, rather than on the conf.
+// - It marks a conf this copy of the library built, since no other conf has this getter. A child or
+//   clone takes a source's function alone, through functionFormatterOf, never the built-in one.
 
 // The function formatter of each conf this copy of the library built with one.
 const functionFormatters = new WeakMap<object, EntryFormatter>();

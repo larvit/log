@@ -12,10 +12,7 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 159 | 2.7.0 |  |  | **Let a reader state from one place what a child or clone of a `Log` inherits, without tracing four sources.** | 3 | 1 | 2 | 4 | 5 | code health by 8 | 5.6 |
 | 160 | 2.7.0 |  |  | **Let a reader check by reading why a query key is redacted or kept, with every redaction 2.x makes still made.** | 3 | 2 | 4 | 7 | 5 | code health by 9 | 4.7 |
-| 162 | 2.7.0 |  |  | **Make how a `Log` hands entries to its transports sit in folders and under names that say so.** | 3 | 1 | 2 | 4 | 4 | code health by 6 | 4.7 |
-| 163 | 2.7.0 |  |  | **Let a reader check from the code and its comments when the export scheduler's shell re-enters `dispatch`, and what each re-entry reads.** | 3 | 1 | 2 | 4 | 4 | code health by 6 | 4.7 |
 | 161 | 2.7.0 |  |  | **Make each function in `credentials/` sit in a file, and under a name, that says what it does.** | 2 | 2 | 4 | 6 | 4 | code health by 7 | 4.4 |
 | 158 | 2.7.0 |  | principle | **Let a test hand a `Log` the network it sends through, so no test swaps `globalThis.fetch` except to prove a default reads it.** | 2 | 1 | 2 | 3 | 3 | code health by 3, 1 by 3 | 3.9 |
 | 156 | 2.7.0 |  |  | **Lower the reading cost of the files a chunk reads most before its first commit.** | 2 | 2 | 1 | 3 | 4 | code health by 3 | 2.7 |
@@ -29,7 +26,7 @@
 | 17 | 2.7.0 |  |  | **Warn once when an instance with `otlpQueue` set or inherited leaves `spanName` unset.** | 1 | 1 | 1 | 1 | 2 | 1 by 4 | 2.0 |
 | 80 | 2.7.0 |  | principle | **Run the browser suite in WebKit and Firefox as well as Chromium.** | 2 | 1 | 1 | 2 | 3 | 3 by 7 | 2.0 |
 | 157 | 2.7.0 |  |  | **Hand a custom transport's `span` method a span in a consumer's shape, and each transport its own copy of an entry and a span.** | 3 | 2 | 3 | 6 | 5 | 1 by 4, 4 by 4 | 1.0 |
-| 164 | 2.8.0 | 159, 160, 161, 162, 163 | owner | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 2 | code health by 3 | 6.2 |
+| 164 | 2.8.0 | 160, 161 | owner | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 2 | code health by 3 | 6.2 |
 | 28 | 2.8.0 |  |  | **Export resource attributes beyond `service.name`.** | 2 | 1 | 2 | 3 | 3 | 2 by 7 | 1.7 |
 | 117 | 2.8.0 |  |  | **Bring the built `index.js` within README → Footprint's 10 KB gzipped budget.** | 2 | 1 | 2 | 3 | 3 | 5 by 7 | 1.5 |
 | 26 | 2.8.0 |  |  | **Check the footprint budget in CI, so the numbers in README → Footprint fail a build instead of going stale.** | 2 | 1 | 1 | 2 | 5 | 5 by 8 | 1.5 |
@@ -86,30 +83,6 @@
 
 ## Details
 
-### 159. Let a reader state from one place what a child or clone of a `Log` inherits, without tracing four sources.
-
-All four seats of the 2026-11-15 scoring run (PR #391, at 4f96af8) named `log/conf.ts:121`
-`inherited`, and Locality, at 5.88, is the run's lowest dimension. No seat could predict what a
-child inherits:
-
-- `log/conf.ts:121` `inherited`: three skip rules, `otlpKeysNotToInherit`, `keysTransportsKeepOut`
-  and the formatter pair, are unioned into one skip set, then applied in a fixed order within
-  `resolveConf` that nothing explains. The architect found `source.conf.entryFormatter` may be a
-  getter that answers with a built-in.
-- `log/conf.ts:66` `ownConf` and `log/conf.ts:157` `withDefaults`: the formatter lives under two
-  keys and is read through `functionFormatterOf` while every other key is read raw; the conf is
-  mutated three more times after the defaults, and stays writable by the caller.
-- `log/deprecated-options/formatter-alias.ts:14` `ENTRY_FORMATTER_ALIAS`: a non-enumerable accessor
-  over a module `WeakMap`, with getter identity as provenance.
-
-Make each of these places easier to read. Today's observable behaviour holds, under strict semver
-(README → Audience): what a child and a clone inherit, `entryFormatter` included. The 2.x layer sits
-where 3.0.0 can delete it: item 62 removes `entryFormatter` and item 97 the OTLP keys, and this item
-leaves both removals to them.
-
-Ranks ahead of the release's other items because docs/decisions.md → "The comprehension baseline"
-ships comprehension work ahead of them; Moves reflects that the overall score is under the 7.0 floor.
-
 ### 160. Let a reader check by reading why a query key is redacted or kept, with every redaction 2.x makes still made.
 
 The query-credential rules were the hardest place of the 2026-11-15 scoring run (PR #391, at
@@ -129,41 +102,6 @@ Make each of these places easier to read. This is security-critical (README → 
 redaction the suite and README → Credentials in a captured value promise still holds. A chunk
 that reworks redaction has let defects escape before (item 84 drew six later fixes), so the chunk
 adds a test for each shape the rework could drop before it changes the code.
-
-Ranks ahead of the release's other items because docs/decisions.md → "The comprehension baseline"
-ships comprehension work ahead of them; Moves reflects that the overall score is under the 7.0 floor.
-
-### 162. Make how a `Log` hands entries to its transports sit in folders and under names that say so.
-
-Seats of the 2026-11-15 scoring run (PR #391, at 4f96af8) found the transport code where its folder
-or comment says something else, under Navigation (7.38) and Shape (6.63):
-
-- `log/deprecated-options/default-transports.ts:9` `transportsOf`: live dispatch, which
-  `opentelemetry-adapter/recorded-span.ts` imports, sits in the folder 3.0.0 cuts down (AGENTS.md →
-  Working here). Two seats named it.
-- `tracing/transport.ts:24` `Transport`: the contract for entries sits in the tracing folder.
-- `log/console-output.ts:7` `writeConsoleEntry`: its comment calls it the one console writer, while
-  `consoleTransport` writes on its own.
-
-Done when each of these places sits where its name, folder and comment say, with imports still
-running one way (AGENTS.md → Working here; the decision log names each import that runs against it).
-What 3.0.0 deletes stays in `log/deprecated-options/`: item 97 removes the OTLP keys and
-`inTransportNames`, and this item leaves them alone. Behaviour doesn't change.
-
-Ranks ahead of the release's other items because docs/decisions.md → "The comprehension baseline"
-ships comprehension work ahead of them; Moves reflects that the overall score is under the 7.0 floor.
-
-### 163. Let a reader check from the code and its comments when the export scheduler's shell re-enters `dispatch`, and what each re-entry reads.
-
-Seats of the 2026-11-15 scoring run (PR #391, at 4f96af8) found the pure `transition` of
-`ExportScheduler` pleasant and its shell hard, under Overall (6.50) and Locality (5.88):
-
-- `otlp/queue/export-scheduler.ts:181` `dispatch`: it re-enters itself from `startRound` and from its
-  catch; `joined` is computed outside the state machine, read before the effects change `joiners`;
-  and `Queue.round` calls `backoff()`, which recomputes, after dispatching.
-
-Make this place easier to read. The 2.x behaviour, the order of rounds, retries and backoff, holds,
-and so do its tests.
 
 Ranks ahead of the release's other items because docs/decisions.md → "The comprehension baseline"
 ships comprehension work ahead of them; Moves reflects that the overall score is under the 7.0 floor.
@@ -285,8 +223,6 @@ Today `TransportSpan` is `{ attributes: Metadata, span: OtlpSpan }`, and README 
 The maintainer chose, on 2026-11-15: give `TransportSpan` a consumer's shape in 2.7.0, and convert to `OtlpSpan` inside the OTLP transport. A shape such as `{ name, traceId, spanId, parentSpanId?, kind, startMs, endMs, status, attributes, serviceName? }` is a starting point. The shape is a spelling consumers read, so a panel seated as README → Audience picks it before it ships. The decision "A `Log` sends through a list of transports" and README → Transports follow the shape.
 
 `Log.end` hands every transport the `Log`'s own `this.span` object, and `log/log.ts` → `Log`'s entry hand-off gives every transport one `entry` object, so a transport that writes to either changes what the next one gets. README → Transports only asks a transport to copy before changing. Hand each transport its own copy of both. The implementing agent chose a copy over a frozen object, since a frozen one fails at runtime in a transport that writes to it; the maintainer was told and did not object.
-
-Once done, `Transport` and its types can move out of `tracing/transport.ts` to a file named for what they hold, since `TransportSpan` no longer imports `OtlpSpan`.
 
 ### 164. Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.
 

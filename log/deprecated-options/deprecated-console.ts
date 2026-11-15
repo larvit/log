@@ -1,6 +1,6 @@
 import type { ResolvedLogConf } from "../types.js";
 import { resolveFormatter } from "../entry-format.js";
-import type { Transport } from "../../tracing/transport.js";
+import type { Transport } from "../transport.js";
 import { withTraceInfo, writeConsoleLine } from "../console-output.js";
 
 // The console the deprecated options make. Unlike consoleTransport it reads the conf at each entry,

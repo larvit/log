@@ -1,6 +1,6 @@
 import { buildLogPayload, buildSpanPayload } from "../otlp/payloads.js";
 import type { OtlpQueue } from "../otlp/queue/queue-types.js";
-import type { Transport } from "../tracing/transport.js";
+import type { Transport } from "./transport.js";
 
 // Hands a queue each entry and span as an OTLP payload: the one place a record becomes a payload,
 // for otlpTransport's queue and for the deprecated `otlpQueue` alike.

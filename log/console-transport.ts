@@ -1,6 +1,6 @@
 import { defaultColors, formatterOf } from "./entry-format.js";
 import type { EntryFormatter } from "./types.js";
-import type { Transport } from "../tracing/transport.js";
+import type { Transport } from "./transport.js";
 import { withTraceInfo, writeConsoleLine } from "./console-output.js";
 
 export type ConsoleTransportOptions = {
