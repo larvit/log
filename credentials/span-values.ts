@@ -14,15 +14,15 @@ import { stringField } from "../primitives/field-reads.js";
 //    pairsInUserinfoRunsOfAnyReading in query-userinfo-runs.ts and NestedQueryReader.pair in query.ts.
 // 6. A listed key after `?`, `&`, `#` or `;` in text: redactTextQueryKeys in text.ts.
 // 7. A url nested in the path: redactedPath in path.ts.
-// buildUrlFull in url-full.ts assembles url.full from 3 and 7. redactedText applies 4 to 7 to a text:
-// failureMessage for a span's status, redactedRecordedAttribute, from 1 to 7, for what an
-// OpenTelemetry instrumentation recorded.
+// buildUrlFull in url-full.ts assembles url.full from 3 and 7. redactedText applies 4 to 6 to a text,
+// and 7 to the path of a known url the text quotes. failureMessage uses it for a span's status.
+// redactedRecordedAttribute applies 1 to 7 to what an OpenTelemetry instrumentation recorded.
 
 export function redactHeaderCredential(name: string, value: string): string {
 	return isCredentialHeaderName(name) || redactedWholeUrl(value) !== undefined || holdsUserinfoInAnyDecoding(value) || holdsListedKeyInAnyDecoding(value) ? "REDACTED" : value;
 }
 
-// `text` with each credential rule of 4 to 7 above applied, `url` being a known url that `text` may quote.
+// `url` is a known url that `text` may quote.
 function redactedText(text: string, url?: URL): string {
 	// Precise rules first, coarse after, so each coarse rule sees only what the finer ones left. First,
 	// the known url, which the runtime quotes back: Firefox's `Window.fetch: <url> …` parses whole, its
@@ -43,8 +43,7 @@ function redactedText(text: string, url?: URL): string {
 	return holdsListedKeyInAnyDecoding(keyed) ? "REDACTED" : keyed;
 }
 
-// The text of an error, as a span's status message. `url` is the one log.fetch handed the runtime, which
-// quotes it back inside free text.
+// `url` is the one log.fetch handed the runtime, which quotes it back inside free text.
 export function failureMessage(error: unknown, url?: URL): string {
 	let message = stringField(error, "message");
 
