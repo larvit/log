@@ -441,11 +441,11 @@ test("a credential in an instrumentation span's attributes, name or status messa
 			"http.request.method": "GET",
 			"http.target": "/orders?token=abc",
 			"url.full": "https://api.test/orders?access_token=s3cret&page=2",
+			"url.nested": "https://img.test/fetch/https:%2F%2Fu:pw@s3.test%2Fk",
 			"url.path": "/fetch/https:%2F%2Fu:pw@s3.test%2Fk",
 			"url.query": "access_token=s3cret&page=2",
-			"url.userinfo": "https://u:pw@api.test/x",
-			"url.nested": "https://img.test/fetch/https:%2F%2Fu:pw@s3.test%2Fk",
 			"url.unchanged": "HTTPS://API.test/x?page=2",
+			"url.userinfo": "https://u:pw@api.test/x",
 		} }).setStatus({ code: SpanStatusCode.ERROR, message: "request to https://u:pw@h.test/x failed" }).end();
 	});
 
