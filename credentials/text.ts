@@ -9,8 +9,8 @@ import { changesInAnyDecoding, decodings, inAnyDecoding, withoutDropped } from "
 // alternatives would overflow the regex stack on a message of megabytes.
 const SLASHED_USERINFO = /(:?\/\/)[^/?# ]*@/g;
 const BACKSLASH_OPENED_USERINFO = /(:?(?:\\[/\\]|\/\\))[^/\\?# ]*@/g;
-
 const OPENS_USERINFO = /\/\/[^/?# ]*$|(?:\\[/\\]|\/\\)[^/\\?# ]*$/;
+
 export const redactTextUserinfo = (text: string) => text.replace(SLASHED_USERINFO, "$1REDACTED@").replace(BACKSLASH_OPENED_USERINFO, "$1REDACTED@");
 
 const SENSITIVE_QUERY_KEY = /(auth|authentication|authorization|consumerid|credential|key|keyid|pass|passphrase|p(ass)?w(or)?d[12]?|secret|sig|sign|signature|signed|token)$|^(code|googleaccessid|idtokenhint)$/;
