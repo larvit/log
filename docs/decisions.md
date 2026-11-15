@@ -514,12 +514,14 @@ and the `Log` handed over explicitly at the request's edge. What that left open:
 - **Each string attribute, the span's name and its status message are read as `log.fetch`'s status
   message is, and as a url where one parses** (README → Goals #7). An instrumentation may put a url
   in any of them, and no list of attribute names would keep up with every instrumentation's, so no
-  value is trusted by its key. The one key read by name is `url.query`, which OpenTelemetry's
-  semantic conventions write without the `?` that the text rules open a pair at. A value starting
-  with `/` or `?` is read as a relative url, so `url.path` and the older `http.target` get the path
-  rules. A value with nothing to redact stays as recorded: re-serialising a url would change what a
-  dashboard groups on. The `Log`'s context is the app's own and goes out as written, as on a
-  `log.fetch` span.
+  value is trusted by its key. Three kinds of key are read by name. A header attribute,
+  `http.request.header.<name>` or `http.response.header.<name>`, takes the header-name rule, as a
+  header `log.fetch` captures does. `url.query` and `url.fragment` are written without their `?` and
+  `#` in OpenTelemetry's semantic conventions, and the text rules find a pair only after one. A
+  value starting with `/` or `?` is read as a relative url, so `url.path` and the older
+  `http.target` get the path rules. A value with nothing to redact stays as recorded: re-serialising
+  a url would change what a dashboard groups on. The `Log`'s context is the app's own and goes out
+  as written, as on a `log.fetch` span.
 - **What an `OtlpSpan` cannot hold is left out and counted.** Its `events` and `links` are typed
   empty and its attribute values are strings, and README → Audience lets only a major widen a type
   a consumer reads. So an event, a link and a list-valued attribute raise the span's dropped
