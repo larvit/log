@@ -615,3 +615,49 @@ Inherited architect, decided by:
 - Shape: `log/deprecated-options/default-transports.ts:9` `transportsOf`: reads worse, since every `Log` and the adapter resolve transports through a folder named for deprecated options
 - Navigation: `log/entry-format.ts:78` `resolveFormatter`: lives beside the formatters it picks from
 - Shape: `opentelemetry-adapter/recorded-span.ts:43` `RecordedSpan` constructor: uses the shared `newSpan`
+
+## 2026-11-15T22:01:34Z, PR #391 at 4f96af8
+
+| Seat | Navigation | Locality | Shape | Self-sufficiency | Overall |
+|---|---|---|---|---|---|
+| Junior A | 7 | 5.5 | 6.5 | 6 | 6 |
+| Mid A | 7.5 | 6 | 6.5 | 6.5 | 6.5 |
+| Maintainability senior | 7.5 | 6 | 6.5 | 6.5 | 6.5 |
+| Inherited architect | 7.5 | 6 | 7 | 7.5 | 7 |
+| Mean | 7.38 | 5.88 | 6.63 | 6.63 | 6.50 |
+
+Junior A, hardest first:
+
+- Overall, Locality, Self-sufficiency: `credentials/query-userinfo-runs.ts:55` `pairsInUserinfoRuns`: a run open across pairs under three readings; why a key that opens a run is checked against the whole pair stayed opaque
+- Overall, Locality: `credentials/query.ts:47` `readNestedUrl`: a cycle with a depth-keyed memo, the depth raised in `redactedSearch`; an output could not be predicted
+- Overall, Locality: `log/conf.ts:121` `inherited`: three skip rules and the formatter pair, applied in an unexplained order
+- Locality: `log/deprecated-options/formatter-alias.ts:14` `ENTRY_FORMATTER_ALIAS`: a non-enumerable accessor over a module WeakMap, with getter identity as provenance
+- Overall: `otlp/queue/export-scheduler.ts:181` `dispatch`: `startRound` re-enters it and `joined` is read before the effects change `joiners`
+- Shape: `credentials/span-values.ts:103` `redactedRecordedValue`: calls `failureMessage` on a value that is no failure
+
+Mid A, hardest first:
+
+- Overall, Locality: `credentials/query-userinfo-runs.ts:34` `scanPair`: run, lastAtSign, closed and going state under three readings, one pair closing and opening a run
+- Overall, Locality: `credentials/query.ts:78` `redactsKeyAndValue`: the depth cap checked in two places and a key read alone and joined; which condition covers which README bullet stayed open
+- Locality, Self-sufficiency: `log/conf.ts:121` `inherited`: the skip set built from three rules, then clone and child inheritance in a fixed order
+- Locality: `log/deprecated-options/formatter-alias.ts:14` `ENTRY_FORMATTER_ALIAS`: hidden formatter state in a WeakMap behind an accessor
+- Shape: `credentials/span-values.ts:85` `redactedAsUrl`: passes a url to `failureMessage` as the error
+- Overall: `otlp/queue/export-scheduler.ts:181` `dispatch`: re-enters itself from its catch, and `backoff()` recomputes after dispatching
+
+Maintainability senior, hardest first:
+
+- Overall, Locality: `credentials/query-userinfo-runs.ts:34` `scanPair`: three readings feed one set of indexes, so a local-looking change can open a gap that one reading would have caught
+- Overall, Locality: `credentials/query.ts:47` `readNestedUrl`: a four-function cycle; the depth rises only in `redactedSearch` while the cap is checked in two places
+- Overall, Locality: `log/conf.ts:66` `ownConf`: the formatter lives under two keys, read through `functionFormatterOf` while every other key is read raw
+- Locality: `log/conf.ts:157` `withDefaults`: the conf is mutated three more times after the defaults, and stays writable by the caller
+- Shape: `credentials/span-values.ts:103` `redactedRecordedValue`: reuses a status-message redactor for any recorded value, with a base prefix put on and taken off twice
+- Shape, Navigation: `log/deprecated-options/default-transports.ts:9` `transportsOf`: live dispatch, which the adapter imports, sits in the folder 3.0.0 cuts down
+
+Inherited architect, would restructure first:
+
+- Locality: `log/conf.ts:121` `inherited`: the `functionFormatters` WeakMap and a shared accessor mean `source.conf.entryFormatter` may be a getter that answers with a built-in
+- Navigation: `log/deprecated-options/default-transports.ts:9` `transportsOf`: how a `Log` picks its destinations lives in a folder labelled deprecated
+- Navigation: `tracing/transport.ts:24` `Transport`: the contract for entries sits in a tracing folder
+- Shape, Navigation: `credentials/text.ts:16` `isListedQueryKey`: the query-key rule sits in a file named for free text
+- Navigation: `credentials/span-values.ts:25` `parseHttpUrl`: the fetch filter lives in the credentials folder
+- Locality: `log/otlp-transport.ts:14` `inTransportNames`: rewrites queue messages whose wording lives in `otlp/send/endpoint.ts`
