@@ -53,7 +53,8 @@ export function redactTextQueryKeys(text: string): string {
 }
 
 export const holdsUserinfoInAnyDecoding = (text: string) => changesInAnyDecoding(text, redactTextUserinfo);
-// Whether a `//`, `\\`, `/\` or `\/` at the text's end, in any decoding, opens userinfo.
+// Whether a `//`, `\\`, `/\` or `\/` with no `/`, `?`, `#` or space after it, in any decoding, opens
+// userinfo that runs on past the text.
 export const opensUserinfoInAnyDecoding = (text: string) => inAnyDecoding(decodings(text), decoding => OPENS_USERINFO.test(decoding));
 export const holdsListedKey = (text: string) => redactTextQueryKeys(text) !== text;
 export const holdsListedKeyInAnyDecoding = (text: string) => changesInAnyDecoding(text, redactTextQueryKeys);

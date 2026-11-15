@@ -10,7 +10,7 @@ import { stringField } from "../primitives/field-reads.js";
 // 3. A url in a kept query value or key: NestedQueryReader in query.ts.
 // 4. A url that parses whole, in a header value or status message: redactedWholeUrl in query.ts.
 // 5. Userinfo after `//` or its backslash forms: redactTextUserinfo in text.ts, and in a query
-//    pairsInUserinfoRunsOfAnyReading in query-userinfo-runs.ts.
+//    pairsInUserinfoRunsOfAnyReading in query-userinfo-runs.ts and NestedQueryReader.pair in query.ts.
 // 6. A listed key after `?`, `&`, `#` or `;` in text: redactTextQueryKeys in text.ts.
 // 7. A url nested in the path: redactedPath in path.ts.
 // buildUrlFull assembles url.full from 3 and 7, failureMessage a span's status from 4 to 7, and
