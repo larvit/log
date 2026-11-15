@@ -1,6 +1,5 @@
-import { colorsFromEnv, msgJsonFormatter, msgTextFormatter } from "./entry-format.js";
+import { defaultColors, msgJsonFormatter, msgTextFormatter } from "./entry-format.js";
 import type { EntryFormatter } from "./types.js";
-import { processEnv } from "../primitives/process-env.js";
 import type { Transport } from "../tracing/transport.js";
 import { withTraceInfo } from "./console-output.js";
 
@@ -14,7 +13,7 @@ export type ConsoleTransportOptions = {
 
 // Writes each entry as one line: error and warn to stderr, the other levels to stdout.
 export function consoleTransport(options: ConsoleTransportOptions = {}): Transport {
-	const colors = options.colors ?? colorsFromEnv(processEnv()) ?? true;
+	const colors = options.colors ?? defaultColors();
 	const stderr = options.stderr ?? console.error;
 	const stdout = options.stdout ?? console.log;
 	let format = msgTextFormatter;
@@ -27,7 +26,8 @@ export function consoleTransport(options: ConsoleTransportOptions = {}): Transpo
 
 	return {
 		entry({ logLevel, metadata, msg, msTimestamp, spanId, spanName, traceId }) {
-			const line = format({ colors, logLevel, metadata: options.printTraceInfo ? withTraceInfo(metadata, { spanId, spanName, traceId }) : metadata, msTimestamp, msg });
+			// A copy, so a formatter that changes it changes no other transport's entry.
+			const line = format({ colors, logLevel, metadata: options.printTraceInfo ? withTraceInfo(metadata, { spanId, spanName, traceId }) : { ...metadata }, msTimestamp, msg });
 
 			if (logLevel === "error" || logLevel === "warn") {
 				stderr(line);

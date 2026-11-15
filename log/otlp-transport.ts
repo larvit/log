@@ -10,15 +10,30 @@ export type OtlpTransportOptions = Omit<QueueConf, "otlpAdditionalHeaders" | "ot
 	protocol?: QueueConf["otlpProtocol"];
 };
 
-// Encodes each entry and span as an OTLP payload, and exports it through a Queue of its own.
+// The Queue names its own options in what it throws and reports; the caller wrote the transport's.
+function inTransportNames(msg: string): string {
+	return msg.replace(/otlpHttpBaseURI/g, "baseUrl").replace(/otlpAdditionalHeaders/g, "headers").replace("on the Queue", "on otlpTransport");
+}
+
+function queueOf(options: OtlpTransportOptions): Queue {
+	const { baseUrl, headers, protocol, report = console.error, ...queueOptions } = options;
+
+	try {
+		return new Queue({
+			...queueOptions,
+			otlpHttpBaseURI: baseUrl,
+			report: (msg, metadata) => { report(inTransportNames(msg), metadata); },
+			...headers === undefined ? {} : { otlpAdditionalHeaders: headers },
+			...protocol === undefined ? {} : { otlpProtocol: protocol },
+		});
+	} catch (err) {
+		throw err instanceof Error ? new Error(inTransportNames(err.message)) : err;
+	}
+}
+
+// Exports each entry and span as an OTLP payload, through a Queue of its own.
 export function otlpTransport(options: OtlpTransportOptions): Transport {
-	const { baseUrl, headers, protocol, ...queueOptions } = options;
-	const queue = new Queue({
-		...queueOptions,
-		otlpHttpBaseURI: baseUrl,
-		...headers === undefined ? {} : { otlpAdditionalHeaders: headers },
-		...protocol === undefined ? {} : { otlpProtocol: protocol },
-	});
+	const queue = queueOf(options);
 
 	return {
 		entry({ logLevel, metadata, msg, msTimestamp, spanId, traceId }) {

@@ -25,7 +25,7 @@ function recorder() {
 	return { calls, fetch: recordingFetch(calls) };
 }
 
-test("a transport is handed each entry as a plain object, and the console is not written without consoleTransport", t => {
+test("a transport is handed each entry as a plain object", t => {
 	const { entries, transport } = spy();
 	const stdout: string[] = [];
 	const log = new Log({ clock: { clearTimeout: () => {}, now: () => 1758150000000, setTimeout: () => 0 }, context: { app: "a" }, spanName: "job", transports: [transport, consoleTransport({ stdout: line => { stdout.push(line); } })] });
@@ -127,15 +127,15 @@ test("a Queue sends with the fetch it is given", async t => {
 test("transports beside an option it replaces throws, naming where the option goes", t => {
 	const transports = [consoleTransport()];
 
-	t.strictEqual(thrown(() => new Log({ format: "json", transports })), "Error: format belongs to consoleTransport({ format }) once transports is set", "format");
-	t.strictEqual(thrown(() => new Log({ entryFormatter: () => "", transports })), "Error: entryFormatter belongs to consoleTransport({ format }) once transports is set", "entryFormatter");
-	t.strictEqual(thrown(() => new Log({ colors: false, transports })), "Error: colors belongs to consoleTransport({ colors }) once transports is set", "colors");
-	t.strictEqual(thrown(() => new Log({ printTraceInfo: true, transports })), "Error: printTraceInfo belongs to consoleTransport({ printTraceInfo }) once transports is set", "printTraceInfo");
-	t.strictEqual(thrown(() => new Log({ stdout: () => {}, transports })), "Error: stdout belongs to consoleTransport({ stdout }) once transports is set", "stdout");
-	t.strictEqual(thrown(() => new Log({ otlpHttpBaseURI: "https://a.example.com", transports })), "Error: otlpHttpBaseURI belongs to otlpTransport({ baseUrl }) once transports is set", "otlpHttpBaseURI");
-	t.strictEqual(thrown(() => new Log({ otlpAdditionalHeaders: {}, transports })), "Error: otlpAdditionalHeaders belongs to otlpTransport({ headers }) once transports is set", "otlpAdditionalHeaders");
-	t.strictEqual(thrown(() => new Log({ otlpProtocol: "http/json", transports })), "Error: otlpProtocol belongs to otlpTransport({ protocol }) once transports is set", "otlpProtocol");
-	t.strictEqual(thrown(() => new Log({ otlpQueue: { enqueue: () => {}, flush: () => Promise.resolve() }, transports })), "Error: otlpQueue is replaced by otlpTransport() once transports is set", "otlpQueue");
+	t.strictEqual(thrown(() => new Log({ format: "json", transports })), "Error: format belongs to consoleTransport({ format }), since this Log has transports", "format");
+	t.strictEqual(thrown(() => new Log({ entryFormatter: () => "", transports })), "Error: entryFormatter belongs to consoleTransport({ format }), since this Log has transports", "entryFormatter");
+	t.strictEqual(thrown(() => new Log({ colors: false, transports })), "Error: colors belongs to consoleTransport({ colors }), since this Log has transports", "colors");
+	t.strictEqual(thrown(() => new Log({ printTraceInfo: true, transports })), "Error: printTraceInfo belongs to consoleTransport({ printTraceInfo }), since this Log has transports", "printTraceInfo");
+	t.strictEqual(thrown(() => new Log({ stdout: () => {}, transports })), "Error: stdout belongs to consoleTransport({ stdout }), since this Log has transports", "stdout");
+	t.strictEqual(thrown(() => new Log({ otlpHttpBaseURI: "https://a.example.com", transports })), "Error: otlpHttpBaseURI belongs to otlpTransport({ baseUrl }), since this Log has transports", "otlpHttpBaseURI");
+	t.strictEqual(thrown(() => new Log({ otlpAdditionalHeaders: {}, transports })), "Error: otlpAdditionalHeaders belongs to otlpTransport({ headers }), since this Log has transports", "otlpAdditionalHeaders");
+	t.strictEqual(thrown(() => new Log({ otlpProtocol: "http/json", transports })), "Error: otlpProtocol belongs to otlpTransport({ protocol }), since this Log has transports", "otlpProtocol");
+	t.strictEqual(thrown(() => new Log({ otlpQueue: { enqueue: () => {}, flush: () => Promise.resolve() }, transports })), "Error: otlpQueue is replaced by otlpTransport({ baseUrl }) or a transport of your own, since this Log has transports", "otlpQueue");
 	t.end();
 });
 
@@ -163,7 +163,7 @@ test("a child and a clone inherit the list, their own list replaces it, and stde
 
 	added.info("both");
 	t.strictEqual(parentSpy.entries.length + own.entries.length, 5, "spreading the parent's list adds to it");
-	t.strictEqual(thrown(() => new Log({ format: "json", parentLog: parent })), "Error: format belongs to consoleTransport({ format }) once transports is set", "a replaced option under an inherited list throws too");
+	t.strictEqual(thrown(() => new Log({ format: "json", parentLog: parent })), "Error: format belongs to consoleTransport({ format }), since this Log inherits transports", "a replaced option under an inherited list throws too");
 	t.strictEqual(new Log(parent.conf).conf.transports, parent.conf.transports, "a Log's own conf is accepted as options");
 	t.strictEqual(new Log({ ...parent.conf }).conf.transports, parent.conf.transports, "and so is a spread of it");
 	t.strictEqual(stderr.length, 0, "no warning was written");
@@ -171,7 +171,7 @@ test("a child and a clone inherit the list, their own list replaces it, and stde
 	t.end();
 });
 
-test("a child with its own list takes no console or otlp option from a parent that has none", async t => {
+test("a child with its own list takes no console or otlp option from a parent without a list", async t => {
 	const { calls, fetch } = recorder();
 	const stdout: string[] = [];
 	const parent = new Log({ format: "json", otlpQueue: new Queue({ fetch, otlpHttpBaseURI: "https://collector.example.com" }), stdout: line => { stdout.push(line); } });
@@ -214,11 +214,99 @@ test("a clone's console options win over the list of the parentLog it is given",
 	t.end();
 });
 
-test("consoleTransport defaults its colors as a Log does", t => {
+test("consoleTransport follows the process env for colors unset in code, defaulting to on; set in code it ignores the env", t => {
+	const original: unknown = Reflect.get(globalThis, "process");
+	const env: Record<string, string> = { NO_COLOR: "1" };
 	const lines: string[] = [];
-	const log = new Log({ transports: [consoleTransport({ format: entry => String(entry.colors), stdout: line => { lines.push(line); } })] });
+	const logWith = (colors?: boolean) => new Log({ transports: [consoleTransport({ ...colors === undefined ? {} : { colors }, format: entry => String(entry.colors), stdout: line => { lines.push(line); } })] });
 
-	log.info("x");
-	t.deepEqual(lines, [String(new Log().conf.colors)], "the environment's choice, or else on");
+	Reflect.set(globalThis, "process", { env });
+	try {
+		logWith().info("NO_COLOR in the process env turns it off");
+		logWith(true).info("colors: true in code wins over NO_COLOR");
+		delete env.NO_COLOR;
+		logWith().info("on when the env says nothing");
+		env.FORCE_COLOR = "1";
+		logWith(false).info("colors: false in code wins over FORCE_COLOR");
+	} finally {
+		if (original === undefined) {
+			Reflect.deleteProperty(globalThis, "process");
+		} else {
+			Reflect.set(globalThis, "process", original);
+		}
+	}
+
+	t.deepEqual(lines, ["false", "true", "true", "false"]);
+	t.end();
+});
+
+test("a formatter that changes its entry's metadata changes no other transport's", async t => {
+	const leak = (entry: { metadata?: Record<string, unknown> }) => {
+		if (entry.metadata) entry.metadata.leaked = "yes";
+
+		return "";
+	};
+	const listed = spy();
+	const log = new Log({ transports: [consoleTransport({ format: leak, stdout: () => {} }), listed.transport] });
+
+	log.info("listed", { orderId: "o1" });
+	t.deepEqual(listed.entries[0].metadata, { orderId: "o1" }, "the transport after consoleTransport is handed what was logged");
+
+	const payloads: unknown[] = [];
+	const plain = new Log({ format: leak, otlpQueue: { enqueue: payload => { payloads.push(payload); }, flush: () => Promise.resolve() }, stdout: () => {} });
+
+	plain.info("default list", { orderId: "o1" });
+	await plain.flush();
+	t.strictEqual(JSON.stringify(payloads).includes("leaked"), false, "and on a Log with no list the queue is handed what was logged");
+	t.end();
+});
+
+test("a transport whose flush rejects, rejects flush() once the other transports have flushed", async t => {
+	let delivered = false;
+	const log = new Log({
+		transports: [
+			{ flush: () => Promise.reject(new Error("sentry is down")) },
+			{
+				flush: async () => {
+					await Promise.resolve();
+					await Promise.resolve();
+					delivered = true;
+
+					return true;
+				},
+			},
+		],
+	});
+	const outcome = await log.flush().then(() => "resolved", (err: unknown) => String(err));
+
+	t.strictEqual(outcome, "Error: sentry is down", "flush() rejects with what the transport rejected with");
+	t.strictEqual(delivered, true, "after a flush that resolves with a value was awaited");
+	t.end();
+});
+
+test("transports that is not a list of transport objects throws, saying what it takes", t => {
+	const expected = "Error: transports takes a list of transports, such as [consoleTransport()]";
+
+	t.strictEqual(thrown(() => new Log({ transports: Object(consoleTransport()) as [] })), expected, "a bare transport");
+	t.strictEqual(thrown(() => new Log({ transports: [Object(consoleTransport) as object] })), expected, "a factory that was not called");
+	t.end();
+});
+
+test("an option beside an inherited list throws, saying the list is inherited", t => {
+	const parent = new Log({ transports: [] });
+
+	t.strictEqual(thrown(() => new Log({ format: "json", parentLog: parent })), "Error: format belongs to consoleTransport({ format }), since this Log inherits transports", "from a parentLog");
+	t.strictEqual(thrown(() => parent.clone({ stdout: () => {} })), "Error: stdout belongs to consoleTransport({ stdout }), since this Log inherits transports", "from the Log it clones");
+	t.end();
+});
+
+test("otlpTransport names its own options in what it throws and reports", t => {
+	const reports: string[] = [];
+
+	t.strictEqual(thrown(() => otlpTransport({ baseUrl: "collector.example.com" })), "Error: baseUrl is not a valid URI; it needs an http:// or https:// prefix, and any / ? # \\ in a password percent-encoded", "a baseUrl without a scheme");
+	otlpTransport({ baseUrl: "https://user:pass@collector.example.com", headers: { Authorization: "Bearer t" }, report: line => { reports.push(line); } });
+	t.strictEqual(reports.length, 1, "both credential spellings warn once");
+	t.ok(reports[0].startsWith("@larvit/log: baseUrl carries user:pass@ and headers sets Authorization, so the headers one is sent"), `in the transport's names, got ${reports[0]}`);
+	t.strictEqual(reports[0].includes("otlp"), false, "and none of the queue's");
 	t.end();
 });

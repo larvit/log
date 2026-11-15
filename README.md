@@ -157,7 +157,7 @@ log.silly("Open the flood gates!"); // stdout
 Levels, most to least severe: `error`, `warn`, `info`, `verbose`, `debug`, `silly`. `"none"` outputs
 nothing but this library's own lines, which no `logLevel` silences: its `@larvit/log:` warnings and,
 with an OTLP transport, the export queue's failure reports. To drop them too, pass a no-op `stderr`,
-and a no-op `report` to a `Queue` you build.
+and a no-op `report` to `otlpTransport` or to a `Queue` you build.
 
 Keep the message a static string and put every value in the metadata object, so entries with the
 same message aggregate in your log backend:
@@ -287,8 +287,9 @@ const log = new Log({
 The list is the whole set: with `transports: [otlpTransport({ … })]` nothing is written to the
 console, and with `transports: []` nothing goes anywhere. Unset, a `Log` writes text to the console.
 A child and a clone use their source's list, and a list of their own replaces it. To add to a
-parent's list, spread it: `transports: [...parentLog.conf.transports ?? [consoleTransport()], mine]`.
-`log.conf.transports` is unset on a `Log` that was given no list.
+parent's list, spread it: `transports: [...parentLog.conf.transports, mine]`. A `Log` given no list
+has no `conf.transports` to spread: what its [deprecated options](#deprecated-options) write is not
+a list, and a child that passes a list of its own takes none of it.
 
 `consoleTransport(options)` writes `error` and `warn` to `stderr` and the other levels to `stdout`:
 
@@ -296,22 +297,24 @@ parent's list, spread it: `transports: [...parentLog.conf.transports ?? [console
 |---|---|---|---|
 | `colors` | `boolean` | `true` | ANSI colour codes in text output. Unset in code, the env decides: `NO_COLOR` (non-empty) turns it off; otherwise `FORCE_COLOR` turns it on, except `0` or `false` which turn it off. |
 | `format` | `"json" \| "text" \| EntryFormatter` | `"text"` | See [Output formats](#output-formats). |
-| `printTraceInfo` | `boolean` | `false` | Append `spanId`, `traceId` and `spanName` to each line. |
-| `stderr` | `(msg: string) => void` | `console.error` | Sink for this library's own warnings, and for `error` and `warn` on a `Log` with no `transports`. |
+| `printTraceInfo` | `boolean` | `false` | Append `spanId`, `traceId` and `spanName` to each line: those of the span the entry is exported under, which for a child is its parent's. |
+| `stderr` | `(msg: string) => void` | `console.error` | Sink for this library's own warnings. Without `transports`, also for `error` and `warn`. |
 | `stdout` | `(msg: string) => void` | `console.log` | Sink for the other levels. |
 
 `otlpTransport(options)` exports over OTLP/HTTP through an [export queue](#queue-exports) of its
-own, and takes every option of that queue. Three have shorter names here, and one is new:
+own, and takes every option of that queue. Three have shorter names here, and `fetch` is the one
+most apps on React Native set:
 
 | Option | Type | Default | |
 |---|---|---|---|
 | `baseUrl` | `string` | required | The queue's `otlpHttpBaseURI`: entries are POSTed to `/v1/logs` under it and spans to `/v1/traces`. |
-| `fetch` | `typeof fetch` | the global `fetch` | What the transport sends with, such as `expo/fetch` or one that pins TLS. |
+| `fetch` | `typeof fetch` | the global `fetch` | What the queue sends with, such as `expo/fetch` or one that pins TLS. |
 | `headers` | `Record<string, string>` | none | The queue's `otlpAdditionalHeaders`. |
 | `protocol` | `"http/json" \| "http/protobuf"` | `"http/json"` | The queue's `otlpProtocol`. |
 
-Create one `otlpTransport` per collector and share it through the list, since each has a queue of
-its own.
+Create one `otlpTransport` per collector, and pass that one to every `Log` that exports there, since
+each has a queue of its own. Its queue's failure reports and warnings go to its `report` option,
+`console.error` unless you pass one, and name the options as you wrote them here.
 
 ### Write your own
 
@@ -330,20 +333,30 @@ const log = new Log({ transports: [consoleTransport(), sentry] });
 
 | Method | |
 |---|---|
-| `entry(entry)` | Called for each entry at or above `logLevel`. `metadata` holds the call's metadata under the instance's context, and `traceId`, `spanId` and `spanName` name the span the entry belongs to: the parent's where the `Log` has a `parentLog`. Every transport is handed the same object, so copy it before changing it. |
-| `span({ span, attributes })` | Called for each ended span of a sampled trace: `span` is the `OtlpSpan`, and `attributes` the context of the `Log` that ended it. |
-| `flush()` | Awaited by `log.flush()` and `log.end()`. Return a promise that resolves once everything handed over is delivered. |
+| `entry(entry)` | Called for each entry at or above `logLevel`. `metadata` holds the call's metadata and the instance's context, which wins where both have a key. `traceId`, `spanId` and `spanName` name the span the entry is exported under, which for a child is its parent's. Every transport is handed the same object, so copy it before changing it. |
+| `span({ span, attributes })` | Called for each ended span of a sampled trace. `span` is the `OtlpSpan`. `attributes` holds what it is exported with: the context of the `Log` that ended it, `error.type`, and a `log.fetch` span's HTTP attributes. |
+| `flush()` | Awaited by `log.flush()` and `log.end()`. Return a promise that settles once everything handed over is delivered. If it rejects, so do they, once every other transport has flushed, so an `end()` you don't await needs a `flush()` that never rejects. |
 
-A transport takes a kind of record by having its method, so leave out what you don't handle. A
-later minor may add a method for a new kind. The methods are called in list order, and what one
-throws is thrown from the call that logged, before the transports after it are reached.
+Leave out the methods for what you don't handle. A later minor may add a method for a new kind of
+record. Each record goes to the transports in the order of the list. What a method throws is thrown
+from the call that logged, and the transports after it are not reached.
 
-`transports` replaces these options, which are deprecated and removed in 3.0.0: `colors`, `format`,
-`printTraceInfo` and `stdout`, which go to `consoleTransport`, and `otlpHttpBaseURI`,
-`otlpAdditionalHeaders`, `otlpProtocol` and `otlpQueue`, which `otlpTransport` replaces. Until then
-they work as before on a `Log` with no list, and one of them beside a list, its own or an inherited
-one, throws and names where it goes. This library's own warnings are written to the `stderr` option
-whatever the list holds.
+### Deprecated options
+
+`transports` replaces nine options on `Log`, removed in 3.0.0:
+
+- `colors`, `entryFormatter`, `format`, `printTraceInfo` and `stdout` go to `consoleTransport`.
+- `otlpAdditionalHeaders`, `otlpHttpBaseURI` and `otlpProtocol` go to `otlpTransport`, as `headers`,
+  `baseUrl` and `protocol`. So does what an `otlpQueue` was built with; an `otlpQueue` of your own
+  becomes a transport of your own.
+
+Until then they work as before on a `Log` with no list and write no warning. Beside a list, the
+`Log`'s own or an inherited one, each throws and names where it goes.
+
+`stderr` stays on `Log`, where this library's own `@larvit/log:` warnings are written whatever the
+list holds. Without a list it is also where `error` and `warn` go, so when you move to a list pass
+your `stderr` to `consoleTransport` too. An `otlpTransport`'s export reports go to its `report`, not
+to the `Log`'s `stderr`.
 
 ## Queue exports
 
@@ -369,7 +382,7 @@ Create one queue per `key` per process, two would overwrite each other. If `getI
 stored queue is left as it is and nothing is written to it until the next start. Without `storage`
 the queue is in memory only.
 
-The options below are the queue's own names, which the deprecated `new Queue(options)` takes;
+The options below are the queue's own names, which `new Queue(options)` takes;
 `otlpTransport` takes the same ones, with `baseUrl`, `headers` and `protocol` for the three `otlp*`
 names. A `Log` given the deprecated `otlpQueue` rejects `otlpHttpBaseURI`, `otlpProtocol` and
 `otlpAdditionalHeaders` beside it.
@@ -384,7 +397,7 @@ or `api-key`. Each one sent over `http:` to a host other than `localhost`, `127.
 writes one `@larvit/log:` line naming the host and the header, and still sends. A line is written
 once per host, header and credential source to each `report` function, or to each `stderr` for a
 queue a `Log` built. On a network you trust, pass `acceptPlainHttpCredentials: true`
-to `otlpTransport` or to the `Queue`, whose report lines go to its `report`, `console.error` unless
+to `otlpTransport` or to the `Queue`. Its lines go to that queue's `report`, `console.error` unless
 you pass one. A `Log` using the deprecated `otlpHttpBaseURI` moves its `otlp*` options to
 `otlpTransport({ acceptPlainHttpCredentials: true, baseUrl })`.
 
@@ -417,7 +430,7 @@ In a browser, the collector must answer a CORS preflight, unless it is on the pa
 Every cross-origin POST sets `Content-Type` to a value CORS doesn't safelist, so the browser first
 sends an `OPTIONS` request. The collector's answer must allow `Content-Type` and every other header
 the queue sends: `Authorization` when the endpoint carries `user:pass@`, and each header in
-`headers`. Without that, every batch fails as a network error, such as Chrome's
+`otlpAdditionalHeaders`. Without that, every batch fails as a network error, such as Chrome's
 `Failed to fetch`, and is retried, never dropped, while newer items queue behind it and the oldest
 of those are dropped past `maxItems`. In the OpenTelemetry Collector, set the OTLP/HTTP receiver's
 `cors`: your page's origin in `allowed_origins`, and each header you send in `allowed_headers`.
@@ -477,7 +490,7 @@ instead. `entryFormatter` is deprecated the same way: pass the function as `form
 | `otlpAdditionalHeaders` | `Record<string, string>` | none | Deprecated, removed in 3.0.0: pass [`transports`](#transports) with `otlpTransport({ headers })`. Shorthand: the same option on the default `Queue`, see [Queue exports](#queue-exports). Not inherited by a child or clone whose `otlpHttpBaseURI` has another origin (scheme, host and port) than its source's. |
 | `otlpHttpBaseURI` | `string` | none | Deprecated, removed in 3.0.0: pass [`transports`](#transports) with `otlpTransport({ baseUrl })`. Shorthand for `otlpQueue: new Queue({ otlpHttpBaseURI, otlpProtocol, otlpAdditionalHeaders })`. `user:pass@` in it authenticates, see [Queue exports](#queue-exports). |
 | `otlpProtocol` | `"http/json" \| "http/protobuf"` | `"http/json"` | Deprecated, removed in 3.0.0: pass [`transports`](#transports) with `otlpTransport({ protocol })`. Shorthand: the same option on the default `Queue`. |
-| `otlpQueue` | `OtlpQueue` | none | Deprecated, removed in 3.0.0: pass [`transports`](#transports) with `otlpTransport()`. The [export queue](#queue-exports). Cannot be combined with the three shorthands above; on an instance given them, `log.conf.otlpQueue` reads back the queue they built. Inherited by children and clones; one that sets a shorthand instead gets a queue of its own. |
+| `otlpQueue` | `OtlpQueue` | none | Deprecated, removed in 3.0.0: pass [`transports`](#transports) with `otlpTransport({ baseUrl })` or a transport of your own. The [export queue](#queue-exports). Cannot be combined with the three shorthands above; on an instance given them, `log.conf.otlpQueue` reads back the queue they built. Inherited by children and clones; one that sets a shorthand instead gets a queue of its own. |
 | `parentLog` | `LogInt` | none | Nest under this instance's span and inherit its options except `traceparent`. Log entries attach to the parent's span. |
 | `printTraceInfo` | `boolean` | `false` | Deprecated, removed in 3.0.0: pass [`transports`](#transports) with `consoleTransport({ printTraceInfo })`. Append `spanId`, `traceId` and `spanName` to console output. |
 | `randomBytes` | `(size: number) => Uint8Array` | Web Crypto, else `Math.random` | Returns `size` random bytes for each trace and span id the `Log` makes. Supply one for deterministic ids in a test. Return exactly `size` bytes, and never all zeros: W3C Trace Context makes an all-zero id invalid, so a receiver drops it. Children and clones inherit it. |
@@ -503,8 +516,8 @@ the same name:
 {"orderId":"…","total":199,"logLevel":"info","msg":"Order placed","time":"2022-09-24T23:40:39.123Z"}
 ```
 
-A formatter of your own takes the entry and returns the line, and is inherited by children and
-clones; either can switch back with `format: "text"`:
+A formatter of your own takes the entry and returns the line. Children and clones inherit it with
+the list:
 
 ```javascript
 new Log({ transports: [consoleTransport({ format: entry => `${entry.logLevel} ${entry.msg}` })] });
@@ -640,7 +653,7 @@ a call below `logLevel`, ≤2 µs for a console call, ≤10 µs with OTLP config
 | `consoleTransport(options?)`, `otlpTransport(options)` | The two transports this library ships, see [Transports](#transports). |
 | `Transport`, `TransportEntry`, `TransportSpan` | A transport, `{ entry?, span?, flush? }`, and what `entry` and `span` are handed. |
 | `ConsoleTransportOptions`, `OtlpTransportOptions` | What the two shipped transports take. |
-| `Queue` | Deprecated with `otlpQueue`, removed in 3.0.0: the export queue, `new Queue(options)`, see [Queue exports](#queue-exports). |
+| `Queue` | The export queue that `otlpTransport` builds and the deprecated `otlpQueue` takes, `new Queue(options)`, see [Queue exports](#queue-exports). |
 | `LogLevels` | Level → OTLP `severityNumber`/`severityText`, most to least severe. |
 | `msgTextFormatter`, `msgJsonFormatter` | The built-in formatters; wrap one to extend it. |
 | `resolveFormatter(conf)` | The `EntryFormatter` a `LogConf` writes with, e.g. a `LogInt.conf` you were handed. |

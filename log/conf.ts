@@ -1,10 +1,9 @@
 import { attachDefaultQueue, OTLP_ENDPOINT_KEYS, rejectQueueBesideShorthand } from "./default-queue.js";
-import { colorsFromEnv, msgJsonFormatter, msgTextFormatter } from "./entry-format.js";
 import { DEFAULT_LOG_LEVEL, type LogLevel } from "../primitives/levels.js";
+import { defaultColors, msgJsonFormatter, msgTextFormatter } from "./entry-format.js";
 import type { EntryFormatter, LogConf, LogOptions, ResolvedLogConf } from "./types.js";
 import { type Metadata, withoutUndefined } from "../primitives/metadata.js";
 import { platformRandomBytes } from "../tracing/traceparent.js";
-import { processEnv } from "../primitives/process-env.js";
 import { systemClock } from "../primitives/clock.js";
 
 // A conf holds the formatter in two keys, as 2.x documents: `format`, "json" or "text", and
@@ -54,23 +53,39 @@ const REPLACED_BY_TRANSPORTS: readonly (readonly [keyof LogConf, string])[] = [
 	["otlpAdditionalHeaders", "belongs to otlpTransport({ headers })"],
 	["otlpHttpBaseURI", "belongs to otlpTransport({ baseUrl })"],
 	["otlpProtocol", "belongs to otlpTransport({ protocol })"],
-	["otlpQueue", "is replaced by otlpTransport()"],
+	["otlpQueue", "is replaced by otlpTransport({ baseUrl }) or a transport of your own"],
 	["printTraceInfo", "belongs to consoleTransport({ printTraceInfo })"],
 	["stdout", "belongs to consoleTransport({ stdout })"],
 ];
 
-// `own` is what the caller wrote, before it inherits: a list, its own or the one it will inherit,
-// would leave a replaced option beside it without effect.
+// A list and the options it replaces never mix. `own` is what the caller wrote, before it inherits:
+// an option there beside a list, the caller's or the one the Log will inherit, would have no effect.
 function rejectBesideTransports(own: LogConf, sources: (LogConf | undefined)[]): void {
+	if (own.transports !== undefined && (!Array.isArray(own.transports) || own.transports.some(transport => typeof transport !== "object" || transport === null))) {
+		throw new Error("transports takes a list of transports, such as [consoleTransport()]");
+	}
+
 	if (!own.transports && !sources.some(source => source?.transports)) {
 		return;
 	}
 
 	for (const [key, goesTo] of REPLACED_BY_TRANSPORTS) {
 		if (own[key] !== undefined) {
-			throw new Error(`${key} ${goesTo} once transports is set`);
+			throw new Error(`${key} ${goesTo}, since this Log ${own.transports ? "has" : "inherits"} transports`);
 		}
 	}
+}
+
+// What a conf, the caller's or a clone's, keeps a source from handing down, so the two never mix:
+// a list keeps out every option it replaces, and such an option keeps out the list.
+function keysTransportsKeepOut(conf: LogConf): (keyof LogConf)[] {
+	const replaced = REPLACED_BY_TRANSPORTS.map(([key]) => key);
+
+	if (conf.transports) {
+		return replaced;
+	}
+
+	return replaced.some(key => conf[key] !== undefined) ? ["transports"] : [];
 }
 
 function isLogConfKey(key: string): key is keyof LogConf {
@@ -192,15 +207,7 @@ function copyKey<K extends keyof LogConf>(target: LogConf, source: LogConf, key:
 }
 
 function inherited(conf: LogConf, source: Source, derivation: Derivation): LogConf {
-	const skip = new Set(otlpKeysNotToInherit(conf, source.conf));
-	const replaced = REPLACED_BY_TRANSPORTS.map(([key]) => key);
-
-	// A list and the options it replaces never mix: whichever the conf holds already keeps the other out.
-	if (conf.transports) {
-		replaced.forEach(key => skip.add(key));
-	} else if (replaced.some(key => conf[key] !== undefined)) {
-		skip.add("transports");
-	}
+	const skip = new Set([...otlpKeysNotToInherit(conf, source.conf), ...keysTransportsKeepOut(conf)]);
 
 	// The caller's formatter, in either key, replaces the source's in both.
 	if (conf.format !== undefined || conf.entryFormatter !== undefined) {
@@ -252,7 +259,7 @@ function withDefaults(given: LogConf): ResolvedLogConf {
 	const conf = {
 		...rest,
 		clock: orDefault(rest.clock, systemClock),
-		colors: orDefault(rest.colors, colorsFromEnv(processEnv()) ?? true),
+		colors: orDefault(rest.colors, defaultColors()),
 		logLevel: orDefault(rest.logLevel, DEFAULT_LOG_LEVEL),
 		randomBytes: orDefault(rest.randomBytes, platformRandomBytes),
 		stderr: orDefault(rest.stderr, console.error),
@@ -260,8 +267,8 @@ function withDefaults(given: LogConf): ResolvedLogConf {
 		...rest.format === undefined && !entryFormatter && !rest.transports ? { format: "text" as const } : {},
 	};
 
-	// ResolvedLogConf requires these two until 3.0.0, yet beside a list they don't configure anything.
-	// Hidden from a spread, they don't get a Log's conf rejected when it is passed back as options.
+	// ResolvedLogConf requires these two until 3.0.0, though beside a list neither has an effect.
+	// Not enumerable, so `new Log({ ...log.conf })` does not hand them back as options, which would throw.
 	if (rest.transports) {
 		Object.defineProperty(conf, "colors", { enumerable: false });
 		Object.defineProperty(conf, "stdout", { enumerable: false });

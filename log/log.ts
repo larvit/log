@@ -36,9 +36,6 @@ export class Log implements LogInt {
 
 	readonly conf: ResolvedLogConf;
 
-	// The default list, built at first use: what the conf's own console and otlp* options make.
-	private defaultTransports?: readonly Transport[];
-
 	// Un-awaited log.fetch calls, awaited by flush() so their spans are queued before the queue flushes.
 	private pendingFetches = new Set<Promise<unknown>>();
 
@@ -104,7 +101,14 @@ export class Log implements LogInt {
 
 	public async flush(): Promise<void> {
 		await Promise.all([...this.pendingFetches]);
-		await Promise.all(this.transports().map(transport => transport.flush?.()));
+		// Every transport gets to finish before the first failure rejects, as a failed Queue flush does in 2.x.
+		const flushed = await Promise.allSettled(this.transports().map(async transport => { await transport.flush?.(); }));
+
+		for (const result of flushed) {
+			if (result.status === "rejected") {
+				throw result.reason;
+			}
+		}
 	}
 
 	public traceparent(): string {
@@ -178,27 +182,23 @@ export class Log implements LogInt {
 		}
 	}
 
-	// The list this Log hands entries and spans to: `transports`, or else the default list. The default
-	// list reads the conf at each record, so a write to `log.conf.format` or `log.conf.otlpQueue` takes
-	// effect from the next one, as 2.x documents.
+	// The list this Log hands entries and spans to: `transports`, or else what the deprecated console
+	// and otlp* options make. That default reads the conf at each record, since 2.x documents that a
+	// write to `log.conf.format` or `log.conf.otlpQueue` takes effect from the next one. It is built
+	// per call and never kept, which holds a Log within README → Footprint's bytes per instance.
 	private transports(): readonly Transport[] {
-		return this.conf.transports ?? (this.defaultTransports ??= [
-			{
-				entry: ({ logLevel, metadata, msg, msTimestamp }) => {
-					// 2.x prints the instance's own span, also where the entry is exported under its parent's.
-					const { name, spanId, traceId } = this.span;
+		return this.conf.transports ?? [{
+			entry: ({ logLevel, metadata, msg, msTimestamp, spanId, traceId }) => {
+				// 2.x prints the instance's own span, even where the entry is exported under its parent's.
+				// The formatter gets a copy, so one that changes it changes nothing that is exported.
+				const printed = this.conf.printTraceInfo ? withTraceInfo(metadata, { spanId: this.span.spanId, spanName: this.span.name, traceId: this.span.traceId }) : { ...metadata };
 
-					writeConsoleEntry(this.conf, logLevel, msg, this.conf.printTraceInfo ? withTraceInfo(metadata, { spanId, spanName: name, traceId }) : metadata, msTimestamp);
-				},
+				writeConsoleEntry(this.conf, logLevel, msg, printed, msTimestamp);
+				this.conf.otlpQueue?.enqueue(buildLogPayload({ attributes: metadata, logLevel, msTimestamp, msg, span: { spanId, traceId } }));
 			},
-			{
-				entry: ({ logLevel, metadata, msg, msTimestamp, spanId, traceId }) => {
-					this.conf.otlpQueue?.enqueue(buildLogPayload({ attributes: metadata, logLevel, msTimestamp, msg, span: { spanId, traceId } }));
-				},
-				flush: async () => { await this.conf.otlpQueue?.flush(); },
-				span: span => { this.conf.otlpQueue?.enqueue(buildSpanPayload(span)); },
-			},
-		]);
+			flush: () => this.conf.otlpQueue?.flush(),
+			span: span => { this.conf.otlpQueue?.enqueue(buildSpanPayload(span)); },
+		}];
 	}
 
 	private spanHost(): SpanHost {

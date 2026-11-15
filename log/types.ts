@@ -10,8 +10,6 @@ export type EntryFormatter = (entry: EntryFormatterConf) => string;
 /** @deprecated Renamed in 3.0.0: use {@link LogEntry}. */
 export type EntryFormatterConf = {
 	// The instance's resolved `colors`. Unset means on.
-
-	/** @deprecated Removed in 3.0.0: pass `transports` with `consoleTransport({ colors })`. */
 	colors?: boolean;
 	logLevel: LogLevel;
 	metadata?: Metadata;
@@ -27,6 +25,8 @@ export type LogConf = {
 	captureRequestHeaders?: string[];
 	captureResponseHeaders?: string[];
 	clock?: Clock;
+
+	/** @deprecated Removed in 3.0.0: pass `transports` with `consoleTransport({ colors })`. */
 	colors?: boolean;
 	context?: Metadata;
 
@@ -46,7 +46,7 @@ export type LogConf = {
 	/** @deprecated Removed in 3.0.0: pass `transports` with `otlpTransport({ protocol })`. */
 	otlpProtocol?: "http/json" | "http/protobuf";
 
-	/** @deprecated Removed in 3.0.0: pass `transports` with `otlpTransport()`. */
+	/** @deprecated Removed in 3.0.0: pass `transports` with `otlpTransport({ baseUrl })`, or a transport of your own. */
 	otlpQueue?: OtlpQueue;
 	parentLog?: LogInt;
 
