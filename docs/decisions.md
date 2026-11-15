@@ -254,7 +254,9 @@ included, so writing that child's `conf.format` changes nothing either.
 2026-11-15, the implementing agent, correcting the paragraph above: `transports` makes `format` on a
 `Log` a deprecated name too, removed in 3.0.0, so `conf.format` is not where a reader moves to.
 The `@deprecated` tag and the warning name `consoleTransport({ format })` instead; `conf.format`
-still never holds a function before 3.0.0.
+still never holds a function before 3.0.0. The maintainer confirmed this on 2026-11-15: `format`
+belongs to the transport from 3.0.0 on, so every pointer from a deprecated name goes to
+`consoleTransport({ format })`.
 
 2026-10-03, the maintainer, superseding the reason above for reads: a read of `conf.entryFormatter`
 still does not warn, though 2.5.0's `resolveFormatter` replaces it. The reader is almost always a
