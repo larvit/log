@@ -12,7 +12,6 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 161 | 2.7.0 |  |  | **Make each function in `credentials/` sit in a file, and under a name, that says what it does.** | 2 | 2 | 4 | 6 | 4 | code health by 7 | 4.4 |
 | 158 | 2.7.0 |  | principle | **Let a test hand a `Log` the network it sends through, so no test swaps `globalThis.fetch` except to prove a default reads it.** | 2 | 1 | 2 | 3 | 3 | code health by 3, 1 by 3 | 3.9 |
 | 156 | 2.7.0 |  |  | **Lower the reading cost of the files a chunk reads most before its first commit.** | 2 | 2 | 1 | 3 | 4 | code health by 3 | 2.7 |
 | 41 | 2.7.0 |  | principle | **Warn once about a negative, zero or `NaN` numeric `QueueConf` option, and use the default.** | 1 | 1 | 1 | 1 | 2 | 1 by 5 | 2.5 |
@@ -25,7 +24,7 @@
 | 17 | 2.7.0 |  |  | **Warn once when an instance with `otlpQueue` set or inherited leaves `spanName` unset.** | 1 | 1 | 1 | 1 | 2 | 1 by 4 | 2.0 |
 | 80 | 2.7.0 |  | principle | **Run the browser suite in WebKit and Firefox as well as Chromium.** | 2 | 1 | 1 | 2 | 3 | 3 by 7 | 2.0 |
 | 157 | 2.7.0 |  |  | **Hand a custom transport's `span` method a span in a consumer's shape, and each transport its own copy of an entry and a span.** | 3 | 2 | 3 | 6 | 5 | 1 by 4, 4 by 4 | 1.0 |
-| 164 | 2.8.0 | 161 | owner | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 2 | code health by 3 | 6.2 |
+| 164 | 2.8.0 |  | owner | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 2 | code health by 3 | 6.2 |
 | 28 | 2.8.0 |  |  | **Export resource attributes beyond `service.name`.** | 2 | 1 | 2 | 3 | 3 | 2 by 7 | 1.7 |
 | 117 | 2.8.0 |  |  | **Bring the built `index.js` within README → Footprint's 10 KB gzipped budget.** | 2 | 1 | 2 | 3 | 3 | 5 by 7 | 1.5 |
 | 26 | 2.8.0 |  |  | **Check the footprint budget in CI, so the numbers in README → Footprint fail a build instead of going stale.** | 2 | 1 | 1 | 2 | 5 | 5 by 8 | 1.5 |
@@ -81,26 +80,6 @@
 | 108 | 3.0.0 |  | principle | **Keep two tabs of one web app sharing a `storage` key from sending a record twice or deleting each other's backlog.** | 3 | 2 | 2 | 5 | 5 | 3 by 5 | 0.7 |
 
 ## Details
-
-### 161. Make each function in `credentials/` sit in a file, and under a name, that says what it does.
-
-Seats of the 2026-11-15 scoring run (PR #391, at 4f96af8) found names and files in `credentials/`
-that mislead, under Shape (6.63) and Navigation (7.38):
-
-- `credentials/span-values.ts:45` `failureMessage`, `:85` `redactedAsUrl` and `:103`
-  `redactedRecordedValue`: a status-message redactor serves as the general redactor of recorded
-  values, called on a value that is no failure, behind a made-up base url put on and taken off twice.
-- `credentials/span-values.ts:25` `parseHttpUrl`: the filter for which urls `log.fetch` traces lives
-  in the credentials folder.
-- `credentials/text.ts:16` `isListedQueryKey`: the query-key rule sits in a file named for free text.
-
-Done when each of these places sits where its name and file say, with imports still running one way
-(AGENTS.md → Working here), and every rule on credentials in a span still in one folder (decision
-"Every rule on credentials in a span sits in one folder"). Every redaction holds (README → Goals #7).
-Leave the logic of the query rules in `credentials/query*.ts` as it is.
-
-Ranks ahead of the release's other items because docs/decisions.md → "The comprehension baseline"
-ships comprehension work ahead of them; Moves reflects that the overall score is under the 7.0 floor.
 
 ### 158. Let a test hand a `Log` the network it sends through, so no test swaps `globalThis.fetch` except to prove a default reads it.
 

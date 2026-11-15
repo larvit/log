@@ -1,8 +1,9 @@
 import { isCredentialHeaderName } from "../credentials/header-names.js";
-import { isListedQueryKey } from "../credentials/text.js";
-import { parseHttpUrl } from "../credentials/span-values.js";
+import { isListedQueryKey } from "../credentials/query-key.js";
+import { parseHttpUrl } from "../credentials/url-full.js";
 import { percentDecoded } from "../credentials/decodings.js";
 import { redactedQuery, redactedWholeUrl } from "../credentials/query.js";
+import { redactedText } from "../credentials/span-values.js";
 import test from "./tap.js";
 import { withGlobals } from "./test-doubles.js";
 
@@ -34,6 +35,13 @@ test("parseHttpUrl returns an http or https url, and undefined for anything else
 	t.strictEqual(parseHttpUrl("not a url", undefined), undefined, "text that is not a url");
 	t.strictEqual(parseHttpUrl("ftp://h.test/", undefined), undefined, "a scheme other than http and https");
 	t.strictEqual(parseHttpUrl("https://h.test/x", undefined)?.href, "https://h.test/x", "an https url");
+	t.end();
+});
+
+test("redactedText redacts free text, and the known url it quotes, without being handed an error", t => {
+	t.strictEqual(redactedText("request to https://h.test/x?token=1 failed", undefined), "request to https://h.test/x?token=REDACTED failed", "a listed key in text");
+	t.strictEqual(redactedText("Window.fetch: https://u:p@h.test/x failed", new URL("https://u:p@h.test/x")), "Window.fetch: https://REDACTED@h.test/x failed", "the known url, quoted back");
+	t.strictEqual(redactedText("nothing to hide", undefined), "nothing to hide", "text holding no credential");
 	t.end();
 });
 

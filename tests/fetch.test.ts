@@ -1,4 +1,4 @@
-import { buildUrlFull } from "../credentials/span-values.js";
+import { buildUrlFull } from "../credentials/url-full.js";
 import { callHeader, capture, clientSpan, exportedRecords, exportedSpans, fetchRecorder, nextTurn, response, stubFetch, testFetchTrace, waitFor } from "./test-doubles.js";
 import { capturedHeaders, fetchFailure, pageHref, requestAttributes, responseAttributes, spanStatusCode } from "../tracing/fetch.js";
 import { formatTraceparent, generateSpanId, generateTraceId, Log, parseTraceparent, Queue, type TimerHandle } from "../index.js";
