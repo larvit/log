@@ -513,7 +513,8 @@ round is done. A failed batch stays queued for the retry, and until that fires `
 nothing new, so `end()` on a busy server cannot hammer a failing collector. Records under one
 resource share one `resourceLogs` entry per POST. Any object with `enqueue(payload)` and `flush()`
 can stand in for `Queue`: the `OtlpQueue` type, with `OtlpLogPayload` and `OtlpSpanPayload` for
-what arrives.
+what arrives. 3.0.0 adds a metrics kind to `OtlpPayload`, so an implementer of `OtlpQueue` handles
+a payload that is neither a log nor a span before it arrives.
 
 ## Accept a logger in your library
 
@@ -623,7 +624,7 @@ Span attributes follow the OpenTelemetry HTTP semantic conventions:
 | `http.request.header.<name>` | Headers listed in `captureRequestHeaders` |
 | `http.response.status_code` | Response status |
 | `http.response.header.<name>` | Headers listed in `captureResponseHeaders` |
-| `error.type` | On a thrown error: its `code`, a numeric one as digits (an abort records `"20"`), else `name`, else `"fetch_error"` |
+| `error.type` | On a thrown error: its `code`, a numeric one as digits (an abort records `"20"`), else `name`, else `"fetch_error"`. 3.0.0 records a string `code`, else `name`, else `"_OTHER"`, as `end({ error })` does, so move a query on `"20"` or `"fetch_error"` first |
 
 A 4xx/5xx response marks the span errored; a thrown error does too, its message the status
 message, redacted as [Credentials in a captured value](#credentials-in-a-captured-value) says.

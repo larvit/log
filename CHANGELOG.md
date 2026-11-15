@@ -41,6 +41,11 @@ Nothing here needs a change in your code.
 - **Answer a CORS preflight at your collector when you export from a browser.** README → Queue
   exports now says every cross-origin OTLP POST is preflighted for its `Content-Type`, and that
   without CORS on the collector each batch fails as a network error and is retried.
+- **Move a query on `log.fetch`'s `error.type` before 3.0.0.** An abort records `"20"` and an error
+  with no `code` or `name` `"fetch_error"`; 3.0.0 records a string `code`, else `name`, else
+  `"_OTHER"`, as `end({ error })` does. See README → `log.fetch` in depth.
+- **Handle a payload that is neither a log nor a span in an `OtlpQueue` of your own before
+  3.0.0.** 3.0.0 adds a metrics kind to `OtlpPayload`. See README → Queue exports.
 
 ## v2.6.1
 

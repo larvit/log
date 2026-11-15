@@ -641,3 +641,18 @@ Read most (opens and searches):
 ## Reading cost, chunk 1ff982c643af, finished 2026-11-15T21:09:05Z
 
 38288 new input tokens before the first commit.
+
+## Reading cost, chunk e32549d5b1c6, finished 2026-11-15T21:54:00Z
+
+52541 new input tokens before the first commit.
+
+Read most (opens and searches):
+
+- `README.md` 3
+- `credentials/path.ts` 3
+- `tests/credentials.test.ts` 2
+- `credentials/decodings.ts` 1
+- `credentials/span-values.ts` 1
+- `credentials/text.ts` 1
+- `package.json` 1
+- `release-tooling/test-in-docker.py` 1
