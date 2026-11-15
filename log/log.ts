@@ -1,4 +1,4 @@
-import { buildLogPayload, buildSpanPayload, type OtlpSpan } from "../otlp/payloads.js";
+import { buildLogPayload, type OtlpSpan } from "../otlp/payloads.js";
 import { DEFAULT_LOG_LEVEL, type LogLevel, LogLevels, SEVERITY_NUMBERS } from "../primitives/levels.js";
 import { endErrorType, exportSpan, openSpan, spanEnd, type SpanHost } from "../tracing/spans.js";
 import { type FetchTrace, traceFetch } from "../tracing/fetch.js";
@@ -6,7 +6,8 @@ import { formatTraceparent } from "../tracing/traceparent.js";
 import type { LogInt, LogOptions, ResolvedLogConf } from "./types.js";
 import { type Metadata, type MetadataInput, withoutUndefined } from "../primitives/metadata.js";
 import { resolveConf } from "./conf.js";
-import type { Transport } from "../tracing/transport.js";
+import type { Transport, TransportEntry } from "../tracing/transport.js";
+import { transportsOf } from "./log-transports.js";
 import { warnOnceToStderr, writeStderr } from "./stderr-lines.js";
 import { withTraceInfo, writeConsoleEntry } from "./console-output.js";
 import { writeOnce } from "../primitives/once-per-sink.js";
@@ -99,13 +100,6 @@ export class Log implements LogInt {
 		}
 	}
 
-	/**
-	 * Not part of the API, so don't call it: `@larvit/log/otel` hands each span it ends here.
-	 */
-	public exportSpan(span: OtlpSpan, attributes: Metadata): void {
-		exportSpan(this.spanHost(), span, attributes);
-	}
-
 	public async flush(): Promise<void> {
 		await Promise.all([...this.pendingFetches]);
 		// Every transport gets to finish before the first failure rejects, as a failed Queue flush does in 2.x.
@@ -189,23 +183,18 @@ export class Log implements LogInt {
 		}
 	}
 
-	// The list this Log hands entries and spans to: `transports`, or else what the deprecated console
-	// and otlp* options make. That default reads the conf at each record, since 2.x documents that a
-	// write to `log.conf.format` or `log.conf.otlpQueue` takes effect from the next one. It is built
-	// per call and never kept, which holds a Log within README → Footprint's bytes per instance.
-	private transports(): readonly Transport[] {
-		return this.conf.transports ?? [{
-			entry: ({ logLevel, metadata, msg, msTimestamp, spanId, traceId }) => {
-				// 2.x prints the instance's own span, even where the entry is exported under its parent's.
-				// The formatter gets a copy, so one that changes it changes nothing that is exported.
-				const printed = this.conf.printTraceInfo ? withTraceInfo(metadata, { spanId: this.span.spanId, spanName: this.span.name, traceId: this.span.traceId }) : { ...metadata };
+	// The deprecated options' entry side: prints the entry and queues it for OTLP.
+	private deprecatedEntry({ logLevel, metadata, msg, msTimestamp, spanId, traceId }: TransportEntry): void {
+		// 2.x prints the instance's own span, even where the entry is exported under its parent's.
+		// The formatter gets a copy, so one that changes it changes nothing that is exported.
+		const printed = this.conf.printTraceInfo ? withTraceInfo(metadata, { spanId: this.span.spanId, spanName: this.span.name, traceId: this.span.traceId }) : { ...metadata };
 
-				writeConsoleEntry(this.conf, logLevel, msg, printed, msTimestamp);
-				this.conf.otlpQueue?.enqueue(buildLogPayload({ attributes: metadata, logLevel, msTimestamp, msg, span: { spanId, traceId } }));
-			},
-			flush: () => this.conf.otlpQueue?.flush(),
-			span: span => { this.conf.otlpQueue?.enqueue(buildSpanPayload(span)); },
-		}];
+		writeConsoleEntry(this.conf, logLevel, msg, printed, msTimestamp);
+		this.conf.otlpQueue?.enqueue(buildLogPayload({ attributes: metadata, logLevel, msTimestamp, msg, span: { spanId, traceId } }));
+	}
+
+	private transports(): readonly Transport[] {
+		return transportsOf(this.conf, entry => { this.deprecatedEntry(entry); });
 	}
 
 	private spanHost(): SpanHost {

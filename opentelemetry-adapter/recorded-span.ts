@@ -1,8 +1,10 @@
 import type { Attributes, AttributeValue, Span, SpanContext, SpanOptions, SpanStatus, TimeInput } from "@opentelemetry/api";
 import { attributesOf, getNsTimestamp, type OtlpSpan, STATUS_CODE_ERROR, STATUS_CODE_OK, STATUS_CODE_UNSET } from "../otlp/payloads.js";
+import { exportSpan } from "../tracing/spans.js";
 import type { Log } from "../log/log.js";
 import type { Metadata } from "../primitives/metadata.js";
 import { spanIdFrom, traceIdFrom } from "../tracing/traceparent.js";
+import { transportsOf } from "../log/log-transports.js";
 
 // A number below the process's start counts from it, as performance.now() does: the rule of
 // `timeInputToHrTime` in @opentelemetry/core, which instrumentation written against the SDK relies on.
@@ -78,7 +80,8 @@ export class RecordedSpan implements Span {
 		// The span's own attribute wins over the Log's context, as a log.fetch span's does.
 		const attributes = { ...this.log.context, ...this.attributes };
 
-		this.log.exportSpan({ ...this.span, attributes: attributesOf(attributes), endTimeUnixNano: nsTimestamp(endTime, this.log) }, attributes);
+		// Over the Log's documented fields, so the hand-off adds no member to Log.
+		exportSpan({ sampled: this.log.sampled, transports: transportsOf(this.log.conf) }, { ...this.span, attributes: attributesOf(attributes), endTimeUnixNano: nsTimestamp(endTime, this.log) }, attributes);
 	}
 
 	isRecording(): boolean {

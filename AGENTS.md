@@ -46,7 +46,7 @@ In [docs/decisions.md](docs/decisions.md):
 - The protobuf encoder stays
 - In text, a plain space ends a credential and no other whitespace does
 - A platform read stays a default, and a consumer injects through `colors` and `clock`
-- A constructor parameter or method marked "Not part of the API" carries what only this library passes
+- A constructor parameter marked "Not part of the API" carries what only this library passes
 - The package publishes one bundled file per entry point, built from a module per part
 - The OpenTelemetry adapter exports a span through the `Log` handed to `runWithLog`, as its instrumentation recorded it
 
