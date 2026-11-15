@@ -659,7 +659,8 @@ imgproxy takes one.
   `?next=https://t.test/x?token=…` records `next=https%3A%2F%2Ft.test%2Fx%3Ftoken%3DREDACTED`. A url
   in a key is read alone and with its value, and where either finds a credential both record
   `REDACTED`: `?https://t.test/x?token=…`, `?https://a@b=pw@host` and `?https://u:p=w@host` record
-  `REDACTED=REDACTED`. A url nested deeper than eight levels records `REDACTED` whole.
+  `REDACTED=REDACTED`. A key or value opening a url nested deeper than eight levels records
+  `REDACTED` whole, whether the runtime parses it or not.
 - **A captured header value or a status message that the runtime's `URL` parses whole:** userinfo or
   a matched key, at every level as above, makes a header value record `REDACTED` whole, and a status
   message record `REDACTED` in place: `http://REDACTED@host/x?access_token=REDACTED`. In its own
