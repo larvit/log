@@ -12,7 +12,6 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 154 | 2.7.0 |  |  | **Point the `entryFormatter` deprecation warning at a name that is not itself deprecated.** | 1 | 1 | 2 | 2 | 2 | code health by 1 | 1.6 |
 | 146 | 2.8.0 |  |  | **Let a reader see from `redactedPath` alone which segments of a request path it keeps.** | 2 | 2 | 4 | 6 | 2 | code health by 3 | 2.3 |
 | 149 | 2.8.0 |  |  | **Keep a queue's storage read from rejecting when `restore` throws.** | 1 | 1 | 2 | 2 | 6 | code health by 3 | 2.3 |
 | 114 | 2.8.0 |  |  | **Move `package.json`'s build and test one-liners into named scripts, and let the OTLP test read its collector's port, image and container name from the environment, today's values as defaults.** | 1 | 1 | 1 | 1 | 2 | code health by 1 | 2.1 |
@@ -81,13 +80,6 @@
 | 108 | 3.0.0 |  | principle | **Keep two tabs of one web app sharing a `storage` key from sending a record twice or deleting each other's backlog.** | 3 | 2 | 2 | 5 | 5 | 3 by 5 | 0.7 |
 
 ## Details
-
-### 154. Point the `entryFormatter` deprecation warning at a name that is not itself deprecated.
-
-`log/conf.ts`'s warning reads "entryFormatter is deprecated and removed in 3.0.0, use format", and
-`format` on a `Log` is deprecated too since `transports`: it belongs to `consoleTransport({ format })`.
-A consumer who follows the warning moves to a name 3.0.0 also removes. Found by the prose review of
-the change that recorded the no-warning approval.
 
 ### 146. Let a reader see from `redactedPath` alone which segments of a request path it keeps.
 

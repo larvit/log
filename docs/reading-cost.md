@@ -607,3 +607,20 @@ Read most (opens and searches):
 - `index.ts` 2
 - `stryker.config.mjs` 2
 - `tests/otel-adapter.test.ts` 2
+
+## Reading cost, chunk 2e29560a95a5, finished 2026-11-15T12:38:53Z
+
+72056 new input tokens before the first commit.
+
+Read most (opens and searches):
+
+- `README.md` 8
+- `tests/otel-adapter.test.ts` 5
+- `credentials/span-values.ts` 3
+- `opentelemetry-adapter/recorded-span.ts` 3
+- `CHANGELOG.md` 2
+- `credentials/query.ts` 2
+- `credentials/text.ts` 2
+- `docs/decisions.md` 2
+- `package.json` 2
+- `credentials/path.ts` 1

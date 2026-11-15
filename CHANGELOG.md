@@ -33,6 +33,9 @@ Nothing here needs a change in your code.
 - **Get a warning, once per `stderr` sink, for a `format` string other than `"text"` or `"json"`.**
   `new Log({ format: process.env.LOG_FORMAT })` wrote text, without a word, for `"pretty"`. It still
   writes text, and now says why.
+- **Follow the `entryFormatter` warning to `consoleTransport({ format })`.** It used to say "use
+  `format`", a name 3.0.0 also removes from a `Log`. It now says `transports: [consoleTransport({
+  format })]`, where the function belongs.
 - **Import `LogEntry`, and stop using `EntryFormatterConf`, which 3.0.0 removes.** Both name the same
   type, so switching now changes nothing at runtime and leaves nothing to do in 3.0.0.
 - **Answer a CORS preflight at your collector when you export from a browser.** README → Queue
