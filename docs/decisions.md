@@ -539,12 +539,12 @@ and the `Log` handed over explicitly at the request's edge. What that left open:
   `timeInputToHrTime` in `@opentelemetry/core` reads it, since instrumentation is written against
   that SDK.
 - **The adapter reads the `Log`'s transports from its documented fields.** `RecordedSpan.end`
-  calls `log/log-transports.ts` → `transportsOf(log.conf)` and hands the list, with `log.sampled`,
-  to `tracing/spans.ts` → `exportSpan`. `Log` builds its own list with the same function, so the
-  rule "`transports`, or else what the deprecated options make" has one home. A method on `Log`
-  for the hand-off would add a public member, and README → Goals #2 counts the public surface.
-  `Log` passes that function the deprecated options' entry side, so the console writer stays out
-  of `otel.js`: the adapter exports only spans.
+  calls `log/deprecated-options/default-transports.ts` → `transportsOf(log.conf)` and hands the
+  list, with `log.sampled`, to `tracing/spans.ts` → `exportSpan`. `Log` builds its own list with
+  the same function, so the rule "`transports`, or else what the deprecated options make" has one
+  home. A method on `Log` for the hand-off would add a public member, and README → Goals #2 counts
+  the public surface. `Log` passes that function its deprecated console, and the adapter passes
+  none: it exports only spans, which no console takes.
 - **The peer range is `>=1.3.0 <2`,** the floor OpenTelemetry's own `sdk-trace-base` accepts.
 - **The suite covers the adapter on Node only,** in `tests/otel-adapter.test.ts`, which
   `npm run test-node` runs after `tests/test.ts`. The browser run serves the compiled modules with
