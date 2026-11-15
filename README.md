@@ -312,11 +312,14 @@ hold a key, the span's own attribute wins. `otel.scope.name` and `otel.scope.ver
 tracer that recorded it. Call `runWithLog` where the request enters your code, as in a middleware:
 that call is the only way a span finds its `Log`.
 
-- **Attributes are exported unredacted.** Nothing under
-  [Credentials in a captured value](#credentials-in-a-captured-value) applies to them, so a
-  password in a `url.full` or a `db.query.text` reaches your collector. Redact it with the
-  instrumentation's own options. Each value is exported as a string, as every attribute this
-  library sends is.
+- **A credential in an attribute, the span's name or its status message records `REDACTED`,** in
+  the shapes [Credentials in a captured value](#credentials-in-a-captured-value) lists for a status
+  message. A value that is one url, or a path or query starting with `/` or `?` as in `url.path`,
+  is also read as `url.full` is, and `url.query` as a kept query: `?access_token=…` in `url.full`
+  records `access_token=REDACTED`. A literal in a `db.query.text`, such as a password in an
+  `UPDATE`, is none of those shapes and reaches your collector, so keep the instrumentation's option
+  that sanitises queries on. The context of `log` is exported as written. Each value is exported as
+  a string, as every attribute this library sends is.
 - **A span started outside `runWithLog` is not exported,** and neither is one under a `Log` whose
   trace is unsampled.
 - **OpenTelemetry's context manager does the nesting,** so install one before the first request.
@@ -625,7 +628,9 @@ them per call site.
 
 ### Credentials in a captured value
 
-Only what the bullets below name is redacted. Anything else is exported as written, text you log
+Only what the bullets below name is redacted, in `log.fetch`'s spans and in those
+[`@larvit/log/otel`](#export-what-opentelemetry-instrumentation-records) exports. Anything else is
+exported as written, text you log
 yourself included, and so is a url you base64-encode into a request path, as an image proxy such as
 imgproxy takes one.
 

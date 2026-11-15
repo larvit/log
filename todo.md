@@ -12,7 +12,6 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 155 | 2.7.0 |  | security | **Keep a credential in an instrumentation span's attributes, such as `url.full`, from reaching the collector through `@larvit/log/otel`.** | 3 | 2 | 4 | 7 | 5 | 7 by 5 | 2.1 |
 | 154 | 2.7.0 |  |  | **Point the `entryFormatter` deprecation warning at a name that is not itself deprecated.** | 1 | 1 | 2 | 2 | 2 | code health by 1 | 1.6 |
 | 146 | 2.8.0 |  |  | **Let a reader see from `redactedPath` alone which segments of a request path it keeps.** | 2 | 2 | 4 | 6 | 2 | code health by 3 | 2.3 |
 | 149 | 2.8.0 |  |  | **Keep a queue's storage read from rejecting when `restore` throws.** | 1 | 1 | 2 | 2 | 6 | code health by 3 | 2.3 |
@@ -82,19 +81,6 @@
 | 108 | 3.0.0 |  | principle | **Keep two tabs of one web app sharing a `storage` key from sending a record twice or deleting each other's backlog.** | 3 | 2 | 2 | 5 | 5 | 3 by 5 | 0.7 |
 
 ## Details
-
-### 155. Keep a credential in an instrumentation span's attributes, such as `url.full`, from reaching the collector through `@larvit/log/otel`.
-
-Security: `@larvit/log/otel` exports each attribute as the instrumentation recorded it. A span from
-`@opentelemetry/instrumentation-undici` carries `url.full` and `url.query` with the whole query, so
-`?access_token=…` reaches every transport of the `Log` and the collector behind it, where the same
-request through `log.fetch` records `REDACTED` (README → Goals #7, → Credentials in a captured
-value). A database instrumentation's `db.query.text` can hold a literal the same way. README and
-the changelog state that these attributes are unredacted. The span's name and its error status
-message are exported as recorded too, and an instrumentation can put a credentialed url in either,
-where `log.fetch` redacts its own span's status. The path: `RecordedSpan.end` in
-`opentelemetry-adapter/recorded-span.ts` → `exportSpan` in `tracing/spans.ts`, over
-`transportsOf(log.conf)` from `log/log-transports.ts` → each transport's `span`.
 
 ### 154. Point the `entryFormatter` deprecation warning at a name that is not itself deprecated.
 

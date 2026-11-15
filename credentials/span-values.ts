@@ -13,7 +13,8 @@ import { stringField } from "../primitives/field-reads.js";
 //    pairsInUserinfoRunsOfAnyReading in query-userinfo-runs.ts.
 // 6. A listed key after `?`, `&`, `#` or `;` in text: redactTextQueryKeys in text.ts.
 // 7. A url nested in the path: redactedPath in path.ts.
-// buildUrlFull assembles url.full from 3 and 7, and failureMessage a span's status from 4 to 7.
+// buildUrlFull assembles url.full from 3 and 7, failureMessage a span's status from 4 to 7, and
+// redactedRecordedValue what an OpenTelemetry instrumentation recorded from 3 to 7.
 
 export function redactHeaderCredential(name: string, value: string): string {
 	return isCredentialHeaderName(name) || redactedWholeUrl(value) !== undefined || holdsUserinfoInAnyDecoding(value) || holdsListedKeyInAnyDecoding(value) ? "REDACTED" : value;
@@ -69,4 +70,28 @@ export function failureMessage(error: unknown, url?: URL): string {
 
 	// Last, a listed key that only a decoding spells is beyond the text rules, so the message goes.
 	return holdsListedKeyInAnyDecoding(keyed) ? "REDACTED" : keyed;
+}
+
+// Where a recorded value that is a url's path or query is read, as in `url.path` or `http.target`.
+const RELATIVE_BASE = "http://relative.invalid";
+
+// A string attribute value, span name or status message an OpenTelemetry instrumentation recorded, read
+// as failureMessage reads log.fetch's status, and as its url where it parses as one, alone or after
+// RELATIVE_BASE. A value with nothing to redact stays as recorded, unnormalised. `url.query`, which
+// OpenTelemetry's semantic conventions write without its `?`, is read as a query.
+export function redactedRecordedValue(key: string, value: string): string {
+	if (key === "url.query") {
+		return redactedQuery(new URL(`?${value}`, RELATIVE_BASE)) ?? value;
+	}
+
+	const relative = /^(?:\/(?![/\\])|\?)/.test(value);
+	const url = parseHttpUrl(value, relative ? RELATIVE_BASE : undefined);
+	const read = url === undefined ? value : url.href;
+	const redacted = failureMessage(read, url);
+
+	if (redacted === read) {
+		return value;
+	}
+
+	return relative && redacted.startsWith(RELATIVE_BASE) ? redacted.slice(RELATIVE_BASE.length) : redacted;
 }

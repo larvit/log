@@ -590,3 +590,20 @@ Read most (opens and searches):
 - `log/default-queue.ts` 1
 - `log/stderr-lines.ts` 1
 - `log/types.ts` 1
+
+## Reading cost, chunk b9f62a7da570, finished 2026-11-15T12:00:23Z
+
+253935 new input tokens before the first commit.
+
+Read most (opens and searches):
+
+- `README.md` 12
+- `otlp/payloads.ts` 6
+- `todo.md` 6
+- `docs/decisions.md` 5
+- `log/log.ts` 5
+- `AGENTS.md` 3
+- `tests/test-doubles.ts` 3
+- `index.ts` 2
+- `stryker.config.mjs` 2
+- `tests/otel-adapter.test.ts` 2

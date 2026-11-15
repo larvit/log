@@ -498,7 +498,7 @@ the few core modules it imports, 2652 bytes gzipped in all, so it never loads `i
 that doesn't import it doesn't load anything new. One consequence: the once-per-sink record of written
 warnings exists once per bundle.
 
-## The OpenTelemetry adapter exports a span through the `Log` handed to `runWithLog`, as its instrumentation recorded it
+## The OpenTelemetry adapter exports a span through the `Log` handed to `runWithLog`, redacted as a `log.fetch` span is
 
 2026-11-15, the implementing agent, on what the maintainer settled on
 2026-11-14: a second entry point of this package, nesting by OpenTelemetry's own context manager,
@@ -511,10 +511,15 @@ and the `Log` handed over explicitly at the request's edge. What that left open:
 - **A span with no `Log` in its context is not recorded.** The provider takes no fallback `Log`,
   since that would be a hidden global (README → Goals #10). Such a span, and one under an unsampled
   `Log`, passes its parent's ids on so propagation still names the caller.
-- **Attributes are exported unredacted.** It works against README → Goals #7 for a `url.full` an
-  instrumentation records. Which attribute holds a credential, and by which rule it is cut, is a
-  design of its own, so it ships as `todo.md` item 155 in the same release, and no release holds
-  the adapter without it.
+- **Each string attribute, the span's name and its status message are read as `log.fetch`'s status
+  message is, and as a url where one parses** (README → Goals #7). An instrumentation may put a url
+  in any of them, and no list of attribute names would keep up with every instrumentation's, so no
+  value is trusted by its key. The one key read by name is `url.query`, which OpenTelemetry's
+  semantic conventions write without the `?` that the text rules open a pair at. A value starting
+  with `/` or `?` is read as a relative url, so `url.path` and the older `http.target` get the path
+  rules. A value with nothing to redact stays as recorded: re-serialising a url would change what a
+  dashboard groups on. The `Log`'s context is the app's own and goes out as written, as on a
+  `log.fetch` span.
 - **What an `OtlpSpan` cannot hold is left out and counted.** Its `events` and `links` are typed
   empty and its attribute values are strings, and README → Audience lets only a major widen a type
   a consumer reads. So an event, a link and a list-valued attribute raise the span's dropped
