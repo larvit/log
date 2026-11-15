@@ -7,22 +7,27 @@ import { redactedWholeUrl } from "./query.js";
 // holding a credential, as decodings.ts says of every reading limit.
 const MAX_SCHEME_SEGMENTS = 8;
 
-// The first segment before `before` that opens a url holding a credential, read with the rest of the
-// path; -1 where there is none. Segment 0 is the empty text before the leading `/`, which opens no
-// url, so the scan starts at 1.
-function firstCredentialUrlSegment(segments: string[], read: Decodings[], before: number): number {
-	let opened = 0;
+const opensCredentialUrl = (rest: Decodings) => inAnyDecoding(rest, decoding => SCHEME_LED.test(decoding) && (redactedWholeUrl(decoding) !== undefined || redactTextUserinfo(decoding) !== decoding));
 
-	for (let index = 1; index < before; index++) {
+// Where `REDACTED` starts: the first segment that either holds a listed key or opens a url holding a
+// credential, read with the rest of the path; -1 keeps the whole path. Stopping at the first of both
+// is what stops a later cut leaving an earlier url's userinfo in the kept prefix. A url nested with
+// no scheme, or behind other text in its segment, still carries a query, so a listed key cuts too.
+function firstCutSegment(segments: string[], read: Decodings[]): number {
+	let schemeSegments = 0;
+
+	for (let index = 0; index < segments.length; index++) {
+		if (inAnyDecoding(read[index], holdsListedKey)) {
+			return index;
+		}
+
 		if (!inAnyDecoding(read[index], decoding => SCHEME_LED.test(decoding))) {
 			continue;
 		}
 
-		opened++;
+		schemeSegments++;
 
-		const nested = decodings(segments.slice(index).join("/"));
-
-		if (opened > MAX_SCHEME_SEGMENTS || inAnyDecoding(nested, decoding => SCHEME_LED.test(decoding) && (redactedWholeUrl(decoding) !== undefined || redactTextUserinfo(decoding) !== decoding))) {
+		if (schemeSegments > MAX_SCHEME_SEGMENTS || opensCredentialUrl(decodings(segments.slice(index).join("/")))) {
 			return index;
 		}
 	}
@@ -30,9 +35,6 @@ function firstCredentialUrlSegment(segments: string[], read: Decodings[], before
 	return -1;
 }
 
-// Cut at the first segment whose nested url holds a credential: a later cut would leave an earlier
-// url's userinfo in the kept prefix. A url nested with no scheme, or behind other text in its segment,
-// still carries a query, so a segment holding a listed key cuts too.
 export function redactedPath(pathname: string): string {
 	const segments = pathname.split("/");
 	const read = segments.map(segment => decodings(segment));
@@ -41,14 +43,11 @@ export function redactedPath(pathname: string): string {
 		return "/REDACTED";
 	}
 
-	const listedKeyAt = read.findIndex(segmentRead => inAnyDecoding(segmentRead, holdsListedKey));
-	// Only a url opened before the listed key can move the cut earlier.
-	const urlAt = firstCredentialUrlSegment(segments, read, listedKeyAt === -1 ? segments.length : listedKeyAt);
-	// Segments before `cutAt` are kept, and `REDACTED` replaces the rest; -1 keeps all.
-	const cutAt = urlAt === -1 ? listedKeyAt : urlAt;
+	const cutAt = firstCutSegment(segments, read);
+	// Segments before `cutAt` are kept, and `REDACTED` replaces the rest.
 	const kept = cutAt === -1 ? pathname : [...segments.slice(0, cutAt), "REDACTED"].join("/");
 
-	// Userinfo after `//`, `\\`, `/\` or `\/` needs no scheme and no query key, so both cuts can miss it.
+	// Userinfo after `//`, `\\`, `/\` or `\/` needs no scheme and no query key, so the cut can miss it.
 	// That userinfo may sit in a decoding that maps to no raw segment, so the whole path goes.
 	return holdsUserinfoInAnyDecoding(kept) ? "/REDACTED" : kept;
 }
