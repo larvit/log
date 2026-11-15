@@ -461,14 +461,20 @@ or `otlpTransport` its `fetch`. The suite swaps a global by name only in the tes
 that reads it:
 - `process`, to prove the colour default reads the env.
 - `Deno` and `setTimeout`, to prove that only the system clock's timer ids reach `Deno.unrefTimer`.
-- `fetch`, for the queue a Log builds from `otlpHttpBaseURI` and for `log.fetch`, which both send
-  through the global.
 - `Request`, to prove `log.fetch` traces a call on a runtime without one.
 - `performance`, to prove the OpenTelemetry adapter reads `performance.timeOrigin`.
 
 One test swaps `URL` to count the parses `redactedQuery` makes, since that function takes no
 parser. Serves README → Goals #2 and #5. Valid while no
 consumer needs the page address or the env injected apart from these.
+
+2026-11-15, the implementing agent, in the release review of 2.7.0: `fetch` is the one global the
+suite swaps outside such a test, which that principle bans by name. A `Log` can't be handed its
+network: `log.fetch`, and the queue a `Log` builds from `otlpHttpBaseURI`, both send through
+`globalThis.fetch`. So 22 tests of those two swap it, through `stubFetch`. Nothing above covers
+this: `colors`, `clock` and an absolute url don't replace the `fetch` a `Log` calls. It stands only
+until `todo.md` item 158 lets a test hand a `Log` its network. A new test of either swaps the
+global until then, and a test of anything else never does.
 
 ## A constructor parameter marked "Not part of the API" carries what only this library passes
 
@@ -551,8 +557,8 @@ and the `Log` handed over explicitly at the request's edge. What that left open:
   list, with `log.sampled`, to `tracing/spans.ts` → `exportSpan`. `Log` builds its own list with
   the same function, so the rule "`transports`, or else what the deprecated options make" has one
   home. A method on `Log` for the hand-off would add a public member, and README → Goals #2 counts
-  the public surface. `Log` passes that function its deprecated console, and the adapter passes
-  none: it exports only spans, which no console takes.
+  the public surface. `Log` passes that function its deprecated console, and the adapter doesn't
+  pass one: it exports only spans, which no console takes.
 - **The peer range is `>=1.3.0 <2`,** the floor OpenTelemetry's own `sdk-trace-base` accepts.
 - **The suite covers the adapter on Node only,** in `tests/otel-adapter.test.ts`, which
   `npm run test-node` runs after `tests/test.ts`. The browser run serves the compiled modules with
