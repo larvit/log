@@ -12,15 +12,22 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 157 | 2.7.0 |  | question | **Settle the shape a custom transport's `span` method is handed before 2.7.0 publishes it.** | 3 | 2 | 3 | 6 | 5 | 1 by 4, 4 by 4 | 1.0 |
+| 146 | 2.7.0 |  |  | **Let a reader see from `redactedPath` alone which segments of a request path it keeps.** | 2 | 2 | 4 | 6 | 2 | code health by 3 | 2.3 |
+| 148 | 2.7.0 | 146 | owner | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
 | 158 | 2.7.0 |  | principle | **Let a test hand a `Log` the network it sends through, so no test swaps `globalThis.fetch` except to prove a default reads it.** | 2 | 1 | 2 | 3 | 3 | code health by 3, 1 by 3 | 3.9 |
-| 156 | 2.8.0 |  |  | **Lower the reading cost of the files a chunk reads most before its first commit.** | 2 | 2 | 1 | 3 | 4 | code health by 3 | 2.7 |
-| 146 | 2.8.0 |  |  | **Let a reader see from `redactedPath` alone which segments of a request path it keeps.** | 2 | 2 | 4 | 6 | 2 | code health by 3 | 2.3 |
-| 149 | 2.8.0 |  |  | **Keep a queue's storage read from rejecting when `restore` throws.** | 1 | 1 | 2 | 2 | 6 | code health by 3 | 2.3 |
-| 114 | 2.8.0 |  |  | **Move `package.json`'s build and test one-liners into named scripts, and let the OTLP test read its collector's port, image and container name from the environment, today's values as defaults.** | 1 | 1 | 1 | 1 | 2 | code health by 1 | 2.1 |
-| 139 | 2.8.0 |  | principle | **Cite "Sane defaults" as applied in the clock and randomness decision, once the principle carries its exception for a library.** | 1 | 2 | 1 | 2 | 1 | code health by 1 | 2.1 |
-| 19 | 2.8.0 |  | defect | **Leave a `Request` untraced in `log.fetch`.** | 1 | 1 | 2 | 2 | 2 | 3.1 by 6 | 2.1 |
-| 80 | 2.8.0 |  | principle | **Run the browser suite in WebKit and Firefox as well as Chromium.** | 2 | 1 | 1 | 2 | 3 | 3 by 7 | 2.0 |
+| 156 | 2.7.0 |  |  | **Lower the reading cost of the files a chunk reads most before its first commit.** | 2 | 2 | 1 | 3 | 4 | code health by 3 | 2.7 |
+| 41 | 2.7.0 |  | principle | **Warn once about a negative, zero or `NaN` numeric `QueueConf` option, and use the default.** | 1 | 1 | 1 | 1 | 2 | 1 by 5 | 2.5 |
+| 149 | 2.7.0 |  |  | **Keep a queue's storage read from rejecting when `restore` throws.** | 1 | 1 | 2 | 2 | 6 | code health by 3 | 2.3 |
+| 20 | 2.7.0 |  |  | **Announce in the README and CHANGELOG that 3.0.0 gives a `log.fetch` span `end({ error })`'s `error.type`, so a query on `"20"` for an abort or `"fetch_error"` moves first.** | 1 | 1 | 1 | 1 | 1 | 1 by 3 | 2.3 |
+| 23 | 2.7.0 |  |  | **Settle one marker for a CHANGELOG entry a consumer must act on, and record it in the `AGENTS.md` line beside `### Security`.** | 1 | 1 | 1 | 1 | 1 | 1 by 3 | 2.3 |
+| 114 | 2.7.0 |  |  | **Move `package.json`'s build and test one-liners into named scripts, and let the OTLP test read its collector's port, image and container name from the environment, today's values as defaults.** | 1 | 1 | 1 | 1 | 2 | code health by 1 | 2.1 |
+| 139 | 2.7.0 |  | principle | **Cite "Sane defaults" as applied in the clock and randomness decision, once the principle carries its exception for a library.** | 1 | 2 | 1 | 2 | 1 | code health by 1 | 2.1 |
+| 19 | 2.7.0 |  | defect | **Leave a `Request` untraced in `log.fetch`.** | 1 | 1 | 2 | 2 | 2 | 3.1 by 6 | 2.1 |
+| 15 | 2.7.0 |  |  | **Warn once when `colors` is unset, `process.stdout.isTTY` is false and neither `NO_COLOR` nor `FORCE_COLOR` is set, where 3.0.0 turns colour off.** | 1 | 1 | 1 | 1 | 2 | 1 by 4 | 2.0 |
+| 17 | 2.7.0 |  |  | **Warn once when an instance with `otlpQueue` set or inherited leaves `spanName` unset.** | 1 | 1 | 1 | 1 | 2 | 1 by 4 | 2.0 |
+| 21 | 2.7.0 |  |  | **Announce in the README that 3.0.0 adds a metrics kind to `OtlpPayload`, so an `OtlpQueue` implementer handles one before it arrives.** | 1 | 1 | 1 | 1 | 1 | 4 by 3 | 2.0 |
+| 80 | 2.7.0 |  | principle | **Run the browser suite in WebKit and Firefox as well as Chromium.** | 2 | 1 | 1 | 2 | 3 | 3 by 7 | 2.0 |
+| 157 | 2.7.0 |  |  | **Hand a custom transport's `span` method a span in a consumer's shape, and each transport its own copy of an entry and a span.** | 3 | 2 | 3 | 6 | 5 | 1 by 4, 4 by 4 | 1.0 |
 | 28 | 2.8.0 |  |  | **Export resource attributes beyond `service.name`.** | 2 | 1 | 2 | 3 | 3 | 2 by 7 | 1.7 |
 | 117 | 2.8.0 |  |  | **Bring the built `index.js` within README → Footprint's 10 KB gzipped budget.** | 2 | 1 | 2 | 3 | 3 | 5 by 7 | 1.5 |
 | 26 | 2.8.0 |  |  | **Check the footprint budget in CI, so the numbers in README → Footprint fail a build instead of going stale.** | 2 | 1 | 1 | 2 | 5 | 5 by 8 | 1.5 |
@@ -35,13 +42,6 @@
 | 86 | 2.8.0 |  |  | **Set `telemetry.sdk.language` to a semconv value, `nodejs` or `webjs`.** | 1 | 1 | 2 | 2 | 2 | 2 by 3 | 1.1 |
 | 29 | 2.8.0 |  |  | **Export span events.** | 3 | 1 | 2 | 4 | 5 | 2 by 6 | 1.0 |
 | 87 | 2.8.0 |  |  | **Report a protobuf export's `partialSuccess` as the JSON transport does.** | 2 | 1 | 2 | 3 | 4 | 2 by 4 | 0.8 |
-| 148 | 2.9.0 | 146 | owner | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 1 | code health by 2 | 6.2 |
-| 41 | 2.9.0 |  | principle | **Warn once about a negative, zero or `NaN` numeric `QueueConf` option, and use the default.** | 1 | 1 | 1 | 1 | 2 | 1 by 5 | 2.5 |
-| 20 | 2.9.0 |  |  | **Announce in the README and CHANGELOG that 3.0.0 gives a `log.fetch` span `end({ error })`'s `error.type`, so a query on `"20"` for an abort or `"fetch_error"` moves first.** | 1 | 1 | 1 | 1 | 1 | 1 by 3 | 2.3 |
-| 23 | 2.9.0 |  |  | **Settle one marker for a CHANGELOG entry a consumer must act on, and record it in the `AGENTS.md` line beside `### Security`.** | 1 | 1 | 1 | 1 | 1 | 1 by 3 | 2.3 |
-| 15 | 2.9.0 |  |  | **Warn once when `colors` is unset, `process.stdout.isTTY` is false and neither `NO_COLOR` nor `FORCE_COLOR` is set, where 3.0.0 turns colour off.** | 1 | 1 | 1 | 1 | 2 | 1 by 4 | 2.0 |
-| 17 | 2.9.0 |  |  | **Warn once when an instance with `otlpQueue` set or inherited leaves `spanName` unset.** | 1 | 1 | 1 | 1 | 2 | 1 by 4 | 2.0 |
-| 21 | 2.9.0 |  |  | **Announce in the README that 3.0.0 adds a metrics kind to `OtlpPayload`, so an `OtlpQueue` implementer handles one before it arrives.** | 1 | 1 | 1 | 1 | 1 | 4 by 3 | 2.0 |
 | 22 | 2.9.0 |  |  | **Announce in the README and CHANGELOG that 3.0.0 stops `log.conf` and `queue.conf` handing back a credential, so a consumer reading one out of them moves to their own copy first.** | 1 | 2 | 1 | 2 | 1 | 1 by 3 | 1.5 |
 | 24 | 2.9.0 |  |  | **End the published `index.js` with a `sourceMappingURL` comment, so a runtime loads `index.js.map` unasked.** | 1 | 1 | 1 | 1 | 2 | 1 by 3 | 1.5 |
 | 46 | 2.9.0 |  | principle | **Keep an injected `clock` or `stdout` that throws from escaping a level method.** | 1 | 1 | 2 | 2 | 2 | 1 by 4 | 1.5 |
@@ -84,29 +84,45 @@
 
 ## Details
 
-### 157. Settle the shape a custom transport's `span` method is handed before 2.7.0 publishes it.
+### 146. Let a reader see from `redactedPath` alone which segments of a request path it keeps.
 
-The 2.7.0 release review's architect raised this as a 🔴 (`tracing/transport.ts` → `TransportSpan`). The maintainer chooses, since each option changes what 2.7.0 holds or the decision "A `Log` sends through a list of transports".
+The comprehension run of 2026-11-14, at 78682e7, scored Shape 6.63, and three of four seats named
+`credentials/path.ts` → `redactedPath`: it picks between two candidate cuts, one at a listed key and
+one at a url nested in the path whose search is bounded by the key's position, skips segment 0, and
+ends in a whole-path fallback that can override either cut. A reader has to hold all three
+together to say what a given path keeps.
 
-Today `TransportSpan` is `{ attributes: Metadata, span: OtlpSpan }`, and README → Transports documents it. Three problems:
+What is redacted stays as README → "Credentials in a captured value" sets it, and a defect here
+exposes a credential in an exported span's `url.full`, README → Goals #7. Against the technical
+principle "Keep It Simple, Stupid", and code health.
 
-- A custom transport gets the OTLP wire form: nanosecond strings, numeric kind and status codes.
-- The attributes travel twice. `span.attributes` is the wire list without `service.name`; `attributes` is the `Metadata`, which `buildSpanPayload` reads only to find `service.name`.
-- After item 97 (3.0.0), only the OTLP transport knows OTLP, so the shape breaks one major after it ships. README → Audience says a feature whose right shape breaks waits for that major. Nothing is published yet, so 2.7.0 can still change it freely.
+### 148. Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.
 
-Options:
+The latest run, at 998478e on 2026-11-15 (PR #386, rerun), scored Navigation 7.50, Locality 6.00,
+Shape 6.50, Self-sufficiency 6.38, overall 6.50. Locality is the lowest. Its seats named:
 
-- A. Give `TransportSpan` a consumer shape, such as `{ name, traceId, spanId, parentSpanId?, kind, startMs, endMs, status, attributes, serviceName? }`, built in `tracing/spans.ts`, and convert to `OtlpSpan` inside `log/queue-transport.ts`. It must still carry what the OpenTelemetry adapter records: nanosecond times from an `HrTime`, and the dropped attribute, event and link counts. A panel benches the spelling first. This does item 97's span half early, and grows `index.js`, which item 117 already holds over budget.
-- B. Document only `entry` and `flush` for a custom transport in 2.7.0, and file A for a later release. A custom transport then gets no spans in 2.7.0; `otlpTransport` and `otlpQueue` export them as before. It rewords the decision's first bullet.
-- C. Keep `OtlpSpan`, hand it once as `{ span, serviceName? }`, record that choice in `docs/decisions.md`, and announce in README → Transports that 3.0.0 changes the shape.
+- What a child inherits: `log/conf.ts` → `inherited`, named by every seat in both runs at this
+  commit. The formatter alias (`ENTRY_FORMATTER_ALIAS`, `functionFormatterOf` and a module WeakMap,
+  since moved to `log/deprecated-options/formatter-alias.ts`) and two skip sets,
+  `otlpKeysNotToInherit` and `keysTransportsKeepOut`, decide the result together, and a reader
+  could not predict it. Item 62 removes the alias and item 97 the OTLP keys,
+  both in 3.0.0; no item takes the rest before then.
+- The query rules: `credentials/query.ts` → `readNestedUrl`, `redactsKeyAndValue` and
+  `redactedSearch`, a cycle carrying a depth and a memo, and `credentials/query-userinfo-runs.ts` →
+  `scanPair` and `pairsInUserinfoRuns`, a scan across pairs under three readings. No item takes them.
+- The transports: `log/otlp-transport.ts` → `inTransportNames` rewrites queue messages whose
+  wording lives in `otlp/send/endpoint.ts`. Item 97 removes the rewriting in 3.0.0.
+- Folders: `credentials/span-values.ts` → `failureMessage` also redacts recorded attributes,
+  `parseHttpUrl`, the fetch filter, sits in `credentials/`, and `tracing/transport.ts` holds the
+  `Transport` contract for entries. No item takes them.
+- `credentials/path.ts` → `redactedPath`, item 146, and `otlp/queue/export-scheduler.ts` →
+  `dispatch`, which no item takes.
 
-Recommended: B now, with A filed for the release that can bench its shape. It is the one option that follows README → Audience as written, and a later minor can add `span` without a break. C is the cheapest, and needs the maintainer to accept a known break.
-
-Apart from the shape, `Log.end` hands every transport the `Log`'s own `this.span` object, so a transport that writes to it changes what the next one gets. Whatever the answer, hand each transport a copy.
-
-Entries have the same problem: `log/log.ts` → `Log`'s entry hand-off gives every transport one `entry` object, and README → Transports only asks a transport to copy it before changing it. The 2.7.0 principles pass raised it under "One owner per value". Settle both with one rule: copy per transport, or freeze.
-
-Once settled, `Transport` and its types can move out of `tracing/transport.ts` to a file named for what they hold, once `TransportSpan` no longer imports `OtlpSpan`.
+This item's tagline names
+the floor, so its chunk runs the four-seat scoring run. Where a dimension or the overall stays under
+7.0, file items for the places the seats name, lowest dimension first, and a copy of this item
+blocked by them. Where every score reaches 7.0, it doesn't file anything, and the run replaces the
+comprehension baseline.
 
 ### 158. Let a test hand a `Log` the network it sends through, so no test swaps `globalThis.fetch` except to prove a default reads it.
 
@@ -146,21 +162,24 @@ Read most over those 5 chunks (opens and searches): `README.md` 32, `docs/decisi
 
 The chunk that ships this runs `reading-cost --reset`.
 
-### 146. Let a reader see from `redactedPath` alone which segments of a request path it keeps.
+### 41. Warn once about a negative, zero or `NaN` numeric `QueueConf` option, and use the default.
 
-The comprehension run of 2026-11-14, at 78682e7, scored Shape 6.63, and three of four seats named
-`credentials/path.ts` → `redactedPath`: it picks between two candidate cuts, one at a listed key and
-one at a url nested in the path whose search is bounded by the key's position, skips segment 0, and
-ends in a whole-path fallback that can override either cut. A reader has to hold all three
-together to say what a given path keeps.
-
-What is redacted stays as README → "Credentials in a captured value" sets it, and a defect here
-exposes a credential in an exported span's `url.full`, README → Goals #7. Against the technical
-principle "Keep It Simple, Stupid", and code health.
+A negative `retryDelayMs` retries at once, `maxItems: 0` drops everything, a `NaN` `maxBatchBytes`
+never flushes on size. Principle: Validate data and build DTOs as early as possible.
 
 ### 149. Keep a queue's storage read from rejecting when `restore` throws.
 
 `StoredQueue.read` (`otlp/queue/queue-storage.ts`) calls `restore`, and `Queue.restore` calls `scheduler.schedule()`, which calls the clock's `setTimeout`. Nothing on that path catches a throw. So an injected clock whose `setTimeout` throws rejects `readable` and `loaded`. That leaves `void this.write(...)` as an unhandled rejection, and rejects every round's `ready`. `ExportScheduler`'s `roundDone` step already guards against such a clock. The prose pass on item 43's chunk found this; the path predates that chunk.
+
+### 20. Announce in the README and CHANGELOG that 3.0.0 gives a `log.fetch` span `end({ error })`'s `error.type`, so a query on `"20"` for an abort or `"fetch_error"` moves first.
+
+A numeric `code` gives way to `name` and the fallback becomes semconv's `"_OTHER"`.
+
+### 23. Settle one marker for a CHANGELOG entry a consumer must act on, and record it in the `AGENTS.md` line beside `### Security`.
+
+Two spellings exist: the `**Breaking:**` prefix `v2.0.0` uses, and the `### Security` grouping.
+Neither covers a deprecation, so `entryFormatter` and the `new Log("debug")` shorthand tell a
+consumer their code stops working in 3.0.0 from inside `### Everything else`, unmarked.
 
 ### 114. Move `package.json`'s build and test one-liners into named scripts, and let the OTLP test read its collector's port, image and container name from the environment, today's values as defaults.
 
@@ -185,11 +204,29 @@ against `location.href` to an http(s) url: `log.fetch` then traces that invented
 with `init` alone, dropping the request's own method, body and headers. The signature says `string |
 URL`, so a TypeScript consumer cannot reach it.
 
+### 17. Warn once when an instance with `otlpQueue` set or inherited leaves `spanName` unset.
+
+Item 77 makes the constructor reject it in 3.0.0, and this warning is that break's only notice.
+
 ### 80. Run the browser suite in WebKit and Firefox as well as Chromium.
 
 `scripts/run-browser-tests.mjs` launches Chromium alone, though its Playwright image ships both.
 WebKit is the only engine on an iPhone, and `failureMessage` has a Firefox branch the suite only
 fakes. `~/.claude/principles/frontend.md` → broad device support.
+
+### 157. Hand a custom transport's `span` method a span in a consumer's shape, and each transport its own copy of an entry and a span.
+
+Today `TransportSpan` is `{ attributes: Metadata, span: OtlpSpan }`, and README → Transports documents it. Nothing is published yet, so 2.7.0 can still change it. Three problems:
+
+- A custom transport gets the OTLP wire form: nanosecond strings, numeric kind and status codes.
+- The attributes travel twice. `span.attributes` is the wire list without `service.name`; `attributes` is the `Metadata`, which `buildSpanPayload` reads only to find `service.name`.
+- After item 97 (3.0.0), only the OTLP transport knows OTLP, so the shape would break one major after it ships.
+
+The maintainer chose, on 2026-11-15: give `TransportSpan` a consumer's shape in 2.7.0, and convert to `OtlpSpan` inside the OTLP transport. A shape such as `{ name, traceId, spanId, parentSpanId?, kind, startMs, endMs, status, attributes, serviceName? }` is a starting point. The shape is a spelling consumers read, so a panel seated as README → Audience picks it before it ships. The decision "A `Log` sends through a list of transports" and README → Transports follow the shape.
+
+`Log.end` hands every transport the `Log`'s own `this.span` object, and `log/log.ts` → `Log`'s entry hand-off gives every transport one `entry` object, so a transport that writes to either changes what the next one gets. README → Transports only asks a transport to copy before changing. Hand each transport its own copy of both. The implementing agent chose a copy over a frozen object, since a frozen one fails at runtime in a transport that writes to it; the maintainer was told and did not object.
+
+Once done, `Transport` and its types can move out of `tracing/transport.ts` to a file named for what they hold, since `TransportSpan` no longer imports `OtlpSpan`.
 
 ### 28. Export resource attributes beyond `service.name`.
 
@@ -269,53 +306,6 @@ dropped-count we would owe them.
 ### 87. Report a protobuf export's `partialSuccess` as the JSON transport does.
 
 Under `http/protobuf` a partially rejected batch counts as delivered.
-
-### 148. Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.
-
-The latest run, at 998478e on 2026-11-15 (PR #386, rerun), scored Navigation 7.50, Locality 6.00,
-Shape 6.50, Self-sufficiency 6.38, overall 6.50. Locality is the lowest. Its seats named:
-
-- What a child inherits: `log/conf.ts` → `inherited`, named by every seat in both runs at this
-  commit. The formatter alias (`ENTRY_FORMATTER_ALIAS`, `functionFormatterOf` and a module WeakMap,
-  since moved to `log/deprecated-options/formatter-alias.ts`) and two skip sets,
-  `otlpKeysNotToInherit` and `keysTransportsKeepOut`, decide the result together, and a reader
-  could not predict it. Item 62 removes the alias and item 97 the OTLP keys,
-  both in 3.0.0; no item takes the rest before then.
-- The query rules: `credentials/query.ts` → `readNestedUrl`, `redactsKeyAndValue` and
-  `redactedSearch`, a cycle carrying a depth and a memo, and `credentials/query-userinfo-runs.ts` →
-  `scanPair` and `pairsInUserinfoRuns`, a scan across pairs under three readings. No item takes them.
-- The transports: `log/otlp-transport.ts` → `inTransportNames` rewrites queue messages whose
-  wording lives in `otlp/send/endpoint.ts`. Item 97 removes the rewriting in 3.0.0.
-- Folders: `credentials/span-values.ts` → `failureMessage` also redacts recorded attributes,
-  `parseHttpUrl`, the fetch filter, sits in `credentials/`, and `tracing/transport.ts` holds the
-  `Transport` contract for entries. No item takes them.
-- `credentials/path.ts` → `redactedPath`, item 146, and `otlp/queue/export-scheduler.ts` →
-  `dispatch`, which no item takes.
-
-This item's tagline names
-the floor, so its chunk runs the four-seat scoring run. Where a dimension or the overall stays under
-7.0, file items for the places the seats name, lowest dimension first, and a copy of this item
-blocked by them. Where every score reaches 7.0, it doesn't file anything, and the run replaces the
-comprehension baseline.
-
-### 41. Warn once about a negative, zero or `NaN` numeric `QueueConf` option, and use the default.
-
-A negative `retryDelayMs` retries at once, `maxItems: 0` drops everything, a `NaN` `maxBatchBytes`
-never flushes on size. Principle: Validate data and build DTOs as early as possible.
-
-### 20. Announce in the README and CHANGELOG that 3.0.0 gives a `log.fetch` span `end({ error })`'s `error.type`, so a query on `"20"` for an abort or `"fetch_error"` moves first.
-
-A numeric `code` gives way to `name` and the fallback becomes semconv's `"_OTHER"`.
-
-### 23. Settle one marker for a CHANGELOG entry a consumer must act on, and record it in the `AGENTS.md` line beside `### Security`.
-
-Two spellings exist: the `**Breaking:**` prefix `v2.0.0` uses, and the `### Security` grouping.
-Neither covers a deprecation, so `entryFormatter` and the `new Log("debug")` shorthand tell a
-consumer their code stops working in 3.0.0 from inside `### Everything else`, unmarked.
-
-### 17. Warn once when an instance with `otlpQueue` set or inherited leaves `spanName` unset.
-
-Item 77 makes the constructor reject it in 3.0.0, and this warning is that break's only notice.
 
 ### 24. End the published `index.js` with a `sourceMappingURL` comment, so a runtime loads `index.js.map` unasked.
 
