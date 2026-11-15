@@ -7,9 +7,9 @@
 // pinned to an exact version for reproducibility.
 
 import assert from "node:assert/strict";
-import { execFile as execFileCb } from "node:child_process";
 import { chmod, mkdir, readFile, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { execFile as execFileCb } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
@@ -29,7 +29,7 @@ const RECEIVED = resolve(DATA_DIR, "otlp-received.json");
 
 const PROTOCOLS = [["http/json", "verify-json"], ["http/protobuf", "verify-protobuf"]];
 
-const sleep = ms => new Promise(done => setTimeout(done, ms));
+const sleep = millis => new Promise(done => setTimeout(done, millis));
 const docker = (args, opts = {}) => execFile("docker", args, opts);
 
 // The library's console output (incl. any OTLP export errors) is buffered and only printed on failure.
@@ -81,7 +81,7 @@ const resourceHasService = (resource, name) =>
 	(resource.attributes ?? []).some(attr => attr.key === "service.name" && attr.value?.stringValue === name);
 
 function assertLog(received, serviceName, protocol) {
-	const resourceLog = received.flatMap(line => line.resourceLogs ?? []).find(rl => resourceHasService(rl.resource, serviceName));
+	const resourceLog = received.flatMap(line => line.resourceLogs ?? []).find(batch => resourceHasService(batch.resource, serviceName));
 
 	assert.ok(resourceLog, `[${protocol}] collector received a log for ${serviceName}`);
 
@@ -103,7 +103,7 @@ function assertLog(received, serviceName, protocol) {
 }
 
 function assertSpan(received, serviceName, protocol, ids) {
-	const resourceSpan = received.flatMap(line => line.resourceSpans ?? []).find(rs => resourceHasService(rs.resource, serviceName));
+	const resourceSpan = received.flatMap(line => line.resourceSpans ?? []).find(batch => resourceHasService(batch.resource, serviceName));
 
 	assert.ok(resourceSpan, `[${protocol}] collector received a span for ${serviceName}`);
 

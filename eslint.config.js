@@ -2,24 +2,37 @@ import larvit from "@larvit/eslint-config-typescript-esm";
 import globals from "globals";
 import perfectionist from "eslint-plugin-perfectionist";
 
+// An import sorts on its first binding, never its path, so moving a module doesn't reorder anything.
+const sortImports = {
+	ignoreCase: false,
+	order: "asc",
+	sortBy: "specifier",
+	type: "natural",
+};
+
 export default [
 	...larvit,
 	{
 		languageOptions: {
 			globals: globals.node,
 		},
+		rules: {
+			"simple-import-sort/imports": "off",
+		},
+	},
+	{
+		// The shared config registers perfectionist for these files already.
+		files: ["**/*.ts"],
+		rules: {
+			"perfectionist/sort-imports": ["error", { ...sortImports, groups: [["value-import", "type-import"]], newlinesBetween: 0 }],
+		},
+	},
+	{
+		// The e2e scripts group host modules, packages and our own code by kind, as the principle allows.
+		files: ["**/*.mjs"],
 		plugins: { perfectionist },
 		rules: {
-			// An import sorts on its first binding, never its path, so moving a module reorders nothing.
-			"perfectionist/sort-imports": ["error", {
-				groups: [["value-import", "type-import"]],
-				ignoreCase: false,
-				newlinesBetween: 0,
-				order: "asc",
-				sortBy: "specifier",
-				type: "natural",
-			}],
-			"simple-import-sort/imports": "off",
+			"perfectionist/sort-imports": ["error", { ...sortImports, groups: ["builtin", "external", ["internal", "parent", "sibling", "index"]], newlinesBetween: 1 }],
 		},
 	},
 ];
