@@ -164,6 +164,7 @@ On 2026-11-13 the bundled build was 11366 bytes, and 11668 after the release rev
 split the credential, settings and queue modules. With `uglifyjs --toplevel` the 11366 became 10241. That flag
 shortens every top-level name, keeping only the names consumers import. So `Log.name` and
 `Queue.name`, which a debugger prints, are shortened too unless the build reserves them.
+On 2026-11-15 `transports`, with `consoleTransport` and `otlpTransport`, took the build to 13638 bytes.
 
 ### 26. Check the footprint budget in CI, so the numbers in README → Footprint fail a build instead of going stale.
 
