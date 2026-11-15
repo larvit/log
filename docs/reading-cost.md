@@ -637,3 +637,7 @@ Read most (opens and searches):
 - `docs/decisions.md` 1
 - `log/conf.ts` 1
 - `package.json` 1
+
+## Reading cost, chunk 1ff982c643af, finished 2026-11-15T21:09:05Z
+
+38288 new input tokens before the first commit.
