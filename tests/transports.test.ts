@@ -186,3 +186,30 @@ test("a child with its own list takes no console or otlp option from a parent th
 	t.strictEqual(child.conf.otlpQueue, undefined, "the child's conf holds no queue");
 	t.end();
 });
+
+test("consoleTransport writes text unless told otherwise, error to stderr, and keeps the metadata beside the trace info", t => {
+	const stderr: string[] = [];
+	const stdout: string[] = [];
+	const log = new Log({ transports: [consoleTransport({ colors: false, format: "text", printTraceInfo: true, stderr: line => { stderr.push(line); }, stdout: line => { stdout.push(line); } })] });
+
+	log.info("out", { orderId: "o1" });
+	log.error("bad");
+	t.ok(stdout[0].includes("[inf] out {\"orderId\":\"o1\",\"spanId\":"), `format "text" writes the text line with the metadata first, got ${stdout[0]}`);
+	t.strictEqual(stdout.length, 1, "error is not written to stdout");
+	t.ok(stderr[0].includes("[err] bad"), "error goes to stderr");
+	t.end();
+});
+
+test("a clone's console options win over the list of the parentLog it is given", t => {
+	const stdout: string[] = [];
+	const original = new Log({ format: "json", stdout: line => { stdout.push(line); } });
+	const listed = spy();
+	const parent = new Log({ transports: [listed.transport] });
+	const clone = original.clone({ parentLog: parent });
+
+	clone.info("to the console");
+	t.strictEqual(JSON.parse(stdout[0]).msg, "to the console", "the clone writes as the Log it clones");
+	t.strictEqual(listed.entries.length, 0, "and takes no list from the parent");
+	t.strictEqual(clone.conf.transports, undefined, "its conf holds none");
+	t.end();
+});
