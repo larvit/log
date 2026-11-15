@@ -6,13 +6,14 @@
 
 `Bar = 0.5`
 
-`Next ID = 158`
+`Next ID = 159`
 
 ## Items
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 157 | 2.7.0 |  | question | **Settle the shape a custom transport's `span` method is handed before 2.7.0 publishes it.** | 3 | 2 | 3 | 6 | 5 | 1 by 4, 4 by 4 | 1.0 |
+| 158 | 2.7.0 |  | principle | **Let a test hand a `Log` the network it sends through, so no test swaps `globalThis.fetch` except to prove a default reads it.** | 2 | 1 | 2 | 3 | 3 | code health by 3, 1 by 3 | 3.9 |
 | 156 | 2.8.0 |  |  | **Lower the reading cost of the files a chunk reads most before its first commit.** | 2 | 2 | 1 | 3 | 4 | code health by 3 | 2.7 |
 | 146 | 2.8.0 |  |  | **Let a reader see from `redactedPath` alone which segments of a request path it keeps.** | 2 | 2 | 4 | 6 | 2 | code health by 3 | 2.3 |
 | 149 | 2.8.0 |  |  | **Keep a queue's storage read from rejecting when `restore` throws.** | 1 | 1 | 2 | 2 | 6 | code health by 3 | 2.3 |
@@ -91,11 +92,7 @@ Today `TransportSpan` is `{ attributes: Metadata, span: OtlpSpan }`, and README 
 
 - A custom transport gets the OTLP wire form: nanosecond strings, numeric kind and status codes.
 - The attributes travel twice. `span.attributes` is the wire list without `service.name`; `attributes` is the `Metadata`, which `buildSpanPayload` reads only to find `service.name`.
-- Item 97 (3.0.0) lets no code outside the OTLP transport know OTLP, so the shape breaks one major after it ships. README → Audience says a feature whose right shape breaks waits for that major. Nothing is published yet, so 2.7.0 can still change it freely.
-
-`Log.end` also hands every transport the `Log`'s own `this.span` object, so a transport that writes to it changes what the next one gets. Whatever the answer, hand each transport a copy.
-
-Entries share the same way: `log/log.ts` → `Log`'s entry hand-off gives every transport one `entry` object, and README → Transports only asks a transport to copy it before changing it. The 2.7.0 principles pass raised it under "One owner per value". Settle both with one rule: copy per transport, or freeze.
+- After item 97 (3.0.0), only the OTLP transport knows OTLP, so the shape breaks one major after it ships. README → Audience says a feature whose right shape breaks waits for that major. Nothing is published yet, so 2.7.0 can still change it freely.
 
 Options:
 
@@ -103,9 +100,43 @@ Options:
 - B. Document only `entry` and `flush` for a custom transport in 2.7.0, and file A for a later release. A custom transport then gets no spans in 2.7.0; `otlpTransport` and `otlpQueue` export them as before. It rewords the decision's first bullet.
 - C. Keep `OtlpSpan`, hand it once as `{ span, serviceName? }`, record that choice in `docs/decisions.md`, and announce in README → Transports that 3.0.0 changes the shape.
 
-Recommended: B now, with A filed for the release that can bench its shape. It is the one option that follows README → Audience as written, and a later minor can add `span` without a break. C is the cheapest, and needs the maintainer to accept a known break, as they did for the two sets of endpoint names.
+Recommended: B now, with A filed for the release that can bench its shape. It is the one option that follows README → Audience as written, and a later minor can add `span` without a break. C is the cheapest, and needs the maintainer to accept a known break.
 
-Once settled, `Transport` and its types can move out of `tracing/transport.ts` to a file named for what they hold, where the answer drops its `OtlpSpan` import.
+Apart from the shape, `Log.end` hands every transport the `Log`'s own `this.span` object, so a transport that writes to it changes what the next one gets. Whatever the answer, hand each transport a copy.
+
+Entries have the same problem: `log/log.ts` → `Log`'s entry hand-off gives every transport one `entry` object, and README → Transports only asks a transport to copy it before changing it. The 2.7.0 principles pass raised it under "One owner per value". Settle both with one rule: copy per transport, or freeze.
+
+Once settled, `Transport` and its types can move out of `tracing/transport.ts` to a file named for what they hold, once `TransportSpan` no longer imports `OtlpSpan`.
+
+### 158. Let a test hand a `Log` the network it sends through, so no test swaps `globalThis.fetch` except to prove a default reads it.
+
+A `Log` takes `clock`, `randomBytes`, `stdout` and `stderr`, and `otlpTransport` and `Queue` take
+`fetch`. The network is the one effect a `Log` can't be handed, in two places: `log/log.ts` →
+`fetchTrace` sends every `log.fetch` request through `globalThis.fetch`, read at the call so a
+polyfill installed later still wins, and `log/deprecated-options/default-queue.ts` →
+`attachDefaultQueue` builds the queue for `otlpHttpBaseURI` with no `fetch`. So 22 tests swap the
+global through `tests/test-doubles.ts` → `stubFetch`: 12 in `tests/fetch.test.ts`, 7 in
+`tests/otlp.test.ts`, 2 in `tests/console.test.ts` and 1 in `tests/trace-context.test.ts`. They
+share one mutable global, a `log.fetch` test that forgets the swap sends a real request, and a
+consumer testing their own code that calls `log.fetch` has to swap the global too.
+
+Principle: "Functional core, imperative shell", which bans a test swapping `globalThis.fetch` by
+name. Found by the principles pass of the 2.7.0 release review, round 2.
+
+Done when the suite swaps `globalThis.fetch` only in the tests that prove a default reads it, as it
+swaps `process` for the colour default, and `docs/decisions.md` → "A platform read stays a default"
+lists it so. A `Log` that is handed nothing still sends through the global, polyfill included.
+
+What bounds the repair:
+
+- An option a consumer writes is a new spelling, so a panel seated as README → Audience picks it
+  before it ships, and README → Goals #2 counts it against the documented surface.
+- `Log`'s second constructor parameter carries only what this library passes
+  (`docs/decisions.md`), so a test may not hand a `Log` its network through it.
+- Item 97 removes the queue a `Log` builds, in 3.0.0. Until then that queue is in this item's
+  scope.
+- The comprehension seats found `attachDefaultQueue` hard to follow, since the two ways a queue is
+  built report to different sinks. A change there makes that easier to read, not harder.
 
 ### 156. Lower the reading cost of the files a chunk reads most before its first commit.
 
@@ -254,18 +285,14 @@ Shape 6.50, Self-sufficiency 6.38, overall 6.50. Locality is the lowest. Its sea
   `redactedSearch`, a cycle carrying a depth and a memo, and `credentials/query-userinfo-runs.ts` →
   `scanPair` and `pairsInUserinfoRuns`, a scan across pairs under three readings. No item takes them.
 - The transports: `log/otlp-transport.ts` → `inTransportNames` rewrites queue messages whose
-  wording lives in `otlp/send/endpoint.ts`, which item 97 removes in 3.0.0. The 2.7.0 release
-  review took the console half: one console writer, and the default list in
-  `log/deprecated-options/`.
+  wording lives in `otlp/send/endpoint.ts`. Item 97 removes the rewriting in 3.0.0.
 - Folders: `credentials/span-values.ts` → `failureMessage` also redacts recorded attributes,
   `parseHttpUrl`, the fetch filter, sits in `credentials/`, and `tracing/transport.ts` holds the
   `Transport` contract for entries. No item takes them.
 - `credentials/path.ts` → `redactedPath`, item 146, and `otlp/queue/export-scheduler.ts` →
   `dispatch`, which no item takes.
 
-Several seats also found the 2.x compatibility layer interleaved with the core `Log`, and comments
-recording what no test can kill. The 2.7.0 release review answered both: `log/deprecated-options/`
-holds that layer, and each such comment now says what the code guarantees. This item's tagline names
+This item's tagline names
 the floor, so its chunk runs the four-seat scoring run. Where a dimension or the overall stays under
 7.0, file items for the places the seats name, lowest dimension first, and a copy of this item
 blocked by them. Where every score reaches 7.0, it doesn't file anything, and the run replaces the

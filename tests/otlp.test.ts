@@ -177,7 +177,8 @@ for (const conf of [
 }
 
 test("an Authorization sent over plain http: to a non-loopback host warns once per report sink, and still goes", async t => {
-	const { calls } = stubFetch();
+	const { calls, fetch } = fetchRecorder();
+	const viaGlobal = stubFetch();
 	const warning = (source: string, header = "authorization") => `@larvit/log: the ${header} header from ${source} goes over plain http: to collector.test:4318, readable by anything on the network path; use an https: endpoint, or on a network you trust set acceptPlainHttpCredentials: true on the Queue`;
 	const send = async (queue: Queue) => {
 		const log = new Log({ otlpQueue: queue, stderr: () => {} });
@@ -188,10 +189,10 @@ test("an Authorization sent over plain http: to a non-loopback host warns once p
 	const sink = reportSink();
 	const header = reportSink();
 	const headers: Record<string, string> = {};
-	const queue = new Queue({ otlpAdditionalHeaders: headers, otlpHttpBaseURI: "http://collector.test:4318", report: header.report });
+	const queue = new Queue({ fetch, otlpAdditionalHeaders: headers, otlpHttpBaseURI: "http://collector.test:4318", report: header.report });
 
-	await send(new Queue({ otlpHttpBaseURI: "http://collector:s3cret@collector.test:4318", report: sink.report }));
-	await send(new Queue({ otlpHttpBaseURI: "http://collector:s3cret@collector.test:4318", report: sink.report }));
+	await send(new Queue({ fetch, otlpHttpBaseURI: "http://collector:s3cret@collector.test:4318", report: sink.report }));
+	await send(new Queue({ fetch, otlpHttpBaseURI: "http://collector:s3cret@collector.test:4318", report: sink.report }));
 	t.deepEqual(sink.lines, [{ msg: warning("user:pass@ in otlpHttpBaseURI") }], "userinfo warns once per sink, naming the host and never the credential");
 
 	await send(queue);
@@ -202,20 +203,20 @@ test("an Authorization sent over plain http: to a non-loopback host warns once p
 
 	const lookalike = reportSink();
 
-	await send(new Queue({ otlpHttpBaseURI: "http://u:p@127.evil.test", report: lookalike.report }));
+	await send(new Queue({ fetch, otlpHttpBaseURI: "http://u:p@127.evil.test", report: lookalike.report }));
 	t.strictEqual(lookalike.lines.length, 1, "a name starting 127. is no loopback address");
 
 	const stringly = reportSink();
-	const unset = new Queue({ otlpHttpBaseURI: "http://u:p@other.test", report: stringly.report });
+	const unset = new Queue({ fetch, otlpHttpBaseURI: "http://u:p@other.test", report: stringly.report });
 
-	await send(Reflect.construct(Queue, [{ acceptPlainHttpCredentials: "false", otlpHttpBaseURI: "http://u:p@other.test", report: stringly.report }]));
+	await send(Reflect.construct(Queue, [{ acceptPlainHttpCredentials: "false", fetch, otlpHttpBaseURI: "http://u:p@other.test", report: stringly.report }]));
 	t.strictEqual(stringly.lines.length, 1, "only true accepts, never a truthy string");
 	t.strictEqual(unset.conf.acceptPlainHttpCredentials, false, "it reads back false when unset");
 
 	let unwarned = "";
 
 	try {
-		await send(Reflect.construct(Queue, [{ otlpHttpBaseURI: "http://u:p@collector.test:4318", report: "not a function" }]));
+		await send(Reflect.construct(Queue, [{ fetch, otlpHttpBaseURI: "http://u:p@collector.test:4318", report: "not a function" }]));
 	} catch (err) {
 		unwarned = String(err);
 	}
@@ -241,7 +242,7 @@ test("an Authorization sent over plain http: to a non-loopback host warns once p
 
 	broken.info("z");
 	t.strictEqual(await broken.flush().then(() => "", err => String(err)), "", "a stderr that throws on the warning never rejects flush()");
-	t.strictEqual(calls.length, 10, "every request still goes");
+	t.deepEqual({ handed: calls.length, viaGlobal: viaGlobal.calls.length }, { handed: 7, viaGlobal: 3 }, "every request still goes, a hand-built queue's through the fetch it was handed");
 	t.end();
 });
 
@@ -288,23 +289,25 @@ test("otlpAdditionalHeaders is read per send, and an invalid one fails the expor
 	await log.flush();
 	t.deepEqual(calls.map(call => callHeader(call, "Authorization")), ["Bearer first", "Bearer second"], "a rotated token reaches the next send without a new queue");
 
+	const unsent = fetchRecorder();
 	const reports = reportSink();
-	const invalid = new Log({ otlpQueue: new Queue({ otlpAdditionalHeaders: { "X-Bad": "s3\ncr3t" }, otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report }), stderr: () => {} });
+	const invalid = new Log({ otlpQueue: new Queue({ fetch: unsent.fetch, otlpAdditionalHeaders: { "X-Bad": "s3\ncr3t" }, otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report }), stderr: () => {} });
 
 	invalid.info("z");
 	await invalid.flush();
-	t.strictEqual(calls.length, 2, "nothing is sent with a header the runtime rejects");
+	t.deepEqual([calls.length, unsent.calls.length], [2, 0], "nothing is sent with a header the runtime rejects");
 	t.deepEqual(reports.lines, [{ error: "otlpAdditionalHeaders carries an invalid X-Bad header", items: 1, msg: "OTLP export headers invalid, batch dropped", path: "/v1/logs", url: "http://127.0.0.1:4318/v1/logs" }], "the batch is dropped under its own message, naming the header but never its value");
 	t.notOk(JSON.stringify(reports.lines).includes("s3cr3t"), "the rejected header value is not reported");
 
 	// A whole header line pasted as a name holds the token, so only its position is reported.
 	const pastedReports = reportSink();
-	const pasted = new Log({ otlpQueue: new Queue({ otlpAdditionalHeaders: { "Authorization: Bearer s3cr3t": "", "X-Ok": "a" }, otlpHttpBaseURI: "http://127.0.0.1:4318", report: pastedReports.report }), stderr: () => {} });
+	const pasted = new Log({ otlpQueue: new Queue({ fetch: unsent.fetch, otlpAdditionalHeaders: { "Authorization: Bearer s3cr3t": "", "X-Ok": "a" }, otlpHttpBaseURI: "http://127.0.0.1:4318", report: pastedReports.report }), stderr: () => {} });
 
 	pasted.info("z");
 	await pasted.flush();
 	t.deepEqual(pastedReports.lines.map(line => line.error), ["otlpAdditionalHeaders carries an invalid header name at position 1 (counting from 1)"], "a name that is no RFC 9110 token is reported by its position");
 	t.notOk(JSON.stringify(pastedReports.lines).includes("s3cr3t"), "the pasted token stays out of the report");
+	t.strictEqual(unsent.calls.length, 0, "and nothing is sent");
 	t.end();
 });
 
