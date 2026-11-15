@@ -97,7 +97,7 @@ that mislead, under Shape (6.63) and Navigation (7.38):
 Done when each of these places sits where its name and file say, with imports still running one way
 (AGENTS.md → Working here), and every rule on credentials in a span still in one folder (decision
 "Every rule on credentials in a span sits in one folder"). Every redaction holds (README → Goals #7).
-Item 160 reworks the query rules in `credentials/query*.ts`; this item leaves their logic to it.
+Leave the logic of the query rules in `credentials/query*.ts` as it is.
 
 Ranks ahead of the release's other items because docs/decisions.md → "The comprehension baseline"
 ships comprehension work ahead of them; Moves reflects that the overall score is under the 7.0 floor.
@@ -205,8 +205,7 @@ The maintainer chose, on 2026-11-15: give `TransportSpan` a consumer's shape in 
 The latest run, at 4f96af8 on 2026-11-15 (PR #391), scored Navigation 7.38, Locality 5.88, Shape
 6.63, Self-sufficiency 6.63, overall 6.50. Locality is the lowest.
 
-Item 160 (the query-credential rules) lifts Locality and the overall, and item 161
-(`credentials/` names) Shape and Navigation. Places the seats named that no item takes:
+Item 161 (`credentials/` names) lifts Shape and Navigation. Places the seats named that no item takes:
 `log/otlp-transport.ts:14` `inTransportNames` and `log/log.ts:187` `deprecatedEntry`, which 3.0.0
 deletes (item 97), and `credentials/path.ts:36` `redactedPath`.
 

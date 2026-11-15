@@ -9,13 +9,13 @@ const holdsAtSignInAnyDecoding = (text: string) => inAnyDecoding(decodings(text)
 
 // A parser reads the `&` in `?//u:p&w@host` as part of the userinfo, which the query splits into
 // two pairs. So a key opening userinfo starts a run: the text after that key, through its value and
-// each later pair, up to the first URL_DELIMITER. The pairs from that key's to the last one holding
-// an `@` in the run are redacted whole. Keep `\` out of URL_DELIMITER, since userinfo after `//` may
+// each later pair, up to the first URL_DELIMITER. The run's pairs, from the one whose key opened it to
+// the last one holding an `@` in the run, are redacted whole. Keep `\` out of URL_DELIMITER, since userinfo after `//` may
 // hold one; a run that a backslash opens may then redact a pair holding no credential. A value opening
 // userinfo is a url of its own, so `?next=https://h&q=a@b` is kept.
 function pairsInUserinfoRuns(pairs: QueryPairs, holdsAtSign: (text: string) => boolean): number[] {
 	const inRuns: number[] = [];
-	// The pair whose key opened the run going, and the last pair holding an `@` in it so far.
+	// While a run is open: the pair whose key opened it, and the last pair so far holding an `@` in it.
 	let start: number | undefined;
 	let lastAtSign: number | undefined;
 
@@ -28,8 +28,8 @@ function pairsInUserinfoRuns(pairs: QueryPairs, holdsAtSign: (text: string) => b
 		lastAtSign = undefined;
 	};
 
-	// One key or value of the pair at `index`, read into the run going: an `@` before the text's first
-	// URL_DELIMITER makes that pair the run's last so far, and the delimiter closes the run.
+	// One key or value of the pair at `index`, read into the open run: an `@` before the text's first
+	// URL_DELIMITER makes `index` the run's last pair so far, and the delimiter closes the run.
 	const readIntoRun = (text: string, index: number) => {
 		const delimiterAt = text.search(URL_DELIMITER);
 
