@@ -56,6 +56,9 @@ In [docs/decisions.md](docs/decisions.md):
   module whose file name stays true of it, or gets its own. A rule set answering one question —
   what a reader has to check as a whole — lives in one module, or in one folder once it outgrows a
   module.
+- `log/deprecated-options/` holds what 3.0.0 deletes: the code that only a deprecated option
+  reaches. What a child or clone inherits stays in `log/conf.ts`, the deprecated keys included,
+  since a reader checks that rule as a whole.
 - Imports point one way: `opentelemetry-adapter/` → `log/` → `tracing/` → `otlp/` →
   `credentials/` → `primitives/`, and inside `otlp/`, `queue/` → `send/`. The decision log names
   each import that runs against it.

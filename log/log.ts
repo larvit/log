@@ -1,4 +1,5 @@
 import { DEFAULT_LOG_LEVEL, type LogLevel, LogLevels, SEVERITY_NUMBERS } from "../primitives/levels.js";
+import { deprecatedConsole } from "./deprecated-options/deprecated-console.js";
 import { endErrorType, exportSpan, openSpan, spanEnd, type SpanHost } from "../tracing/spans.js";
 import { type FetchTrace, traceFetch } from "../tracing/fetch.js";
 import { formatTraceparent } from "../tracing/traceparent.js";
@@ -6,11 +7,9 @@ import type { LogInt, LogOptions, ResolvedLogConf } from "./types.js";
 import { type Metadata, type MetadataInput, withoutUndefined } from "../primitives/metadata.js";
 import type { OtlpSpan } from "../otlp/payloads.js";
 import { resolveConf } from "./conf.js";
-import { resolveFormatter } from "./entry-format.js";
 import type { Transport } from "../tracing/transport.js";
-import { transportsOf } from "./log-transports.js";
+import { transportsOf } from "./deprecated-options/default-transports.js";
 import { warnOnceToStderr, writeStderr } from "./stderr-lines.js";
-import { withTraceInfo, writeConsoleLine } from "./console-output.js";
 import { writeOnce } from "../primitives/once-per-sink.js";
 
 // A configured logLevel that is not a level, as the warning about it prints it.
@@ -184,22 +183,8 @@ export class Log implements LogInt {
 		}
 	}
 
-	// The console the deprecated options make. Unlike consoleTransport it reads the conf at each
-	// entry, and its printTraceInfo prints the instance's own span, as 2.x does, even where the entry
-	// is exported under its parent's.
-	private deprecatedConsole(): Transport {
-		return {
-			entry: ({ logLevel, metadata, msg, msTimestamp }) => {
-				// The formatter gets a copy, so one that changes it changes nothing that is exported.
-				const printed = this.conf.printTraceInfo ? withTraceInfo(metadata, { spanId: this.span.spanId, spanName: this.span.name, traceId: this.span.traceId }) : { ...metadata };
-
-				writeConsoleLine(this.conf, resolveFormatter(this.conf), { logLevel, metadata: printed, msTimestamp, msg });
-			},
-		};
-	}
-
 	private transports(): readonly Transport[] {
-		return transportsOf(this.conf, this.deprecatedConsole());
+		return transportsOf(this.conf, deprecatedConsole(this.conf, this.span));
 	}
 
 	private spanHost(): SpanHost {
