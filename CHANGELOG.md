@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Record `REDACTED` for a query value opening a url nested past eight levels, even one the runtime cannot parse,** as a key there already did.
+
 A `Log` now sends to a list of transports you choose, and you can write your own. The options the
 list replaces are deprecated and keep working until 3.0.0. A string `format` other than `"text"` or
 `"json"` now warns, and the entry a formatter takes has a new name, `LogEntry`. A second entry

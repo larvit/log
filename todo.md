@@ -12,7 +12,6 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 160 | 2.7.0 |  |  | **Let a reader check by reading why a query key is redacted or kept, with every redaction 2.x makes still made.** | 3 | 2 | 4 | 7 | 5 | code health by 9 | 4.7 |
 | 161 | 2.7.0 |  |  | **Make each function in `credentials/` sit in a file, and under a name, that says what it does.** | 2 | 2 | 4 | 6 | 4 | code health by 7 | 4.4 |
 | 158 | 2.7.0 |  | principle | **Let a test hand a `Log` the network it sends through, so no test swaps `globalThis.fetch` except to prove a default reads it.** | 2 | 1 | 2 | 3 | 3 | code health by 3, 1 by 3 | 3.9 |
 | 156 | 2.7.0 |  |  | **Lower the reading cost of the files a chunk reads most before its first commit.** | 2 | 2 | 1 | 3 | 4 | code health by 3 | 2.7 |
@@ -26,7 +25,7 @@
 | 17 | 2.7.0 |  |  | **Warn once when an instance with `otlpQueue` set or inherited leaves `spanName` unset.** | 1 | 1 | 1 | 1 | 2 | 1 by 4 | 2.0 |
 | 80 | 2.7.0 |  | principle | **Run the browser suite in WebKit and Firefox as well as Chromium.** | 2 | 1 | 1 | 2 | 3 | 3 by 7 | 2.0 |
 | 157 | 2.7.0 |  |  | **Hand a custom transport's `span` method a span in a consumer's shape, and each transport its own copy of an entry and a span.** | 3 | 2 | 3 | 6 | 5 | 1 by 4, 4 by 4 | 1.0 |
-| 164 | 2.8.0 | 160, 161 | owner | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 2 | code health by 3 | 6.2 |
+| 164 | 2.8.0 | 161 | owner | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 2 | code health by 3 | 6.2 |
 | 28 | 2.8.0 |  |  | **Export resource attributes beyond `service.name`.** | 2 | 1 | 2 | 3 | 3 | 2 by 7 | 1.7 |
 | 117 | 2.8.0 |  |  | **Bring the built `index.js` within README → Footprint's 10 KB gzipped budget.** | 2 | 1 | 2 | 3 | 3 | 5 by 7 | 1.5 |
 | 26 | 2.8.0 |  |  | **Check the footprint budget in CI, so the numbers in README → Footprint fail a build instead of going stale.** | 2 | 1 | 1 | 2 | 5 | 5 by 8 | 1.5 |
@@ -82,29 +81,6 @@
 | 108 | 3.0.0 |  | principle | **Keep two tabs of one web app sharing a `storage` key from sending a record twice or deleting each other's backlog.** | 3 | 2 | 2 | 5 | 5 | 3 by 5 | 0.7 |
 
 ## Details
-
-### 160. Let a reader check by reading why a query key is redacted or kept, with every redaction 2.x makes still made.
-
-The query-credential rules were the hardest place of the 2026-11-15 scoring run (PR #391, at
-4f96af8) for every seat, under Overall and Locality, the run's lowest dimension at 5.88:
-
-- `credentials/query.ts:47` `readNestedUrl`, `:78` `redactsKeyAndValue` and `:111`
-  `redactedSearch`: a cycle of three or four functions with a depth-keyed memo. The depth rises
-  only in `redactedSearch` while the cap is checked in two places, and a key is read alone and
-  joined. Seats could not predict an output, nor say which condition covers which README bullet.
-- `credentials/query-userinfo-runs.ts:34` `scanPair` and `:55` `pairsInUserinfoRuns`: a run is
-  tracked across pairs under three readings of the query, and one pair can close a run and open
-  another. Why a key that opens a run is checked against the whole pair stayed opaque, and a
-  comment admits a special case. The senior warned that a local-looking change can open a gap that
-  one reading would have caught.
-
-Make each of these places easier to read. This is security-critical (README → Goals #7): every
-redaction the suite and README → Credentials in a captured value promise still holds. A chunk
-that reworks redaction has let defects escape before (item 84 drew six later fixes), so the chunk
-adds a test for each shape the rework could drop before it changes the code.
-
-Ranks ahead of the release's other items because docs/decisions.md → "The comprehension baseline"
-ships comprehension work ahead of them; Moves reflects that the overall score is under the 7.0 floor.
 
 ### 161. Make each function in `credentials/` sit in a file, and under a name, that says what it does.
 
