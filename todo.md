@@ -94,7 +94,8 @@ value). A database instrumentation's `db.query.text` can hold a literal the same
 the changelog state that these attributes are unredacted. The span's name and its error status
 message are exported as recorded too, and an instrumentation can put a credentialed url in either,
 where `log.fetch` redacts its own span's status. The path: `RecordedSpan.end` in
-`opentelemetry-adapter/recorded-span.ts` → `Log.exportSpan` → each transport's `span`.
+`opentelemetry-adapter/recorded-span.ts` → `exportSpan` in `tracing/spans.ts`, over
+`transportsOf(log.conf)` from `log/log-transports.ts` → each transport's `span`.
 
 ### 153. Let an app export the spans OpenTelemetry's instrumentation packages record, such as pg or Prisma queries, through a `Log`, nested under the request they ran in.
 

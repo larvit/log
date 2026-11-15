@@ -457,7 +457,7 @@ the env, and, through `withGlobals`, `Deno` and `setTimeout` to prove that only 
 timer ids reach `Deno.unrefTimer`. Serves README → Goals #2 and #5. Valid while no
 consumer needs the page address or the env injected apart from these.
 
-## A constructor parameter or method marked "Not part of the API" carries what only this library passes
+## A constructor parameter marked "Not part of the API" carries what only this library passes
 
 2026-11-13, the implementing agent, in the release review of 2.6.0: `Queue`'s second parameter
 `warn` and `Log`'s second parameter are each passed only by this library, and each says so in the
@@ -470,13 +470,6 @@ carries.
 `log/conf.ts` → `resolveConf` can then read the caller's options before it inherits anything, so
 one function makes the whole conf. Serves code health; bounded by README → Goals #8. Valid until
 3.0.0, where `todo.md` item 142 takes both off the published constructors.
-
-2026-11-15, the implementing agent: `Log.exportSpan` is the first such method. `@larvit/log/otel`
-is a bundle of its own, so it can reach a `Log` only through a public method. It cannot read the
-transports itself: a `Log` with none listed builds them from the deprecated options each time it
-exports. Both bundles ship in one
-package version, so nothing outside this library depends on the method's shape. Documenting it
-would add to the surface README → Goals #2 counts. Valid while the adapter ships from this package.
 
 ## The package publishes one bundled file per entry point, built from a module per part
 
@@ -501,7 +494,7 @@ supported runtime loads one ESM file.
 2026-11-15, the implementing agent: `otel.ts` is a second entry point,
 bundled the same way into `otel.js` by `release-tooling/bundle.mjs`, with `@opentelemetry/api` left
 as an import so the app's instrumentation shares that one copy. `otel.js` carries its own copy of
-the few core modules it imports, 2330 bytes gzipped in all, so it never loads `index.js` and an app
+the few core modules it imports, 2652 bytes gzipped in all, so it never loads `index.js` and an app
 that doesn't import it doesn't load anything new. One consequence: the once-per-sink record of written
 warnings exists once per bundle.
 
@@ -533,6 +526,13 @@ and the `Log` handed over explicitly at the request's edge. What that left open:
 - **A number below `performance.timeOrigin` is a `performance.now()` reading,** as
   `timeInputToHrTime` in `@opentelemetry/core` reads it, since instrumentation is written against
   that SDK.
+- **The adapter reads the `Log`'s transports from its documented fields.** `RecordedSpan.end`
+  calls `log/log-transports.ts` → `transportsOf(log.conf)` and hands the list, with `log.sampled`,
+  to `tracing/spans.ts` → `exportSpan`. `Log` builds its own list with the same function, so the
+  rule "`transports`, or else what the deprecated options make" has one home. A method on `Log`
+  for the hand-off would add a public member, and README → Goals #2 counts the public surface.
+  `Log` passes that function the deprecated options' entry side, so the console writer stays out
+  of `otel.js`: the adapter exports only spans.
 - **The peer range is `>=1.3.0 <2`,** the floor OpenTelemetry's own `sdk-trace-base` accepts.
 - **The suite covers the adapter on Node only,** in `tests/otel-adapter.test.ts`, which
   `npm run test-node` runs after `tests/test.ts`. The browser run serves the compiled modules with
