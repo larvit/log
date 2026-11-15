@@ -5,7 +5,7 @@ import type { Metadata } from "../primitives/metadata.js";
 export type ConsoleSink = { colors: boolean, stderr: (msg: string) => void, stdout: (msg: string) => void };
 
 // The one writer of a console line: an entry, from consoleTransport or the deprecated console
-// options, and each line this library writes of its own accord. error and warn go to stderr.
+// options, and each line this library writes of its own accord.
 export function writeConsoleLine(sink: ConsoleSink, format: EntryFormatter, entry: Omit<EntryFormatterConf, "colors">): void {
 	const line = format({ colors: sink.colors, ...entry });
 

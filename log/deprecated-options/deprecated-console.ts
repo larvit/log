@@ -9,7 +9,7 @@ import { withTraceInfo, writeConsoleLine } from "../console-output.js";
 export function deprecatedConsole(conf: ResolvedLogConf, ownSpan: { name: string, spanId: string, traceId: string }): Transport {
 	return {
 		entry({ logLevel, metadata, msg, msTimestamp }) {
-			// The formatter gets a copy, so one that changes it changes nothing that is exported.
+			// The formatter gets a copy, so one that changes it doesn't change anything that is exported.
 			const printed = conf.printTraceInfo ? withTraceInfo(metadata, { spanId: ownSpan.spanId, spanName: ownSpan.name, traceId: ownSpan.traceId }) : { ...metadata };
 
 			writeConsoleLine(conf, resolveFormatter(conf), { logLevel, metadata: printed, msTimestamp, msg });
