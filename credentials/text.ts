@@ -1,4 +1,5 @@
 import { changesInAnyDecoding, decodings, inAnyDecoding, withoutDropped } from "./decodings.js";
+import { isListedQueryKey } from "./query-key.js";
 
 // Userinfo after `//`, and the same after `\\`, `/\` or `\/`: the patterns match a url among other text, or one
 // the runtime cannot parse. After an opener holding a `\`, userinfo may not hold a `\`, so matching a
@@ -12,12 +13,6 @@ const BACKSLASH_OPENED_USERINFO = /(:?(?:\\[/\\]|\/\\))[^/\\?# ]*@/g;
 const OPENS_USERINFO = /\/\/[^/?# ]*$|(?:\\[/\\]|\/\\)[^/\\?# ]*$/;
 
 export const redactTextUserinfo = (text: string) => text.replace(SLASHED_USERINFO, "$1REDACTED@").replace(BACKSLASH_OPENED_USERINFO, "$1REDACTED@");
-
-const SENSITIVE_QUERY_KEY = /(auth|authentication|authorization|consumerid|credential|key|keyid|pass|passphrase|p(ass)?w(or)?d[12]?|secret|sig|sign|signature|signed|token)$|^(code|googleaccessid|idtokenhint)$/;
-
-export function isListedQueryKey(key: string): boolean {
-	return SENSITIVE_QUERY_KEY.test(key.toLowerCase().replace(/[-_]/g, ""));
-}
 
 // The text with each listed key's value replaced by `REDACTED`, wherever a url's own query rules don't
 // reach it: a status message such as `request to …?token=… failed`, a relative `location`, a

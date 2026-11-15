@@ -1,5 +1,6 @@
 import { formDecoded, withoutDropped } from "./decodings.js";
-import { holdsListedKeyInAnyDecoding, holdsUserinfoInAnyDecoding, isListedQueryKey, opensUserinfoInAnyDecoding, SCHEME_LED } from "./text.js";
+import { holdsListedKeyInAnyDecoding, holdsUserinfoInAnyDecoding, opensUserinfoInAnyDecoding, SCHEME_LED } from "./text.js";
+import { isListedQueryKey } from "./query-key.js";
 import { pairsInUserinfoRunsOfAnyReading } from "./query-userinfo-runs.js";
 
 // A part is a key, a value, or a key joined to its value by its `=`. A query is read level by level:

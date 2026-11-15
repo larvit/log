@@ -679,3 +679,20 @@ Read most (opens and searches):
 - `log/deprecated-options/default-queue.ts` 1
 - `log/deprecated-options/formatter-alias.ts` 1
 - `log/deprecated-options/replaced-by-transports.ts` 1
+
+## Reading cost, chunk ac8206e47778, finished 2026-11-15T23:29:42Z
+
+91902 new input tokens before the first commit.
+
+Read most (opens and searches):
+
+- `tests/credentials.test.ts` 6
+- `README.md` 5
+- `tests/fetch.test.ts` 4
+- `credentials/query-userinfo-runs.ts` 3
+- `credentials/text.ts` 3
+- `credentials/query.ts` 2
+- `credentials/decodings.ts` 1
+- `credentials/span-values.ts` 1
+- `eslint.config.js` 1
+- `package.json` 1

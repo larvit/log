@@ -1,8 +1,9 @@
-import { buildUrlFull, parseHttpUrl, redactHeaderCredential } from "../credentials/span-values.js";
+import { buildUrlFull, parseHttpUrl } from "../credentials/url-full.js";
 import { childSpan, exportSpan, fetchErrorType, spanEnd, type SpanFailure, type SpanHost } from "./spans.js";
 import { formatTraceparent } from "./traceparent.js";
 import type { Metadata } from "../primitives/metadata.js";
 import { type OtlpSpan, SPAN_KIND_CLIENT, STATUS_CODE_ERROR, STATUS_CODE_UNSET } from "../otlp/payloads.js";
+import { redactHeaderCredential } from "../credentials/span-values.js";
 
 // What log.fetch reads of its Log, as plain values a test can hand it.
 export type FetchTrace = SpanHost & {
