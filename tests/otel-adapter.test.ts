@@ -1,11 +1,11 @@
-import { type Context, context, type ContextManager, ROOT_CONTEXT, SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
+import { type Context, context, type ContextManager, ROOT_CONTEXT, SpanKind, SpanStatusCode, type TimeInput, trace } from "@opentelemetry/api";
 import { fakeClock, nanos, thrown, withGlobals } from "./test-doubles.js";
 import { Log, type LogOptions, type OtlpPayload, type TransportSpan } from "../index.js";
 import { logTracerProvider, runWithLog } from "../otel.js";
 import test from "./tap.js";
 
-// The contract of OpenTelemetry's context manager with no async hooks: the context `with` is handed
-// is active until its callback returns.
+// The contract of OpenTelemetry's context manager with no async hooks: `with` keeps the context it
+// is handed active until its callback returns.
 class StackContextManager implements ContextManager {
 	private current = ROOT_CONTEXT;
 
@@ -177,7 +177,7 @@ test("runWithLog returns what the callback returns and passes on what it throws"
 	t.strictEqual(thrown(() => runWithLog(log, () => { throw new Error("from the callback"); })), "Error: from the callback");
 });
 
-test("a span started outside runWithLog records nothing and exports nothing", t => {
+test("a span started outside runWithLog is not recorded or exported", t => {
 	const { log, spans } = requestLog();
 	const span = pgTracer.startSpan("orphan");
 
@@ -189,7 +189,7 @@ test("a span started outside runWithLog records nothing and exports nothing", t 
 	t.strictEqual(log.ended, false);
 });
 
-test("under a Log whose trace is unsampled, a span exports nothing and carries the Log's ids with the sampled flag off", t => {
+test("under a Log whose trace is unsampled, a span is not exported, and carries the Log's ids with the sampled flag off", t => {
 	const traceId = "0af7651916cd43dd8448eb211c80319c";
 	const { log, spans } = requestLog({ traceparent: `00-${traceId}-b7ad6b7169203331-00` });
 
@@ -238,7 +238,7 @@ test("an ERROR status is exported with its message, and an OK status without one
 
 test("a start or end time the caller gives is exported, as a Date, an epoch number or an HrTime", t => {
 	const { log, spans } = requestLog();
-	// An epoch number is told from a performance.now() one by the process's start, so this one follows it.
+	// Later than the process's start, so it is read as an epoch.
 	const epochMs = Math.ceil(performance.timeOrigin) + 3;
 
 	runWithLog(log, () => {
@@ -286,6 +286,28 @@ test("on a runtime with no performance global, every number is an epoch", t => {
 	});
 
 	t.deepEqual([spans[0]?.span.startTimeUnixNano, spans[0]?.span.endTimeUnixNano], ["1500000000", "1501000000"]);
+});
+
+test("a time that is no time reads as now", t => {
+	const { clock, log, spans } = requestLog();
+	const now = `${clock.now()}000000`;
+	const noTimes: TimeInput[] = [Number.NaN, Number.POSITIVE_INFINITY, new Date("no date"), [1758150000, 1234.5], [1758150000.5, 0]];
+
+	runWithLog(log, () => {
+		for (const noTime of noTimes) {
+			pgTracer.startSpan("badly timed", { startTime: noTime }).end(noTime);
+		}
+	});
+
+	t.deepEqual(spans.map(({ span }) => [span.startTimeUnixNano, span.endTimeUnixNano]), noTimes.map(() => [now, now]));
+});
+
+test("a kind OpenTelemetry does not define is exported as internal", t => {
+	const { log, spans } = requestLog();
+
+	runWithLog(log, () => pgTracer.startSpan("oddly kinded", { kind: 9 as SpanKind }).end());
+
+	t.strictEqual(spans[0]?.span.kind, 1);
 });
 
 test("events, links and attribute values OTLP's stringValue cannot hold are left out and counted", t => {

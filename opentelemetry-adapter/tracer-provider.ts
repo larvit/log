@@ -1,16 +1,18 @@
-import { type Context, context, createContextKey, INVALID_SPAN_CONTEXT, type Span, type SpanOptions, trace, type Tracer, type TracerProvider } from "@opentelemetry/api";
+import { type Context, context, INVALID_SPAN_CONTEXT, type Span, type SpanOptions, trace, type Tracer, type TracerProvider } from "@opentelemetry/api";
 import type { Log } from "../log/log.js";
 import type { Metadata } from "../primitives/metadata.js";
 import { RecordedSpan } from "./recorded-span.js";
 import { warnOnceToStderr } from "../log/stderr-lines.js";
 
-// Where OpenTelemetry's context carries the Log that runWithLog was handed.
-const LOG_KEY = createContextKey("@larvit/log: the Log spans are exported through");
+// A symbol of this module's own, where createContextKey would share one with every copy of this
+// package, so only this module's runWithLog writes under it.
+const LOG_KEY = Symbol("@larvit/log: the Log spans are exported through");
 
 /**
- * Runs `callback` so that each span an OpenTelemetry tracer starts while it runs, or in what it awaits,
- * joins the trace of `log`, nests under its span and is exported through its transports. It needs
- * OpenTelemetry's context manager installed, and returns what `callback` returns.
+ * Runs `callback` so that each span an OpenTelemetry tracer starts while `callback` runs, or in
+ * what `callback` awaits, joins the trace of `log`, nests under the span of `log` and is exported
+ * through the transports of `log`. It needs OpenTelemetry's context manager installed, and returns
+ * what `callback` returns.
  */
 export function runWithLog<T>(log: Log, callback: () => T): T {
 	const { spanId, traceId } = log.span;
@@ -28,12 +30,11 @@ export function runWithLog<T>(log: Log, callback: () => T): T {
 
 type ActiveSpanArgs<F> = [F] | [SpanOptions, F] | [SpanOptions, Context, F];
 
-// `scope` names the instrumentation that asked for the tracer, in the attributes OpenTelemetry's
-// specification gives an exporter with no scope field of its own to fill. Every span leaves under
-// this library's scope, since a transport is handed a span and no scope.
+// `scope` holds the tracer's name and version as attributes, since a transport is handed a span
+// and no scope.
 function tracer(scope: Metadata): Tracer {
-	// A span is recorded only inside runWithLog, under a Log whose trace is sampled. Any other span
-	// only passes its parent's ids on, so what is propagated downstream still names the caller.
+	// A span that is not recorded passes its parent's ids on, so what is propagated downstream
+	// still names the caller.
 	function startSpan(name: string, options: SpanOptions = {}, active: Context = context.active()): Span {
 		const log = active.getValue(LOG_KEY) as Log | undefined;
 		const parent = options.root ? undefined : trace.getSpanContext(active);
@@ -41,13 +42,17 @@ function tracer(scope: Metadata): Tracer {
 		return log?.sampled ? new RecordedSpan(log, scope, name, options, parent) : trace.wrapSpanContext(parent ?? INVALID_SPAN_CONTEXT);
 	}
 
-	function startActiveSpan<F extends (span: Span) => unknown>(name: string, ...args: ActiveSpanArgs<F>): ReturnType<F> {
-		const callback = args[args.length - 1] as F;
-		const options = args.length > 1 ? args[0] as SpanOptions : undefined;
-		const active = args.length > 2 ? args[1] as Context : context.active();
+	function runActive<F extends (span: Span) => ReturnType<F>>(name: string, options: SpanOptions | undefined, active: Context, callback: F): ReturnType<F> {
 		const span = startSpan(name, options, active);
 
-		return context.with(trace.setSpan(active, span), callback as (span: Span) => ReturnType<F>, undefined, span);
+		return context.with(trace.setSpan(active, span), callback, undefined, span);
+	}
+
+	function startActiveSpan<F extends (span: Span) => ReturnType<F>>(name: string, ...args: ActiveSpanArgs<F>): ReturnType<F> {
+		if (args.length === 1) return runActive(name, undefined, context.active(), args[0]);
+		if (args.length === 2) return runActive(name, args[0], context.active(), args[1]);
+
+		return runActive(name, args[0], args[1], args[2]);
 	}
 
 	return { startActiveSpan, startSpan };
