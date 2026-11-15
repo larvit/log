@@ -113,6 +113,23 @@ Every seat of the 2026-10-03 comprehension run named `formatFunctions` and `defa
 module-level tables a reader must trace to know a `Log`'s formatter and queue. Where the console
 and OTLP transports take those over, the formatter and the queue are read where they are used.
 
+Benched on 2026-11-15 with eight fresh readers seated from README → Audience, in two rounds, and
+awaiting the maintainer's approval:
+
+- `transports: [consoleTransport({ format }), otlpTransport({ baseUrl, headers, protocol, fetch, storage })]`:
+  factory functions, picked by 3 of 4 over classes. `Queue` as the OTLP transport read as a buffer,
+  and `Console` as the global.
+- `baseUrl`, `headers` and `protocol` inside `otlpTransport`, picked by 3 of 4. `url` and `endpoint`
+  read as the full `/v1/logs` url, and the `otlp` prefix as noise there.
+- A transport is an object with optional `entry(entry)`, `span(span)` and `flush()`, picked by 3 of
+  4. `onEntry` read as a fire-and-forget event, and one `write(record)` breaks on a new kind.
+- `transports` replaces the default list, and a child inherits its parent's list: every reader
+  predicted both.
+- `transports` beside an option it replaces throws, naming where the option goes: picked by 4 of 4
+  over a warning or a merge.
+- Deprecate only the four `otlp*` options, and keep the console options as the short way to set up
+  the default console transport: picked by 3 of 4.
+
 ### 153. Let an app export the spans OpenTelemetry's instrumentation packages record, such as pg or Prisma queries, through a `Log`, nested under the request they ran in.
 
 Database, queue and RPC calls appear in a trace today only where the app wraps each one in a span by

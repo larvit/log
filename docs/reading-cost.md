@@ -552,3 +552,24 @@ Read most (opens and searches):
 - `credentials/query-userinfo-runs.ts` 1
 - `credentials/span-values.ts` 1
 - `credentials/text.ts` 1
+
+## Reading cost, chunk 075f49b1abd2, finished 2026-11-15T00:07:57Z
+
+48602 new input tokens before the first commit.
+
+Read most (opens and searches):
+
+- `README.md` 4
+- `CHANGELOG.md` 1
+
+## Reading cost, chunk 3d764b7839af, finished 2026-11-15T00:34:52Z
+
+45439 new input tokens before the first commit.
+
+Read most (opens and searches):
+
+- `package.json` 4
+- `AGENTS.md` 2
+- `README.md` 2
+- `log/log.ts` 1
+- `tracing/fetch.ts` 1
