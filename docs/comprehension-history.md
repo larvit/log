@@ -496,3 +496,94 @@ Inherited architect, decided by:
 - Shape: `otlp/queue/export-scheduler.ts:143` `ExportScheduler`: grew from 176 to 268 lines with 8 events, 5 effects and a `dispatch` that calls itself from its catch; `otlp/queue/queue-storage.ts:33` `saveTransition` puts the same pattern on a save loop that was clear before
 - Shape: `otlp/queue/queue.ts:5` the imports of `send/`: the new folders import each other both ways, so the split says nothing about dependency direction
 - Self-sufficiency: `tracing/spans.ts:68` `fetchErrorType`: both rules side by side with README citations, where `fetchFailure` pointed at a todo.md item; against that, mutation-testing notes at `otlp/queue/export-scheduler.ts:81`, `otlp/queue/queue.ts:232` and `tracing/fetch.ts:139` cost a re-read of each guard
+
+## 2026-11-15T12:56:37Z, PR #386 at 998478e
+
+| Seat | Navigation | Locality | Shape | Self-sufficiency | Overall |
+|---|---|---|---|---|---|
+| Junior A | 7 | 5.5 | 6 | 5.5 | 6 |
+| Mid A | 7 | 5.5 | 6.5 | 6 | 6 |
+| Maintainability senior | 7.5 | 6 | 6.5 | 6.5 | 6.5 |
+| Inherited architect | 7.5 | 6.5 | 7 | 7.5 | 7 |
+| Mean | 7.25 | 5.88 | 6.50 | 6.38 | 6.38 |
+
+Junior A, hardest first:
+
+- Overall, Locality, Self-sufficiency: `credentials/query-userinfo-runs.ts:57` `pairsInUserinfoRuns`: a run tracked across pairs under three readings, one pair closing and opening a run; why it is correct never came clear
+- Overall, Locality: `credentials/query.ts:48` `readNestedUrl`: three functions in a cycle with a depth-keyed memo and OR'd conditions; a url's branch needs a hand trace
+- Locality, Self-sufficiency: `log/conf.ts:209` `inherited`: several skip sets unioned, and a formatter held in a module WeakMap behind a shared accessor; the 2.x rules sit in the README
+- Shape, Self-sufficiency: `credentials/path.ts:36` `redactedPath`: three indices, segment 0 as empty text and a whole-path fallback, needing README's path bullet open
+- Overall: `otlp/queue/export-scheduler.ts:103` `transition`: the shell re-dispatches on a thrown effect, and `Queue.round` calls `backoff()` mid-round
+- Shape: `credentials/span-values.ts:103` `redactedRecordedValue`: reuses a status-message function on attribute values behind a made-up base url
+
+Mid A, hardest first:
+
+- Overall, Locality, Self-sufficiency: `log/conf.ts:209` `inherited`: a skip set from two functions, a formatter under two keys and getter identity as provenance, in a strict six-step `resolveConf` order
+- Overall, Locality: `credentials/query.ts:112` `redactedSearch`: a three-function cycle, a depth-plus-text memo and two readings of each pair
+- Overall, Locality: `credentials/query-userinfo-runs.ts:36` `scanPair`: run, closed and going state at once, and a `ss//x@h` special case that cannot be derived
+- Shape: `credentials/span-values.ts:44` `failureMessage`: also the general redactor for attributes, through `redactedAsUrl`
+- Shape, Navigation: `log/console-output.ts:7` `writeConsoleEntry`: says it is the one console writer, while `consoleTransport` formats and writes on its own
+- Locality: `log/default-queue.ts:18` `isDefaultQueueFor`: a subclass marker plus headers compared by identity
+
+Maintainability senior, hardest first:
+
+- Overall, Locality: `credentials/query.ts:48` `readNestedUrl`: four functions in a cycle with a memo, a depth cap and two readings; which OR'd conditions are needed stayed opaque
+- Overall, Locality: `credentials/query-userinfo-runs.ts:36` `scanPair`: one pair can close a run and open another, and a comment admits two spots no test tells apart
+- Locality: `log/conf.ts:209` `inherited`: three rule families feed one skip set, and spread and unspread confs differ
+- Shape: `credentials/span-values.ts:45` `failureMessage`: named for a failure message, used as the general redactor
+- Shape, Navigation: `log/log.ts:187` `deprecatedEntry`: the deprecated console path is split over three modules and repeats `consoleTransport`'s write
+- Self-sufficiency: `credentials/path.ts:36` `redactedPath`: segment 0 and a -1 sentinel took two rereads
+
+Inherited architect, would restructure first:
+
+- Shape, Locality: `log/conf.ts:97` formatter alias: the 2.x compatibility layer is interleaved through six files in `log/`, about 13 concepts
+- Navigation: `tracing/transport.ts:24` `Transport`: the public contract lives in a tracing file, which half the name tells
+- Locality: `log/otlp-transport.ts:14` `inTransportNames`: rewrites queue messages by regex and a WeakMap of wrappers
+- Navigation: `log/default-queue.ts:33` `attachDefaultQueue`: two queue-construction paths report to different sinks
+- Self-sufficiency: `otlp/queue/export-scheduler.ts:81` comment: records what no test can kill, not what the code guarantees
+
+## 2026-11-15T12:59:36Z, PR #386 rerun at 998478e
+
+| Seat | Navigation | Locality | Shape | Self-sufficiency | Overall |
+|---|---|---|---|---|---|
+| Junior A | 7 | 5.5 | 6 | 6 | 6 |
+| Mid A | 7.5 | 6 | 6.5 | 6 | 6.5 |
+| Maintainability senior | 8 | 6.5 | 7 | 6.5 | 7 |
+| Inherited architect | 7.5 | 6 | 6.5 | 7 | 6.5 |
+| Mean | 7.50 | 6.00 | 6.50 | 6.38 | 6.50 |
+
+Junior A, hardest first:
+
+- Overall, Locality: `log/conf.ts:209` `inherited`: four sources decide what a child takes, with the formatter read through `functionFormatterOf` and held in a module WeakMap; a result could not be predicted
+- Locality: `log/conf.ts:111` `ENTRY_FORMATTER_ALIAS`: a getter on the conf and the function in a WeakMap, which survives only while the caller doesn't spread
+- Overall, Locality: `credentials/query-userinfo-runs.ts:36` `scanPair`: runs across `&` under three readings, each with its own idea of `@`
+- Overall, Locality: `credentials/query.ts:79` `redactsKeyAndValue`: a recursion with a depth and a memo, and a key read alone and with its value
+- Shape: `credentials/span-values.ts:103` `redactedRecordedValue`: calls `failureMessage` on a value that is no failure, behind a made-up base url
+- Self-sufficiency: `credentials/path.ts:36` `redactedPath`: why `firstCredentialUrlSegment` re-reads the rest of the path on every segment stayed opaque
+
+Mid A, hardest first:
+
+- Overall, Locality, Self-sufficiency: `credentials/query-userinfo-runs.ts:36` `scanPair`: the comments describe a parser being imitated, not an invariant to check
+- Overall, Locality: `credentials/query.ts:79` `redactsKeyAndValue`: four functions in a cycle, and which of four condition sets caught an input needed the README open
+- Locality, Self-sufficiency: `log/conf.ts:209` `inherited`: five sources decide the skipped keys, and the order of `ownConf`, `inherited`, `withDefaults` and `attachFormatter` was rebuilt by hand
+- Locality: `log/otlp-transport.ts:14` `inTransportNames`: rewrites messages whose wording lives in `otlp/send/endpoint.ts`, with nothing marking the dependency
+- Shape: `credentials/span-values.ts:45` `failureMessage`: also the redactor for recorded attributes
+- Shape: `credentials/text.ts:55` `holdsListedKey`: near-identical predicates over the readings that are hard to keep apart
+
+Maintainability senior, hardest first:
+
+- Overall, Locality, Self-sufficiency: `log/conf.ts:209` `inherited`: observable under strict semver, with the formatter state in a module WeakMap and a footprint budget shaping the code
+- Overall, Locality: `credentials/query-userinfo-runs.ts:57` `pairsInUserinfoRuns`: a run scan repeated over three readings, understood only by tracing the README example by hand
+- Locality: `credentials/query.ts:48` `readNestedUrl`: a depth check in two functions of a cycle, and whether both are needed stayed opaque
+- Locality: `otlp/queue/export-scheduler.ts:179` `dispatch`: re-enters itself from `startRound` and its catch, with `joined` computed outside the machine
+- Shape, Navigation: `log/console-output.ts:7` `writeConsoleEntry`: two console writers, and an import cycle through `conf.ts`, `default-queue.ts` and `stderr-lines.ts`
+- Shape: `credentials/span-values.ts:103` `redactedRecordedValue`: reuses a failure redactor for values that are no failure
+
+Inherited architect, would restructure first:
+
+- Shape, Locality: `log/conf.ts:209` `inherited`: four rule sets meet in one skip set, and the 2.x layer sits in no folder 3.0.0 can delete
+- Navigation: `log/log-transports.ts:12` `transportsOf`: the name doesn't predict the deprecated default transport built on every record
+- Locality: `log/otlp-transport.ts:14` `inTransportNames`: rewording one message in `endpoint.ts` silently stops the rename
+- Navigation: `log/console-output.ts:7` `writeConsoleEntry`: the comment says it is the one console writer, while `consoleTransport` writes on its own
+- Navigation: `tracing/transport.ts:24` `Transport`: holds the contract for entries too, under a tracing folder
+- Navigation: `credentials/span-values.ts:25` `parseHttpUrl`: the fetch filter lives in the credentials folder
