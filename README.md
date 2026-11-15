@@ -312,14 +312,16 @@ hold a key, the span's own attribute wins. `otel.scope.name` and `otel.scope.ver
 tracer that recorded it. Call `runWithLog` where the request enters your code, as in a middleware:
 that call is the only way a span finds its `Log`.
 
-- **A credential in an attribute, the span's name or its status message records `REDACTED`,** in
-  the shapes [Credentials in a captured value](#credentials-in-a-captured-value) lists for a status
-  message. A value that is one url, or a path or query starting with `/` or `?` as in `url.path`,
-  is also read as `url.full` is, and `url.query` as a kept query: `?access_token=…` in `url.full`
-  records `access_token=REDACTED`. A literal in a `db.query.text`, such as a password in an
-  `UPDATE`, is none of those shapes and reaches your collector, so keep the instrumentation's option
-  that sanitises queries on. The context of `log` is exported as written. Each value is exported as
-  a string, as every attribute this library sends is.
+- **A credential in an attribute, the span's name or its status message records `REDACTED`.** Each
+  is read by the rules [Credentials in a captured value](#credentials-in-a-captured-value) lists
+  for a status message, and an attribute named `http.request.header.<name>` or
+  `http.response.header.<name>` by the rule for a header. A value that is an `http:` or `https:`
+  url, or a path or query starting with `/` or `?` as in `url.path`, is also read by the rules for
+  the request path and query: `?access_token=…` in `url.full` records `?access_token=REDACTED`.
+  `url.query` and `url.fragment` are written without their `?` and `#`, and are read as a query and
+  a fragment. A literal in a `db.query.text`, such as a password in an `UPDATE`, is none of these
+  shapes and reaches your collector: pass it as a query parameter, so the query text holds only its
+  placeholder. The context of `log` is exported as written.
 - **A span started outside `runWithLog` is not exported,** and neither is one under a `Log` whose
   trace is unsampled.
 - **OpenTelemetry's context manager does the nesting,** so install one before the first request.
@@ -327,7 +329,8 @@ that call is the only way a span finds its `Log`.
   gets one warning. This library keeps no context of its own.
 - **Span events, span links and attributes holding a list are left out,** and counted in the span's
   `droppedEventsCount`, `droppedLinksCount` and `droppedAttributesCount`. An exception recorded on a
-  span is an event, so set the span's status to keep its message.
+  span is an event, so set the span's status to keep its message. Every other attribute value is
+  exported as a string, as every attribute this library sends is.
 - **An instrumentation package sends `traceparent` downstream only through a propagator,** as
   OpenTelemetry's HTTP client instrumentation does. Set one with `propagation.setGlobalPropagator()`,
   such as `W3CTraceContextPropagator` from `@opentelemetry/core`. `log.fetch` needs none.
@@ -628,9 +631,10 @@ them per call site.
 
 ### Credentials in a captured value
 
-Only what the bullets below name is redacted, in `log.fetch`'s spans and in those
-[`@larvit/log/otel`](#export-what-opentelemetry-instrumentation-records) exports. Anything else is
-exported as written, text you log
+Only what the bullets below name is redacted. They apply to `log.fetch`'s spans, and to the spans
+`@larvit/log/otel` exports as
+[its section](#export-what-opentelemetry-instrumentation-records) says. Anything else is exported
+as written, text you log
 yourself included, and so is a url you base64-encode into a request path, as an image proxy such as
 imgproxy takes one.
 
