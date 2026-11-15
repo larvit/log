@@ -573,3 +573,20 @@ Read most (opens and searches):
 - `README.md` 2
 - `log/log.ts` 1
 - `tracing/fetch.ts` 1
+
+## Reading cost, chunk 4753a31b8c98, finished 2026-11-15T11:11:39Z
+
+267783 new input tokens before the first commit.
+
+Read most (opens and searches):
+
+- `README.md` 4
+- `log/conf.ts` 3
+- `log/log.ts` 3
+- `otlp/payloads.ts` 3
+- `docs/decisions.md` 2
+- `index.ts` 2
+- `log/console-output.ts` 1
+- `log/default-queue.ts` 1
+- `log/stderr-lines.ts` 1
+- `log/types.ts` 1

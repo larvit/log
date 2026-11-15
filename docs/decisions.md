@@ -457,7 +457,7 @@ the env, and, through `withGlobals`, `Deno` and `setTimeout` to prove that only 
 timer ids reach `Deno.unrefTimer`. Serves README → Goals #2 and #5. Valid while no
 consumer needs the page address or the env injected apart from these.
 
-## A constructor parameter marked "Not part of the API" carries what only this library passes
+## A constructor parameter or method marked "Not part of the API" carries what only this library passes
 
 2026-11-13, the implementing agent, in the release review of 2.6.0: `Queue`'s second parameter
 `warn` and `Log`'s second parameter are each passed only by this library, and each says so in the
@@ -471,7 +471,13 @@ carries.
 one function makes the whole conf. Serves code health; bounded by README → Goals #8. Valid until
 3.0.0, where `todo.md` item 142 takes both off the published constructors.
 
-## The package publishes one bundled `index.js`, built from a module per part
+2026-11-15, the implementing agent: `Log.exportSpan` is the first such method. `@larvit/log/otel`
+is a bundle of its own and hands each span it ends to a `Log`, whose transports are private: with
+none listed they are built from the deprecated options at each record. Both bundles ship in one
+package version, so nothing outside this library depends on the method's shape. Documenting it
+would add to the surface README → Goals #2 counts. Valid while the adapter ships from this package.
+
+## The package publishes one bundled file per entry point, built from a module per part
 
 2026-11-13, the implementing agent, on the maintainer's request for source files in folders: the
 source is `index.ts`, holding only the public exports, and one module per part under `log/`,
@@ -490,3 +496,43 @@ import runs against it: `Log` hands `tracing/` plain values (`SpanOrigin`, `Span
 263 bytes gzipped, 11608 to 11871. Serves code health and
 README → Goals #5; applies the technical principle "Compose, do not entangle". Valid while every
 supported runtime loads one ESM file.
+
+2026-11-15, the implementing agent, with `todo.md` item 153: `otel.ts` is a second entry point,
+bundled the same way into `otel.js` by `release-tooling/bundle.sh`, with `@opentelemetry/api` left
+as an import so the app's instrumentation shares that one copy. `otel.js` carries its own copy of
+the few core modules it imports, 2330 bytes gzipped in all, so it never loads `index.js` and an app
+that doesn't import it loads nothing new. One consequence: the once-per-sink record of written
+warnings exists once per bundle.
+
+## The OpenTelemetry adapter exports a span through the `Log` handed to `runWithLog`, as its instrumentation recorded it
+
+2026-11-15, the implementing agent, shipping `todo.md` item 153 on what the maintainer settled on
+2026-11-14: a second entry point of this package, nesting by OpenTelemetry's own context manager,
+and the `Log` handed over explicitly at the request's edge. What that left open:
+
+- **Names.** `logTracerProvider()` and `runWithLog(log, callback)` from `@larvit/log/otel`. A panel
+  of three readers seated from README → Audience picked them in two rounds: `withLog` read as a
+  wrapper that returns a function, `otelTracerProvider` as OpenTelemetry's own provider, and a
+  class with `new` as something to configure.
+- **A span with no `Log` in its context is not recorded.** The provider takes no fallback `Log`,
+  since that would be a hidden global (README → Goals #10). Such a span, and one under an unsampled
+  `Log`, passes its parent's ids on so propagation still names the caller.
+- **What an `OtlpSpan` cannot hold is left out and counted.** Its `events` and `links` are typed
+  empty and its attribute values are strings, and README → Audience lets only a major widen a type
+  a consumer reads. So an event, a link and a list-valued attribute raise the span's dropped
+  counts, which is what OTLP's fields are for (README → Goals #6).
+- **The tracer's name and version travel as `otel.scope.name` and `otel.scope.version`.** A
+  transport is handed a span and no scope, and these are the attributes OpenTelemetry's
+  specification gives an exporter without a scope field ("Instrumentation Scope" under its
+  non-OTLP compatibility mappings).
+- **A number below `performance.timeOrigin` is a `performance.now()` reading,** as
+  `timeInputToHrTime` in `@opentelemetry/core` reads it, since instrumentation is written against
+  that SDK.
+- **The peer range is `>=1.3.0 <2`,** the floor OpenTelemetry's own `sdk-trace-base` accepts.
+- **Attributes are exported unredacted.** README says so. It works against README → Goals #7 for
+  a `url.full` an instrumentation records, and stands until `todo.md` item 155 ends it.
+- **The suite covers the adapter on Node only,** in `tests/otel-adapter.test.ts`, which
+  `npm run test-node` runs after `tests/test.ts`. The browser run serves the compiled modules with
+  no bundler, which cannot resolve the bare `@opentelemetry/api` import.
+
+Serves README → Goals #2 and #4. Valid while the adapter ships from this package.

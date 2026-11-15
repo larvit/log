@@ -99,6 +99,13 @@ export class Log implements LogInt {
 		}
 	}
 
+	/**
+	 * Not part of the API, so don't call it: `@larvit/log/otel` hands each span it ends here.
+	 */
+	public exportSpan(span: OtlpSpan, attributes: Metadata): void {
+		exportSpan(this.spanHost(), span, attributes);
+	}
+
 	public async flush(): Promise<void> {
 		await Promise.all([...this.pendingFetches]);
 		// Every transport gets to finish before the first failure rejects, as a failed Queue flush does in 2.x.

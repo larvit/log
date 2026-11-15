@@ -4,13 +4,21 @@
 
 A `Log` now sends to a list of transports you choose, and you can write your own. The options the
 list replaces are deprecated and keep working until 3.0.0. A string `format` other than `"text"` or
-`"json"` now warns, and the entry a formatter takes has a new name, `LogEntry`. Nothing here needs a
-change in your code.
+`"json"` now warns, and the entry a formatter takes has a new name, `LogEntry`. A second entry
+point, `@larvit/log/otel`, exports the spans that OpenTelemetry's instrumentation packages record.
+Nothing here needs a change in your code.
 
 - **Send to any set of destinations with `transports`.**
   `new Log({ transports: [consoleTransport({ format: "json" }), otlpTransport({ baseUrl })] })`
   lists every destination, and an object with `entry(entry)`, `span(span)` or `flush()` is a
   transport of your own, such as one for Sentry or a test spy. See README → Transports.
+- **Export the spans OpenTelemetry's instrumentation packages record, such as pg or Prisma queries,
+  through a `Log`.** `trace.setGlobalTracerProvider(logTracerProvider())` and
+  `runWithLog(reqLog, next)`, both from the new entry point `@larvit/log/otel`, nest each span under
+  the request's `Log` and send it to that `Log`'s transports, with no OpenTelemetry SDK. It needs
+  `@opentelemetry/api` and a context manager, and an app that doesn't import it loads nothing new.
+  Attributes are exported as the instrumentation recorded them, unredacted. See README → Export
+  what OpenTelemetry instrumentation records.
 - **Send OTLP with a `fetch` of your own.** `otlpTransport({ baseUrl, fetch })` exports through the
   `fetch` you pass, such as `expo/fetch` or one that pins TLS, and no longer needs the global one.
 - **Move `colors`, `format`, `printTraceInfo` and `stdout` to `consoleTransport`, and the `otlp*`

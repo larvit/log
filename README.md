@@ -8,7 +8,9 @@ Structured logging with a tiny API, plus OTLP export of logs and traces from Nod
 browsers and React Native. No OpenTelemetry SDK, no dependencies.
 
 - **One built file, every runtime.** It uses the global `fetch`, so a browser and a React Native
-  app export the same way a server does. No SDK, no bundler config, no native module.
+  app export the same way a server does. No SDK, no bundler config, no native module. The opt-in
+  [OpenTelemetry adapter](#export-what-opentelemetry-instrumentation-records) is a second file,
+  loaded only by an app that imports it.
 - **Exports survive a restart.** Entries and spans are batched and retried with backoff; give the
   queue a storage and an offline phone holds them until the network is back.
 - **Just log.** `log.info("msg", { key: "value" })` to stdout/stderr, text or JSON.
@@ -16,12 +18,15 @@ browsers and React Native. No OpenTelemetry SDK, no dependencies.
   with it. OTLP (OpenTelemetry's export protocol) over HTTP, JSON or protobuf.
 - **HTTP client tracing.** `log.fetch()` is a drop-in `fetch` that records a client span and
   propagates the trace downstream.
+- **Database and queue spans from OpenTelemetry's instrumentation.** `@larvit/log/otel` exports what
+  packages such as `@opentelemetry/instrumentation-pg` record, nested under the request's span.
 - **Composable.** Nest instances under a parent, join an upstream trace from a `traceparent` header,
   hand the current context on to any client.
 
 [Goals](#goals) · [Audience](#audience) · [Install](#install) · [Log something](#log-something) ·
 [Group logs into a trace](#group-logs-into-a-trace) ·
 [Trace outgoing HTTP](#trace-outgoing-http) · [Join an incoming trace](#join-an-incoming-trace) ·
+[Export what OpenTelemetry instrumentation records](#export-what-opentelemetry-instrumentation-records) ·
 [Transports](#transports) · [Queue exports](#queue-exports) ·
 [Accept a logger in your library](#accept-a-logger-in-your-library) ·
 [Options](#options) · [Output formats](#output-formats) · [`log.fetch` in depth](#logfetch-in-depth) ·
@@ -268,6 +273,65 @@ an untrusted header is safe to pass.
 An unsampled header (flags `00`) is honoured: the instance and its children export no spans, and
 `log.traceparent()` and `log.fetch` pass `00` on; `log.sampled` is `false`. Log entries still
 export.
+
+## Export what OpenTelemetry instrumentation records
+
+OpenTelemetry's instrumentation packages record a span for each database, queue or RPC call, as
+`@opentelemetry/instrumentation-pg` does for each query. So does any library that calls
+`@opentelemetry/api` itself, as Prisma does. `@larvit/log/otel` exports those spans through a `Log`,
+nested under the request they ran in, with no OpenTelemetry SDK:
+
+```bash
+npm install @opentelemetry/api @opentelemetry/context-async-hooks
+```
+
+```javascript
+import { context, trace } from "@opentelemetry/api";
+import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
+import { logTracerProvider, runWithLog } from "@larvit/log/otel";
+
+context.setGlobalContextManager(new AsyncLocalStorageContextManager());
+trace.setGlobalTracerProvider(logTracerProvider());
+
+app.use((req, res, next) => {
+	const reqLog = appLog.clone({ spanName: `${req.method} ${req.path}`, traceparent: req.headers.traceparent });
+
+	res.on("finish", () => reqLog.end());
+	runWithLog(reqLog, next);
+});
+```
+
+Register each instrumentation package as its own docs say. It records through the global tracer
+provider, which is now this library's.
+
+`runWithLog(log, callback)` runs `callback` and returns what it returns. A span that a tracer starts
+while `callback` runs, or in anything it awaits, joins the trace of `log`. It nests under the span
+of `log`, or under the instrumentation span that was active when it started, and goes to the
+[transports](#transports) of `log` when it ends. The span carries the context of `log`, under its
+own attributes where both have a key, and `otel.scope.name` and `otel.scope.version` name the
+tracer that recorded it. Call `runWithLog` where the request enters your code, as in a middleware:
+that call is the only way a span finds its `Log`.
+
+- **A span started outside `runWithLog` is not exported,** and neither is one under a `Log` whose
+  trace is unsampled.
+- **OpenTelemetry's context manager does the nesting,** so install one before the first request.
+  Without one, `runWithLog` still runs `callback`, no span is exported, and the `stderr` of `log`
+  gets one warning. This library keeps no context of its own.
+- **Attributes are exported as the instrumentation recorded them.** Nothing under
+  [Credentials in a captured value](#credentials-in-a-captured-value) applies to them, so a
+  password in a `url.full` or a `db.query.text` reaches your collector. Redact it with the
+  instrumentation's own options.
+- **Span events, span links and attributes holding a list are left out,** and counted in the span's
+  `droppedEventsCount`, `droppedLinksCount` and `droppedAttributesCount`. An exception recorded on a
+  span is an event, so set the span's status to keep its message.
+- **An instrumentation package sends `traceparent` downstream only through a propagator,** as
+  OpenTelemetry's HTTP client instrumentation does. Set one with `propagation.setGlobalPropagator()`,
+  such as `W3CTraceContextPropagator` from `@opentelemetry/core`. `log.fetch` needs none.
+- **`@opentelemetry/api` 1.3.0 or later, below 2,** is an optional peer dependency. An app that
+  never imports `@larvit/log/otel` installs nothing more and loads only `index.js`.
+
+CI proves the adapter on Node 18 to 26. It reads nothing Node-specific, so it runs wherever
+OpenTelemetry's context manager for that runtime does.
 
 ## Transports
 
@@ -673,6 +737,10 @@ a call below `logLevel`, ≤2 µs for a console call, ≤10 µs with OTLP config
 | `QueueConf`, `ResolvedQueueConf`, `QueueStorage` | `Queue`'s options, `queue.conf` with defaults applied, and the `storage` shape, `{ getItem, setItem, removeItem }`. |
 
 Instance fields: `log.conf`, `log.context`, `log.span`, `log.sampled`, `log.ended`.
+
+`@larvit/log/otel` exports `logTracerProvider()`, an OpenTelemetry `TracerProvider`, and
+`runWithLog(log, callback)`, see
+[Export what OpenTelemetry instrumentation records](#export-what-opentelemetry-instrumentation-records).
 
 ## Development
 

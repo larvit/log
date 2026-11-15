@@ -6,12 +6,13 @@
 
 `Bar = 0.5`
 
-`Next ID = 155`
+`Next ID = 156`
 
 ## Items
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
+| 155 | 2.7.0 |  | security | **Keep a credential in an instrumentation span's attributes, such as `url.full`, from reaching the collector through `@larvit/log/otel`.** | 3 | 2 | 4 | 7 | 5 | 7 by 5 | 2.1 |
 | 153 | 2.7.0 |  | owner | **Let an app export the spans OpenTelemetry's instrumentation packages record, such as pg or Prisma queries, through a `Log`, nested under the request they ran in.** | 4 | 2 | 2 | 6 | 6 | 2 by 8, 4 by 6 | 1.7 |
 | 154 | 2.7.0 |  |  | **Point the `entryFormatter` deprecation warning at a name that is not itself deprecated.** | 1 | 1 | 2 | 2 | 2 | code health by 1 | 1.6 |
 | 146 | 2.8.0 |  |  | **Let a reader see from `redactedPath` alone which segments of a request path it keeps.** | 2 | 2 | 4 | 6 | 2 | code health by 3 | 2.3 |
@@ -83,6 +84,16 @@
 
 ## Details
 
+### 155. Keep a credential in an instrumentation span's attributes, such as `url.full`, from reaching the collector through `@larvit/log/otel`.
+
+Security: `@larvit/log/otel` exports each attribute as the instrumentation recorded it. A span from
+`@opentelemetry/instrumentation-undici` carries `url.full` and `url.query` with the whole query, so
+`?access_token=…` reaches every transport of the `Log` and the collector behind it, where the same
+request through `log.fetch` records `REDACTED` (README → Goals #7, → Credentials in a captured
+value). A database instrumentation's `db.query.text` can hold a literal the same way. README and
+the changelog state that these attributes are unredacted. The path: `RecordedSpan.end` in
+`opentelemetry-adapter/recorded-span.ts` → `Log.exportSpan` → each transport's `span`.
+
 ### 153. Let an app export the spans OpenTelemetry's instrumentation packages record, such as pg or Prisma queries, through a `Log`, nested under the request they ran in.
 
 Database, queue and RPC calls appear in a trace today only where the app wraps each one in a span by
@@ -129,7 +140,7 @@ principle "Keep It Simple, Stupid", and code health.
 
 ### 114. Move `package.json`'s build and test one-liners into named scripts, and let the OTLP test read its collector's port, image and container name from the environment, today's values as defaults.
 
-`build`, `build-tests`, `replace-version-string`, `test-browser`, `test-docker` and `test-otlp` chain
+`build`, `build-tests`, `test-browser`, `test-docker` and `test-otlp` chain
 shell inside one JSON string. `scripts/run-otlp-tests.mjs` fixes port 4318, the image and the
 container name, so two runs on one machine clash, and its `docker rm -f` removes the other run's
 collector. Found by the technical principles audit on 2026-10-26.

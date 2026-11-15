@@ -8,6 +8,8 @@ index.js
 index.js.map
 node_modules/
 npm-debug.log*
+otel.js
+otel.js.map
 reports/
 types/
 yarn-debug.log*
