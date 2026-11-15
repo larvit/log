@@ -427,8 +427,8 @@ test("a plain space still ends userinfo in a status message", async t => {
 });
 
 test("a Log's captureQuery reaches the url.full of its log.fetch span", async t => {
-	const { calls } = stubFetch();
-	const log = new Log({ captureQuery: true, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+	const { calls, fetch } = fetchRecorder();
+	const log = new Log({ captureQuery: true, fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 
 	await log.fetch("https://api.test/x?q=hi");
 	await log.end();
@@ -546,12 +546,12 @@ test("log.fetch keeps a caller-supplied traceparent", async t => {
 });
 
 test("await log.end() drains a fire-and-forget log.fetch span, and its rejection still goes unhandled", async t => {
-	const { calls } = stubFetch(path => {
+	const { calls, fetch } = fetchRecorder(path => {
 		if (path === "/fail") throw new TypeError("network down");
 
 		return undefined;
 	});
-	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+	const log = new Log({ fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 	const unhandled: unknown[] = [];
 	const onNode = (reason: unknown) => { unhandled.push(reason); };
 	const onBrowser = (event: PromiseRejectionEvent) => { event.preventDefault(); unhandled.push(event.reason); };
@@ -577,12 +577,12 @@ test("await log.end() drains a fire-and-forget log.fetch span, and its rejection
 test("await log.flush() waits for a fire-and-forget log.fetch still in flight, and delivers its span", async t => {
 	let released = false;
 	let flushed = false;
-	const { calls } = stubFetch(async () => {
+	const { calls, fetch } = fetchRecorder(async () => {
 		await waitFor(() => released);
 
 		return undefined;
 	});
-	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+	const log = new Log({ fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 
 	void log.fetch("https://api.test/slow"); // deliberately NOT awaited
 	const flushing = log.flush().then(() => { flushed = true; });
@@ -608,8 +608,8 @@ for (const [scope, expected, name] of [
 }
 
 test("log.fetch skips an invalid name in captureRequestHeaders or captureResponseHeaders and warns once per stderr", async t => {
-	const { calls } = stubFetch(path => path === "/x" ? response({ headers: new Headers({ "x-resp": "rv" }) }) : undefined);
-	const { log, stderr } = capture({ captureRequestHeaders: ["X-Api-Key: hunter2", "x-req"], captureResponseHeaders: ["x-resp", "bad\nname"], format: "json", otlpHttpBaseURI: "http://127.0.0.1:4318" });
+	const { calls, fetch } = fetchRecorder(path => path === "/x" ? response({ headers: new Headers({ "x-resp": "rv" }) }) : undefined);
+	const { log, stderr } = capture({ captureRequestHeaders: ["X-Api-Key: hunter2", "x-req"], captureResponseHeaders: ["x-resp", "bad\nname"], fetch, format: "json", otlpHttpBaseURI: "http://127.0.0.1:4318" });
 
 	t.strictEqual((await log.fetch("https://api.test/x", { headers: { "x-req": "rq" } })).status, 200, "call 1 resolves with the platform's response");
 	t.strictEqual((await log.fetch("https://api.test/x", { headers: { "x-req": "rq" } })).status, 200, "call 2 resolves with the platform's response");
@@ -628,9 +628,9 @@ test("log.fetch skips an invalid name in captureRequestHeaders or captureRespons
 });
 
 test("log.fetch skips a captureResponseHeaders name that is no string, with its warning", async t => {
-	stubFetch();
+	const { fetch } = fetchRecorder();
 
-	const untyped = capture({ captureResponseHeaders: [null as unknown as string] });
+	const untyped = capture({ captureResponseHeaders: [null as unknown as string], fetch });
 
 	t.strictEqual((await untyped.log.fetch("https://api.test/x")).status, 200, "a name that is no string is skipped too");
 	t.strictEqual(untyped.stderr.length, 1, "with its warning");
@@ -638,17 +638,17 @@ test("log.fetch skips a captureResponseHeaders name that is no string, with its 
 });
 
 test("a stderr that throws on log.fetch's header-name warning never changes the result", async t => {
-	stubFetch();
+	const { fetch } = fetchRecorder();
 
-	const broken = new Log({ captureRequestHeaders: ["bad name"], stderr: () => { throw new Error("stderr closed"); } });
+	const broken = new Log({ captureRequestHeaders: ["bad name"], fetch, stderr: () => { throw new Error("stderr closed"); } });
 
 	t.strictEqual((await broken.fetch("https://api.test/x")).status, 200, "a stderr that throws on the warning never changes the result");
 	t.end();
 });
 
 test("log.fetch with an invalid header rejects but never hangs end()", async t => {
-	const { calls } = stubFetch();
-	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+	const { calls, fetch } = fetchRecorder();
+	const log = new Log({ fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
 
 	let threw = false;
 
@@ -700,8 +700,8 @@ test("log.fetch traces a call on a runtime with no Request", async t => {
 const platformTimers = { clearTimeout: (timer?: TimerHandle) => clearTimeout(timer), setTimeout: (callback: () => void, delayMs: number) => setTimeout(callback, delayMs) };
 
 test("a clock whose now() is fractional keeps the fraction on a log.fetch span", async t => {
-	const { calls } = stubFetch();
-	const fractional = new Log({ clock: { ...platformTimers, now: () => 1758150000000.3 }, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {}, stdout: () => {} });
+	const { calls, fetch } = fetchRecorder();
+	const fractional = new Log({ clock: { ...platformTimers, now: () => 1758150000000.3 }, fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {}, stdout: () => {} });
 
 	fractional.info("record");
 	await fractional.fetch("https://api.test/x");
@@ -713,23 +713,21 @@ test("a clock whose now() is fractional keeps the fraction on a log.fetch span",
 
 test("a clock whose now() throws never changes a log.fetch result or hangs end()", async t => {
 	let broken = false;
+	const { calls: ended, fetch } = fetchRecorder(path => {
+		if (path === "/closes") broken = true;
+
+		return undefined;
+	});
 	const brokenNow = () => {
 		if (broken) throw new Error("clock broke");
 
 		return Date.now();
 	};
-	const throwing = new Log({ clock: { ...platformTimers, now: brokenNow }, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {}, stdout: () => {} });
+	const throwing = new Log({ clock: { ...platformTimers, now: brokenNow }, fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {}, stdout: () => {} });
 
 	throwing.info("before");
-	stubFetch(path => {
-		if (path === "/closes") broken = true;
-
-		return undefined;
-	});
 	t.strictEqual((await throwing.fetch("https://api.test/closes")).status, 200, "a now() throwing as the span closes leaves the platform's response");
 	t.strictEqual((await throwing.fetch("https://api.test/opens")).status, 200, "and one throwing as it opens still sends the request");
-
-	const { calls: ended } = stubFetch();
 
 	t.strictEqual(await throwing.end().then(() => "resolved", () => "rejected"), "rejected", "end() rejects on the clock, never hangs");
 	t.deepEqual(exportedRecords(ended), ["before"], "and still delivers what was queued");
@@ -755,8 +753,8 @@ test("log.fetch reads the platform's fetch at the call, so one installed after t
 });
 
 test("log.fetch works without OTLP, still injecting a traceparent", async t => {
-	const { calls } = stubFetch();
-	const log = new Log({ stderr: () => {} });
+	const { calls, fetch } = fetchRecorder();
+	const log = new Log({ fetch, stderr: () => {} });
 
 	const res = await log.fetch("https://api.test/x");
 
@@ -838,7 +836,7 @@ test("log.fetch: a pending request's span goes to the queue the Log had when the
 	let release = () => {};
 	const held = new Promise<void>(resolve => { release = resolve; });
 
-	stubFetch(async () => {
+	const { fetch } = fetchRecorder(async () => {
 		await held;
 
 		return response();
@@ -846,7 +844,7 @@ test("log.fetch: a pending request's span goes to the queue the Log had when the
 
 	const firstQueue = new Queue({ fetch: first.fetch, otlpHttpBaseURI: "http://127.0.0.1:4318" });
 	const secondQueue = new Queue({ fetch: second.fetch, otlpHttpBaseURI: "http://127.0.0.1:4319" });
-	const log = new Log({ otlpQueue: firstQueue, stderr: () => {}, stdout: () => {} });
+	const log = new Log({ fetch, otlpQueue: firstQueue, stderr: () => {}, stdout: () => {} });
 	const pending = log.fetch("https://api.test/x");
 
 	log.conf.otlpQueue = secondQueue;
@@ -857,5 +855,52 @@ test("log.fetch: a pending request's span goes to the queue the Log had when the
 
 	t.deepEqual(exportedSpans(first.calls).map(span => span.name), ["GET api.test"], "the queue set at the call takes the span, as in 2.6.1");
 	t.deepEqual(exportedSpans(second.calls), [], "and a queue written to log.conf.otlpQueue while it was pending takes none");
+	t.end();
+});
+
+test("a Log handed a fetch sends log.fetch, its span and the default queue through it, and a child and a clone keep it", async t => {
+	const { calls, fetch } = fetchRecorder();
+	const globalFetch = globalThis.fetch;
+	let globalCalls = 0;
+
+	globalThis.fetch = () => {
+		globalCalls++;
+
+		return Promise.reject(new Error("the global fetch"));
+	};
+
+	try {
+		const log = new Log({ fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", stderr: () => {} });
+
+		await log.fetch("https://api.test/a");
+		await log.clone().fetch("https://api.test/b");
+		await new Log({ parentLog: log, stderr: () => {} }).fetch("https://api.test/c");
+		await log.end();
+	} finally {
+		globalThis.fetch = globalFetch;
+	}
+
+	t.deepEqual(calls.filter(call => call.url.startsWith("https://api.test/")).map(call => call.url), ["https://api.test/a", "https://api.test/b", "https://api.test/c"], "log.fetch of the Log, its clone and its child go through the handed fetch");
+	t.ok(calls.some(call => call.path === "/v1/traces"), "the queue the otlp* shorthand builds sends through it too");
+	t.strictEqual(globalCalls, 0, "the global fetch is never called");
+	t.end();
+});
+
+test("log.fetch hands a Request, which its signature does not take, to the platform untraced and whole", async t => {
+	const seen: { init: RequestInit | undefined, input: unknown }[] = [];
+	const { calls, logFetch } = testFetchTrace({
+		fetch: async (input, init) => {
+			seen.push({ init, input });
+
+			return response() as unknown as Response;
+		},
+	});
+	const request = new Request("https://api.test/x", { body: "payload", method: "POST" });
+	const init = { headers: { "x-keep": "kept" } };
+
+	await logFetch(request as unknown as string, init);
+	t.strictEqual(seen[0].input, request, "the platform gets the Request itself, with its own method, body and url");
+	t.strictEqual(seen[0].init, init, "and the init as given, with no traceparent injected");
+	t.deepEqual(calls, [], "no span is exported");
 	t.end();
 });

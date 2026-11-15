@@ -32,9 +32,12 @@ export function rejectQueueBesideShorthand(conf: LogConf): void {
 // while the queue is being built, so the conf has to exist first.
 export function attachDefaultQueue(conf: ResolvedLogConf): void {
 	if (!conf.otlpQueue && conf.otlpHttpBaseURI) {
-		const { otlpAdditionalHeaders, otlpHttpBaseURI, otlpProtocol } = conf;
+		const { fetch, otlpAdditionalHeaders, otlpHttpBaseURI, otlpProtocol } = conf;
+		// Two sinks, both the Log's stderr: `report` writes each failed send as an error line, and the constructor's
+		// second argument takes the queue's warnings about its own options, once per stderr.
 		const report = (msg: string, metadata: Metadata) => writeStderr(conf, "error", metadata, msg);
+		const warn = (msg: string) => warnOnceToStderr(conf, undefined, msg);
 
-		conf.otlpQueue = new DefaultQueue({ clock: conf.clock, otlpAdditionalHeaders, otlpHttpBaseURI, otlpProtocol, report }, msg => warnOnceToStderr(conf, undefined, msg));
+		conf.otlpQueue = new DefaultQueue({ clock: conf.clock, fetch, otlpAdditionalHeaders, otlpHttpBaseURI, otlpProtocol, report }, warn);
 	}
 }

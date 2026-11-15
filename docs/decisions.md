@@ -461,9 +461,12 @@ whose timers `unref` handles, and through an absolute url, which needs no page a
 option would grow the documented surface for what only a default reads. Applies the technical
 principle "Functional core, imperative shell". The suite tests `colorsFromEnv` and `unref` with
 the value passed in, and `pageHref` with a stand-in for the global object. A test hands a `Queue`
-or `otlpTransport` its `fetch`. The suite swaps a global by name only in the tests of the default
+or `otlpTransport` its `fetch`, and a `Log` its `fetch` option, which `log.fetch` and the queue built
+from `otlpHttpBaseURI` send through. The suite swaps a global by name only in the tests of the default
 that reads it:
-- `process`, to prove the colour default reads the env.
+- `process`, to prove the colour default reads the env, and the notice off a non-TTY stdout.
+- `fetch`, to prove a `Log` handed none sends through the global, one installed after the `Log` was made
+  included, and to prove that code handed a `fetch` leaves the global alone.
 - `Deno` and `setTimeout`, to prove that only the system clock's timer ids reach `Deno.unrefTimer`.
 - `Request`, to prove `log.fetch` traces a call on a runtime without one.
 - `performance`, to prove the OpenTelemetry adapter reads `performance.timeOrigin`.
@@ -471,15 +474,6 @@ that reads it:
 One test swaps `URL` to count the parses `redactedQuery` makes, since that function takes no
 parser. Serves README → Goals #2 and #5. Valid while no
 consumer needs the page address or the env injected apart from these.
-
-2026-11-15, the implementing agent, in the release review of 2.7.0: the suite also swaps `fetch`,
-which "Functional core, imperative shell" bans by name. A `Log` can't be handed its network:
-`log.fetch`, and the queue a `Log` builds from `otlpHttpBaseURI`, both send through
-`globalThis.fetch`. So the tests of those two swap it, through `stubFetch`. Nothing above covers
-this: `colors`, `clock` and an absolute url don't replace the `fetch` a `Log` calls. It stands only
-until `todo.md` item 158 lets a test hand a `Log` its network. Until then a new test of either
-swaps the global. So does a test proving that code handed a `fetch` leaves the global alone, as
-one in `tests/transports.test.ts` does. No other test swaps it.
 
 ## A constructor parameter marked "Not part of the API" carries what only this library passes
 

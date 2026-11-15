@@ -12,16 +12,11 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 158 | 2.7.0 |  | principle | **Let a test hand a `Log` the network it sends through, so no test swaps `globalThis.fetch` except to prove a default reads it.** | 2 | 1 | 2 | 3 | 3 | code health by 3, 1 by 3 | 3.9 |
 | 156 | 2.7.0 |  |  | **Lower the reading cost of the files a chunk reads most before its first commit.** | 2 | 2 | 1 | 3 | 4 | code health by 3 | 2.7 |
-| 41 | 2.7.0 |  | principle | **Warn once about a negative, zero or `NaN` numeric `QueueConf` option, and use the default.** | 1 | 1 | 1 | 1 | 2 | 1 by 5 | 2.5 |
 | 149 | 2.7.0 |  |  | **Keep a queue's storage read from rejecting when `restore` throws.** | 1 | 1 | 2 | 2 | 6 | code health by 3 | 2.3 |
 | 23 | 2.7.0 |  |  | **Settle one marker for a CHANGELOG entry a consumer must act on, and record it in the `AGENTS.md` line beside `### Security`.** | 1 | 1 | 1 | 1 | 1 | 1 by 3 | 2.3 |
 | 114 | 2.7.0 |  |  | **Move `package.json`'s build and test one-liners into named scripts, and let the OTLP test read its collector's port, image and container name from the environment, today's values as defaults.** | 1 | 1 | 1 | 1 | 2 | code health by 1 | 2.1 |
 | 139 | 2.7.0 |  | principle | **Cite "Sane defaults" as applied in the clock and randomness decision, once the principle carries its exception for a library.** | 1 | 2 | 1 | 2 | 1 | code health by 1 | 2.1 |
-| 19 | 2.7.0 |  | defect | **Leave a `Request` untraced in `log.fetch`.** | 1 | 1 | 2 | 2 | 2 | 3.1 by 6 | 2.1 |
-| 15 | 2.7.0 |  |  | **Warn once when `colors` is unset, `process.stdout.isTTY` is false and neither `NO_COLOR` nor `FORCE_COLOR` is set, where 3.0.0 turns colour off.** | 1 | 1 | 1 | 1 | 2 | 1 by 4 | 2.0 |
-| 17 | 2.7.0 |  |  | **Warn once when an instance with `otlpQueue` set or inherited leaves `spanName` unset.** | 1 | 1 | 1 | 1 | 2 | 1 by 4 | 2.0 |
 | 80 | 2.7.0 |  | principle | **Run the browser suite in WebKit and Firefox as well as Chromium.** | 2 | 1 | 1 | 2 | 3 | 3 by 7 | 2.0 |
 | 157 | 2.7.0 |  |  | **Hand a custom transport's `span` method a span in a consumer's shape, and each transport its own copy of an entry and a span.** | 3 | 2 | 3 | 6 | 5 | 1 by 4, 4 by 4 | 1.0 |
 | 164 | 2.8.0 |  | owner | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 2 | code health by 3 | 6.2 |
@@ -55,7 +50,7 @@
 | 64 | 3.0.0 |  |  | **Reject a `format` string other than `"text"` or `"json"` in the constructor.** | 1 | 1 | 2 | 2 | 1 | 1 by 4 | 2.0 |
 | 67 | 3.0.0 |  |  | **Let per-call metadata win over `context` on a key collision.** | 1 | 1 | 2 | 2 | 1 | 1 by 4 | 2.0 |
 | 76 | 3.0.0 |  | decision | **Reject `user:pass@` in `otlpHttpBaseURI` beside an `Authorization` in `otlpAdditionalHeaders`, in the constructor.** | 1 | 1 | 2 | 2 | 1 | 1 by 4 | 2.0 |
-| 77 | 3.0.0 | 17 |  | **Require `spanName` whenever `otlpQueue` is set or inherited.** | 1 | 1 | 2 | 2 | 1 | 1 by 4 | 2.0 |
+| 77 | 3.0.0 |  |  | **Require `spanName` whenever `otlpQueue` is set or inherited.** | 1 | 1 | 2 | 2 | 1 | 1 by 4 | 2.0 |
 | 78 | 3.0.0 |  | decision | **Write `MIGRATION.md`: one entry per 3.0.0 item, with the 2.x spelling and the 3.0.0 spelling.** | 1 | 2 | 2 | 3 | 3 | 1 by 8 | 2.0 |
 | 57 | 3.0.0 |  |  | **Retry only what OTLP/HTTP calls retryable: 429, 502, 503 and 504.** | 1 | 1 | 2 | 2 | 2 | 2 by 5 | 1.8 |
 | 70 | 3.0.0 |  |  | **Stop a child inheriting `spanName`.** | 1 | 1 | 2 | 2 | 1 | 4 by 4 | 1.8 |
@@ -65,7 +60,7 @@
 | 53 | 3.0.0 |  |  | **Keep the auth scheme when an allow-listed `authorization` records `REDACTED`.** | 1 | 1 | 2 | 2 | 2 | 1 by 4 | 1.5 |
 | 54 | 3.0.0 |  | principle | **Require `msTimestamp` in `EntryFormatterConf`, and have the built-in formatters return a value for an unknown level.** | 1 | 1 | 1 | 1 | 2 | 1 by 3 | 1.5 |
 | 63 | 3.0.0 |  |  | **Rename `EntryFormatterConf` to `LogEntry`.** | 1 | 1 | 2 | 2 | 2 | 1 by 4 | 1.5 |
-| 65 | 3.0.0 | 15 | decision | **Default `colors` to `process.stdout.isTTY` when neither `NO_COLOR` nor `FORCE_COLOR` is set.** | 2 | 1 | 2 | 3 | 2 | 1 by 5 | 1.5 |
+| 65 | 3.0.0 |  | decision | **Default `colors` to `process.stdout.isTTY` when neither `NO_COLOR` nor `FORCE_COLOR` is set.** | 2 | 1 | 2 | 3 | 2 | 1 by 5 | 1.5 |
 | 69 | 3.0.0 |  |  | **Export metadata as typed OTLP attribute values instead of coercing every one to `stringValue`.** | 2 | 1 | 3 | 4 | 3 | 2 by 7 | 1.5 |
 | 52 | 3.0.0 |  |  | **Spell a redacted `url.full` the way OTel semconv asks: `https://REDACTED:REDACTED@host/x`.** | 1 | 1 | 2 | 2 | 2 | 2 by 4 | 1.5 |
 | 59 | 3.0.0 |  |  | **Give a `log.fetch` span `end({ error })`'s `error.type`: a string `code`, else `name`, else `"_OTHER"`.** | 1 | 1 | 2 | 2 | 2 | 2 by 4 | 1.5 |
@@ -81,36 +76,6 @@
 
 ## Details
 
-### 158. Let a test hand a `Log` the network it sends through, so no test swaps `globalThis.fetch` except to prove a default reads it.
-
-A `Log` takes `clock`, `randomBytes`, `stdout` and `stderr`, and `otlpTransport` and `Queue` take
-`fetch`. The network is the one effect a `Log` can't be handed, in two places: `log/log.ts` →
-`fetchTrace` sends every `log.fetch` request through `globalThis.fetch`, read at the call so a
-polyfill installed later still wins, and `log/deprecated-options/default-queue.ts` →
-`attachDefaultQueue` builds the queue for `otlpHttpBaseURI` with no `fetch`. So each test of those
-two swaps the global through `tests/test-doubles.ts` → `stubFetch`. They
-share one mutable global, a `log.fetch` test that forgets the swap sends a real request, and a
-consumer testing their own code that calls `log.fetch` has to swap the global too.
-
-Principle: "Functional core, imperative shell", which bans a test swapping `globalThis.fetch` by
-name. Found by the principles pass of the 2.7.0 release review, round 2.
-
-Done when the suite swaps `globalThis.fetch` only in a test that proves a default reads it, or
-that code handed a `fetch` leaves the global alone, and the decision "A platform read stays a
-default, and a consumer injects through `colors` and `clock`" lists `fetch` among those swaps. A `Log` that is handed nothing still sends through the global, polyfill included.
-
-What bounds the repair:
-
-- An option a consumer writes is a new spelling, so a panel seated as README → Audience picks it
-  before it ships, and README → Goals #2 counts it against the documented surface.
-- `Log`'s second constructor parameter carries only what this library passes
-  (decision "A constructor parameter marked 'Not part of the API' carries what only this library
-  passes"), so a test may not hand a `Log` its network through it.
-- Item 97 removes the queue a `Log` builds, in 3.0.0. Until then that queue is in this item's
-  scope.
-- The comprehension seats found `attachDefaultQueue` hard to follow, since the two ways a queue is
-  built report to different sinks. A change there makes that easier to read, not harder.
-
 ### 156. Lower the reading cost of the files a chunk reads most before its first commit.
 
 `~/.claude/bin/reading-cost` reported `Rising:` at the 2.7.0 release review: the last 5 chunks' median is 72056 new input tokens before their first commit, the 5 before them 59661. `docs/reading-cost.md` holds the figures.
@@ -118,11 +83,6 @@ What bounds the repair:
 Read most over those 5 chunks (opens and searches): `README.md` 32, `docs/decisions.md` 10, `log/log.ts` 9, `otlp/payloads.ts` 9, `CHANGELOG.md` 8, `package.json` 7, `tests/otel-adapter.test.ts` 7, `todo.md` 6, `AGENTS.md` 5, `index.ts` 4.
 
 The chunk that ships this runs `reading-cost --reset`.
-
-### 41. Warn once about a negative, zero or `NaN` numeric `QueueConf` option, and use the default.
-
-A negative `retryDelayMs` retries at once, `maxItems: 0` drops everything, a `NaN` `maxBatchBytes`
-never flushes on size. Principle: Validate data and build DTOs as early as possible.
 
 ### 149. Keep a queue's storage read from rejecting when `restore` throws.
 
@@ -149,17 +109,6 @@ and randomness. The exception is planned where the technical principles are kept
 repo. When it lands, reword the decision to cite the principle as applied, and finish this item.
 Until then the code stays: README → Goals #1 and #2 need the defaults. Found by the principles pass
 of 2.6.0's release review.
-
-### 19. Leave a `Request` untraced in `log.fetch`.
-
-A JS consumer passing one gets `String(request)` = `"[object Request]"`, which in a browser resolves
-against `location.href` to an http(s) url: `log.fetch` then traces that invented url and fetches it
-with `init` alone, dropping the request's own method, body and headers. The signature says `string |
-URL`, so a TypeScript consumer cannot reach it.
-
-### 17. Warn once when an instance with `otlpQueue` set or inherited leaves `spanName` unset.
-
-Item 77 makes the constructor reject it in 3.0.0, and this warning is that break's only notice.
 
 ### 80. Run the browser suite in WebKit and Firefox as well as Chromium.
 

@@ -1,5 +1,5 @@
-import { capture, clientSpan, fakeClock, stubFetch, thrown } from "./test-doubles.js";
-import { colorsFromEnv } from "../log/entry-format.js";
+import { capture, clientSpan, fakeClock, fetchRecorder, thrown } from "./test-doubles.js";
+import { colorsDefaultWarning, colorsFromEnv } from "../log/entry-format.js";
 import { type EntryFormatter, type EntryFormatterConf, generateSpanId, generateTraceId, Log, type LogConf, type LogEntry, type Logger, type LogInt, type LogLevel, LogLevels, type LogOptions, type Metadata, msgJsonFormatter, msgTextFormatter, Queue, type ResolvedLogConf, resolveFormatter } from "../index.js";
 import test from "./tap.js";
 
@@ -60,10 +60,10 @@ test("colors unset in code follows the process env, defaulting to on; set in cod
 
 	Reflect.set(globalThis, "process", { env });
 	try {
-		fromEnv = new Log().conf.colors;
+		fromEnv = new Log({ stderr: () => {} }).conf.colors;
 		inCode = new Log({ colors: true }).conf.colors;
 		delete env.NO_COLOR;
-		unset = new Log().conf.colors;
+		unset = new Log({ stderr: () => {} }).conf.colors;
 	} finally {
 		if (original === undefined) {
 			Reflect.deleteProperty(globalThis, "process");
@@ -75,6 +75,51 @@ test("colors unset in code follows the process env, defaulting to on; set in cod
 	t.strictEqual(fromEnv, false, "NO_COLOR in the process env turns it off");
 	t.strictEqual(inCode, true, "colors: true in code wins over NO_COLOR");
 	t.strictEqual(unset, true, "on when the env says nothing");
+	t.end();
+});
+
+const COLORS_NOTICE = "@larvit/log: colors is unset and stdout is no TTY, so text entries carry colour codes, which 3.0.0 turns off here; set colors, or NO_COLOR or FORCE_COLOR, to decide now";
+
+for (const [name, env, isTTY, expected] of [
+	["no env var and no TTY", {}, undefined, COLORS_NOTICE],
+	["a TTY flag of false", {}, false, COLORS_NOTICE],
+	["a TTY", {}, true, undefined],
+	["NO_COLOR set", { NO_COLOR: "1" }, undefined, undefined],
+	["FORCE_COLOR set", { FORCE_COLOR: "1" }, undefined, undefined],
+	["no env at all", undefined, undefined, COLORS_NOTICE],
+] as const) {
+	test(`colorsDefaultWarning: ${name}`, t => {
+		t.strictEqual(colorsDefaultWarning(env, isTTY), expected, name);
+		t.end();
+	});
+}
+
+test("a Log with colors unset in a text format warns once per stderr when stdout is no TTY", t => {
+	const lines: string[] = [];
+	const stderr = (line: string) => { lines.push(line); };
+	const original: unknown = Reflect.get(globalThis, "process");
+	let quiet: string[];
+
+	// Not withGlobals: Node's `process` is an accessor, and putting its descriptor back would keep the stand-in.
+	Reflect.set(globalThis, "process", { env: {}, stdout: {} });
+	try {
+		new Log({ colors: false, stderr });
+		new Log({ format: "json", stderr });
+		new Log({ stderr, transports: [] });
+		quiet = [...lines];
+		new Log({ stderr });
+		new Log({ stderr });
+	} finally {
+		if (original === undefined) {
+			Reflect.deleteProperty(globalThis, "process");
+		} else {
+			Reflect.set(globalThis, "process", original);
+		}
+	}
+
+	t.deepEqual(quiet, [], "no warning where colors is set, where the output is JSON or where a transports list owns it");
+	t.strictEqual(lines.length, 1, "a text Log warns, once for its stderr sink");
+	t.ok(lines[0].includes(COLORS_NOTICE), "and says what 3.0.0 does");
 	t.end();
 });
 
@@ -212,7 +257,7 @@ for (const [name, options, lines] of [
 	test(`format ${name} earns no warning about the format`, t => {
 		const written: string[] = [];
 
-		new Log({ ...options, stderr: line => { written.push(line); } });
+		new Log({ colors: false, ...options, stderr: line => { written.push(line); } });
 		t.deepEqual(written.filter(line => line.includes("other than")), [], "the format is no mistake");
 		t.strictEqual(written.length, lines, "and the lines written are the deprecation's alone");
 		t.end();
@@ -359,10 +404,10 @@ test("generateSpanId/generateTraceId produce valid, unique hex ids", t => {
 });
 
 test("randomBytes decides every trace and span id, and children and clones inherit it", async t => {
-	const { calls } = stubFetch();
+	const { calls, fetch } = fetchRecorder();
 	let counter = 0;
 	const randomBytes = (size: number): Uint8Array => new Uint8Array(size).fill(++counter);
-	const log = new Log({ otlpHttpBaseURI: "http://127.0.0.1:4318", randomBytes, stderr: () => {} });
+	const log = new Log({ fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", randomBytes, stderr: () => {} });
 
 	t.strictEqual(log.span.spanId, "0101010101010101", "the first draw is the span id");
 	t.strictEqual(log.span.traceId, "02020202020202020202020202020202", "the second draw is the trace id");
@@ -421,7 +466,7 @@ test("clone can downgrade json format to text", t => {
 });
 
 test("clone inherits config (OTLP, printTraceInfo, fetch policy) but keeps its own span", async t => {
-	const { calls } = stubFetch();
+	const { calls, fetch } = fetchRecorder();
 	const stdout: string[] = [];
 	const clock = fakeClock();
 	const base = new Log({
@@ -430,6 +475,7 @@ test("clone inherits config (OTLP, printTraceInfo, fetch policy) but keeps its o
 		captureResponseHeaders: ["x-resp"],
 		clock,
 		colors: false,
+		fetch,
 		otlpHttpBaseURI: "http://127.0.0.1:4318",
 		otlpProtocol: "http/protobuf",
 		printTraceInfo: true,
@@ -524,6 +570,8 @@ test("log.conf.context reads back at its v2.3.0 type, its undefined keys dropped
 
 test("the level-string shorthand still works and warns once per stderr sink", t => {
 	const stderr: string[] = [];
+	// Off a TTY a Log with colors unset also warns about the colour default, which is not what this test is about.
+	const shorthandLines = () => stderr.filter(line => line.includes("is deprecated"));
 	const realConsoleError = console.error;
 	let afterSilent: number;
 	let shorthand: Log;
@@ -531,7 +579,7 @@ test("the level-string shorthand still works and warns once per stderr sink", t 
 	console.error = (line: string) => { stderr.push(line); };
 	try {
 		new Log("none");
-		afterSilent = stderr.length;
+		afterSilent = shorthandLines().length;
 		shorthand = new Log("debug");
 	} finally {
 		console.error = realConsoleError;
@@ -539,9 +587,9 @@ test("the level-string shorthand still works and warns once per stderr sink", t 
 
 	t.strictEqual(shorthand.conf.logLevel, "debug", "the shorthand still sets the level");
 	t.strictEqual(afterSilent, 1, "logLevel \"none\" does not silence the warning");
-	t.strictEqual(stderr.length, 1, "a second instance on the same sink stays quiet");
-	t.ok(stderr[0].includes("war") && stderr[0].includes("new Log({ logLevel })"), "the constructor warning is a warn line naming the spelling to use instead");
-	t.ok(stderr[0].includes("@larvit/log: "), "and names the package, so an app developer can tell which dependency emitted it");
+	t.strictEqual(shorthandLines().length, 1, "a second instance on the same sink stays quiet");
+	t.ok(shorthandLines()[0].includes("war") && shorthandLines()[0].includes("new Log({ logLevel })"), "the constructor warning is a warn line naming the spelling to use instead");
+	t.ok(shorthandLines()[0].includes("@larvit/log: "), "and names the package, so an app developer can tell which dependency emitted it");
 
 	const cloneStderr: string[] = [];
 	const parent = new Log({ colors: false, stderr: line => { cloneStderr.push(line); } });

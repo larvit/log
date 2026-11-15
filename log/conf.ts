@@ -1,10 +1,12 @@
 import { attachDefaultQueue, OTLP_ENDPOINT_KEYS, rejectQueueBesideShorthand } from "./deprecated-options/default-queue.js";
 import { attachFormatter, formatterWarning, functionFormatterOf, ownFunctionFormatter } from "./deprecated-options/formatter-alias.js";
 import { DEFAULT_LOG_LEVEL, type LogLevel } from "../primitives/levels.js";
+import { defaultChangeWarnings } from "./deprecated-options/default-changes-in-3.js";
 import { defaultColors } from "./entry-format.js";
 import type { LogConf, LogOptions, ResolvedLogConf } from "./types.js";
 import { type Metadata, withoutUndefined } from "../primitives/metadata.js";
 import { platformRandomBytes } from "../tracing/traceparent.js";
+import { processEnv, stdoutIsTTY } from "../primitives/process-env.js";
 import { rejectBesideTransports, REPLACED_BY_TRANSPORTS } from "./deprecated-options/replaced-by-transports.js";
 import { systemClock } from "../primitives/clock.js";
 
@@ -29,6 +31,7 @@ const INHERITED_BY: { [K in keyof LogConf]-?: readonly Derivation[] } = {
 	context: ["child"],
 	// handedDown says which formatter a source hands down here.
 	entryFormatter: CHILD_AND_CLONE,
+	fetch: CHILD_AND_CLONE,
 	format: CHILD_AND_CLONE,
 	logLevel: CHILD_AND_CLONE,
 	otlpAdditionalHeaders: CHILD_AND_CLONE,
@@ -201,9 +204,10 @@ export function resolveConf(options: LogOptions | LogLevel | "none" | undefined,
 
 	rejectQueueBesideShorthand(derived);
 
+	const warnings = [...warning ? [warning] : [], ...defaultChangeWarnings(derived, processEnv(), stdoutIsTTY())];
 	const conf = withDefaults(derived);
 
 	attachDefaultQueue(conf);
 
-	return { conf, warnings: warning ? [warning] : [] };
+	return { conf, warnings };
 }
