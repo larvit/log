@@ -46,7 +46,7 @@ The implementing agent, same day, on what that leaves open:
 
 - The deprecated options write no warning. Nearly every configured consumer sets one, so a line per
   `stderr` sink would change the output of code that did not change, in a minor. The `@deprecated`
-  tags, the README and the changelog say it instead. The maintainer approved this on 2026-11-15.
+  tags, the README and the changelog say it instead. The maintainer approved this.
 - `log.conf.transports` is unset on a `Log` given no list. What such a `Log` sends to is read from
   `log.conf` at each record, because 2.x documents that a write to `log.conf.format` takes effect
   from the next line. It is one `Log`'s own, so a child cannot inherit it as a list, and it is built
@@ -123,10 +123,10 @@ Goals #8.
 ## This library's own warnings are written once per `stderr` sink
 
 2026-09-18, the implementing agent: a deprecation, or a setting this library cannot use, is written
-once per `stderr` sink through the instance's formatter at `warn`, whatever `logLevel` is. Instances
-sharing the default `console.error` share that one warning; a sink the caller injects gets its own,
-which keeps a test independent of run order. The options that `transports` replaces are the
-exception and write no deprecation warning: "A `Log` sends through a list of transports" says why. A `warnOnce` message is literal: anything varying in it
+once per `stderr` sink through the instance's formatter at `warn`, whatever `logLevel` is. The
+options a `transports` list replaces are deprecated without a warning, for the reason "A `Log` sends
+through a list of transports" gives. Instances sharing the default `console.error` share that one
+warning; a sink the caller injects gets its own, which keeps a test independent of run order. A `warnOnce` message is literal: anything varying in it
 breaks the once-only rule. Every such line opens with `@larvit/log: `, part of that literal, so an
 app developer can tell which dependency emitted one about code they may not own. A `Queue`'s failure
 lines through `report` carry no prefix, since they report that developer's own setup; its
