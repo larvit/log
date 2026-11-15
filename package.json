@@ -8,22 +8,22 @@
     "node": ">=18"
   },
   "scripts": {
-    "build": "rm -rf index.js index.js.map types && tsc -p tsconfig.build.json && esbuild index.ts --bundle --minify-syntax --format=esm --target=es2020 --sourcemap=external --sources-content=false --log-level=warning --outfile=index.js && npm run replace-version-string && uglifyjs index.js -m --source-map \"content='index.js.map'\" -o index.js",
-    "build-tests": "npm run build && rm -rf .tmp/test && tsc -p tsconfig.test.json && cp index.js .tmp/test/index.js",
+    "build": "rm -rf index.js index.js.map otel.js otel.js.map types && tsc -p tsconfig.build.json && release-tooling/bundle.sh index && release-tooling/bundle.sh otel",
+    "build-tests": "npm run build && rm -rf .tmp/test && tsc -p tsconfig.test.json && cp index.js otel.js .tmp/test/",
     "ci": "npm run build-tests && npm run test-node",
     "ci-browser": "npm run build-tests && node e2e-tests/run-browser-tests.mjs",
-    "lint": "eslint eslint.config.js index.ts credentials e2e-tests log otlp primitives tracing tests",
-    "lint-fix": "eslint --fix eslint.config.js index.ts credentials e2e-tests log otlp primitives tracing tests",
-    "replace-version-string": "grep -o '\"version\": \"[^\"]*\"' package.json | cut -d'\"' -f4 | xargs -I {} sed -i.bak 's/__version__/{}/g' index.js && rm -f index.js.bak",
+    "lint": "eslint eslint.config.js index.ts otel.ts credentials e2e-tests log opentelemetry-adapter otlp primitives tracing tests",
+    "lint-fix": "eslint --fix eslint.config.js index.ts otel.ts credentials e2e-tests log opentelemetry-adapter otlp primitives tracing tests",
     "test": "npm run test-docker && npm run test-browser",
     "test-browser": "docker build -t larvit-log-test-browser --build-arg BASE_IMAGE=mcr.microsoft.com/playwright:v$(node -p \"require('./package.json').devDependencies.playwright\")-noble . && docker run --rm --init --ipc=host larvit-log-test-browser npm run ci-browser",
     "test-docker": "release-tooling/test-in-docker.py",
     "test-mutation": "docker run --rm --memory 4g --memory-swap 4g \"$(docker build -q .)\" npx stryker run",
-    "test-node": "node .tmp/test/tests/test.js",
+    "test-node": "node .tmp/test/tests/test.js && node .tmp/test/tests/otel-adapter.test.js",
     "test-otlp": "docker build -t larvit-log-test-node . && docker run --rm larvit-log-test-node sh -c \"npm run build >/dev/null && cat index.js\" > index.js && node e2e-tests/run-otlp-tests.mjs"
   },
   "devDependencies": {
     "@larvit/eslint-config-typescript-esm": "2.0.0",
+    "@opentelemetry/api": "1.10.0",
     "@stryker-mutator/core": "10.1.1",
     "@types/node": "26.6.6",
     "esbuild": "0.28.2",
@@ -33,6 +33,14 @@
     "playwright": "1.65.0",
     "typescript": "6.0.3",
     "uglify-js": "3.19.3"
+  },
+  "peerDependencies": {
+    "@opentelemetry/api": ">=1.3.0 <2"
+  },
+  "peerDependenciesMeta": {
+    "@opentelemetry/api": {
+      "optional": true
+    }
   },
   "publishConfig": {
     "access": "public",
@@ -48,6 +56,10 @@
     ".": {
       "types": "./types/index.d.ts",
       "default": "./index.js"
+    },
+    "./otel": {
+      "types": "./types/otel.d.ts",
+      "default": "./otel.js"
     }
   },
   "sideEffects": false,
@@ -55,6 +67,8 @@
     "index.js",
     "index.js.map",
     "LICENSE",
+    "otel.js",
+    "otel.js.map",
     "package.json",
     "README.md",
     "types"

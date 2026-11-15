@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """NODE_IMAGE picks the base image, as `docker build --build-arg BASE_IMAGE` does.
 
-After a green run, TESTED_BUILD_DIR names a folder that receives index.js, index.js.map and types,
+After a green run, TESTED_BUILD_DIR names a folder that receives index.js, otel.js, their source maps and types,
 all built in the container whose copy of index.js the suite ran. push.yaml uploads that folder and
 publish.yaml publishes it.
 """
@@ -12,7 +12,7 @@ import subprocess
 import sys
 
 IMAGE = "larvit-log-test-node"
-PACKAGE_FILES = ["index.js", "index.js.map", "types"]
+PACKAGE_FILES = ["index.js", "index.js.map", "otel.js", "otel.js.map", "types"]
 
 
 def main() -> int:

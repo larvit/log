@@ -46,15 +46,16 @@ In [docs/decisions.md](docs/decisions.md):
 - The protobuf encoder stays
 - In text, a plain space ends a credential and no other whitespace does
 - A platform read stays a default, and a consumer injects through `colors` and `clock`
-- A constructor parameter marked "Not part of the API" carries what only this library passes
-- The package publishes one bundled `index.js`, built from a module per part
+- A constructor parameter or method marked "Not part of the API" carries what only this library passes
+- The package publishes one bundled file per entry point, built from a module per part
+- The OpenTelemetry adapter exports a span through the `Log` handed to `runWithLog`, as its instrumentation recorded it
 
 ## Working here
 
-- `index.ts` holds only the public exports. New code joins the module whose file name stays true
+- `index.ts` and `otel.ts` hold only the public exports of their entry points. New code joins the module whose file name stays true
   of it, or gets its own. A rule set answering one question — what a reader has to check as a
   whole — lives in one module, or in one folder once it outgrows a module.
-- Imports point one way: `log/` → `tracing/` → `otlp/` → `credentials/` → `primitives/`, and
+- Imports point one way: `opentelemetry-adapter/` → `log/` → `tracing/` → `otlp/` → `credentials/` → `primitives/`, and
   inside `otlp/`, `queue/` → `send/`. The decision log names each import that runs against it.
 - A `// --- name ---` banner divides a source module only where a technical limit stops a split.
 - A done `todo.md` item leaves the file: a change a consumer can observe is reworded for them

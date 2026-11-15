@@ -76,6 +76,7 @@ const SCOPE = { name: "@larvit/log", version: "__version__" } as const satisfies
 export const SPAN_KIND_INTERNAL = 1;
 export const SPAN_KIND_CLIENT = 3;
 export const STATUS_CODE_UNSET = 0;
+export const STATUS_CODE_OK = 1;
 export const STATUS_CODE_ERROR = 2;
 
 // The one branch on a payload's kind, so a new kind fails to compile at every caller.

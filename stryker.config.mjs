@@ -1,9 +1,9 @@
 // @ts-check
 /** @type {import("@stryker-mutator/api/core").PartialStrykerOptions} */
 export default {
-	mutate: ["index.ts", "{credentials,log,otlp,primitives,tracing}/**/*.ts"],
+	mutate: ["index.ts", "otel.ts", "{credentials,log,opentelemetry-adapter,otlp,primitives,tracing}/**/*.ts"],
 	// tsc type-checks the build, and a mutant often doesn't type-check.
-	disableTypeChecks: "{index,{credentials,log,otlp,primitives,tracing}/**/*}.ts",
+	disableTypeChecks: "{index,otel,{credentials,log,opentelemetry-adapter,otlp,primitives,tracing}/**/*}.ts",
 	// The suite runs against the built bundle, so the sandbox builds it once with every mutant in it,
 	// and each run switches one on.
 	buildCommand: "npm run build-tests",
