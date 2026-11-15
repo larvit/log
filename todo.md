@@ -142,8 +142,8 @@ principle "Keep It Simple, Stupid", and code health.
 
 ### 114. Move `package.json`'s build and test one-liners into named scripts, and let the OTLP test read its collector's port, image and container name from the environment, today's values as defaults.
 
-`build`, `build-tests`, `test-browser`, `test-docker` and `test-otlp` chain
-shell inside one JSON string. `scripts/run-otlp-tests.mjs` fixes port 4318, the image and the
+`build`, `build-tests`, `test-browser`, `test-node` and `test-otlp` chain
+shell inside one JSON string. `e2e-tests/run-otlp-tests.mjs` fixes port 4318, the image and the
 container name, so two runs on one machine clash, and its `docker rm -f` removes the other run's
 collector. Found by the technical principles audit on 2026-10-26.
 

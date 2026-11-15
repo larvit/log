@@ -472,8 +472,9 @@ one function makes the whole conf. Serves code health; bounded by README → Goa
 3.0.0, where `todo.md` item 142 takes both off the published constructors.
 
 2026-11-15, the implementing agent: `Log.exportSpan` is the first such method. `@larvit/log/otel`
-is a bundle of its own and hands each span it ends to a `Log`, whose transports are private: with
-none listed they are built from the deprecated options at each record. Both bundles ship in one
+is a bundle of its own, so it can reach a `Log` only through a public method. It cannot read the
+transports itself: a `Log` with none listed builds them from the deprecated options each time it
+exports. Both bundles ship in one
 package version, so nothing outside this library depends on the method's shape. Documenting it
 would add to the surface README → Goals #2 counts. Valid while the adapter ships from this package.
 
@@ -497,16 +498,16 @@ import runs against it: `Log` hands `tracing/` plain values (`SpanOrigin`, `Span
 README → Goals #5; applies the technical principle "Compose, do not entangle". Valid while every
 supported runtime loads one ESM file.
 
-2026-11-15, the implementing agent, with `todo.md` item 153: `otel.ts` is a second entry point,
-bundled the same way into `otel.js` by `release-tooling/bundle.sh`, with `@opentelemetry/api` left
+2026-11-15, the implementing agent: `otel.ts` is a second entry point,
+bundled the same way into `otel.js` by `release-tooling/bundle.mjs`, with `@opentelemetry/api` left
 as an import so the app's instrumentation shares that one copy. `otel.js` carries its own copy of
 the few core modules it imports, 2330 bytes gzipped in all, so it never loads `index.js` and an app
-that doesn't import it loads nothing new. One consequence: the once-per-sink record of written
+that doesn't import it doesn't load anything new. One consequence: the once-per-sink record of written
 warnings exists once per bundle.
 
 ## The OpenTelemetry adapter exports a span through the `Log` handed to `runWithLog`, as its instrumentation recorded it
 
-2026-11-15, the implementing agent, shipping `todo.md` item 153 on what the maintainer settled on
+2026-11-15, the implementing agent, on what the maintainer settled on
 2026-11-14: a second entry point of this package, nesting by OpenTelemetry's own context manager,
 and the `Log` handed over explicitly at the request's edge. What that left open:
 
@@ -517,6 +518,10 @@ and the `Log` handed over explicitly at the request's edge. What that left open:
 - **A span with no `Log` in its context is not recorded.** The provider takes no fallback `Log`,
   since that would be a hidden global (README → Goals #10). Such a span, and one under an unsampled
   `Log`, passes its parent's ids on so propagation still names the caller.
+- **Attributes are exported unredacted.** It works against README → Goals #7 for a `url.full` an
+  instrumentation records. Which attribute holds a credential, and by which rule it is cut, is a
+  design of its own, so it ships as `todo.md` item 155 in the same release, and no release holds
+  the adapter without it.
 - **What an `OtlpSpan` cannot hold is left out and counted.** Its `events` and `links` are typed
   empty and its attribute values are strings, and README → Audience lets only a major widen a type
   a consumer reads. So an event, a link and a list-valued attribute raise the span's dropped
@@ -529,8 +534,6 @@ and the `Log` handed over explicitly at the request's edge. What that left open:
   `timeInputToHrTime` in `@opentelemetry/core` reads it, since instrumentation is written against
   that SDK.
 - **The peer range is `>=1.3.0 <2`,** the floor OpenTelemetry's own `sdk-trace-base` accepts.
-- **Attributes are exported unredacted.** README says so. It works against README → Goals #7 for
-  a `url.full` an instrumentation records, and stands until `todo.md` item 155 ends it.
 - **The suite covers the adapter on Node only,** in `tests/otel-adapter.test.ts`, which
   `npm run test-node` runs after `tests/test.ts`. The browser run serves the compiled modules with
   no bundler, which cannot resolve the bare `@opentelemetry/api` import.
