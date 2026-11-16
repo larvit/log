@@ -12,7 +12,6 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 156 | 2.7.0 |  |  | **Lower the reading cost of the files a chunk reads most before its first commit.** | 2 | 2 | 1 | 3 | 4 | code health by 3 | 2.7 |
 | 149 | 2.7.0 |  |  | **Keep a queue's storage read from rejecting when `restore` throws.** | 1 | 1 | 2 | 2 | 6 | code health by 3 | 2.3 |
 | 23 | 2.7.0 |  |  | **Settle one marker for a CHANGELOG entry a consumer must act on, and record it in the `AGENTS.md` line beside `### Security`.** | 1 | 1 | 1 | 1 | 1 | 1 by 3 | 2.3 |
 | 114 | 2.7.0 |  |  | **Move `package.json`'s build and test one-liners into named scripts, and let the OTLP test read its collector's port, image and container name from the environment, today's values as defaults.** | 1 | 1 | 1 | 1 | 2 | code health by 1 | 2.1 |
@@ -76,14 +75,6 @@
 | 108 | 3.0.0 |  | principle | **Keep two tabs of one web app sharing a `storage` key from sending a record twice or deleting each other's backlog.** | 3 | 2 | 2 | 5 | 5 | 3 by 5 | 0.7 |
 
 ## Details
-
-### 156. Lower the reading cost of the files a chunk reads most before its first commit.
-
-`~/.claude/bin/reading-cost` reported `Rising:` at the 2.7.0 release review: the last 5 chunks' median is 72056 new input tokens before their first commit, the 5 before them 59661. `docs/reading-cost.md` holds the figures.
-
-Read most over those 5 chunks (opens and searches): `README.md` 32, `docs/decisions.md` 10, `log/log.ts` 9, `otlp/payloads.ts` 9, `CHANGELOG.md` 8, `package.json` 7, `tests/otel-adapter.test.ts` 7, `todo.md` 6, `AGENTS.md` 5, `index.ts` 4.
-
-The chunk that ships this runs `reading-cost --reset`.
 
 ### 149. Keep a queue's storage read from rejecting when `restore` throws.
 
