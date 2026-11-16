@@ -78,9 +78,8 @@
 departs from the technical principle "Sane defaults", which still has a library ask for its clock
 and randomness. The exception is planned where the technical principles are kept, outside this
 repo. When it lands, reword the decision to cite the principle as applied, and finish this item.
-Until then the code stays: README → Goals #1 and #2 need the defaults. As of 2026-11-16 the
-principle still has a library ask (claude-config item 291 is open), so this item waits. Found by the principles pass
-of 2.6.0's release review.
+Until then the code stays: README → Goals #1 and #2 need the defaults. The item waits on
+claude-config's item 291. Found by the principles pass of 2.6.0's release review.
 
 ### 157. Hand a custom transport's `span` method a span in a consumer's shape, and each transport its own copy of an entry and a span.
 
@@ -165,8 +164,8 @@ sampling decision made by accident. An incoming `traceparent` flag still wins wh
 
 ### 107. Run the suite on React Native's Hermes in CI.
 
-README → Audience calls React Native a primary target, but CI runs Node and Chromium only, so a break
-under Hermes or React Native's own globals, such as a `URL` whose getters throw, ships unseen. Items 80 and 81 don't cover
+README → Audience calls React Native a primary target, but CI runs Node and the browsers only, so a break
+under Hermes or React Native's own globals, such as a `URL` whose getters throw, ships unseen. Item 81 doesn't cover
 it. `~/.claude/principles/frontend.md` → Testability and broad device support.
 
 ### 81. Test export and `log.fetch` against a real server in a browser.

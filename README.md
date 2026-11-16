@@ -96,8 +96,8 @@ queue survives app restarts through a `storage` adapter, and a full one holds ab
 **Runtimes.** Anything with a parser that takes `?.` and working global `fetch`, `TextEncoder`,
 `btoa`, `BigInt`, `URL` and `URLSearchParams`. In a browser that means Chrome 80, Firefox 74 or
 Safari 14, or newer; an older one throws a `SyntaxError` loading `index.js`. CI proves Node 18
-to 26 and current Chromium, Firefox and WebKit. React Native is supported from 0.74, where Hermes gained `TextEncoder`
-and `btoa`. Its own `URL` and `URLSearchParams` throw "not implemented" from members this package
+to 26 and current Chromium, Firefox and WebKit. React Native is supported from 0.74, where Hermes
+gained `TextEncoder` and `btoa`. Its own `URL` and `URLSearchParams` throw "not implemented" from members this package
 reads, so an app that doesn't already replace them installs a polyfill, such as
 `react-native-url-polyfill`, before its code uses this package. Deno and Bun meet the rule and are
 not in CI.
