@@ -48,7 +48,8 @@ test("log.fetch sends a Request passed as init with its own method, body, signal
 	});
 	const controller = new AbortController();
 	const makeRequest = () => new Request("https://api.test/x", { body: "payload", headers: { "x-keep": "kept" }, method: "POST", signal: controller.signal });
-	// Firefox's Request constructor, like its own fetch(url, request), drops the body of a Request given as init.
+	// Firefox's Request constructor, like its own fetch(url, request), drops the body of a Request passed as init,
+	// so the body to expect is whatever this platform's constructor keeps from an identical Request.
 	const bodyKept = await new Request("https://api.test/x", makeRequest()).text();
 
 	await logFetch("https://api.test/x", makeRequest());
@@ -318,15 +319,15 @@ test("log.fetch keeps a url's credentials off the exported span", async t => {
 	const span = clientSpan(calls);
 	const urlFull = span.attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue;
 
-	t.ok(rejection !== "", "the runtime's own rejection reaches the caller");
 	t.ok(!JSON.stringify(calls).includes("hunter2"), "the password reaches nothing the collector is sent");
 	t.ok(!JSON.stringify(calls).includes("myuser"), "the username reaches nothing the collector is sent");
 	t.ok(!JSON.stringify(calls).includes("s3cr3t"), "the access_token reaches nothing the collector is sent");
 	t.strictEqual(urlFull, "http://127.0.0.1:45231/x", "url.full keeps the url without the userinfo");
 	t.strictEqual(span.status.code, 2, "the span is ERROR");
-	// Node and Chromium quote the url in the rejection, WebKit doesn't, and their wording around it differs.
-	// Where the runtime quotes it, the span's message keeps it with the userinfo redacted.
-	t.ok(!rejection.includes("hunter2") || span.status.message.includes("http://REDACTED@127.0.0.1:45231/x?access_token=REDACTED"), "the runtime's own message survives with the userinfo redacted");
+	// Node, Chromium and Firefox quote the url in the rejection, WebKit doesn't, and the wording around it
+	// differs, Firefox's span message also losing its tail. So the span holds the redacted url exactly when the
+	// runtime quoted the credential.
+	t.strictEqual(span.status.message.includes("http://REDACTED@127.0.0.1:45231/x?access_token=REDACTED"), rejection.includes("hunter2"), "the runtime's own message survives with the userinfo redacted");
 	t.end();
 });
 
@@ -494,9 +495,10 @@ test("log.fetch captures allow-listed request and response headers only, never a
 });
 
 test("log.fetch marks error spans for 4xx and for network failures, propagating each outcome", async t => {
+	const down = Object.assign(new Error("down"), { code: "ECONNREFUSED" });
 	const { calls, logFetch } = testFetchTrace({}, path => {
 		if (path === "/missing") return response({ status: 404 });
-		if (path === "/boom") throw Object.assign(new Error("down"), { code: "ECONNREFUSED" });
+		if (path === "/boom") throw down;
 		if (path === "/abort") throw new DOMException("aborted", "AbortError");
 		if (path === "/bare") throw "bare";
 		if (path.startsWith("/a/")) throw new Error("fetch failed: https://api.test/a/https:%2F%2Fu:hunter3%40z/b");
@@ -510,14 +512,14 @@ test("log.fetch marks error spans for 4xx and for network failures, propagating 
 	t.strictEqual(res.status, 404, "a 4xx response is still returned");
 
 	// A network failure re-throws unchanged.
-	let threw = false;
+	let thrown: unknown;
 
 	try {
 		await logFetch("https://api.test/boom");
-	} catch {
-		threw = true;
+	} catch (err) {
+		thrown = err;
 	}
-	t.ok(threw, "the underlying network error propagates to the caller");
+	t.strictEqual(thrown, down, "the underlying network error propagates to the caller, as the same object");
 
 	await logFetch("https://api.test/abort").catch(() => {});
 	await logFetch("https://api.test/bare").catch(() => {});
