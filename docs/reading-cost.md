@@ -746,3 +746,19 @@ Read most (opens and searches):
 - `package.json` 1
 - `release-tooling/test-in-docker.py` 1
 - `todo.md` 1
+
+## Reading cost, chunk 87267f88a783, finished 2026-11-16T01:14:48Z
+
+60224 new input tokens before the first commit.
+
+Read most (opens and searches):
+
+- `tests/otlp.test.ts` 4
+- `CHANGELOG.md` 3
+- `otlp/queue/export-scheduler.ts` 3
+- `tests/test-doubles.ts` 3
+- `otlp/queue/queue-storage.ts` 2
+- `otlp/queue/queue.ts` 1
+- `package.json` 1
+- `release-tooling/test-in-docker.py` 1
+- `tests/fetch.test.ts` 1

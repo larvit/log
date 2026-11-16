@@ -7,8 +7,33 @@ list replaces are deprecated and keep working until 3.0.0. A string `format` oth
 `"json"` now warns, and the entry a formatter takes has a new name, `LogEntry`. A second entry
 point, `@larvit/log/otel`, exports the spans that OpenTelemetry's instrumentation packages record.
 A `Log` also warns once on `stderr` when 3.0.0 will turn its text colour off, or will need a `spanName`
-it lacks. Nothing here needs a change in your code, except that a `Queue` given `batchDelayMs: 0` or
-`retryDelayMs: 0` now waits 1000 ms.
+it lacks. Nothing here needs a change in your code now, except that a `Queue` given `batchDelayMs: 0` or
+`retryDelayMs: 0` now waits 1000 ms. `### Action needed` lists what to change before 3.0.0.
+
+### Action needed
+
+- **Move `colors`, `format`, `printTraceInfo` and `stdout` to `consoleTransport`, and the `otlp*`
+  options to `otlpTransport`, before 3.0.0 removes them.** They work as before on a `Log` with no
+  `transports`, and write no warning. `otlpHttpBaseURI`, `otlpAdditionalHeaders` and `otlpProtocol`
+  become `baseUrl`, `headers` and `protocol`, and `otlpTransport` takes what `new Queue()` took. Two
+  things change when you move: pass your `stderr` to `consoleTransport` too, since the `Log`'s then
+  takes only this library's warnings, and expect export failure reports on `otlpTransport`'s
+  `report`, `console.error` by default, where the `otlp*` options sent them to the `Log`'s `stderr`.
+  README → Transports → Deprecated options lists each option.
+- **Import `LogEntry`, and stop using `EntryFormatterConf`, which 3.0.0 removes.** Both name the same
+  type, so switching now changes nothing at runtime and leaves nothing to do in 3.0.0.
+- **Match both values of `log.fetch`'s `error.type` until every sender runs 3.0.0.** 3.0.0 records
+  a string `code`, else `name`, else `"_OTHER"`, as `end({ error })` does. An abort then records
+  `"AbortError"` instead of `"20"`, a timeout `"TimeoutError"` instead of `"23"`, and an error with
+  no `code` or `name` `"_OTHER"` instead of `"fetch_error"`. See README → `log.fetch` in depth.
+- **Make an `OtlpQueue` of your own accept a metrics payload before 3.0.0.** `OtlpPayload`, what
+  `enqueue` receives, gains a third payload holding `resourceMetrics`. A queue that forwards
+  payloads can pass it on unchanged; one that branches on the payload needs a `default` branch. See
+  README → Queue exports.
+- **A `Log` warns once when its text output will lose colour in 3.0.0.** It fires on a `Log` that writes text with `colors` unset, where neither `NO_COLOR` nor `FORCE_COLOR` is set and stdout is no TTY or there is none, as in a browser. To decide now, pass `transports` with `consoleTransport({ colors })`, or set `NO_COLOR` or `FORCE_COLOR`.
+- **A `Log` with an OTLP queue and no `spanName` warns once.** 3.0.0 throws there, so name the span now. It fires on a `Log` given `otlpQueue`, and on a child or clone of one with `otlpHttpBaseURI` or `otlpQueue`.
+
+### Everything else
 
 - **Send to any set of destinations with `transports`.**
   `new Log({ transports: [consoleTransport({ format: "json" }), otlpTransport({ baseUrl })] })`
@@ -24,41 +49,21 @@ it lacks. Nothing here needs a change in your code, except that a `Queue` given 
   what OpenTelemetry instrumentation records.
 - **Send OTLP with a `fetch` of your own.** `otlpTransport({ baseUrl, fetch })` exports through the
   `fetch` you pass, such as `expo/fetch` or one that pins TLS, and no longer needs the global one.
-- **Move `colors`, `format`, `printTraceInfo` and `stdout` to `consoleTransport`, and the `otlp*`
-  options to `otlpTransport`, before 3.0.0 removes them.** They work as before on a `Log` with no
-  `transports`, and write no warning. `otlpHttpBaseURI`, `otlpAdditionalHeaders` and `otlpProtocol`
-  become `baseUrl`, `headers` and `protocol`, and `otlpTransport` takes what `new Queue()` took. Two
-  things change when you move: pass your `stderr` to `consoleTransport` too, since the `Log`'s then
-  takes only this library's warnings, and expect export failure reports on `otlpTransport`'s
-  `report`, `console.error` by default, where the `otlp*` options sent them to the `Log`'s `stderr`.
-  README → Transports → Deprecated options lists each option.
 - **Get a warning, once per `stderr` sink, for a `format` string other than `"text"` or `"json"`.**
   `new Log({ format: process.env.LOG_FORMAT })` wrote text, without a word, for `"pretty"`. It still
   writes text, and now says why.
 - **Follow the `entryFormatter` warning to `consoleTransport({ format })`.** It used to say "use
   `format`", a name 3.0.0 also removes from a `Log`. It now says `transports: [consoleTransport({
   format })]`.
-- **Import `LogEntry`, and stop using `EntryFormatterConf`, which 3.0.0 removes.** Both name the same
-  type, so switching now changes nothing at runtime and leaves nothing to do in 3.0.0.
 - **Answer a CORS preflight at your collector when you export from a browser.** README → Queue
   exports now says every cross-origin OTLP POST is preflighted for its `Content-Type`, and that
   without CORS on the collector each batch fails as a network error and is retried.
-- **Match both values of `log.fetch`'s `error.type` until every sender runs 3.0.0.** 3.0.0 records
-  a string `code`, else `name`, else `"_OTHER"`, as `end({ error })` does. An abort then records
-  `"AbortError"` instead of `"20"`, a timeout `"TimeoutError"` instead of `"23"`, and an error with
-  no `code` or `name` `"_OTHER"` instead of `"fetch_error"`. See README → `log.fetch` in depth.
-- **Make an `OtlpQueue` of your own accept a metrics payload before 3.0.0.** `OtlpPayload`, what
-  `enqueue` receives, gains a third payload holding `resourceMetrics`. A queue that forwards
-  payloads can pass it on unchanged; one that branches on the payload needs a `default` branch. See
-  README → Queue exports.
 - **A query value opening a url nested past eight levels records `REDACTED` even where the runtime
   cannot parse it.** A key there, and a value the runtime parses, already did, so the change only
   redacts more: `https://[` nested nine urls deep was exported as written.
-- **A `Log` warns once when its text output will lose colour in 3.0.0.** It fires on a `Log` that writes text with `colors` unset, where neither `NO_COLOR` nor `FORCE_COLOR` is set and stdout is no TTY or there is none, as in a browser. To decide now, pass `transports` with `consoleTransport({ colors })`, or set `NO_COLOR` or `FORCE_COLOR`.
 - **A `Queue` option that is zero, negative or `NaN` now warns once and uses the default.** `batchDelayMs`, `maxBatchBytes`, `maxItems` and `retryDelayMs` are checked. A `batchDelayMs` or `retryDelayMs` of `0`, which sent or retried at once, now waits 1000 ms. The warning goes to the queue's `report`, or to the `Log`'s `stderr` for a queue it built.
 - **`log.fetch` leaves a `Request` object untraced and passes it to the platform whole.** Before, a browser recorded a span for a url made of the page's address and `[object Request]`. Pass a `string` or a `URL` to have the call traced.
 - **Hand a `Log` the `fetch` it sends through, with the new `fetch` option.** `log.fetch` and the queue built from `otlpHttpBaseURI` send with it, and a child and a clone inherit it. A `Log` handed none still sends through the global `fetch`, read at each call, so a polyfill installed later still wins. See README → Options.
-- **A `Log` with an OTLP queue and no `spanName` warns once.** 3.0.0 throws there, so name the span now. It fires on a `Log` given `otlpQueue`, and on a child or clone of one with `otlpHttpBaseURI` or `otlpQueue`.
 - **A `clock` that throws while the queue restores its saved payloads no longer fails the queue's flushes.** The queue reports "OTLP queue restore failed, what it restored is kept" through `report` and goes on, instead of leaving an unhandled rejection and failing every flush.
 
 ## v2.6.1
