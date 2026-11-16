@@ -713,3 +713,22 @@ Read most (opens and searches):
 - `credentials/url-full.ts` 1
 - `release-tooling/test-in-docker.py` 1
 - `tests/credentials.test.ts` 1
+
+## Reading cost, chunk 8f809d20ab6e, finished 2026-11-16T00:33:38Z
+
+286143 new input tokens before the first commit.
+
+Read most (opens and searches):
+
+- `tests/fetch.test.ts` 19
+- `README.md` 16
+- `tests/otlp.test.ts` 15
+- `tests/console.test.ts` 13
+- `docs/decisions.md` 8
+- `log/conf.ts` 6
+- `otlp/queue/queue.ts` 6
+- `CHANGELOG.md` 5
+- `tests/test-doubles.ts` 5
+- `log/log.ts` 4
+
+## Reading cost reset, 2026-11-16T00:34:49Z
