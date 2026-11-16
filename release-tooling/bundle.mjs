@@ -3,8 +3,8 @@
 // uglifyjs. A Node script, since the build runs in the Node image,
 // which holds no Python. @opentelemetry/api stays an import, since the app's instrumentation has
 // to share that one copy.
-import { readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { readFileSync, writeFileSync } from "node:fs";
 
 const [name] = process.argv.slice(2);
 const { version } = JSON.parse(readFileSync("package.json", "utf8"));
