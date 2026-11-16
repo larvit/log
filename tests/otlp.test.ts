@@ -1,4 +1,4 @@
-import { callHeader, exportedRecords, exportedSpans, fakeClock, fakeStorage, fetchRecorder, nanos, reportSink, response, storedRecords, thrown, waitFor, withGlobals } from "./test-doubles.js";
+import { callHeader, exportedRecords, exportedSpans, fakeClock, fakeStorage, fetchRecorder, nanos, nextTurn, reportSink, response, storedRecords, thrown, waitFor, withGlobals } from "./test-doubles.js";
 import { type Clock, Log, type Metadata, type OtlpPayload, type OtlpQueue, Queue, type QueueStorage, type TimerHandle } from "../index.js";
 import { encodeBatch } from "../otlp/send/batch.js";
 import { ExportScheduler, transition, unref } from "../otlp/queue/export-scheduler.js";
@@ -659,7 +659,7 @@ for (const async of [false, true]) {
 	});
 }
 
-test("Queue reports a restore that throws, instead of rejecting its storage read", async t => {
+test("Queue reports a restore that throws, and its storage read does not reject", async t => {
 	const storage = fakeStorage(true);
 	const reports = reportSink();
 	const { payload } = recordPayload("held");
@@ -676,16 +676,17 @@ test("Queue reports a restore that throws, instead of rejecting its storage read
 	globalThis.addEventListener?.("unhandledrejection", onBrowser);
 
 	const clock = { ...fakeClock(), setTimeout: (): never => { throw new Error("no timers here"); } };
-	const queue = new Queue({ clock, fetch: fetchRecorder().fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report, storage });
 
-	await waitFor(() => reports.lines.length > 0);
-	await new Promise(resolve => setTimeout(resolve, 20));
+	new Queue({ clock, fetch: fetchRecorder().fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report, storage });
+
+	await waitFor(() => reports.lines.length > 0 || unhandled.length > 0);
+	await nextTurn();
 	nodeProcess?.off("unhandledRejection", onNode);
 	globalThis.removeEventListener?.("unhandledrejection", onBrowser);
 
-	t.strictEqual(queue.conf.storage, storage, "the queue keeps its storage");
+	t.strictEqual(storage.data.get("@larvit/log:otlp-queue"), stored, "storage still holds the payloads");
 	t.deepEqual(unhandled, [], "no rejection reaches the runtime");
-	t.deepEqual(reports.lines, [{ error: "no timers here", key: "@larvit/log:otlp-queue", msg: "OTLP queue restore failed" }], "the failure is reported once");
+	t.deepEqual(reports.lines, [{ error: "no timers here", key: "@larvit/log:otlp-queue", msg: "OTLP queue restore failed, what it restored is kept" }], "the failure is reported once");
 	t.end();
 });
 
