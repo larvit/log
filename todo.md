@@ -6,7 +6,7 @@
 
 `Bar = 0.5`
 
-`Next ID = 165`
+`Next ID = 166`
 
 ## Items
 
@@ -20,6 +20,7 @@
 | 80 | 2.7.0 |  | principle | **Run the browser suite in WebKit and Firefox as well as Chromium.** | 2 | 1 | 1 | 2 | 3 | 3 by 7 | 2.0 |
 | 157 | 2.7.0 |  |  | **Hand a custom transport's `span` method a span in a consumer's shape, and each transport its own copy of an entry and a span.** | 3 | 2 | 3 | 6 | 5 | 1 by 4, 4 by 4 | 1.0 |
 | 164 | 2.8.0 |  | owner | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 2 | code health by 3 | 6.2 |
+| 165 | 2.8.0 |  |  | **Warn once when `consoleTransport` leaves `colors` unset where 3.0.0 turns colour off.** | 1 | 1 | 1 | 1 | 2 | 1 by 5 | 2.5 |
 | 28 | 2.8.0 |  |  | **Export resource attributes beyond `service.name`.** | 2 | 1 | 2 | 3 | 3 | 2 by 7 | 1.7 |
 | 117 | 2.8.0 |  |  | **Bring the built `index.js` within README → Footprint's 10 KB gzipped budget.** | 2 | 1 | 2 | 3 | 3 | 5 by 7 | 1.5 |
 | 26 | 2.8.0 |  |  | **Check the footprint budget in CI, so the numbers in README → Footprint fail a build instead of going stale.** | 2 | 1 | 1 | 2 | 5 | 5 by 8 | 1.5 |
@@ -141,6 +142,13 @@ This item's tagline names the floor, so its chunk runs the four-seat scoring run
 or the overall stays under 7.0, file items for the places the seats name, lowest dimension first,
 and a copy of this item blocked by them. Where every score reaches 7.0, it doesn't file anything,
 and the run replaces the comprehension baseline.
+
+### 165. Warn once when `consoleTransport` leaves `colors` unset where 3.0.0 turns colour off.
+
+`transports: [consoleTransport()]` is the shape the transports release asks everyone to move to, and it
+takes its colour from `defaultColors()`, which item 65 changes in 3.0.0. A `Log` with a `transports`
+list is exempt from the colour warning on the `Log`'s `colors` option, so that consumer gets no notice.
+Found in the product-owner and stability reviews of 2.7.0's items 15 and 158.
 
 ### 28. Export resource attributes beyond `service.name`.
 

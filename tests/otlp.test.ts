@@ -2020,7 +2020,7 @@ test("a Queue option that is NaN, zero or negative warns once per report sink an
 });
 
 test("an instance with an otlpQueue and no spanName warns once per stderr sink", t => {
-	const notice = "@larvit/log: spanName is unset on an instance with an otlpQueue, so its span is named \"unnamed-span\"; 3.0.0 throws there, so set spanName";
+	const notice = "@larvit/log: spanName is unset on an instance that has an OTLP queue, so its span is named \"unnamed-span\"; 3.0.0 throws there, so set spanName";
 	const { fetch } = fetchRecorder();
 	const otlpQueue = new Queue({ fetch, otlpHttpBaseURI: "http://127.0.0.1:4318" });
 	const lines: string[] = [];
