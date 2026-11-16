@@ -767,6 +767,21 @@ test("log.fetch reads the platform's fetch at the call, so one installed after t
 	t.end();
 });
 
+test("log.fetch calls a handed fetch with no this, since a browser's fetch throws when called as a method of anything but the window", async t => {
+	const receivers: unknown[] = [];
+
+	function fetch(this: unknown) {
+		receivers.push(this);
+
+		return Promise.resolve(response() as unknown as Response);
+	}
+	const log = new Log({ fetch, stderr: () => {} });
+
+	await log.fetch("https://api.test/x");
+	t.deepEqual(receivers, [undefined], "this is undefined, not the conf that holds the function");
+	t.end();
+});
+
 test("log.fetch works without OTLP, still injecting a traceparent", async t => {
 	const { calls, fetch } = fetchRecorder();
 	const log = new Log({ fetch, stderr: () => {} });

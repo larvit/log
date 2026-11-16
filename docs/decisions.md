@@ -451,7 +451,7 @@ no-break space, `\v`, `\f`, U+2028 and the like in both, so ending there would e
 credential, and prose such as `see //host and mail a@b` stays readable. Serves README → Goals #7.
 Valid while a url parser keeps such whitespace in userinfo and a query value.
 
-## A platform read stays a default, and a consumer injects through `colors` and `clock`
+## A platform read stays a default, and a consumer injects through `colors`, `clock` and `fetch`
 
 2026-11-13, the implementing agent: `colorsFromEnv`, `parseHttpUrl` and `unref` take the value they
 read, and `processEnv` and `denoUnrefTimer` read it at their callers. `pageHref` reads the global
@@ -464,16 +464,26 @@ the value passed in, and `pageHref` with a stand-in for the global object. A tes
 or `otlpTransport` its `fetch`, and a `Log` its `fetch` option, which `log.fetch` and the queue built
 from `otlpHttpBaseURI` send through. The suite swaps a global by name only in the tests of the default
 that reads it:
-- `process`, to prove the colour default reads the env, and the notice off a non-TTY stdout.
-- `fetch`, to prove a `Log` handed none sends through the global, one installed after the `Log` was made
-  included, and to prove that code handed a `fetch` leaves the global alone.
 - `Deno` and `setTimeout`, to prove that only the system clock's timer ids reach `Deno.unrefTimer`.
-- `Request`, to prove `log.fetch` traces a call on a runtime without one.
+- `fetch`, to prove a `Log` handed none sends through the global (one installed after the `Log` was made
+  too), and to prove that code handed a `fetch` leaves the global alone.
 - `performance`, to prove the OpenTelemetry adapter reads `performance.timeOrigin`.
+- `process`, to prove the colour default reads the env, and the colour warning reads stdout's TTY flag.
+- `Request`, to prove `log.fetch` traces a call on a runtime without one.
 
 One test swaps `URL` to count the parses `redactedQuery` makes, since that function takes no
 parser. Serves README → Goals #2 and #5. Valid while no
 consumer needs the page address or the env injected apart from these.
+
+2026-11-16, the implementing agent: `Log` gains a `fetch` option, because `log.fetch` and the queue built
+from `otlpHttpBaseURI` send through the network, and none of `colors`, `clock` or an absolute url
+replaces that. A consumer needs it for `expo/fetch`, a fetch that pins TLS or a test that records the
+requests, and a test that swaps the global instead cannot run beside another. The spelling is `fetch`,
+as `Queue` and `otlpTransport` already spell it. A panel of a server app developer, a library author
+and a mobile app developer picked it unanimously over `httpClient` and `fetchImpl`, since `httpClient`
+reads as taking an object and `fetchImpl` as another option than the queue's. A `Log` does not hand
+the function on as a method of `conf`, since a browser's `fetch` throws then. The option stays out of
+`Log`'s second constructor parameter, which carries only what this library passes.
 
 ## A constructor parameter marked "Not part of the API" carries what only this library passes
 

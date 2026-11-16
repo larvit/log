@@ -79,7 +79,7 @@ test("colors unset in code follows the process env, defaulting to on; set in cod
 	t.end();
 });
 
-const COLORS_NOTICE = "@larvit/log: colors is unset and stdout is no TTY, so text entries carry colour codes, which 3.0.0 turns off here; set colors, or NO_COLOR or FORCE_COLOR, to decide now";
+const COLORS_NOTICE = "@larvit/log: colors is unset and stdout is no TTY or has none, so text entries carry colour codes, which 3.0.0 turns off here; to decide now, pass transports with consoleTransport({ colors }), or set NO_COLOR or FORCE_COLOR";
 
 for (const [name, env, isTTY, expected] of [
 	["no env var and no TTY", {}, undefined, COLORS_NOTICE],
@@ -122,6 +122,7 @@ test("a Log with colors unset in a text format warns once per stderr when stdout
 		new Log({ colors: false, stderr });
 		new Log({ format: "json", stderr });
 		new Log({ stderr, transports: [] });
+		new Log({ logLevel: "none", stderr });
 		quiet = [...lines];
 		new Log({ stderr });
 		new Log({ stderr });
@@ -133,7 +134,7 @@ test("a Log with colors unset in a text format warns once per stderr when stdout
 		}
 	}
 
-	t.deepEqual(quiet, [], "no warning where colors is set, where the output is JSON or where a transports list owns it");
+	t.deepEqual(quiet, [], "no warning where colors is set, where the output is JSON, where a transports list owns it or where the level is none");
 	t.strictEqual(lines.length, 1, "a text Log warns, once for its stderr sink");
 	t.ok(lines[0].includes(COLORS_NOTICE), "and says what 3.0.0 does");
 	t.end();

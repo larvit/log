@@ -156,14 +156,14 @@ export function pageHref(scope: object = globalThis): string | undefined {
 	return typeof href === "string" ? href : undefined;
 }
 
-// The signature takes a string or a URL, but a JS caller can pass a Request. It has no href, and String() of it is
-// "[object Request]", which a browser resolves against the page into a url the caller never meant.
+// The signature takes a string or a URL, but a JS caller can pass a Request. A Request has no href, and String() of it
+// is "[object Request]", which a browser resolves against the page into a url the caller never meant.
 export function isStringOrUrl(input: unknown): input is string | URL {
 	return typeof input === "string" || (typeof input === "object" && input !== null && typeof Reflect.get(input, "href") === "string");
 }
 
-// log.fetch as a whole: an input that is no string or URL, such as a Request, and a url `parseHttpUrl` rejects
-// (unparsable, or not `http:` or `https:`), go to the platform untraced, and any other is traced. `track` gets a
+// log.fetch as a whole. Two kinds of input go to the platform untraced: one that is no string or URL, such as a Request,
+// and a url `parseHttpUrl` rejects (unparsable, or not `http:` or `https:`). Any other is traced. `track` gets a
 // promise that settles once the traced request settles, with its span queued or dropped. `track` isn't called for an
 // untraced input.
 export function traceFetch(trace: FetchTrace, input: string | URL, init: RequestInit | undefined, track: (spanQueued: Promise<void>) => void): Promise<Response> {

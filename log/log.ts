@@ -204,8 +204,13 @@ export class Log implements LogInt {
 			captureResponseHeaders,
 			context: this.context,
 			// Read at the call, so a `conf.fetch` set later, or a polyfill installed after this Log was made, still wins.
-			// The global is called as a method of globalThis, since a browser's fetch throws when detached.
-			fetch: (...args) => this.conf.fetch ? this.conf.fetch(...args) : globalThis.fetch(...args),
+			// Neither is called as a method of `conf`: a browser's fetch throws unless `this` is the window or undefined.
+			// The global is called through globalThis for that reason.
+			fetch: (...args) => {
+				const { fetch } = this.conf;
+
+				return fetch ? fetch(...args) : globalThis.fetch(...args);
+			},
 			warn: msg => warnOnceToStderr(this.conf, this.context, msg),
 		};
 	}

@@ -45,7 +45,7 @@ In [docs/decisions.md](docs/decisions.md):
 - `ProtoWriter.string` uses `TextEncoder` with no fallback
 - The protobuf encoder stays
 - In text, a plain space ends a credential and no other whitespace does
-- A platform read stays a default, and a consumer injects through `colors` and `clock`
+- A platform read stays a default, and a consumer injects through `colors`, `clock` and `fetch`
 - A constructor parameter marked "Not part of the API" carries what only this library passes
 - The package publishes one bundled file per entry point, built from a module per part
 - The OpenTelemetry adapter exports a span through the `Log` handed to `runWithLog`, redacted as a `log.fetch` span is
@@ -75,8 +75,7 @@ In [docs/decisions.md](docs/decisions.md):
 - Tests-first. Tests sit in one file per part of the library, as `tests/otlp.test.ts`, beside the
   doubles they share in `tests/test-doubles.ts`. Import a new test file in `tests/test.ts`, the
   entry the Node and browser runs both load. A test of `@larvit/log/otel` goes in
-  `tests/otel-adapter.test.ts`, which only `npm run test-node` runs. The suite injects `stdout`/`stderr` and stubs the global
-  `fetch`, so the same tests cover console + OTLP in both runtimes.
+  `tests/otel-adapter.test.ts`, which only `npm run test-node` runs. The suite injects `stdout`, `stderr` and `fetch`, so the same tests cover console + OTLP in both runtimes.
 - See [README](README.md) for build/test/release commands.
 - Don't wait on CodeRabbit: under 10 stars it reviews only when triggered by hand.
 

@@ -49,8 +49,9 @@ class ItemBuffer {
 	}
 }
 
-// The numeric options, with the default each falls to when it is NaN, zero or negative.
-const NUMERIC_DEFAULTS = { batchDelayMs: 1000, maxBatchBytes: KEEPALIVE_MAX_BYTES, maxItems: 1000, retryDelayMs: 1000 } as const;
+// The numeric options, with the default each falls to when it is unset, NaN, zero or negative.
+const NUMERIC_KEYS = ["batchDelayMs", "maxBatchBytes", "maxItems", "retryDelayMs"] as const;
+const NUMERIC_DEFAULTS: Record<(typeof NUMERIC_KEYS)[number], number> = { batchDelayMs: 1000, maxBatchBytes: KEEPALIVE_MAX_BYTES, maxItems: 1000, retryDelayMs: 1000 };
 
 export class Queue implements OtlpQueue {
 	readonly conf: ResolvedQueueConf;
@@ -87,8 +88,10 @@ export class Queue implements OtlpQueue {
 		// A browser's localStorage holds the origin's session tokens, so no stringify or spread may carry it.
 		Object.defineProperty(this.conf, "storage", { configurable: true, enumerable: false, value: conf.storage, writable: true });
 
-		// Such a number would retry at once, drop everything or never flush on size.
-		for (const key of Object.keys(NUMERIC_DEFAULTS) as (keyof typeof NUMERIC_DEFAULTS)[]) {
+		// An option that is no number above zero (a given 0, a negative or NaN) would retry at once, drop everything or
+		// never flush on size. Zero is rejected too, though a batchDelayMs of 0 once meant the next tick: a delay that
+		// short sends every item alone, which defeats batching.
+		for (const key of NUMERIC_KEYS) {
 			const given = this.conf[key];
 
 			if (!(given > 0)) {

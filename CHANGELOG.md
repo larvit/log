@@ -6,7 +6,9 @@ A `Log` now sends to a list of transports you choose, and you can write your own
 list replaces are deprecated and keep working until 3.0.0. A string `format` other than `"text"` or
 `"json"` now warns, and the entry a formatter takes has a new name, `LogEntry`. A second entry
 point, `@larvit/log/otel`, exports the spans that OpenTelemetry's instrumentation packages record.
-Nothing here needs a change in your code.
+A `Log` also warns once on `stderr` when 3.0.0 will turn its text colour off, or will need a `spanName`
+it lacks. Nothing here needs a change in your code, except that a `Queue` given `batchDelayMs: 0` or
+`retryDelayMs: 0` now waits 1000 ms.
 
 - **Send to any set of destinations with `transports`.**
   `new Log({ transports: [consoleTransport({ format: "json" }), otlpTransport({ baseUrl })] })`
@@ -52,11 +54,11 @@ Nothing here needs a change in your code.
 - **A query value opening a url nested past eight levels records `REDACTED` even where the runtime
   cannot parse it.** A key there, and a value the runtime parses, already did, so the change only
   redacts more: `https://[` nested nine urls deep was exported as written.
-- **A `Log` warns once when its text output will lose colour in 3.0.0.** It fires when `colors` is unset, stdout is no TTY and neither `NO_COLOR` nor `FORCE_COLOR` is set. Set one of them to decide now.
-- **A `Queue` option that is negative, zero or `NaN` now warns once and uses the default.** `batchDelayMs`, `maxBatchBytes`, `maxItems` and `retryDelayMs` are checked, and the warning goes to the queue's `report` sink.
-- **`log.fetch` leaves a `Request` object untraced and passes it to the platform whole.** Before, it read the `Request`'s url and could drop its method, headers and body. Pass a `string` or a `URL` to have the call traced.
+- **A `Log` warns once when its text output will lose colour in 3.0.0.** It fires on a `Log` that writes text with `colors` unset, where neither `NO_COLOR` nor `FORCE_COLOR` is set and stdout is no TTY or there is none, as in a browser. To decide now, pass `transports` with `consoleTransport({ colors })`, or set `NO_COLOR` or `FORCE_COLOR`.
+- **A `Queue` option that is zero, negative or `NaN` now warns once and uses the default.** `batchDelayMs`, `maxBatchBytes`, `maxItems` and `retryDelayMs` are checked. A `batchDelayMs` or `retryDelayMs` of `0`, which sent or retried at once, now waits 1000 ms. The warning goes to the queue's `report`, or to the `Log`'s `stderr` for a queue it built.
+- **`log.fetch` leaves a `Request` object untraced and passes it to the platform whole.** Before, a browser recorded a span for a url made of the page's address and `[object Request]`. Pass a `string` or a `URL` to have the call traced.
 - **Hand a `Log` the `fetch` it sends through, with the new `fetch` option.** `log.fetch` and the queue built from `otlpHttpBaseURI` send with it, and a child and a clone inherit it. A `Log` handed none still sends through the global `fetch`, read at each call, so a polyfill installed later still wins. See README → Options.
-- **A `Log` warns once when it has an `otlpQueue` and no `spanName`.** 3.0.0 throws there, so name the span now.
+- **A `Log` with an OTLP queue and no `spanName` warns once.** 3.0.0 throws there, so name the span now. It fires on a `Log` given `otlpQueue`, and on a child or clone of one with `otlpHttpBaseURI` or `otlpQueue`.
 
 ## v2.6.1
 
