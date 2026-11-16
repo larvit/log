@@ -109,7 +109,12 @@ export class StoredQueue {
 		const stored = parseStoredPayloads(raw);
 
 		if ("payloads" in stored) {
-			restore(stored.payloads);
+			try {
+				restore(stored.payloads);
+			} catch (err) {
+				// The storage was read, so writes go on. What `restore` did before it threw stays.
+				this.report("OTLP queue restore failed", withoutUndefined({ error: stringField(err, "message"), key }));
+			}
 
 			return true;
 		}

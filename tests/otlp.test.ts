@@ -659,6 +659,36 @@ for (const async of [false, true]) {
 	});
 }
 
+test("Queue reports a restore that throws, instead of rejecting its storage read", async t => {
+	const storage = fakeStorage(true);
+	const reports = reportSink();
+	const { payload } = recordPayload("held");
+	const stored = JSON.stringify([payload]);
+
+	storage.data.set("@larvit/log:otlp-queue", stored);
+
+	const unhandled: unknown[] = [];
+	const onNode = (reason: unknown) => { unhandled.push(reason); };
+	const onBrowser = (event: PromiseRejectionEvent) => { event.preventDefault(); unhandled.push(event.reason); };
+	const nodeProcess = typeof process === "undefined" ? undefined : process;
+
+	nodeProcess?.on("unhandledRejection", onNode);
+	globalThis.addEventListener?.("unhandledrejection", onBrowser);
+
+	const clock = { ...fakeClock(), setTimeout: (): never => { throw new Error("no timers here"); } };
+	const queue = new Queue({ clock, fetch: fetchRecorder().fetch, otlpHttpBaseURI: "http://127.0.0.1:4318", report: reports.report, storage });
+
+	await waitFor(() => reports.lines.length > 0);
+	await new Promise(resolve => setTimeout(resolve, 20));
+	nodeProcess?.off("unhandledRejection", onNode);
+	globalThis.removeEventListener?.("unhandledrejection", onBrowser);
+
+	t.strictEqual(queue.conf.storage, storage, "the queue keeps its storage");
+	t.deepEqual(unhandled, [], "no rejection reaches the runtime");
+	t.deepEqual(reports.lines, [{ error: "no timers here", key: "@larvit/log:otlp-queue", msg: "OTLP queue restore failed" }], "the failure is reported once");
+	t.end();
+});
+
 test("Queue's byte count follows its items, so a delivered or dropped record stops filling the next batch", async t => {
 	const clock = fakeClock();
 	const big = "a".repeat(5000);
