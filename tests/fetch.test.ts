@@ -1,6 +1,6 @@
 import { buildUrlFull } from "../credentials/url-full.js";
 import { callHeader, capture, clientSpan, exportedRecords, exportedSpans, fetchRecorder, nextTurn, response, stubFetch, testFetchTrace, waitFor } from "./test-doubles.js";
-import { capturedHeaders, fetchFailure, pageHref, requestAttributes, responseAttributes, spanStatusCode } from "../tracing/fetch.js";
+import { capturedHeaders, fetchFailure, isStringOrUrl, pageHref, requestAttributes, responseAttributes, spanStatusCode } from "../tracing/fetch.js";
 import { formatTraceparent, generateSpanId, generateTraceId, Log, parseTraceparent, Queue, type TimerHandle } from "../index.js";
 import { isCredentialHeaderName } from "../credentials/header-names.js";
 import { STATUS_CODE_ERROR, STATUS_CODE_UNSET } from "../otlp/payloads.js";
@@ -594,6 +594,21 @@ test("await log.flush() waits for a fire-and-forget log.fetch still in flight, a
 	t.strictEqual(exportedSpans(calls).find(span => span.kind === 3)?.name, "GET api.test", "and resolves once the client span is delivered");
 	t.end();
 });
+
+for (const [input, expected, name] of [
+	["https://api.test/x", true, "a string"],
+	[new URL("https://api.test/x"), true, "a URL"],
+	[{ href: "https://api.test/x" }, true, "an object holding a string href"],
+	[{ href: 5 }, false, "an object whose href is no string"],
+	[{ url: "https://api.test/x" }, false, "a Request-like object holding a url, not an href"],
+	[null, false, "null"],
+	[5, false, "a number"],
+] as const) {
+	test(`log.fetch traces ${name}: ${expected}`, t => {
+		t.strictEqual(isStringOrUrl(input), expected, name);
+		t.end();
+	});
+}
 
 for (const [scope, expected, name] of [
 	[{ location: { href: "https://app.test/page" } }, "https://app.test/page", "a page's location"],

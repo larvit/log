@@ -10,9 +10,9 @@ export function processEnv(): unknown {
 }
 
 // Whether the process global's stdout is a terminal: true there, else false or undefined, and undefined where there is no process.
-export function stdoutIsTTY(): unknown {
+export function stdoutIsTTY(scope: object = globalThis): unknown {
 	try {
-		const processGlobal: unknown = Reflect.get(globalThis, "process");
+		const processGlobal: unknown = Reflect.get(scope, "process");
 		const stdout: unknown = typeof processGlobal === "object" && processGlobal !== null ? Reflect.get(processGlobal, "stdout") : undefined;
 
 		return typeof stdout === "object" && stdout !== null ? Reflect.get(stdout, "isTTY") : undefined;

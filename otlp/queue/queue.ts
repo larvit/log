@@ -91,7 +91,7 @@ export class Queue implements OtlpQueue {
 		for (const key of Object.keys(NUMERIC_DEFAULTS) as (keyof typeof NUMERIC_DEFAULTS)[]) {
 			const given = this.conf[key];
 
-			if (typeof given === "number" && !(given > 0)) {
+			if (!(given > 0)) {
 				this.warnOnceToSink(`@larvit/log: ${key} ${given} is not above zero, using ${NUMERIC_DEFAULTS[key]}`);
 				this.conf[key] = NUMERIC_DEFAULTS[key];
 			}

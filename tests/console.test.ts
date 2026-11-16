@@ -1,6 +1,7 @@
 import { capture, clientSpan, fakeClock, fetchRecorder, thrown } from "./test-doubles.js";
 import { colorsDefaultWarning, colorsFromEnv } from "../log/entry-format.js";
 import { type EntryFormatter, type EntryFormatterConf, generateSpanId, generateTraceId, Log, type LogConf, type LogEntry, type Logger, type LogInt, type LogLevel, LogLevels, type LogOptions, type Metadata, msgJsonFormatter, msgTextFormatter, Queue, type ResolvedLogConf, resolveFormatter } from "../index.js";
+import { stdoutIsTTY } from "../primitives/process-env.js";
 import test from "./tap.js";
 
 for (const { level, stream, token } of [
@@ -90,6 +91,21 @@ for (const [name, env, isTTY, expected] of [
 ] as const) {
 	test(`colorsDefaultWarning: ${name}`, t => {
 		t.strictEqual(colorsDefaultWarning(env, isTTY), expected, name);
+		t.end();
+	});
+}
+
+for (const [scope, expected, name] of [
+	[{ process: { stdout: { isTTY: true } } }, true, "a TTY"],
+	[{ process: { stdout: { isTTY: false } } }, false, "stdout that is no TTY"],
+	[{ process: { stdout: {} } }, undefined, "stdout with no isTTY"],
+	[{ process: {} }, undefined, "a process with no stdout"],
+	[{ process: null }, undefined, "no process"],
+	[{}, undefined, "no process global"],
+	[Object.defineProperty({}, "process", { get: () => { throw new Error("blocked"); } }), undefined, "a process getter that throws"],
+] as const) {
+	test(`stdoutIsTTY reads ${name}`, t => {
+		t.strictEqual(stdoutIsTTY(scope), expected, name);
 		t.end();
 	});
 }
