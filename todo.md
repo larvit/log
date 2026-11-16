@@ -13,7 +13,6 @@
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 139 | 2.7.0 |  | principle | **Cite "Sane defaults" as applied in the clock and randomness decision, once the principle carries its exception for a library.** | 1 | 2 | 1 | 2 | 1 | code health by 1 | 2.1 |
-| 80 | 2.7.0 |  | principle | **Run the browser suite in WebKit and Firefox as well as Chromium.** | 2 | 1 | 1 | 2 | 3 | 3 by 7 | 2.0 |
 | 157 | 2.7.0 |  |  | **Hand a custom transport's `span` method a span in a consumer's shape, and each transport its own copy of an entry and a span.** | 3 | 2 | 3 | 6 | 5 | 1 by 4, 4 by 4 | 1.0 |
 | 164 | 2.8.0 |  | owner | **Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.** | 1 | 1 | 1 | 1 | 2 | code health by 3 | 6.2 |
 | 165 | 2.8.0 |  |  | **Warn once when `consoleTransport` leaves `colors` unset where 3.0.0 turns colour off.** | 1 | 1 | 1 | 1 | 2 | 1 by 5 | 2.5 |
@@ -79,14 +78,9 @@
 departs from the technical principle "Sane defaults", which still has a library ask for its clock
 and randomness. The exception is planned where the technical principles are kept, outside this
 repo. When it lands, reword the decision to cite the principle as applied, and finish this item.
-Until then the code stays: README → Goals #1 and #2 need the defaults. Found by the principles pass
+Until then the code stays: README → Goals #1 and #2 need the defaults. As of 2026-11-16 the
+principle still has a library ask (claude-config item 291 is open), so this item waits. Found by the principles pass
 of 2.6.0's release review.
-
-### 80. Run the browser suite in WebKit and Firefox as well as Chromium.
-
-`scripts/run-browser-tests.mjs` launches Chromium alone, though its Playwright image ships both.
-WebKit is the only engine on an iPhone, and `redactedText` has a Firefox branch the suite only
-fakes. `~/.claude/principles/frontend.md` → broad device support.
 
 ### 157. Hand a custom transport's `span` method a span in a consumer's shape, and each transport its own copy of an entry and a span.
 

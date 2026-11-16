@@ -47,14 +47,16 @@ test("log.fetch sends a Request passed as init with its own method, body, signal
 		},
 	});
 	const controller = new AbortController();
-	const request = new Request("https://api.test/x", { body: "payload", headers: { "x-keep": "kept" }, method: "POST", signal: controller.signal });
+	const makeRequest = () => new Request("https://api.test/x", { body: "payload", headers: { "x-keep": "kept" }, method: "POST", signal: controller.signal });
+	// Firefox's Request constructor, like its own fetch(url, request), drops the body of a Request given as init.
+	const bodyKept = await new Request("https://api.test/x", makeRequest()).text();
 
-	await logFetch("https://api.test/x", request);
+	await logFetch("https://api.test/x", makeRequest());
 	controller.abort();
 
 	t.strictEqual(sent.length, 1, "one request is sent");
 	t.strictEqual(sent[0].method, "POST", "the Request's method is kept");
-	t.strictEqual(await sent[0].text(), "payload", "the Request's body is kept");
+	t.strictEqual(await sent[0].text(), bodyKept, "the Request's body is kept as the platform keeps it");
 	t.strictEqual(sent[0].signal.aborted, true, "the Request's signal is kept");
 	t.strictEqual(sent[0].headers.get("x-keep"), "kept", "the Request's headers are kept");
 	t.strictEqual(sent[0].headers.get("traceparent")?.split("-")[1], trace.span.traceId, "the request continues the log's trace");
@@ -316,15 +318,15 @@ test("log.fetch keeps a url's credentials off the exported span", async t => {
 	const span = clientSpan(calls);
 	const urlFull = span.attributes.find((attribute: any) => attribute.key === "url.full").value.stringValue;
 
-	// Red here means the runtime stopped quoting the credential: drop this line, keep the rest.
-	t.ok(rejection.includes("hunter2"), "the runtime's own rejection, credentials and all, reaches the caller");
+	t.ok(rejection !== "", "the runtime's own rejection reaches the caller");
 	t.ok(!JSON.stringify(calls).includes("hunter2"), "the password reaches nothing the collector is sent");
 	t.ok(!JSON.stringify(calls).includes("myuser"), "the username reaches nothing the collector is sent");
 	t.ok(!JSON.stringify(calls).includes("s3cr3t"), "the access_token reaches nothing the collector is sent");
 	t.strictEqual(urlFull, "http://127.0.0.1:45231/x", "url.full keeps the url without the userinfo");
 	t.strictEqual(span.status.code, 2, "the span is ERROR");
-	// The wording around it differs between Node and the browser; the redaction does not.
-	t.ok(span.status.message.includes("http://REDACTED@127.0.0.1:45231/x?access_token=REDACTED"), "the runtime's own message survives with the userinfo redacted");
+	// Node and Chromium quote the url in the rejection, WebKit doesn't, and their wording around it differs.
+	// Where the runtime quotes it, the span's message keeps it with the userinfo redacted.
+	t.ok(!rejection.includes("hunter2") || span.status.message.includes("http://REDACTED@127.0.0.1:45231/x?access_token=REDACTED"), "the runtime's own message survives with the userinfo redacted");
 	t.end();
 });
 
