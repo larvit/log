@@ -1,5 +1,5 @@
-// Runs the browser suite in the Playwright image that matches the playwright version in
-// package.json, which ships the browsers. Needs Docker and Node on the host.
+// Runs the browser suite in the Playwright image whose version matches the playwright dependency in
+// package.json. That image ships the browsers. Needs Docker and Node on the host.
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
