@@ -2011,6 +2011,11 @@ test("a Queue option that is NaN, zero or negative warns once per report sink an
 	const kept = new Queue({ batchDelayMs: 5, maxBatchBytes: 10, maxItems: 3, otlpHttpBaseURI: "http://127.0.0.1:4318", report: valid.report, retryDelayMs: 7 });
 
 	t.deepEqual({ batchDelayMs: kept.conf.batchDelayMs, lines: valid.lines.length, maxBatchBytes: kept.conf.maxBatchBytes, maxItems: kept.conf.maxItems, retryDelayMs: kept.conf.retryDelayMs }, { batchDelayMs: 5, lines: 0, maxBatchBytes: 10, maxItems: 3, retryDelayMs: 7 }, "a number above zero is kept, with no warning");
+
+	const text = reportSink();
+	const fromJs = new Queue({ maxItems: "many" as unknown as number, otlpHttpBaseURI: "http://127.0.0.1:4318", report: text.report });
+
+	t.deepEqual([fromJs.conf.maxItems, text.lines.map(line => line.msg)], [1000, ["@larvit/log: maxItems many is not above zero, using 1000"]], "so is a value a JS caller gave that is no number");
 	t.end();
 });
 

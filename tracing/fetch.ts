@@ -158,7 +158,7 @@ export function pageHref(scope: object = globalThis): string | undefined {
 
 // The signature takes a string or a URL, but a JS caller can pass a Request. It has no href, and String() of it is
 // "[object Request]", which a browser resolves against the page into a url the caller never meant.
-function isStringOrUrl(input: unknown): input is string | URL {
+export function isStringOrUrl(input: unknown): input is string | URL {
 	return typeof input === "string" || (typeof input === "object" && input !== null && typeof Reflect.get(input, "href") === "string");
 }
 
