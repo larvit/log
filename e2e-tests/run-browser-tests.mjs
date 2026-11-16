@@ -1,6 +1,6 @@
 // Runs the compiled test suite (.tmp/test) inside a real browser and reports the result.
 // Intended to run inside the official Playwright Docker image (browsers preinstalled), so it
-// never depends on the local OS or a locally installed Chromium. See package.json "test-browser".
+// never depends on the local OS or a locally installed Chromium. release-tooling/test-browser.mjs starts it.
 
 import { createServer } from "node:http";
 import { dirname, extname, join, resolve, sep } from "node:path";

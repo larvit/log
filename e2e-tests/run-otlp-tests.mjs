@@ -3,9 +3,9 @@
 // telemetry. The collector is the OTLP reference implementation, so this validates the hand-rolled
 // protobuf encoder against the spec itself, a stronger oracle than the in-suite decoder.
 //
-// Needs Docker + Node. Run via `npm run test-otlp` (builds index.js first). OTLP_PORT, OTLP_IMAGE and
-// OTLP_CONTAINER override the host port, the collector image and the container name. The image is
-// pinned to an exact version for reproducibility.
+// Needs Docker + Node. Run via `npm run test-otlp` (builds index.js first). OTLP_CONTAINER, OTLP_IMAGE and
+// OTLP_PORT override the container name, the collector image and the host port, so a second run takes
+// its own. The default image is pinned to an exact version for reproducibility.
 
 import assert from "node:assert/strict";
 import { chmod, mkdir, readFile, rm } from "node:fs/promises";
@@ -19,11 +19,11 @@ import { Log, otlpTransport } from "../index.js";
 const execFile = promisify(execFileCb);
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-// Each is set by an environment variable, so two runs on one machine can take different ports and
-// container names; the defaults are the pinned image and the collector's standard OTLP/HTTP port.
-const IMAGE = process.env.OTLP_IMAGE ?? "otel/opentelemetry-collector-contrib:0.154.0";
-const CONTAINER = process.env.OTLP_CONTAINER ?? "larvit-log-otlp-verify";
-const PORT = process.env.OTLP_PORT ?? "4318";
+// `||`, not `??`: an empty variable takes the default, since an empty container name would leave
+// the collector running under a random name that `removeContainer` never finds.
+const CONTAINER = process.env.OTLP_CONTAINER || "larvit-log-otlp-verify";
+const IMAGE = process.env.OTLP_IMAGE || "otel/opentelemetry-collector-contrib:0.154.0";
+const PORT = process.env.OTLP_PORT || "4318";
 const ENDPOINT = `http://127.0.0.1:${PORT}`;
 const CONFIG = resolve(SCRIPT_DIR, "otel-collector-config.yaml");
 // Host dir mounted into the container at /data; the collector's file exporter writes here and the
@@ -126,7 +126,7 @@ try {
 	await mkdir(DATA_DIR, { recursive: true });
 	await chmod(DATA_DIR, 0o777);
 
-	await docker(["run", "-d", "--name", CONTAINER, "-p", `${PORT}:4318`, "-v", `${CONFIG}:/etc/otel-config.yaml:ro`, "-v", `${DATA_DIR}:/data`, IMAGE, "--config", "/etc/otel-config.yaml"]);
+	await docker(["run", "-d", "--name", CONTAINER, "--memory", "1g", "--memory-swap", "1g", "-p", `${PORT}:4318`, "-v", `${CONFIG}:/etc/otel-config.yaml:ro`, "-v", `${DATA_DIR}:/data`, IMAGE, "--config", "/etc/otel-config.yaml"]);
 
 	await waitUntil("collector HTTP endpoint", async () => {
 		await fetch(ENDPOINT);
@@ -157,7 +157,7 @@ try {
 		assertSpan(received, name, protocol, ids);
 	}
 
-	console.log(`OTLP verification passed: collector ${IMAGE.split(":")[1]} parsed both JSON and protobuf output correctly.`);
+	console.log(`OTLP verification passed: collector ${IMAGE} parsed both JSON and protobuf output correctly.`);
 } catch (err) {
 	console.error("OTLP verification FAILED:", err.message);
 	if (logSink.length) console.error("library output:\n" + logSink.join("\n"));
