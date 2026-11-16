@@ -13,5 +13,5 @@ try {
 	writeFileSync("index.js", built);
 	execFileSync("node", ["e2e-tests/run-otlp-tests.mjs"], { stdio: "inherit" });
 } finally {
-	execFileSync("docker", ["rmi", IMAGE], { stdio: "ignore" });
+	execFileSync("docker", ["rmi", "-f", IMAGE], { stdio: "ignore" });
 }
