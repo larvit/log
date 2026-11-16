@@ -12,7 +12,6 @@
 
 | ID | Release | Blocked by | Exempt | Item | L | E | I | R | S | Moves | Score |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 114 | 2.7.0 |  |  | **Move `package.json`'s build and test one-liners into named scripts, and let the OTLP test read its collector's port, image and container name from the environment, today's values as defaults.** | 1 | 1 | 1 | 1 | 2 | code health by 1 | 2.1 |
 | 139 | 2.7.0 |  | principle | **Cite "Sane defaults" as applied in the clock and randomness decision, once the principle carries its exception for a library.** | 1 | 2 | 1 | 2 | 1 | code health by 1 | 2.1 |
 | 80 | 2.7.0 |  | principle | **Run the browser suite in WebKit and Firefox as well as Chromium.** | 2 | 1 | 1 | 2 | 3 | 3 by 7 | 2.0 |
 | 157 | 2.7.0 |  |  | **Hand a custom transport's `span` method a span in a consumer's shape, and each transport its own copy of an entry and a span.** | 3 | 2 | 3 | 6 | 5 | 1 by 4, 4 by 4 | 1.0 |
@@ -73,13 +72,6 @@
 | 108 | 3.0.0 |  | principle | **Keep two tabs of one web app sharing a `storage` key from sending a record twice or deleting each other's backlog.** | 3 | 2 | 2 | 5 | 5 | 3 by 5 | 0.7 |
 
 ## Details
-
-### 114. Move `package.json`'s build and test one-liners into named scripts, and let the OTLP test read its collector's port, image and container name from the environment, today's values as defaults.
-
-`build`, `build-tests`, `test-browser`, `test-node` and `test-otlp` chain
-shell inside one JSON string. `e2e-tests/run-otlp-tests.mjs` fixes port 4318, the image and the
-container name, so two runs on one machine clash, and its `docker rm -f` removes the other run's
-collector. Found by the technical principles audit on 2026-10-26.
 
 ### 139. Cite "Sane defaults" as applied in the clock and randomness decision, once the principle carries its exception for a library.
 
