@@ -96,7 +96,7 @@ queue survives app restarts through a `storage` adapter, and a full one holds ab
 **Runtimes.** Anything with a parser that takes `?.` and working global `fetch`, `TextEncoder`,
 `btoa`, `BigInt`, `URL` and `URLSearchParams`. In a browser that means Chrome 80, Firefox 74 or
 Safari 14, or newer; an older one throws a `SyntaxError` loading `index.js`. CI proves Node 18
-to 26 and current Chromium. React Native is supported from 0.74, where Hermes gained `TextEncoder`
+to 26 and current Chromium, Firefox and WebKit. React Native is supported from 0.74, where Hermes gained `TextEncoder`
 and `btoa`. Its own `URL` and `URLSearchParams` throw "not implemented" from members this package
 reads, so an app that doesn't already replace them installs a polyfill, such as
 `react-native-url-polyfill`, before its code uses this package. Deno and Bun meet the rule and are
@@ -773,7 +773,7 @@ and `npm run test-otlp` need Node 18+ on the host.
 |---|---|
 | `npm test` | Node and browser suites. |
 | `npm run test-docker` | Node suite, on the image the `Dockerfile` pins. `NODE_IMAGE=node:18.20.8-bookworm-slim npm run test-docker` picks another; CI runs 18 to 26. |
-| `npm run test-browser` | The same suite in Chromium, less the OpenTelemetry adapter's tests. |
+| `npm run test-browser` | The same suite in Chromium, Firefox and WebKit, less the OpenTelemetry adapter's tests. |
 | `npm run test-otlp` | Export to a real OpenTelemetry Collector, JSON and protobuf. `OTLP_DEBUG=1` prints what it received. `OTLP_CONTAINER` (`larvit-log-otlp-verify`), `OTLP_IMAGE` and `OTLP_PORT` (4318) set the container name, the collector image and the host port: a run in another checkout sets a container name and a port of its own. |
 | `npm run test-mutation` | Stryker mutation tests of the library, against the Node suite. `npm run test-mutation -- --mutate credentials/path.ts:30-50` mutates only those lines. |
 | `npm run lint` | eslint. |

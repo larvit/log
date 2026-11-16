@@ -43,7 +43,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      # Same suite in real Chromium via the official Playwright Docker image.
+      # Same suite in real Chromium, Firefox and WebKit via the official Playwright Docker image.
       - run: npm run test-browser
 
   OTLP-test:
