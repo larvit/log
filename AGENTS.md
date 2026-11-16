@@ -77,8 +77,8 @@ In [docs/decisions.md](docs/decisions.md):
   entry the Node and browser runs both load. A test of `@larvit/log/otel` goes in
   `tests/otel-adapter.test.ts`, which only `npm run test-node` runs. The suite injects `stdout`, `stderr` and `fetch`, so the same tests cover console + OTLP in both runtimes.
 - `npm run test-docker` runs the Node suite in a container built from the `Dockerfile`. `npm run lint`
-  runs eslint on the host, after `npm ci` on Node 20+. [README](README.md) → Development lists the
-  other test and lint commands.
+  runs eslint on the host, after `npm ci` on Node 20+. [README](README.md) → Development has the
+  browser, collector and mutation test commands.
 - Don't wait on CodeRabbit: under 10 stars it reviews only when triggered by hand.
 
 ## Words
