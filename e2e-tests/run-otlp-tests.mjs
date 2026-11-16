@@ -3,7 +3,8 @@
 // telemetry. The collector is the OTLP reference implementation, so this validates the hand-rolled
 // protobuf encoder against the spec itself, a stronger oracle than the in-suite decoder.
 //
-// Needs Docker + Node. Run via `npm run test-otlp` (builds index.js first). The collector image is
+// Needs Docker + Node. Run via `npm run test-otlp` (builds index.js first). OTLP_PORT, OTLP_IMAGE and
+// OTLP_CONTAINER override the host port, the collector image and the container name. The image is
 // pinned to an exact version for reproducibility.
 
 import assert from "node:assert/strict";
@@ -18,9 +19,12 @@ import { Log, otlpTransport } from "../index.js";
 const execFile = promisify(execFileCb);
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-const IMAGE = "otel/opentelemetry-collector-contrib:0.154.0";
-const CONTAINER = "larvit-log-otlp-verify";
-const ENDPOINT = "http://127.0.0.1:4318";
+// Each is set by an environment variable, so two runs on one machine can take different ports and
+// container names; the defaults are the pinned image and the collector's standard OTLP/HTTP port.
+const IMAGE = process.env.OTLP_IMAGE ?? "otel/opentelemetry-collector-contrib:0.154.0";
+const CONTAINER = process.env.OTLP_CONTAINER ?? "larvit-log-otlp-verify";
+const PORT = process.env.OTLP_PORT ?? "4318";
+const ENDPOINT = `http://127.0.0.1:${PORT}`;
 const CONFIG = resolve(SCRIPT_DIR, "otel-collector-config.yaml");
 // Host dir mounted into the container at /data; the collector's file exporter writes here and the
 // test reads it back. The contrib image is distroless (no /tmp, no shell), so a mount is required.
@@ -122,7 +126,7 @@ try {
 	await mkdir(DATA_DIR, { recursive: true });
 	await chmod(DATA_DIR, 0o777);
 
-	await docker(["run", "-d", "--name", CONTAINER, "-p", "4318:4318", "-v", `${CONFIG}:/etc/otel-config.yaml:ro`, "-v", `${DATA_DIR}:/data`, IMAGE, "--config", "/etc/otel-config.yaml"]);
+	await docker(["run", "-d", "--name", CONTAINER, "-p", `${PORT}:4318`, "-v", `${CONFIG}:/etc/otel-config.yaml:ro`, "-v", `${DATA_DIR}:/data`, IMAGE, "--config", "/etc/otel-config.yaml"]);
 
 	await waitUntil("collector HTTP endpoint", async () => {
 		await fetch(ENDPOINT);
