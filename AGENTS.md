@@ -69,10 +69,11 @@ In [docs/decisions.md](docs/decisions.md):
   is evidence of the problem, never the prescribed repair.
 - A release section opens with a few lines on its most important changes, and each bullet with a
   bold one-sentence tagline of the change, so the taglines alone say what the release holds.
-- A release section with anything a consumer must act on — a rotation advisory, an exposure still
-  open, a deprecation to move off before the next major — puts `### Action needed` holding it right
-  after that intro, ahead of `### Everything else`; one with none omits both headings. Thirty flat
-  bullets is where a rotation notice goes unread. v2.4.0 and v2.5.0 call the heading `### Security`.
+- A release section puts what a consumer must act on under `### Action needed`, right after that
+  intro and ahead of `### Everything else`: a rotation advisory, an exposure still open, a change
+  that takes effect on upgrade, a deprecation to move off before the next major. One with none omits
+  both headings. Thirty flat bullets is where a rotation notice goes unread. v2.4.0 and v2.5.0 call
+  the heading `### Security`.
 - Tests-first. Tests sit in one file per part of the library, as `tests/otlp.test.ts`, beside the
   doubles they share in `tests/test-doubles.ts`. Import a new test file in `tests/test.ts`, the
   entry the Node and browser runs both load. A test of `@larvit/log/otel` goes in

@@ -7,11 +7,12 @@ list replaces are deprecated and keep working until 3.0.0. A string `format` oth
 `"json"` now warns, and the entry a formatter takes has a new name, `LogEntry`. A second entry
 point, `@larvit/log/otel`, exports the spans that OpenTelemetry's instrumentation packages record.
 A `Log` also warns once on `stderr` when 3.0.0 will turn its text colour off, or will need a `spanName`
-it lacks. Nothing here needs a change in your code now, except that a `Queue` given `batchDelayMs: 0` or
-`retryDelayMs: 0` now waits 1000 ms. `### Action needed` lists what to change before 3.0.0.
+it lacks. Only `### Action needed` asks for a change in your code, now or before 3.0.0.
 
 ### Action needed
 
+- **Pass `1` where you passed `0` for a `Queue`'s `batchDelayMs` or `retryDelayMs`.** A zero, negative or `NaN` `batchDelayMs`, `maxBatchBytes`, `maxItems` or `retryDelayMs` now warns once and uses the default. A `0` for a delay, which sent or retried at once, now waits 1000 ms. The warning goes to the queue's `report`, or to the `Log`'s `stderr` for a queue it built.
+- **Name the span of a `Log` with an OTLP queue before 3.0.0 throws without `spanName`.** The `Log` warns once now. It fires on a `Log` given `otlpQueue`, and on a child or clone of one with `otlpHttpBaseURI` or `otlpQueue`.
 - **Move `colors`, `format`, `printTraceInfo` and `stdout` to `consoleTransport`, and the `otlp*`
   options to `otlpTransport`, before 3.0.0 removes them.** They work as before on a `Log` with no
   `transports`, and write no warning. `otlpHttpBaseURI`, `otlpAdditionalHeaders` and `otlpProtocol`
@@ -30,8 +31,7 @@ it lacks. Nothing here needs a change in your code now, except that a `Queue` gi
   `enqueue` receives, gains a third payload holding `resourceMetrics`. A queue that forwards
   payloads can pass it on unchanged; one that branches on the payload needs a `default` branch. See
   README → Queue exports.
-- **A `Log` warns once when its text output will lose colour in 3.0.0.** It fires on a `Log` that writes text with `colors` unset, where neither `NO_COLOR` nor `FORCE_COLOR` is set and stdout is no TTY or there is none, as in a browser. To decide now, pass `transports` with `consoleTransport({ colors })`, or set `NO_COLOR` or `FORCE_COLOR`.
-- **A `Log` with an OTLP queue and no `spanName` warns once.** 3.0.0 throws there, so name the span now. It fires on a `Log` given `otlpQueue`, and on a child or clone of one with `otlpHttpBaseURI` or `otlpQueue`.
+- **Choose your text colour before 3.0.0 turns it off.** A `Log` warns once when it writes text with `colors` unset, where neither `NO_COLOR` nor `FORCE_COLOR` is set and stdout is no TTY or there is none, as in a browser. To decide now, pass `transports` with `consoleTransport({ colors })`, or set `NO_COLOR` or `FORCE_COLOR`.
 
 ### Everything else
 
@@ -61,7 +61,6 @@ it lacks. Nothing here needs a change in your code now, except that a `Queue` gi
 - **A query value opening a url nested past eight levels records `REDACTED` even where the runtime
   cannot parse it.** A key there, and a value the runtime parses, already did, so the change only
   redacts more: `https://[` nested nine urls deep was exported as written.
-- **A `Queue` option that is zero, negative or `NaN` now warns once and uses the default.** `batchDelayMs`, `maxBatchBytes`, `maxItems` and `retryDelayMs` are checked. A `batchDelayMs` or `retryDelayMs` of `0`, which sent or retried at once, now waits 1000 ms. The warning goes to the queue's `report`, or to the `Log`'s `stderr` for a queue it built.
 - **`log.fetch` leaves a `Request` object untraced and passes it to the platform whole.** Before, a browser recorded a span for a url made of the page's address and `[object Request]`. Pass a `string` or a `URL` to have the call traced.
 - **Hand a `Log` the `fetch` it sends through, with the new `fetch` option.** `log.fetch` and the queue built from `otlpHttpBaseURI` send with it, and a child and a clone inherit it. A `Log` handed none still sends through the global `fetch`, read at each call, so a polyfill installed later still wins. See README → Options.
 - **A `clock` that throws while the queue restores its saved payloads no longer fails the queue's flushes.** The queue reports "OTLP queue restore failed, what it restored is kept" through `report` and goes on, instead of leaving an unhandled rejection and failing every flush.
