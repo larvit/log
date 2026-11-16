@@ -1,5 +1,5 @@
-// Builds the package: the declaration files under types/ and the bundled index.js and otel.js, each
-// with its source map. Run it as `npm run build`, whose PATH holds tsc.
+// Builds the package: the declaration files under types/, and index.js and otel.js, each bundled
+// with a source map. Run it as `npm run build`, which puts tsc on the PATH.
 import { execFileSync } from "node:child_process";
 import { rmSync } from "node:fs";
 

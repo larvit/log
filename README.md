@@ -766,15 +766,15 @@ Instance fields: `log.conf`, `log.context`, `log.span`, `log.sampled`, `log.ende
 ## Development
 
 Everything runs in Docker with dependencies installed in the container, so no local `npm install`.
-The exceptions: `npm run lint` needs Node 20+ and `npm ci` on the host, and `npm run test-otlp`
-needs Node 18+ on the host.
+The exceptions: `npm run lint` needs Node 20+ and `npm ci` on the host, and `npm run test-browser`
+and `npm run test-otlp` need Node 18+ on the host.
 
 | Command | |
 |---|---|
 | `npm test` | Node and browser suites. |
 | `npm run test-docker` | Node suite, on the image the `Dockerfile` pins. `NODE_IMAGE=node:18.20.8-bookworm-slim npm run test-docker` picks another; CI runs 18 to 26. |
 | `npm run test-browser` | The same suite in Chromium, less the OpenTelemetry adapter's tests. |
-| `npm run test-otlp` | Export to a real OpenTelemetry Collector, JSON and protobuf. `OTLP_DEBUG=1` prints what it received; `OTLP_PORT`, `OTLP_IMAGE` and `OTLP_CONTAINER` set the host port (4318), the collector image and the container name (`larvit-log-otlp-verify`), so two runs can share a machine. |
+| `npm run test-otlp` | Export to a real OpenTelemetry Collector, JSON and protobuf. `OTLP_DEBUG=1` prints what it received. `OTLP_CONTAINER` (`larvit-log-otlp-verify`), `OTLP_IMAGE` and `OTLP_PORT` (4318) set the container name, the collector image and the host port: a run in another checkout sets a container name and a port of its own. |
 | `npm run test-mutation` | Stryker mutation tests of the library, against the Node suite. `npm run test-mutation -- --mutate credentials/path.ts:30-50` mutates only those lines. |
 | `npm run lint` | eslint. |
 | `npm run lint-fix` | eslint, fixing what it can, such as import order. |
