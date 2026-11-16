@@ -45,7 +45,6 @@ const server = createServer(async (req, res) => {
 await new Promise(ready => server.listen(0, "127.0.0.1", ready));
 const { port } = server.address();
 
-// Each engine runs the whole suite; the run fails when any engine fails or does not finish.
 async function runSuite(engine) {
 	const browser = await engine.launch();
 	const page = await browser.newPage();
@@ -64,13 +63,14 @@ async function runSuite(engine) {
 
 		return await page.evaluate(() => globalThis.__tap);
 	} catch (err) {
-		console.error("Browser run failed:", err?.message ?? err);
+		console.error(`${engine.name()} run failed:`, err?.message ?? err);
 		pageErrors.forEach(pageError => console.error(pageError.stack ?? pageError.message));
 	} finally {
 		await browser.close();
 	}
 }
 
+// Each engine runs the whole suite; the run fails when any engine fails or does not finish.
 let failed = false;
 
 for (const engine of [chromium, firefox, webkit]) {
