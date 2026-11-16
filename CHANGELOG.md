@@ -64,6 +64,7 @@ it lacks. Only `### Action needed` asks for a change in your code, now or before
 - **`log.fetch` leaves a `Request` object untraced and passes it to the platform whole.** Before, a browser recorded a span for a url made of the page's address and `[object Request]`. Pass a `string` or a `URL` to have the call traced.
 - **Hand a `Log` the `fetch` it sends through, with the new `fetch` option.** `log.fetch` and the queue built from `otlpHttpBaseURI` send with it, and a child and a clone inherit it. A `Log` handed none still sends through the global `fetch`, read at each call, so a polyfill installed later still wins. See README → Options.
 - **A `clock` that throws while the queue restores its saved payloads no longer fails the queue's flushes.** The queue reports "OTLP queue restore failed, what it restored is kept" through `report` and goes on, instead of leaving an unhandled rejection and failing every flush.
+- **CI runs the browser suite in Firefox and WebKit as well as Chromium.** README → Runtimes now says so; no library code changed.
 
 ## v2.6.1
 
