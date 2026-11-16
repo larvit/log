@@ -112,8 +112,8 @@ export class StoredQueue {
 			try {
 				restore(stored.payloads);
 			} catch (err) {
-				// The storage was read, so writes go on. What `restore` did before it threw stays.
-				this.report("OTLP queue restore failed", withoutUndefined({ error: stringField(err, "message"), key }));
+				// The storage was read, so writes go on. The payloads `restore` queued before it threw stay queued.
+				this.report("OTLP queue restore failed, what it restored is kept", withoutUndefined({ error: stringField(err, "message"), key }));
 			}
 
 			return true;
