@@ -59,6 +59,7 @@ it lacks. Nothing here needs a change in your code, except that a `Queue` given 
 - **`log.fetch` leaves a `Request` object untraced and passes it to the platform whole.** Before, a browser recorded a span for a url made of the page's address and `[object Request]`. Pass a `string` or a `URL` to have the call traced.
 - **Hand a `Log` the `fetch` it sends through, with the new `fetch` option.** `log.fetch` and the queue built from `otlpHttpBaseURI` send with it, and a child and a clone inherit it. A `Log` handed none still sends through the global `fetch`, read at each call, so a polyfill installed later still wins. See README → Options.
 - **A `Log` with an OTLP queue and no `spanName` warns once.** 3.0.0 throws there, so name the span now. It fires on a `Log` given `otlpQueue`, and on a child or clone of one with `otlpHttpBaseURI` or `otlpQueue`.
+- **Keep a queue reading its storage when `restore` throws.** A `clock` whose `setTimeout` throws while the queue restores saved payloads now reports "OTLP queue restore failed" through `report`, instead of leaving an unhandled rejection and failing every flush.
 
 ## v2.6.1
 

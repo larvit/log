@@ -732,3 +732,17 @@ Read most (opens and searches):
 - `log/log.ts` 4
 
 ## Reading cost reset, 2026-11-16T00:34:49Z
+
+## Reading cost, chunk 89373cb89718, finished 2026-11-16T00:40:48Z
+
+54368 new input tokens before the first commit.
+
+Read most (opens and searches):
+
+- `README.md` 4
+- `AGENTS.md` 2
+- `docs/decisions.md` 1
+- `docs/reading-cost.md` 1
+- `package.json` 1
+- `release-tooling/test-in-docker.py` 1
+- `todo.md` 1
