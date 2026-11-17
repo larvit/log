@@ -93,6 +93,20 @@ The maintainer chose, on 2026-11-15: give `TransportSpan` a consumer's shape in 
 
 `Log.end` hands every transport the `Log`'s own `this.span` object, and `log/log.ts` → `Log`'s entry hand-off gives every transport one `entry` object, so a transport that writes to either changes what the next one gets. README → Transports only asks a transport to copy before changing. Hand each transport its own copy of both. The implementing agent chose a copy over a frozen object, since a frozen one fails at runtime in a transport that writes to it; the maintainer was told and did not object.
 
+Touches:
+
+- `tracing/spans.ts`: `TransportSpan`, `exportSpan`, `spanEnd`
+- `log/log.ts`: `Log.log`, `Log.end`
+- `log/queue-transport.ts`: `queueTransport`
+- `otlp/payloads.ts`: `buildSpanPayload`
+- `log/transport.ts`: `TransportEntry` (small)
+- `opentelemetry-adapter/recorded-span.ts`: `RecordedSpan.end` (small)
+- `tracing/fetch.ts`: `tracedFetch` (small)
+- `README.md`: `## Transports`, `### Write your own`, `## Exports` (small)
+- `tests/transports.test.ts`
+- `tests/otel-adapter.test.ts`
+- `tests/test-doubles.ts` (small)
+
 ### 164. Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.
 
 The latest run, at 4f96af8 on 2026-11-15 (PR #391), scored Navigation 7.38, Locality 5.88, Shape
