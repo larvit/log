@@ -30,7 +30,7 @@
     "eslint": "10.14.0",
     "eslint-plugin-perfectionist": "5.13.0",
     "globals": "17.14.0",
-    "playwright": "1.65.0",
+    "playwright": "1.65.1",
     "typescript": "6.0.3",
     "uglify-js": "3.19.3"
   },
