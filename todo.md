@@ -105,7 +105,7 @@ Touches:
 - `README.md`: `## Transports`, `### Write your own`, `## Exports` (small)
 - `tests/transports.test.ts`
 - `tests/otel-adapter.test.ts`
-- `tests/test-doubles.ts` (small)
+- `tests/test-doubles.ts`
 
 ### 164. Reach the comprehension floor: score the project against 7.0, and while any score is under it, file items lifting the lowest dimension, with this item's successor.
 
